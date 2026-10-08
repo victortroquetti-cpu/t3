@@ -189,8 +189,8 @@ check(same_image(image('layout').crop(casa), img['base'].crop(casa)), 'layout: m
 again = {k[1]: v for k, v in lay.items() if k[0] == 1}
 check(again == {k[1]: v for k, v in lay.items() if k[0] == 0}, 'layout: depois de recarregar os retangulos sao os mesmos')
 
-# Cara do kit (versao Layout): cabecalho do kit no lugar da barra de titulo, X, rodape, linhas so em cima e embaixo,
-# interruptor e slider do kit. As medidas sao as do kit vezes a escala da tela.
+# Cara do kit (versao Layout): cabecalho do kit no lugar da barra de titulo, X, so a linha do cabecalho (sem rodape),
+# botao, interruptor e slider do kit. As medidas sao as do kit vezes a escala da tela.
 kit = image('layout')
 bg = kit.getpixel((240, 530))  # fundo da janela padronizada
 
@@ -208,9 +208,8 @@ check(lay[(0, 'Painel A|texto')][1] >= hy, 'kit: o conteudo comeca embaixo do ca
 check(brighter(kit.getpixel((240, int(hy - 0.5))), bg, 5), 'kit: linha embaixo do cabecalho')
 xbox = [kit.getpixel((x, y)) for x in range(418, 430) for y in range(48, 60)]
 check(max(max(p) for p in xbox) > 100, 'kit: X no cabecalho, a direita (18 da borda)')
-fy = 40 + 520 - 36 * u
-check(brighter(kit.getpixel((240, int(fy) + 1)), bg, 4) and sum(kit.getpixel((240, int(fy) + 10))) < sum(bg),
-      'kit: rodape do kit (linha em cima e faixa mais escura, 36 x escala)')
+check(all(kit.getpixel((240, y)) == bg for y in range(500, 555)),
+      'kit: sem a faixa do rodape (o fundo da janela vai ate embaixo, sem linha)')
 
 
 def gap(img, r):
@@ -219,7 +218,7 @@ def gap(img, r):
     return [img.getpixel((240, y)) for y in range(int(top) + 1, int(bottom))]
 
 
-check(all(sum(p) <= sum(bg) + 6 for p in gap(kit, lay)), 'kit: sem linha separadora no meio (so a do cabecalho e a do rodape)')
+check(all(sum(p) <= sum(bg) + 6 for p in gap(kit, lay)), 'kit: sem linha separadora no meio (so a do cabecalho)')
 check(any(sum(p) >= sum(bg) + 30 for p in gap(img['completo'], completo)), 'versao normal: a linha separadora do mod continua')
 
 
@@ -237,6 +236,24 @@ nx0, ny0, nx1, ny1 = completo[(0, 'Painel A|slider')]
 check(min(kit.getpixel((int(sx0) + 6, int((sy0 + sy1) / 2)))) > 200 and
       max(img['completo'].getpixel((int(nx0) + 6, int((ny0 + ny1) / 2)))) < 60,
       'kit: slider virou a trilha fina do kit (a parte preenchida e clara; no ImGui e o fundo do campo)')
+
+
+
+def text_height(img, r):
+    """Altura do texto (pixels claros) dentro de um botao, fora do contorno."""
+    x0, y0, x1, y1 = (int(v) for v in r)
+    ys = [y for y in range(y0 + 2, y1 - 1) for x in range(x0 + 2, x1 - 2) if min(img.getpixel((x, y))) > 120]
+    return max(ys) - min(ys) + 1 if ys else 0
+
+
+sv = lay[(0, 'Painel A|salvar')]
+check(abs((sv[3] - sv[1]) - 24 * u) < 0.1, f'kit: botao com a altura do kit ({sv[3] - sv[1]:.2f} px = 24 x escala)')
+kit_text, normal_text = text_height(kit, sv), text_height(img['completo'], completo[(0, 'Painel A|salvar')])
+check(0 < kit_text < 0.85 * normal_text,
+      f'kit: texto do botao na fonte pequena do kit ({kit_text} px de altura; no botao do ImGui, {normal_text})')
+bx0, by0, bx1, by1 = lay[(0, 'Painel B|botao_vermelho')]
+r_, g_, b_ = kit.getpixel((int(bx0) + 4, int((by0 + by1) / 2)))
+check(r_ > 150 and g_ < 80 and b_ < 80, 'kit: botao vermelho do script continua vermelho')
 
 # Kit com mouse e teclado (cenario cliques): o interruptor e o slider mudam os valores do mod, o X e o Esc fecham.
 # Esc: primeiro a lista aberta, depois a janela; nunca com o chat do SA-MP aberto; nunca o menu de outro script
@@ -262,6 +279,7 @@ common = [
     ('interruptor check=0 volume=65 aberto=1', 'clique no interruptor desliga a opcao do mod'),
     ('slider_apertado check=0 volume=0 aberto=1', 'apertar na ponta esquerda do slider leva ao minimo'),
     ('slider_solto check=0 volume=100 aberto=1', 'arrastar ate a ponta direita leva ao maximo'),
+    ('botao salvo=1', 'o clique no botao chega ao mod'),
     ('esc_outro_script jogo', 'Esc depois de mexer na janela sem X: nao fecha o menu de outro script'),
     ('esc_outro_script painel_b check=1 volume=65 aberto=1', 'o Painel B (de outro script, ainda em foco no ImGui dele) continua aberto'),
 ]

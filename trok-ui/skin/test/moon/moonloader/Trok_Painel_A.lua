@@ -20,6 +20,7 @@ colors[clr.Button] = ImVec4(0.26, 0.59, 0.98, 0.4)
 colors[clr.Border] = ImVec4(0, 0, 0, 0.3)
 
 HOST_VALUES = function() return teste.values(s, open) end
+HOST_SAVED = function() return 'salvo=' .. s.saved end
 
 function imgui.OnDrawFrame()
     -- Segunda janela do script, sem botao de fechar (o Esc nao fecha janela sem X).

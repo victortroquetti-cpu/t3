@@ -34,6 +34,7 @@
 #include <cstring>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "MinHook.h"
@@ -168,6 +169,7 @@ typedef void(__cdecl* NewFrameFn)();
 typedef bool(__cdecl* BeginFn)(const char*, bool*, ImGuiWindowFlags);
 typedef void(__cdecl* EndFn)();
 typedef bool(__cdecl* CheckboxFn)(const char*, bool*);
+typedef bool(__cdecl* ButtonFn)(const char*, const ImVec2);
 typedef bool(__cdecl* SliderFloatFn)(const char*, float*, float, float, const char*, float);
 typedef bool(__cdecl* SliderIntFn)(const char*, int*, int, int, const char*);
 typedef bool(__cdecl* ComboItemsGetter)(void*, int, const char**);
@@ -201,6 +203,7 @@ NewFrameFn o_igNewFrame = nullptr;
 BeginFn o_igBegin = nullptr;
 EndFn o_igEnd = nullptr;
 CheckboxFn o_igCheckbox = nullptr;
+ButtonFn o_igButton = nullptr;
 SliderFloatFn o_igSliderFloat = nullptr;
 SliderIntFn o_igSliderInt = nullptr;
 ComboFn o_igCombo = nullptr;
@@ -405,6 +408,7 @@ struct Script {
     bool untouched = false;                              // mod da casa ou em manter_scripts=
     float sizeFactor = 0.0f; // layout=1: tamanho de texto da casa / primeira fonte do atlas (0 = ainda nao carregou)
     ImFont* titleFont = nullptr; // layout=1: fonte da casa no tamanho de titulo do kit (cabecalho das janelas)
+    ImFont* descFont = nullptr;  // layout=1: fonte da casa no tamanho pequeno do kit (texto dos botoes)
     std::vector<std::pair<std::string, std::string>> windows; // titulo -> o que a skin fez (para o log)
     // Esc do kit (layout=1): a janela com X que estava em foco no ultimo quadro, a que o Esc mandou fechar (no
     // proximo Begin dela) e se o Esc foi engolido ate soltar (as repeticoes tambem nao vao para o jogo). Com um
@@ -421,6 +425,7 @@ struct Script {
     // nem ve, entao dois menus podem estar "em foco" ao mesmo tempo: o Esc vai so para o mais recente.
     unsigned escStamp = 0;
     DWORD escLiveSeen = 0;
+    std::unordered_set<ImGuiID> litButtons; // layout=1: botoes com o mouse em cima no ultimo quadro (cor do kit)
 };
 std::unordered_map<ImGuiContext*, Script> g_scripts;
 std::unordered_map<std::string, Script> g_moonScripts; // imgui antigo: por arquivo do script (sobrevive ao Ctrl+R)
@@ -751,6 +756,13 @@ struct KitApi {
     bool(__cdecl* IsAnyItemActive)();
     bool(__cdecl* IsPopupOpen)(const char*);
     bool(__cdecl* IsWindowAppearing)();
+    void(__cdecl* PushFont)(ImFont*);
+    void(__cdecl* PopFont)();
+    void(__cdecl* PushStyleColorU32)(ImGuiCol, ImU32);
+    void(__cdecl* PopStyleColor)(int);
+    void(__cdecl* PushStyleVarVec2)(ImGuiStyleVar, const ImVec2);
+    void(__cdecl* PopStyleVar)(int);
+    ImGuiID(__cdecl* GetID)(const char*);
     bool(__cdecl* IsMouseClicked)(int, bool);
     bool(__cdecl* IsMouseHoveringRect)(const ImVec2, const ImVec2, bool);
     ImDrawList*(__cdecl* GetWindowDrawList)();
@@ -774,16 +786,13 @@ struct KitApi {
     void(__cdecl* GetItemRectMax)(ImVec2*);
     void(__cdecl* PushClipRect)(const ImVec2, const ImVec2, bool);
     void(__cdecl* PopClipRect)();
-    void(__cdecl* Dummy)(const ImVec2);
-    void(__cdecl* DrawListPushClipRect)(ImDrawList*, const ImVec2, const ImVec2, bool);
-    void(__cdecl* DrawListPopClipRect)(ImDrawList*);
 };
 KitApi k = {};
 volatile bool g_kit = false;    // layout=1 e as funcoes acima resolvidas
 volatile bool g_kitEsc = false; // Esc fecha a janela do kit em foco (ImGui_ImplWin32_WndProcHandler desviado)
 std::vector<char> g_kitWindows; // pilha de Begin/End do script atual: KIT_* da janela
 constexpr char KIT_WINDOW = 1;  // janela padronizada: os controles dela sao os do kit
-constexpr char KIT_SHELL = 2;   // ganhou cabecalho e rodape do kit (e o recorte do conteudo entre os dois)
+constexpr char KIT_SHELL = 2;   // ganhou o cabecalho do kit (e o recorte do conteudo embaixo dele)
 
 ImU32 Rgba(int r, int g, int b, int a) {
     return static_cast<ImU32>(a) << 24 | static_cast<ImU32>(b) << 16 | static_cast<ImU32>(g) << 8 | static_cast<ImU32>(r);
@@ -807,18 +816,10 @@ float KitScale() {
     return Scale(p_igGetIO()->DisplaySize.y);
 }
 
-// Medidas da casca do kit (as do Trok UI): cabecalho de 44 e faixa do rodape de 36, vezes a escala.
-float KitHeaderH() {
-    return 44 * KitScale();
-}
-
-float KitFooterH() {
-    return 36 * KitScale();
-}
-
-// Cabecalho do kit: titulo centralizado na fonte de titulo, X (se a janela tem botao de fechar) e a linha embaixo.
-// O X nao e um item do ImGui (so desenho e clique): nao mexe no tamanho das janelas que se ajustam ao conteudo. O
-// conteudo fica recortado entre o cabecalho e o rodape (KitFooter tira o recorte).
+// Cabecalho do kit (44 x escala): titulo centralizado na fonte de titulo, X (se a janela tem botao de fechar) e a
+// linha embaixo, a unica linha da janela. O X nao e um item do ImGui (so desenho e clique): nao mexe no tamanho das
+// janelas que se ajustam ao conteudo. O conteudo que rola fica recortado embaixo do cabecalho (o End tira o
+// recorte). Sem rodape: nos menus da casa ele e a faixa das dicas de tecla, e menu de outro mod nao tem dicas.
 void KitShell(const char* name, bool* open) {
     ImGuiStyle* style = p_igGetStyle();
     float u = KitScale();
@@ -875,27 +876,7 @@ void KitShell(const char* name, bool* open) {
     }
     // O conteudo comeca embaixo do cabecalho (posicao local: acompanha a rolagem da janela).
     k.SetCursorPos(ImVec2(style->WindowPadding.x, headerH + style->WindowPadding.y * 0.75f));
-    k.PushClipRect(ImVec2(pos.x, pos.y + headerH), ImVec2(pos.x + size.x, pos.y + size.y - KitFooterH()), true);
-}
-
-// Rodape do kit: so a faixa escura com a linha em cima, de borda a borda (no kit, as unicas linhas da janela sao
-// a de baixo do cabecalho e esta). Reserva a altura dela no fim do conteudo: janela que se ajusta ao conteudo cresce,
-// a de tamanho fixo ganha rolagem em vez de esconder o fim embaixo da faixa.
-void KitFooter() {
-    ImGuiStyle* style = p_igGetStyle();
-    float u = KitScale(), footerH = KitFooterH();
-    k.PopClipRect();
-    k.Dummy(ImVec2(0.0f, std::max(0.0f, footerH + 12 * u - style->ItemSpacing.y - style->WindowPadding.y)));
-    ImVec2 pos, size;
-    k.GetWindowPos(&pos);
-    k.GetWindowSize(&size);
-    ImDrawList* dl = k.GetWindowDrawList();
-    float y = pos.y + size.y - footerH;
-    k.DrawListPushClipRect(dl, pos, ImVec2(pos.x + size.x, pos.y + size.y), false);
-    k.AddRectFilled(dl, ImVec2(pos.x + 1, y), ImVec2(pos.x + size.x - 1, pos.y + size.y - 1), Rgba(0, 0, 0, 46),
-                    style->WindowRounding, ImDrawCornerFlags_Bot);
-    k.AddLine(dl, ImVec2(pos.x + 1, y + 0.5f), ImVec2(pos.x + size.x - 1, y + 0.5f), Rgba(255, 255, 255, 10), 1.0f);
-    k.DrawListPopClipRect(dl);
+    k.PushClipRect(ImVec2(pos.x, pos.y + headerH), ImVec2(pos.x + size.x, pos.y + size.y), true);
 }
 
 // Interruptor do kit no lugar da caixa de marcar: mesmo id e mesmo retorno (true quando o valor muda).
@@ -934,6 +915,68 @@ bool __cdecl HookCheckbox(const char* label, bool* v) {
     if (end > label) {
         k.AddText(dl, ImVec2(pos.x + tw + style->ItemInnerSpacing.x, std::floor(pos.y + (fh - ls.y) * 0.5f)),
                   k.GetColorU32(ImGuiCol_Text, 1.0f), label, end);
+    }
+    return pressed;
+}
+
+// Botao do kit: texto na fonte pequena da casa (13,5 x escala), 24 de altura e 14 de folga de cada lado; fundo
+// branco a 8% com contorno a 22% (16% e 40% com o mouse em cima) e texto 200 (240 com o mouse em cima). E o botao do
+// proprio ImGui, com essas medidas e cores empurradas so durante a chamada: mesmo id, mesmo retorno, repeticao
+// (PushButtonRepeat) e alinhamento da linha como antes. Tamanho que o mod deu fica (a folga encolhe para o texto
+// caber); cor que o mod pos no botao ou no texto (vermelho de apagar, destaque da opcao escolhida) fica, e no botao
+// colorido pelo mod o texto fica no branco da casa.
+bool __cdecl HookButton(const char* label, const ImVec2 size) {
+    if (!KitActive() || !label) {
+        return o_igButton(label, size);
+    }
+    ImGuiStyle* style = p_igGetStyle();
+    Script& script = ScriptOf(p_igGetCurrentContext());
+    float u = KitScale();
+    ImFont* font = script.descFont;
+    float fontSize = font ? font->FontSize : k.GetFontSize();
+    const char* end = VisibleEnd(label);
+    ImVec2 ts(0, 0);
+    if (end > label) {
+        o_CalcTextSizeA(&ts, font ? font : k.GetFont(), fontSize, FLT_MAX, 0.0f, label, end, nullptr);
+    }
+    float padX = 14 * u, padY = std::max(0.0f, (24 * u - fontSize) * 0.5f);
+    if (size.x > 0) {
+        padX = std::min(padX, std::max(0.0f, (size.x - ts.x) * 0.5f));
+    }
+    if (size.y > 0) {
+        padY = std::min(padY, std::max(0.0f, (size.y - fontSize) * 0.5f));
+    }
+    ImGuiID id = k.GetID(label);
+    bool lit = script.litButtons.count(id) > 0;
+    int colors = 0;
+    bool kitColors = Same(style->Colors[ImGuiCol_Button], g_house[ImGuiCol_Button]);
+    if (kitColors) {
+        k.PushStyleColorU32(ImGuiCol_Button, Rgba(255, 255, 255, 8));
+        k.PushStyleColorU32(ImGuiCol_ButtonHovered, Rgba(255, 255, 255, 16));
+        k.PushStyleColorU32(ImGuiCol_ButtonActive, Rgba(255, 255, 255, 16));
+        colors += 3;
+    }
+    if (kitColors && Same(style->Colors[ImGuiCol_Text], g_house[ImGuiCol_Text])) {
+        k.PushStyleColorU32(ImGuiCol_Text, Gray(lit ? 240 : 200));
+        ++colors;
+    }
+    k.PushStyleColorU32(ImGuiCol_Border, Rgba(255, 255, 255, lit ? 40 : 22));
+    ++colors;
+    if (font) {
+        k.PushFont(font);
+    }
+    k.PushStyleVarVec2(ImGuiStyleVar_FramePadding, ImVec2(padX, padY));
+    bool pressed = o_igButton(label, size);
+    bool hovered = k.IsItemHovered(0) || k.IsItemActive();
+    k.PopStyleVar(1);
+    if (font) {
+        k.PopFont();
+    }
+    k.PopStyleColor(colors);
+    if (hovered) {
+        script.litButtons.insert(id);
+    } else {
+        script.litButtons.erase(id);
     }
     return pressed;
 }
@@ -1359,7 +1402,7 @@ void __cdecl HookEnd() {
         g_kitWindows.pop_back();
     }
     if (kit & KIT_SHELL) {
-        KitFooter();
+        k.PopClipRect(); // o recorte do cabecalho
     }
     o_igEnd();
 }
@@ -1589,11 +1632,16 @@ ImFont* __cdecl HookAddFontFromFileTTF(ImFontAtlas* atlas, const char* filename,
     o_AddFontFromFileTTF(atlas, filename, houseSize, &fallback, ranges);
     g_replaced[font] = Replaced{atlas, ratio};
     if (g_kit && !script.titleFont) {
-        // Fonte de titulo do kit (20 x escala) para o cabecalho das janelas, com a mesma reserva de glifos.
-        float titleSize = 20.0f * Scale(ScreenHeight());
-        script.titleFont = o_AddFontFromFileTTF(atlas, g_housePath, titleSize, &base, ranges);
+        // Fontes do kit, com a mesma reserva de glifos: a de titulo (20 x escala) para o cabecalho das janelas e a
+        // pequena (13,5 x escala) para o texto dos botoes.
+        float scale = Scale(ScreenHeight());
+        script.titleFont = o_AddFontFromFileTTF(atlas, g_housePath, 20.0f * scale, &base, ranges);
         if (script.titleFont) {
-            o_AddFontFromFileTTF(atlas, filename, titleSize, &fallback, ranges);
+            o_AddFontFromFileTTF(atlas, filename, 20.0f * scale, &fallback, ranges);
+        }
+        script.descFont = o_AddFontFromFileTTF(atlas, g_housePath, 13.5f * scale, &base, ranges);
+        if (script.descFont) {
+            o_AddFontFromFileTTF(atlas, filename, 13.5f * scale, &fallback, ranges);
         }
     }
     Log("fonte %s %.1f px de %s -> fonte da casa %.1f px (%s)", filename, size, owner.c_str(), houseSize,
@@ -1646,6 +1694,7 @@ void ResetLayoutFactor(ImFontAtlas* atlas) {
     if (found != g_scripts.end() && p_igGetIO()->Fonts == atlas) {
         found->second.sizeFactor = 0.0f;
         found->second.titleFont = nullptr;
+        found->second.descFont = nullptr;
     }
 }
 
@@ -2012,7 +2061,11 @@ void InstallKit(HMODULE dll) {
               Resolve(dll, "igIsItemActive", k.IsItemActive) && Resolve(dll, "igIsWindowHovered", k.IsWindowHovered) &&
               Resolve(dll, "igIsWindowFocused", k.IsWindowFocused) &&
               Resolve(dll, "igIsAnyItemActive", k.IsAnyItemActive) && Resolve(dll, "igIsPopupOpen", k.IsPopupOpen) &&
-              Resolve(dll, "igIsWindowAppearing", k.IsWindowAppearing) &&
+              Resolve(dll, "igIsWindowAppearing", k.IsWindowAppearing) && Resolve(dll, "igPushFont", k.PushFont) &&
+              Resolve(dll, "igPopFont", k.PopFont) && Resolve(dll, "igPushStyleColorU32", k.PushStyleColorU32) &&
+              Resolve(dll, "igPopStyleColor", k.PopStyleColor) &&
+              Resolve(dll, "igPushStyleVarVec2", k.PushStyleVarVec2) && Resolve(dll, "igPopStyleVar", k.PopStyleVar) &&
+              Resolve(dll, "igGetIDStr", k.GetID) &&
               Resolve(dll, "igIsMouseClicked", k.IsMouseClicked) &&
               Resolve(dll, "igIsMouseHoveringRect", k.IsMouseHoveringRect) &&
               Resolve(dll, "igGetWindowDrawList", k.GetWindowDrawList) && Resolve(dll, "igGetFont", k.GetFont) &&
@@ -2029,13 +2082,12 @@ void InstallKit(HMODULE dll) {
               Resolve(dll, "ImDrawList_AddText", k.AddText) &&
               Resolve(dll, "igGetItemRectMin_nonUDT", k.GetItemRectMin) &&
               Resolve(dll, "igGetItemRectMax_nonUDT", k.GetItemRectMax) &&
-              Resolve(dll, "igPushClipRect", k.PushClipRect) && Resolve(dll, "igPopClipRect", k.PopClipRect) &&
-              Resolve(dll, "igDummy", k.Dummy) && Resolve(dll, "ImDrawList_PushClipRect", k.DrawListPushClipRect) &&
-              Resolve(dll, "ImDrawList_PopClipRect", k.DrawListPopClipRect);
+              Resolve(dll, "igPushClipRect", k.PushClipRect) && Resolve(dll, "igPopClipRect", k.PopClipRect);
     std::vector<void*> targets;
     if (ok) {
         ok = Hook(dll, "igEnd", reinterpret_cast<void*>(HookEnd), o_igEnd) &&
              Hook(dll, "igCheckbox", reinterpret_cast<void*>(HookCheckbox), o_igCheckbox) &&
+             Hook(dll, "igButton", reinterpret_cast<void*>(HookButton), o_igButton) &&
              Hook(dll, "igSliderFloat", reinterpret_cast<void*>(HookSliderFloat), o_igSliderFloat) &&
              Hook(dll, "igSliderInt", reinterpret_cast<void*>(HookSliderInt), o_igSliderInt) &&
              Hook(dll, "igCombo", reinterpret_cast<void*>(HookCombo), o_igCombo) &&
@@ -2044,8 +2096,8 @@ void InstallKit(HMODULE dll) {
              Hook(dll, "igCollapsingHeader", reinterpret_cast<void*>(HookCollapsingHeader), o_igCollapsingHeader) &&
              Hook(dll, "igCollapsingHeaderBoolPtr", reinterpret_cast<void*>(HookCollapsingHeaderBoolPtr),
                   o_igCollapsingHeaderBoolPtr);
-        for (const char* name : {"igEnd", "igCheckbox", "igSliderFloat", "igSliderInt", "igCombo", "igComboStr",
-                                 "igComboFnPtr", "igCollapsingHeader", "igCollapsingHeaderBoolPtr"}) {
+        for (const char* name : {"igEnd", "igCheckbox", "igButton", "igSliderFloat", "igSliderInt", "igCombo",
+                                 "igComboStr", "igComboFnPtr", "igCollapsingHeader", "igCollapsingHeaderBoolPtr"}) {
             if (void* t = reinterpret_cast<void*>(GetProcAddress(dll, name))) {
                 targets.push_back(t);
             }
@@ -2062,7 +2114,8 @@ void InstallKit(HMODULE dll) {
         return;
     }
     g_kit = true;
-    Log("kit do layout ligado no mimgui: cabecalho do kit, interruptor, slider, lista e cabecalho recolhivel da casa");
+    Log("kit do layout ligado no mimgui: cabecalho do kit, botao, interruptor, slider, lista e cabecalho recolhivel "
+        "da casa");
     // Esc fecha a janela em foco: opcional (sem ele, o kit segue e o Esc fica com o jogo, como antes).
     // Os popups (lista, menu de contexto) entram junto: com um aberto, o Esc fecha ele primeiro.
     struct Optional {
@@ -2499,7 +2552,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         char file[MAX_PATH] = {};
         GetModuleFileNameA(module, file, MAX_PATH);
         const char* base = strrchr(file, '\\') ? strrchr(file, '\\') + 1 : file;
-        Log("Trok Skin .asi v1.4.0 (%s)", base);
+        Log("Trok Skin .asi v1.4.1 (%s)", base);
         // Uma copia so por jogo: com o Trok Skin.asi e o Trok Skin Layout.asi juntos na pasta, a que carregar
         // depois fica desligada (as duas desviariam as mesmas funcoes).
         CreateMutexA(nullptr, FALSE, "TrokSkin.UmaCopia");

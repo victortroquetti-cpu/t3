@@ -6,7 +6,7 @@
 //   alternar  carrega tambem um samp.dll falso (0.3.7 R1) e, depois da primeira carga, digita /trokskin
 //             duas vezes, salvando a tela depois de cada uma (out_desligado.bmp e out_religado.bmp)
 //   cliques   carrega o samp.dll falso e, depois da primeira carga, usa mouse e teclado simulados: no "Painel A",
-//             clica no interruptor e arrasta o slider; clica no "Painel A2" e aperta Esc; abre a lista do Painel A
+//             clica no interruptor, arrasta o slider e clica no botao "Salvar"; clica no "Painel A2" e aperta Esc; abre a lista do Painel A
 //             e aperta Esc (fecha a lista) e de novo (com o chat do SA-MP aberto e fechado); clica fora e aperta
 //             Esc; clica no X do "Painel B". Grava os valores em out_cliques.txt e as telas out_lista.bmp (lista
 //             aberta), out_lista_fechada.bmp e out_cliques.bmp (no fim). Cliques e teclas passam pelo
@@ -156,8 +156,9 @@ struct Script {
     char nome[64] = "Victor_Trok";
     int modo = 1;
     bool open = true; // a janela some quando o X (ou o Esc) fecha
-    // Onde o interruptor, o slider e a lista ficaram no ultimo quadro.
-    ImVec2 checkMin, checkMax, sliderMin, sliderMax, comboMin, comboMax;
+    int saved = 0;    // cliques no botao "Salvar"
+    // Onde o botao, o interruptor, o slider e a lista ficaram no ultimo quadro.
+    ImVec2 saveMin, saveMax, checkMin, checkMax, sliderMin, sliderMax, comboMin, comboMax;
 };
 
 Api g;
@@ -220,8 +221,12 @@ void Init(Script& s, const char* systemFont) {
 void Widgets(Script& s) {
     g.Text("Configura\xc3\xa7\xc3\xb5\x65s do menu (%s)", s.name);
     Rect(s.name, "texto");
-    g.Button("Salvar", ImVec2(0, 0));
+    if (g.Button("Salvar", ImVec2(0, 0))) {
+        ++s.saved;
+    }
     Rect(s.name, "salvar");
+    g.GetItemRectMin(&s.saveMin);
+    g.GetItemRectMax(&s.saveMax);
     g.SameLine(0, -1);
     g.Button("Fechar", ImVec2(0, 0));
     Rect(s.name, "fechar");
@@ -470,6 +475,9 @@ void Clicks(Script* scripts, int count, HMODULE samp, const char* out) {
     MouseAt(scripts, count, a.sliderMax.x - 2, sy, true);
     MouseAt(scripts, count, a.sliderMax.x - 2, sy, false);
     values("slider_solto");
+    // Botao: o clique chega ao mod (o botao do kit e o do ImGui com outras medidas).
+    Click(scripts, count, (a.saveMin.x + a.saveMax.x) * 0.5f, (a.saveMin.y + a.saveMax.y) * 0.5f);
+    fprintf(f, "botao salvo=%d\n", a.saved);
     // Clique na janela sem X do mesmo script (o mais recente agora), com o Painel B ainda em foco no ImGui do script
     // dele (o clique no Painel A nunca chegou la): o Esc nao e de nenhum dos dois e vai para o jogo.
     Click(scripts, count, 240, 675);

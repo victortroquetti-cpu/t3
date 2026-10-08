@@ -56,7 +56,8 @@ function __host_message(msg, wparam, lparam)
     return consumed
 end
 
--- Valores do script (o que o teste confere depois dos cliques): o script define HOST_VALUES.
-function __host_values()
-    return HOST_VALUES and HOST_VALUES() or ''
+-- Valores do script (o que o teste confere depois dos cliques): o script define HOST_VALUES (ou outra HOST_*).
+function __host_values(which)
+    local fn = _G[which or 'HOST_VALUES']
+    return fn and fn() or ''
 end

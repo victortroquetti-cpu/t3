@@ -15,13 +15,13 @@ end
 
 function M.state()
     return {check = imgui.ImBool(true), volume = imgui.ImFloat(65), nome = imgui.ImBuffer('Victor_Trok', 64),
-            modo = imgui.ImInt(1)}
+            modo = imgui.ImInt(1), saved = 0}
 end
 
 function M.widgets(name, s)
     imgui.Text('Configura\195\167\195\181es do menu (' .. name .. ')')
     M.rect(name, 'texto')
-    imgui.Button('Salvar')
+    if imgui.Button('Salvar') then s.saved = s.saved + 1 end
     M.rect(name, 'salvar')
     imgui.SameLine()
     imgui.Button('Fechar')

@@ -207,13 +207,13 @@ local layoutOn = false      -- layout=1: espacamentos da casa tambem
 local theme = true          -- tema ligado neste quadro (/trokskin vale a partir do quadro seguinte)
 local dead = false
 local notes, noted = {}, 0
--- Kit (layout=1): cabecalho, rodape e controles desenhados como no Trok UI. kitWindows: pilha de Begin/End do
--- quadro (KIT_WINDOW: os controles da janela sao os do kit; KIT_SHELL: ela ganhou cabecalho e rodape); titleFont:
--- fonte de titulo do kit, criada junto com a primeira fonte trocada.
+-- Kit (layout=1): cabecalho e controles desenhados como no Trok UI. kitWindows: pilha de Begin/End do quadro
+-- (KIT_WINDOW: os controles da janela sao os do kit; KIT_SHELL: ela ganhou o cabecalho); titleFont e descFont: fontes
+-- de titulo e pequena do kit, criadas junto com a primeira fonte trocada.
 local kitOn = skin.spacing(1080) ~= nil
 local kitWindows, kitDepth, kitScale = {}, 0, nil
 local KIT_WINDOW, KIT_SHELL = 1, 2
-local titleFont = nil
+local titleFont, descFont = nil, nil
 -- Esc do kit: fecha o popup aberto (lista, menu de contexto) ou a janela com X que estava em foco no ultimo quadro
 -- (como o X), e o jogo nao recebe a tecla. escWindow/escPopup/escSeen: a janela em foco, a janela com popup aberto e
 -- quando; escClose/escPopupClose: o que o Esc mandou fechar (vale so para o quadro seguinte); escHeld: Esc engolido
@@ -426,17 +426,24 @@ local function patchFonts()
         end
         if not ok then skin.log('fonte de reserva nao entrou: ' .. tostring(err)) end
         if kitOn and titleFont == nil then
-            -- Fonte de titulo do kit (20 x escala) para o cabecalho das janelas, com a mesma reserva de glifos.
-            local titleSize = skin.titleSize()
-            fallback.MergeMode = false
-            if ranges ~= nil then titleFont = add(self, skin.housePath(), titleSize, cfg, ranges)
-            elseif cfg ~= nil then titleFont = add(self, skin.housePath(), titleSize, cfg)
-            else titleFont = add(self, skin.housePath(), titleSize) end
-            fallback.MergeMode = true
-            if titleFont then
-                if ranges ~= nil then pcall(add, self, fontPath, titleSize, fallback, ranges)
-                else pcall(add, self, fontPath, titleSize, fallback) end
+            -- Fontes do kit, com a mesma reserva de glifos: a de titulo (20 x escala) para o cabecalho das janelas e
+            -- a pequena (13,5 x escala) para o texto dos botoes.
+            local function kitFont(kitSize)
+                fallback.MergeMode = false
+                local kf
+                if ranges ~= nil then kf = add(self, skin.housePath(), kitSize, cfg, ranges)
+                elseif cfg ~= nil then kf = add(self, skin.housePath(), kitSize, cfg)
+                else kf = add(self, skin.housePath(), kitSize) end
+                fallback.MergeMode = true
+                if kf then
+                    if ranges ~= nil then pcall(add, self, fontPath, kitSize, fallback, ranges)
+                    else pcall(add, self, fontPath, kitSize, fallback) end
+                end
+                return kf
             end
+            local titleSize = skin.titleSize()
+            titleFont = kitFont(titleSize)
+            descFont = kitFont(titleSize * 13.5 / 20)
         end
         if cfg ~= nil then cfg.MergeMode = false end
         skin.log(string.format('fonte %s %.1f px de %s -> fonte da casa %.1f px (%s)', fontPath, size, file, houseSize,
@@ -483,7 +490,7 @@ local function patchFonts()
         if original then
             wrapped[name] = function(self, ...)
                 pcall(skin.resetFonts, file)
-                titleFont = nil
+                titleFont, descFont = nil, nil
                 return original(self, ...)
             end
         end
@@ -550,9 +557,10 @@ local function visibleLabel(label)
     return label:match('^(.-)##') or label
 end
 
--- Cabecalho do kit: titulo centralizado na fonte de titulo, X (se a janela tem botao de fechar) e a linha embaixo.
--- O X nao e um item do ImGui (so desenho e clique): nao mexe no tamanho das janelas que se ajustam ao conteudo. O
--- conteudo fica recortado entre o cabecalho e o rodape (kitFooter tira o recorte).
+-- Cabecalho do kit (44 x escala): titulo centralizado na fonte de titulo, X (se a janela tem botao de fechar) e a
+-- linha embaixo, a unica linha da janela. O X nao e um item do ImGui (so desenho e clique): nao mexe no tamanho das
+-- janelas que se ajustam ao conteudo. O conteudo que rola fica recortado embaixo do cabecalho (o End tira o
+-- recorte). Sem rodape: nos menus da casa ele e a faixa das dicas de tecla, e menu de outro mod nao tem dicas.
 local function kitShell(name, open)
     local u = kitU()
     local pos, size = imgui.GetWindowPos(), imgui.GetWindowSize()
@@ -598,25 +606,7 @@ local function kitShell(name, open)
     local style = styleRef()
     -- O conteudo comeca embaixo do cabecalho (posicao local: acompanha a rolagem da janela).
     imgui.SetCursorPos(V(style.WindowPadding.x, headerH + style.WindowPadding.y * 0.75))
-    imgui.PushClipRect(V(pos.x, pos.y + headerH), V(pos.x + size.x, pos.y + size.y - 36 * u), true)
-end
-
--- Rodape do kit: so a faixa escura com a linha em cima, de borda a borda (no kit, as unicas linhas da janela sao a
--- de baixo do cabecalho e esta). Reserva a altura dela no fim do conteudo: janela que se ajusta ao conteudo cresce,
--- a de tamanho fixo ganha rolagem em vez de esconder o fim embaixo da faixa.
-local function kitFooter()
-    local u = kitU()
-    local footerH = 36 * u
-    imgui.PopClipRect()
-    local style = styleRef()
-    imgui.Dummy(V(0, math.max(0, footerH + 12 * u - style.ItemSpacing.y - style.WindowPadding.y)))
-    local pos, size = imgui.GetWindowPos(), imgui.GetWindowSize()
-    local dl = imgui.GetWindowDrawList()
-    local y = pos.y + size.y - footerH
-    imgui.PushClipRect(pos, V(pos.x + size.x, pos.y + size.y), false)
-    dl:AddRectFilled(V(pos.x + 1, y), V(pos.x + size.x - 1, pos.y + size.y - 1), rgba(0, 0, 0, 46), style.WindowRounding, 12)
-    dl:AddLine(V(pos.x + 1, y + 0.5), V(pos.x + size.x - 1, y + 0.5), rgba(255, 255, 255, 10), 1)
-    imgui.PopClipRect()
+    imgui.PushClipRect(V(pos.x, pos.y + headerH), V(pos.x + size.x, pos.y + size.y), true)
 end
 
 local function frameHeight(style)
@@ -836,6 +826,84 @@ end
 
 local checkbox, sliderFloat, sliderInt = imgui.Checkbox, imgui.SliderFloat, imgui.SliderInt
 
+-- Botao do kit: texto na fonte pequena da casa (13,5 x escala), 24 de altura e 14 de folga de cada lado; fundo branco
+-- a 8% com contorno a 22% (16% e 40% com o mouse em cima) e texto 200 (240 com o mouse em cima). E o botao do proprio
+-- ImGui, com essas medidas e cores empurradas so durante a chamada: mesmo id, mesmo retorno e alinhamento da linha.
+-- Tamanho que o mod deu fica (a folga encolhe para o texto caber); cor que o mod pos no botao ou no texto fica, e no
+-- botao colorido pelo mod o texto fica no branco da casa. state guarda o que foi empurrado (um erro no meio
+-- desempilha so isso: push sem pop trava o 1.52).
+local BUTTON, BUTTON_HOVERED, BUTTON_ACTIVE, TEXT, BORDER, FRAME_PADDING = 23, 24, 25, 1, 6, 5
+local litButtons = {}
+
+local function isHouseColor(i)
+    local style, base = styleRef()
+    local c, k = style.Colors[i + base], i * 4
+    return math.abs(c.x - house[k - 3]) < 0.002 and math.abs(c.y - house[k - 2]) < 0.002 and
+           math.abs(c.z - house[k - 1]) < 0.002 and math.abs(c.w - house[k]) < 0.002
+end
+
+local function kitButtonPush(state, label, size)
+    local u = kitU()
+    state.key = (kitNames[kitDepth] or '') .. '\0' .. label
+    local lit = litButtons[state.key] == true
+    local kitColors = isHouseColor(BUTTON)
+    local kitText = kitColors and isHouseColor(TEXT)
+    if descFont then
+        imgui.PushFont(descFont)
+        state.font = true
+    end
+    local fs = imgui.GetFontSize()
+    local shown = visibleLabel(label)
+    local tw = shown ~= '' and imgui.CalcTextSize(shown).x or 0
+    local padX, padY = 14 * u, math.max(0, (24 * u - fs) * 0.5)
+    if type(size) == 'userdata' then
+        if size.x > 0 then padX = math.min(padX, math.max(0, (size.x - tw) * 0.5)) end
+        if size.y > 0 then padY = math.min(padY, math.max(0, (size.y - fs) * 0.5)) end
+    end
+    if kitColors then
+        for _, c in ipairs({{BUTTON, 8}, {BUTTON_HOVERED, 16}, {BUTTON_ACTIVE, 16}}) do
+            imgui.PushStyleColor(c[1], imgui.ImVec4(1, 1, 1, c[2] / 255))
+            state.colors = state.colors + 1
+        end
+    end
+    if kitText then
+        local g = (lit and 240 or 200) / 255
+        imgui.PushStyleColor(TEXT, imgui.ImVec4(g, g, g, 1))
+        state.colors = state.colors + 1
+    end
+    imgui.PushStyleColor(BORDER, imgui.ImVec4(1, 1, 1, (lit and 40 or 22) / 255))
+    state.colors = state.colors + 1
+    imgui.PushStyleVar(FRAME_PADDING, V(padX, padY))
+    state.vars = 1
+end
+
+local function kitButtonPop(state)
+    if state.vars > 0 then imgui.PopStyleVar(state.vars) end
+    if state.colors > 0 then imgui.PopStyleColor(state.colors) end
+    if state.font then imgui.PopFont() end
+end
+
+local button = imgui.Button
+if kitOn and button then
+    imgui.Button = function(...)
+        local label, size = ...
+        if not kitActive() or type(label) ~= 'string' then return button(...) end
+        local state = {font = false, colors = 0, vars = 0}
+        local okPush, err = pcall(kitButtonPush, state, label, size)
+        if not okPush then
+            kitButtonPop(state)
+            kitFail(err)
+            return button(...)
+        end
+        local ok, pressed, b = pcall(button, ...) -- os mesmos argumentos que o script passou
+        local hovered = ok and (imgui.IsItemHovered() or imgui.IsItemActive())
+        kitButtonPop(state)
+        if not ok then error(pressed, 2) end
+        litButtons[state.key] = hovered or nil
+        return pressed, b
+    end
+end
+
 if kitOn and checkbox then
     imgui.Checkbox = function(label, value, ...)
         if kitActive() and type(label) == 'string' and type(value) == 'userdata' then
@@ -1018,8 +1086,8 @@ imgui.End = function(...)
         kitDepth = kitDepth - 1
     end
     if kit >= KIT_SHELL then
-        -- O recorte empurrado no cabecalho sai aqui de qualquer jeito (pop sem push trava o 1.52).
-        local ok, err = pcall(kitFooter)
+        -- O recorte empurrado no cabecalho sai aqui de qualquer jeito (push sem pop trava o 1.52).
+        local ok, err = pcall(imgui.PopClipRect)
         if not ok then kitFail(err) end
     end
     return endWindow(...)

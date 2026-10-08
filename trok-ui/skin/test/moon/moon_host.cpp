@@ -9,7 +9,8 @@
 //             duas vezes, salvando a tela depois de cada uma (out_desligado.bmp e out_religado.bmp)
 //   cliques   carrega o samp.dll falso e, depois da primeira carga, usa mouse e teclado simulados (mensagens da
 //             janela, como o moonloader manda ao onWindowMessage de cada script: o script que segura uma mensagem
-//             esconde dos seguintes): no "Painel A", clica no interruptor e arrasta o slider; clica no "Painel A2"
+//             esconde dos seguintes): no "Painel A", clica no interruptor, arrasta o slider e clica no botao
+//             "Salvar"; clica no "Painel A2"
 //             e aperta Esc; abre a lista do Painel A e aperta Esc (fecha a lista) e de novo (com o chat do SA-MP
 //             aberto e fechado); clica fora e aperta Esc; clica no X do "Painel B". Grava os valores em
 //             out_cliques.txt e as telas out_lista.bmp (lista aberta), out_lista_fechada.bmp e out_cliques.bmp
@@ -94,8 +95,9 @@ void LoadLua() {
     Get(dll, "lua_toboolean", lua.toboolean);
 }
 
-// Onde o interruptor, o slider e a lista do "Painel A" ficaram no ultimo quadro (x0, y0, x1, y1), para os cliques.
-float g_check[4], g_slider[4], g_combo[4];
+// Onde o botao, o interruptor, o slider e a lista do "Painel A" ficaram no ultimo quadro (x0, y0, x1, y1), para os
+// cliques.
+float g_save[4], g_check[4], g_slider[4], g_combo[4];
 
 // host_rect(script, controle, x0, y0, x1, y1): retangulo de um controle, so no quadro gravado.
 int __cdecl HostRect(lua_State* L) {
@@ -107,10 +109,11 @@ int __cdecl HostRect(lua_State* L) {
     }
     float* r = nullptr;
     if (strcmp(script, "Painel A") == 0) {
-        r = strcmp(what, "checkbox") == 0 ? g_check
-            : strcmp(what, "slider") == 0 ? g_slider
-            : strcmp(what, "combo") == 0  ? g_combo
-                                          : nullptr;
+        r = strcmp(what, "salvar") == 0     ? g_save
+            : strcmp(what, "checkbox") == 0 ? g_check
+            : strcmp(what, "slider") == 0   ? g_slider
+            : strcmp(what, "combo") == 0    ? g_combo
+                                            : nullptr;
     }
     if (r) {
         for (int i = 0; i < 4; ++i) {
@@ -233,10 +236,13 @@ const char* Message(lua_State** states, UINT msg, WPARAM wParam, LPARAM lParam) 
     return "jogo";
 }
 
-// Valores de um script (HOST_VALUES dele).
-void Values(FILE* f, lua_State* L, const char* when) {
+// Valores de um script (HOST_VALUES dele, ou outra funcao HOST_* que ele definiu).
+void Values(FILE* f, lua_State* L, const char* when, const char* which = nullptr) {
     lua.getfield(L, LUA_GLOBALSINDEX, "__host_values");
-    Check(L, lua.pcall(L, 0, 1, 0), "__host_values");
+    if (which) {
+        lua.pushstring(L, which);
+    }
+    Check(L, lua.pcall(L, which ? 1 : 0, 1, 0), "__host_values");
     fprintf(f, "%s %s\n", when, lua.tolstring(L, -1, nullptr));
     lua.settop(L, 0);
 }
@@ -282,6 +288,9 @@ void Clicks(lua_State** states, HMODULE samp, const char* out) {
     MouseAt(states, right, sy, true);
     MouseAt(states, right, sy, false);
     Values(f, a, "slider_solto");
+    // Botao: o clique chega ao mod (o botao do kit e o do ImGui com outras medidas).
+    Click(states, static_cast<int>((g_save[0] + g_save[2]) * 0.5f), static_cast<int>((g_save[1] + g_save[3]) * 0.5f));
+    Values(f, a, "botao", "HOST_SAVED");
     // Clique na janela sem X do mesmo script (o mais recente agora), com o Painel B ainda em foco no ImGui do script
     // dele (o clique no Painel A nunca chegou la): o Esc nao e de nenhum dos dois e vai para o jogo.
     Click(states, 240, 675);
