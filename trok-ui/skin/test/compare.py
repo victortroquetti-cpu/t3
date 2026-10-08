@@ -89,9 +89,23 @@ check(reddish_pixels(img['tema'], tema[(0, 'Painel B|texto_vermelho')]) > 20, 't
 bx0, by0, bx1, by1 = tema[(0, 'Painel B|botao_vermelho')]
 check(img['tema'].getpixel((int(bx0) + 3, int((by0 + by1) / 2)))[0] > 150, 'tema: botao vermelho do script ficou vermelho')
 
-# Janela da casa (##trokCasa): a skin nao muda nada nela.
+# Script da casa (Trok_Casa.lua, janela ##trokCasa): a skin nao muda nada nele, nem a fonte.
 casa = (940, 200, 1241, 501)
 check(same_image(img['tema'].crop(casa), img['base'].crop(casa)), 'casa: janela ##trok identica a sem a skin, pixel a pixel')
+check(same_image(img['completo'].crop(casa), img['base'].crop(casa)), 'casa: com fonte=1 o script da casa segue identico (fonte dele intocada)')
+check('script do mimgui: Trok_Casa.lua (da casa: fica como esta)' in log('tema'), 'casa: script com "trok" no nome reconhecido (log)')
+check(not any('de Trok_Casa.lua ->' in line for line in log('completo').splitlines()), 'casa: nenhuma fonte do script da casa trocada (log)')
+
+# Log que explica: cada script e cada janela com a decisao.
+for line in ('script do mimgui: painel_a.lua (padronizado)', 'janela "Painel A" de painel_a.lua: padronizada',
+             'janela "HUD" de hud.lua: fundo transparente (HUD): fica como esta',
+             'fonte C:\\windows\\Fonts\\trebucbd.ttf 14.0 px de painel_a.lua -> fonte da casa'):
+    check(line in log('completo'), f'log: "{line}"')
+
+# Script inteiro mantido (manter_scripts=painel_b.lua): Painel B igual ao original, fonte incluida.
+painel_b = (480, 40, 881, 561)
+check(same_image(image('manter_script').crop(painel_b), img['base'].crop(painel_b)), 'manter_scripts: Painel B identico ao original, pixel a pixel')
+check(dark(image('manter_script').getpixel((240, 530))), 'manter_scripts: Painel A segue padronizado')
 
 # Janela mantida (manter=Painel B): exatamente como o autor fez; a outra padronizada.
 box = (480, 40, 881, 561)
@@ -135,6 +149,7 @@ check(rects('versao') == base, 'versao: retangulos identicos aos sem a skin')
 check(same_image(image('alternar', 'out_desligado.bmp'), img['base']), '/trokskin: desligado na hora = sem a skin, pixel a pixel')
 check(same_image(image('alternar', 'out_religado.bmp'), img['tema']), '/trokskin: religado = tema, pixel a pixel')
 check('/trokskin: tema desligado' in log('alternar') and '/trokskin: tema ligado' in log('alternar'), '/trokskin: registrado e usado (log)')
+check('  painel_a.lua: janela "Painel A" -> padronizada' in log('alternar'), '/trokskin: resumo por script e janela no log')
 
 # Pasta do GTA com acento: a fonte da casa abre do mesmo jeito (caminho em UTF-8 para o ImGui).
 check('-> fonte da casa' in log('acentua\u00e7\u00e3o'), 'acento: fonte da casa carregou numa pasta com acento (log)')

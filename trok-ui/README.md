@@ -146,12 +146,13 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 - **O layout.** Espaçamentos, tamanhos e bordas de janela ficam como o autor fez; os controles ficam exatamente no mesmo lugar (o teste confere os 52 retângulos).
 - **HUDs com fundo transparente**, por cima do jogo.
 - **Cores com significado** que o script põe dentro da janela, como um texto vermelho de erro ou um botão vermelho de "apagar".
-- **Janelas da casa**, com id começando em `##trok` (Kill List, vitrine, mods novos com o kit).
+- **Scripts da casa**: os que têm "trok" no nome do arquivo (Kill List, vitrine, mods novos com o kit) ficam inteiros como estão, tema e fonte. O nome vem do próprio mimgui, que guarda `config\mimgui\<script>.ini` em cada script. Janelas com id começando em `##trok` também ficam.
 - **Fontes próprias do mod** (decorativas, de ícones, da pasta dele).
 
 **Controles:**
 - `/trokskin` liga e desliga o visual na hora, para comparar. Desligado, cada script volta a ser exatamente o que era. A fonte só volta ao recarregar os scripts (Ctrl+R).
-- `Trok Skin.ini` (criado ao lado do .asi): `tema=1`, `fonte=1` e `manter=Título|Outro título`, para janelas que devem ficar como o autor fez.
+- `Trok Skin.ini` (criado ao lado do .asi): `tema=1` e `fonte=1` ligam ou desligam o tema e a fonte. `manter=Título|Outro título` deixa janelas como o autor fez, e `manter_scripts=mod.lua|outro.lua` deixa scripts inteiros.
+- `Trok Skin.log` diz o que aconteceu: cada script pelo nome (padronizado ou intocado), cada janela com a decisão (padronizada, mantida, HUD transparente) e cada fonte trocada. A cada `/trokskin` sai um resumo por script. Se nenhum menu de outro mod apareceu ainda, o chat avisa.
 
 **Limites:** só vale para mimgui. O imgui antigo (moon_imgui), menus desenhados com `renderDrawBox` e os `.asi` de outros ficam como estão. Como o layout não muda, menus de outros não ganham o que depende de saber o significado de cada opção (linhas numeradas, marca do padrão, dicas de tecla). A setinha de recolher do ImGui continua: no 1.72 ela só some mudando o comportamento da janela.
 
@@ -173,11 +174,11 @@ Duas regras que custaram caro na primeira versão:
 - **.asi num GTA de mentira:** `asi/test/smoke/run.sh` roda o .asi no Wine 32 bits (com Xvfb) com um processo que expõe o device d3d9 nos endereços do `gta_sa.exe` e carrega um `samp.dll` falso com os endereços do 0.3.7 R1. Depois digita `/trokui` duas vezes e confere os pixels do back buffer: o menu tem que abrir por cima de tudo e fechar, e o cursor do SA-MP tem que ir para o modo 2 e voltar. Com o menu aberto, confere também quais teclas chegam ao jogo: o T chega, a seta não, e com o chat aberto tudo chega. São 5 cenários: device direto; proxy estilo SA-MP com dois ganchos de vtable na regra do Dialogs/Radar (lida no binário do Dialogs 2.28); sem `0xC8CF88`; só pela classe da janela; e um wrapper que esconde o device real.
 - **Capturas sem o jogo:** `asi/test/run.sh <pasta>` roda a vitrine num rasterizador por software e salva PNGs de cada tela. Com `TROK_FONT=…/font.ttf TROK_ICONS=…/lucide.ttf`, usa a fonte e os ícones da casa (foi assim que as imagens acima foram geradas).
 - **Lua sem o jogo:** `cd lua && luajit test/mock_run.lua` roda todas as abas, popups, diálogos e o modo de mover num mimgui simulado. O teste confere se cada Push tem o seu Pop, se cada Begin tem End, os canais do draw list, os ids repetidos e os tipos dos argumentos. Também confere que nenhum campo mostra o rótulo do ImGui (o id tem que começar com `##`), que o mimgui inicializa sozinho e as regras do chat acima.
-- **Trok Skin:** `skin/build.sh` gera `skin/dist/Trok Skin.asi`. `skin/test/run.sh` compila o `cimguidx9.dll` do mimgui 1.7.1 a partir das fontes dele e roda, no Wine, um "moonloader" de mentira com quatro scripts: um com tema claro, um com fundo vermelho empurrado e texto e botão vermelhos, um HUD transparente e uma janela `##trok`. São 47 verificações. Entre elas:
+- **Trok Skin:** `skin/build.sh` gera `skin/dist/Trok Skin.asi`. `skin/test/run.sh` compila o `cimguidx9.dll` do mimgui 1.7.1 a partir das fontes dele e roda, no Wine, um "moonloader" de mentira com quatro scripts: um com tema claro, um com fundo vermelho empurrado e texto e botão vermelhos, um HUD transparente e uma janela `##trok`. São 57 verificações. Entre elas:
   - os retângulos de todos os controles ficam idênticos com o tema;
   - a tela desligada é idêntica, pixel a pixel, à sem a skin;
   - `/trokskin` desliga e religa na hora;
-  - a janela `manter` e a da casa ficam intactas;
+  - a janela `manter`, o script de `manter_scripts` e o script da casa ficam intactos (o da casa até com `fonte=1`);
   - o texto com a fonte da casa tem a mesma largura (até 6%);
   - tudo continua igual depois de descarregar e recarregar a DLL;
   - um ImGui de outra versão é recusado;

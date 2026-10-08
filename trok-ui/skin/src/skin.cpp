@@ -11,9 +11,13 @@
 // que a DLL carrega. So liga se a DLL for o ImGui 1.72 (o mesmo dos headers usados aqui); com outra versao,
 // nao faz nada e diz no log.
 //
-// /trokskin liga e desliga o tema na hora (a fonte so muda quando os scripts recarregam).
-// Trok Skin.ini (ao lado do .asi): tema=1, fonte=1 e manter=Titulo|Outro titulo (janelas que ficam como o
-// autor fez).
+// Scripts da casa (o nome do arquivo tem "trok": Kill List, vitrine, mods novos) ficam intocados: tema e
+// fonte. O nome vem do proprio mimgui, que guarda config\mimgui\<script>.ini no contexto de cada script.
+//
+// /trokskin liga e desliga o tema na hora (a fonte so muda quando os scripts recarregam) e anota no log
+// cada janela que viu e o que fez com ela.
+// Trok Skin.ini (ao lado do .asi): tema=1, fonte=1, manter=Titulo|Outro titulo (janelas que ficam como o
+// autor fez) e manter_scripts=mod.lua|outro.lua (scripts inteiros que ficam como estao).
 
 #include <windows.h>
 #include <cmath>
@@ -43,7 +47,8 @@ char g_housePath[MAX_PATH * 3] = {};
 HMODULE g_module = nullptr;
 volatile bool g_theme = true;
 volatile bool g_fontOn = true;
-std::vector<std::string> g_kept; // titulos (minusculos) das janelas que ficam como o autor fez
+std::vector<std::string> g_kept;        // titulos (minusculos) das janelas que ficam como o autor fez
+std::vector<std::string> g_keptScripts; // arquivos (minusculos) de scripts que ficam como estao
 
 void Log(const char* fmt, ...) {
     if (!g_logPath[0]) {
@@ -88,30 +93,37 @@ void LoadConfig() {
                   "; Fonte da casa no lugar das fontes de sistema (vale quando os scripts carregam).\n"
                   "fonte=1\n"
                   "; Janelas que ficam como o autor fez: o titulo que aparece na janela, separados por |\n"
-                  "manter=\n",
+                  "manter=\n"
+                  "; Scripts inteiros que ficam como estao: o nome do arquivo, separados por | (os da casa,\n"
+                  "; com \"trok\" no nome, ja ficam sozinhos)\n"
+                  "manter_scripts=\n",
                   f);
             fclose(f);
         }
     }
     g_theme = GetPrivateProfileIntA("skin", "tema", 1, g_iniPath) != 0;
     g_fontOn = GetPrivateProfileIntA("skin", "fonte", 1, g_iniPath) != 0;
-    char kept[2048] = {};
-    GetPrivateProfileStringA("skin", "manter", "", kept, sizeof(kept), g_iniPath);
-    std::string list = kept;
-    size_t start = 0;
-    while (start <= list.size()) {
-        size_t bar = list.find('|', start);
-        std::string item = Trim(list.substr(start, bar == std::string::npos ? std::string::npos : bar - start));
-        if (!item.empty()) {
-            g_kept.push_back(Lower(item));
+    auto readList = [](const char* key, std::vector<std::string>& out) {
+        char raw[2048] = {};
+        GetPrivateProfileStringA("skin", key, "", raw, sizeof(raw), g_iniPath);
+        std::string list = raw;
+        size_t start = 0;
+        while (start <= list.size()) {
+            size_t bar = list.find('|', start);
+            std::string item = Trim(list.substr(start, bar == std::string::npos ? std::string::npos : bar - start));
+            if (!item.empty()) {
+                out.push_back(Lower(item));
+            }
+            if (bar == std::string::npos) {
+                break;
+            }
+            start = bar + 1;
         }
-        if (bar == std::string::npos) {
-            break;
-        }
-        start = bar + 1;
-    }
-    Log("config: tema %s, fonte %s, %d janela(s) mantida(s)", g_theme ? "ligado" : "desligado",
-        g_fontOn ? "ligada" : "desligada", static_cast<int>(g_kept.size()));
+    };
+    readList("manter", g_kept);
+    readList("manter_scripts", g_keptScripts);
+    Log("config: tema %s, fonte %s, %d janela(s) e %d script(s) mantidos", g_theme ? "ligado" : "desligado",
+        g_fontOn ? "ligada" : "desligada", static_cast<int>(g_kept.size()), static_cast<int>(g_keptScripts.size()));
 }
 
 // ---------------------------------------------------------------- funcoes do cimguidx9.dll
@@ -290,6 +302,68 @@ void House(const Look& script, Look& out, float u) {
     }
 }
 
+// Cada contexto e um script do moonloader. O mimgui grava config\mimgui\<script>.ini no IniFilename logo ao
+// criar o contexto, antes de qualquer fonte: e dali que sai o nome do script.
+struct Script {
+    std::string name;                                    // "meu_mod.lua" ("?" se o script apagou o IniFilename antes)
+    bool untouched = false;                              // da casa ("trok" no nome) ou em manter_scripts=
+    std::vector<std::pair<std::string, std::string>> windows; // titulo -> o que a skin fez (para o log)
+};
+std::unordered_map<ImGuiContext*, Script> g_scripts;
+
+// So com o contexto do script ativo (le o IO dele).
+Script& ScriptOf(ImGuiContext* ctx) {
+    auto found = g_scripts.find(ctx);
+    if (found != g_scripts.end()) {
+        return found->second;
+    }
+    Script& script = g_scripts[ctx];
+    const char* ini = p_igGetIO()->IniFilename;
+    script.name = "?";
+    if (ini && *ini) {
+        std::string path = ini;
+        size_t slash = path.find_last_of("\\/");
+        std::string base = slash == std::string::npos ? path : path.substr(slash + 1);
+        if (base.size() > 4 && Lower(base.substr(base.size() - 4)) == ".ini") {
+            base.resize(base.size() - 4);
+        }
+        if (!base.empty()) {
+            script.name = base;
+        }
+    }
+    std::string low = Lower(script.name);
+    bool house = low.find("trok") != std::string::npos;
+    bool listed = false;
+    for (const std::string& k : g_keptScripts) {
+        listed = listed || k == low || k + ".lua" == low;
+    }
+    script.untouched = house || listed;
+    Log("script do mimgui: %s (%s)", script.name.c_str(),
+        house ? "da casa: fica como esta" : listed ? "em manter_scripts: fica como esta" : "padronizado");
+    return script;
+}
+
+// Anota no log a primeira vez que a janela aparece e cada vez que a decisao muda.
+void NoteWindow(Script& script, const char* name, const char* decision) {
+    std::string title = name ? name : "";
+    size_t hidden = title.find("##");
+    std::string shown = hidden == std::string::npos ? title : title.substr(0, hidden);
+    if (shown.empty()) {
+        shown = title; // so id (##...): mostra o id
+    }
+    for (auto& w : script.windows) {
+        if (w.first == shown) {
+            if (w.second != decision) {
+                w.second = decision;
+                Log("janela \"%s\" de %s: %s", shown.c_str(), script.name.c_str(), decision);
+            }
+            return;
+        }
+    }
+    script.windows.emplace_back(shown, decision);
+    Log("janela \"%s\" de %s: %s", shown.c_str(), script.name.c_str(), decision);
+}
+
 // Estado por contexto (cada script do mimgui tem o seu): o visual do proprio script (orig), para o tema
 // poder desligar na hora, e o que a skin escreveu no ultimo quadro (applied), para perceber o que o script
 // mudou depois.
@@ -329,7 +403,7 @@ void Absorb(State& st, const Look& cur) {
 // Inicio de cada quadro de cada script: base do estilo = tema da casa (ou o visual do script, desligado).
 void ApplyFrame() {
     ImGuiContext* ctx = p_igGetCurrentContext();
-    if (!ctx) {
+    if (!ctx || ScriptOf(ctx).untouched) {
         return;
     }
     ImGuiStyle* style = p_igGetStyle();
@@ -342,8 +416,6 @@ void ApplyFrame() {
         st.orig = cur;
         st.applied = cur;
         found = g_states.emplace(ctx, st).first;
-        Log("script novo do mimgui (contexto 0x%08X, %d no total)", reinterpret_cast<DWORD>(ctx),
-            static_cast<int>(g_states.size()));
     } else {
         Absorb(found->second, cur);
     }
@@ -388,19 +460,24 @@ bool Kept(const char* name) {
 // para esta janela). Janela padronizada volta ao tema; janela mantida (manter= ou da casa, ##trok...) volta
 // ao visual do script. HUD (fundo transparente) fica intocado.
 void ApplyWindow(const char* name, ImGuiWindowFlags flags) {
-    auto found = g_states.find(p_igGetCurrentContext());
-    if (found == g_states.end()) {
-        return;
+    ImGuiContext* ctx = p_igGetCurrentContext();
+    auto found = g_states.find(ctx);
+    if (!ctx || found == g_states.end()) {
+        return; // script intocado (nem tem estado) ou sem quadro ainda
     }
+    Script& script = ScriptOf(ctx);
     State& st = found->second;
     ImGuiStyle* style = p_igGetStyle();
     if ((flags & ImGuiWindowFlags_NoBackground) || style->Colors[ImGuiCol_WindowBg].w < 0.5f) {
+        NoteWindow(script, name, "fundo transparente (HUD): fica como esta");
         return;
     }
+    bool kept = Kept(name);
+    NoteWindow(script, name, kept ? "mantida (##trok ou manter=)" : g_theme ? "padronizada" : "tema desligado");
     Look cur;
     Read(*style, cur);
     Look want = cur;
-    if (!g_theme || Kept(name)) {
+    if (!g_theme || kept) {
         // Sem push do script, o campo volta ao valor dele; com push, fica o que ele empurrou.
 #define KEEP(f)                                                                                                   \
     if (cur.f == st.applied.f) {                                                                                  \
@@ -568,6 +645,11 @@ ImFont* __cdecl HookAddFontFromFileTTF(ImFontAtlas* atlas, const char* filename,
     if (!g_fontOn || !g_houseFont || !filename || (cfg && cfg->MergeMode) || !Replaceable(filename)) {
         return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
     }
+    ImGuiContext* ctx = p_igGetCurrentContext();
+    if (!ctx || ScriptOf(ctx).untouched) {
+        return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
+    }
+    const std::string& owner = ScriptOf(ctx).name;
     FontFile* source = LoadFontFile(filename);
     if (!source) {
         return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
@@ -594,7 +676,8 @@ ImFont* __cdecl HookAddFontFromFileTTF(ImFontAtlas* atlas, const char* filename,
     fallback.DstFont = nullptr;
     o_AddFontFromFileTTF(atlas, filename, houseSize, &fallback, ranges);
     g_replaced[font] = Replaced{atlas, ratio};
-    Log("fonte %s %.1f px -> fonte da casa %.1f px (mesma largura de texto)", filename, size, houseSize);
+    Log("fonte %s %.1f px de %s -> fonte da casa %.1f px (mesma largura de texto)", filename, size, owner.c_str(),
+        houseSize);
     return font;
 }
 
@@ -626,6 +709,7 @@ void __cdecl HookDestroyContext(ImGuiContext* ctx) {
         ForgetAtlas(found->second.atlas);
         g_states.erase(found);
     }
+    g_scripts.erase(target);
     o_igDestroyContext(ctx);
 }
 
@@ -794,9 +878,29 @@ void __cdecl CmdTrokSkin(const char*) {
     }
     g_theme = !g_theme;
     Log("/trokskin: tema %s", g_theme ? "ligado" : "desligado");
+    // Resumo: o que cada script tem na tela e o que a skin faz com cada janela.
+    int themed = 0;
+    for (auto& entry : g_scripts) {
+        const Script& script = entry.second;
+        if (script.untouched) {
+            Log("  %s: fica como esta (da casa ou manter_scripts)", script.name.c_str());
+            continue;
+        }
+        if (script.windows.empty()) {
+            Log("  %s: nenhuma janela desenhada ate agora", script.name.c_str());
+        }
+        for (const auto& w : script.windows) {
+            Log("  %s: janela \"%s\" -> %s", script.name.c_str(), w.first.c_str(), w.second.c_str());
+            themed += w.second == "padronizada" || w.second == "tema desligado";
+        }
+    }
     Chat(g_theme ? "{FFFFFF}[Trok Skin] visual da casa {8AFF8A}ligado{FFFFFF}."
                  : "{FFFFFF}[Trok Skin] visual da casa {FF8A8A}desligado{FFFFFF} (a fonte volta ao recarregar os "
                    "scripts).");
+    if (themed == 0) {
+        Chat("{FFFFFF}[Trok Skin] nenhum menu de outro mod apareceu ainda. Abra o menu do mod e use "
+             "{FFD27A}/trokskin{FFFFFF} de novo.");
+    }
 }
 
 void RegisterCommand() {
@@ -900,7 +1004,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         } else {
             g_logPath[0] = 0;
         }
-        Log("Trok Skin .asi v1.0.0");
+        Log("Trok Skin .asi v1.1.0");
         InitializeCriticalSection(&g_installLock);
         CreateThread(nullptr, 0, Boot, nullptr, 0, nullptr);
     }

@@ -135,6 +135,7 @@ bool LoadApi(Api& a) {
 
 struct Script {
     const char* name;
+    char ini[MAX_PATH] = {}; // como o mimgui: config\mimgui\<arquivo do script>.ini
     void* d3d = nullptr;
     ImGuiContext* ctx = nullptr;
     INT64 ticks = 0, time = 0;
@@ -167,7 +168,13 @@ void Init(Script& s, const char* systemFont) {
     g.SetCurrentContext(s.ctx);
     g.ImplWin32_Init(g_hwnd, &s.ticks, &s.time);
     ImGuiIO* io = g.GetIO();
-    io->IniFilename = nullptr;
+    // O mimgui grava o nome do arquivo do script aqui, antes de qualquer fonte (a skin le daqui).
+    const char* file = strcmp(s.name, "Painel A") == 0   ? "painel_a.lua"
+                       : strcmp(s.name, "Painel B") == 0 ? "painel_b.lua"
+                       : strcmp(s.name, "HUD") == 0      ? "hud.lua"
+                                                         : "Trok_Casa.lua";
+    snprintf(s.ini, sizeof(s.ini), "C:\\GTA\\moonloader\\config\\mimgui\\%s.ini", file);
+    io->IniFilename = s.ini;
     io->LogFilename = nullptr;
     g.AddFontFromFileTTF(io->Fonts, systemFont, 14.0f, nullptr, g.GetGlyphRangesCyrillic(io->Fonts));
     // OnInitialize de cada script.

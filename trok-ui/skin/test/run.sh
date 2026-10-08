@@ -71,5 +71,6 @@ run manter skin $'tema=1\nfonte=0\nmanter=Painel B'
 run versao skin $'tema=1\nfonte=1' cimguidx9_v199.dll
 run alternar skin $'tema=1\nfonte=0' cimguidx9.dll alternar
 run "acentuação" skin $'tema=1\nfonte=1'
+run manter_script skin $'tema=1\nfonte=1\nmanter_scripts=painel_b.lua'
 
 python3 test/compare.py "$OUT"
