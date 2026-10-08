@@ -25,6 +25,9 @@ if [ ! -d "$MINHOOK" ]; then
 fi
 
 mkdir -p build/minhook dist
+
+# O ajuste do imgui antigo (src/moon_patch.lua) vai embutido no .asi como texto.
+{ printf 'R"TROKLUA('; cat src/moon_patch.lua; printf ')TROKLUA"\n'; } > build/moon_patch.inc
 CXX=${CXX:-i686-w64-mingw32-g++}
 CC=${CC:-i686-w64-mingw32-gcc}
 
@@ -35,7 +38,7 @@ for f in buffer.c hook.c trampoline.c hde/hde32.c; do
     MINHOOK_OBJECTS="$MINHOOK_OBJECTS $obj"
 done
 
-$CXX -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Wno-unused-function -I$IMGUI -I$MINHOOK/include -shared \
+$CXX -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Wno-unused-function -I$IMGUI -I$MINHOOK/include -Ibuild -shared \
     -o "dist/Trok Skin.asi" src/skin.cpp $MINHOOK_OBJECTS \
     -static -static-libgcc -static-libstdc++ -s -luser32
 

@@ -133,20 +133,24 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 
 ## Trok Skin: o visual da casa nos mods dos outros
 
-`skin/dist/Trok Skin.asi` padroniza os menus de qualquer mod Lua feito com **mimgui**, sem editar os mods. Copie para a pasta do GTA (ou `scripts\`) e pronto. Funciona com o mimgui 1.7.x (Dear ImGui 1.72) e confere a versão sozinho: com qualquer outra, não encosta em nada e diz o motivo no `Trok Skin.log`.
+`skin/dist/Trok Skin.asi` padroniza os menus de qualquer mod Lua feito com **mimgui** ou com o **imgui antigo do moonloader** (moon_imgui, o `require 'imgui'` com `imgui.OnDrawFrame`), sem editar os mods. Copie para a pasta do GTA (ou `scripts\`) e pronto. Funciona com o mimgui 1.7.x (Dear ImGui 1.72) e com o moon_imgui 1.1.5 (Dear ImGui 1.52), e confere a versão sozinho: com qualquer outra, não encosta em nada e diz o motivo no `Trok Skin.log`.
 
 ![Sem a skin e com a skin](docs/09-skin.png)
 
-**O que muda em todo menu mimgui:**
+![TKeyBinder (imgui antigo): à esquerda o tema dele, à direita o da casa](docs/10-skin-imgui-antigo.png)
+
+*Primeira imagem: dois menus mimgui de teste, sem a skin (em cima) e com ela (embaixo). Segunda: o TKeyBinder, que usa o imgui antigo, com o tema dele (à esquerda) e o da casa (à direita), mesmo layout.*
+
+**O que muda em todo menu:**
 - **Cores da casa:** fundo 12,12,12, borda branca, texto 240, campos e botões discretos, check e bolinha do slider brancos, abas e listas no mesmo tom.
-- **Cantos e títulos:** cantos arredondados, título centralizado com o divisor embaixo e campos com contorno.
-- **Fonte da casa** (`moonloader\resource\trok\font.ttf`) no lugar das fontes de interface do Windows: a Trebuchet padrão do mimgui, Arial, Tahoma, Verdana, Segoe UI e Calibri. O tamanho é ajustado para o texto ocupar a mesma largura. Letras que a fonte da casa não tem vêm da fonte original, então nada vira `?`.
+- **Cantos e títulos:** cantos arredondados, título centralizado com o divisor embaixo e campos com contorno. No imgui antigo, a borda da janela, o contorno dos campos e o divisor vêm todos da mesma opção (`ShowBorders`), e o botão de fechar é um círculo discreto (o X aparece com o mouse em cima, como sempre foi no 1.52).
+- **Fonte da casa** (`moonloader\resource\trok\font.ttf`) no lugar das fontes de interface do Windows: a Trebuchet padrão do mimgui e do imgui antigo, Arial, Tahoma, Verdana, Segoe UI e Calibri. O tamanho é ajustado para o texto ocupar a mesma largura. Letras que a fonte da casa não tem vêm da fonte original, então nada vira `?`.
 
 **O que não muda:**
 - **O layout.** Espaçamentos, tamanhos e bordas de janela ficam como o autor fez; os controles ficam exatamente no mesmo lugar (o teste confere os 52 retângulos).
 - **HUDs com fundo transparente**, por cima do jogo.
 - **Cores com significado** que o script põe dentro da janela, como um texto vermelho de erro ou um botão vermelho de "apagar".
-- **Scripts da casa**: os que têm "trok" no nome do arquivo (Kill List, vitrine, mods novos com o kit) ficam inteiros como estão, tema e fonte. O nome vem do próprio mimgui, que guarda `config\mimgui\<script>.ini` em cada script. Janelas com id começando em `##trok` também ficam.
+- **Scripts da casa**: os que têm "trok" no nome do arquivo (Kill List, vitrine, mods novos com o kit) ficam inteiros como estão, tema e fonte. No mimgui, o nome vem do `config\mimgui\<script>.ini` que ele guarda em cada script; no imgui antigo, do `thisScript()` do moonloader. Janelas com id começando em `##trok` também ficam.
 - **Fontes próprias do mod** (decorativas, de ícones, da pasta dele).
 
 **Controles:**
@@ -154,9 +158,11 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 - `Trok Skin.ini` (criado ao lado do .asi): `tema=1` e `fonte=1` ligam ou desligam o tema e a fonte. `manter=Título|Outro título` deixa janelas como o autor fez, e `manter_scripts=mod.lua|outro.lua` deixa scripts inteiros.
 - `Trok Skin.log` diz o que aconteceu: cada script pelo nome (padronizado ou intocado), cada janela com a decisão (padronizada, mantida, HUD transparente) e cada fonte trocada. A cada `/trokskin` sai um resumo por script. Se nenhum menu de outro mod apareceu ainda, o chat avisa.
 
-**Limites:** só vale para mimgui. O imgui antigo (moon_imgui), menus desenhados com `renderDrawBox` e os `.asi` de outros ficam como estão. Como o layout não muda, menus de outros não ganham o que depende de saber o significado de cada opção (linhas numeradas, marca do padrão, dicas de tecla). A setinha de recolher do ImGui continua: no 1.72 ela só some mudando o comportamento da janela.
+**Limites:** vale para mimgui e para o imgui antigo. Menus desenhados com `renderDrawBox` e os `.asi` de outros ficam como estão. Como o layout não muda, menus de outros não ganham o que depende de saber o significado de cada opção (linhas numeradas, marca do padrão, dicas de tecla). A setinha de recolher do ImGui continua: ela só some mudando o comportamento da janela. No imgui antigo, texto desenhado com tamanho explícito (`AddText` com tamanho) não é compensado, e janelas filhas sem borda não ganham contorno nos campos (no 1.52 o contorno é da janela onde o campo está).
 
-**Como funciona:** o mimgui carrega uma DLL nativa só (`lib\mimgui\cimguidx9.dll`) que todos os scripts chamam. A skin desvia, com o MinHook, as funções dessa DLL que importam: início de quadro, abertura de janela, fontes e texto com tamanho explícito. O desvio entra no momento em que a DLL carrega, antes de qualquer script usar. A DLL fica presa na memória, para os desvios sobreviverem ao Ctrl+R.
+**Como funciona:**
+- **mimgui:** carrega uma DLL nativa só (`lib\mimgui\cimguidx9.dll`) que todos os scripts chamam. A skin desvia, com o MinHook, as funções dessa DLL que importam: início de quadro, abertura de janela, fontes e texto com tamanho explícito. O desvio entra no momento em que a DLL carrega, antes de qualquer script usar. A DLL fica presa na memória, para os desvios sobreviverem ao Ctrl+R.
+- **imgui antigo:** é um módulo C do Lua (`lib\MoonImGui.dll`) que cada script abre no seu próprio estado Lua pelo `require 'imgui'`. A skin desvia o `luaopen_MoonImGui` e, com a tabela do módulo pronta (antes do resto do `imgui.lua`), roda naquele script um ajuste em Lua (`skin/src/moon_patch.lua`, embutido no .asi). O ajuste troca três coisas, só pela API Lua do próprio moon_imgui: o renderizador (para saber o começo de cada quadro), o `imgui.Begin` e o `AddFontFromFileTTF` do atlas de fontes do script. Ler as 43 cores pela API custa uns 60 µs por janela. Por isso a skin lê o estilo pela FFI do LuaJIT, mas só depois de conferir que a FFI vê exatamente os mesmos valores que a API (senão fica na API); assim cai para uns 3 µs. O ajuste nunca mexe na pilha de push/pop do ImGui: no 1.52, um pop fora do lugar abre uma caixa de assert e trava o jogo. Qualquer erro desliga a skin só naquele script e devolve o visual dele.
 
 ## Reaproveitar nos próximos mods
 
@@ -183,10 +189,11 @@ Duas regras que custaram caro na primeira versão:
   - tudo continua igual depois de descarregar e recarregar a DLL;
   - um ImGui de outra versão é recusado;
   - a fonte abre numa pasta com acento.
+- **Trok Skin no imgui antigo:** `skin/test/moon/run.sh` compila o LuaJIT 2.1 como `lua51.dll` (precisa do gcc com multilib) e baixa o moon_imgui 1.1.5 (`imgui.lua` + `MoonImGui.dll`) de uma cópia pública, conferindo o SHA-256. Com `MOONIMGUI_DIR=…\moonloader\lib`, usa os do jogo. No Wine, cada script roda no seu estado Lua com o `imgui.lua` de verdade, como no moonloader, nos mesmos quatro papéis do teste do mimgui. São 73 verificações: as mesmas do mimgui, mais o host terminar (um assert do 1.52 travaria numa caixa de mensagem), os campos que o 1.52 deixa a 30% irem para o fundo da casa, a borda e o divisor do título, e o Ctrl+R com todos os scripts fechando e abrindo de novo.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
 > O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.
 
 ## Terceiros
 
-O .asi inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.
+O .asi inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). O teste do imgui antigo baixa o [LuaJIT](https://github.com/LuaJIT/LuaJIT) (MIT, © Mike Pall) e o moon_imgui (© FYP), que não vão no repositório nem no .asi. As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.

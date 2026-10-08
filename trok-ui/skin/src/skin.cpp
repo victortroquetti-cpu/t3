@@ -1,18 +1,23 @@
 // Trok Skin (.asi) -- Victor_Trok
-// Padroniza o visual dos menus de qualquer mod Lua feito com mimgui, sem editar os mods:
+// Padroniza o visual dos menus de qualquer mod Lua feito com mimgui ou com o imgui antigo do moonloader
+// (moon_imgui), sem editar os mods:
 //  - tema da casa (cores, cantos, borda dos campos e titulo centralizado) em todo quadro de cada script;
 //  - a fonte da casa no lugar das fontes de sistema (Trebuchet do mimgui, Arial, Tahoma...), com o tamanho
 //    ajustado para o texto ocupar a mesma largura. Glifos que a fonte da casa nao tem vem da fonte original.
 // Nada que mexe no layout e alterado: espacamentos, tamanhos e bordas de janela ficam como o script deixou.
 // HUDs com fundo transparente ficam exatamente como o autor fez.
 //
-// Como: o mimgui carrega uma DLL nativa so (moonloader\lib\mimgui\cimguidx9.dll, Dear ImGui 1.72 + cimgui)
-// e todo script chama as funcoes exportadas dela. A skin desvia algumas dessas funcoes com o MinHook assim
-// que a DLL carrega. So liga se a DLL for o ImGui 1.72 (o mesmo dos headers usados aqui); com outra versao,
-// nao faz nada e diz no log.
+// Como, no mimgui: ele carrega uma DLL nativa so (moonloader\lib\mimgui\cimguidx9.dll, Dear ImGui 1.72 +
+// cimgui) e todo script chama as funcoes exportadas dela. A skin desvia algumas dessas funcoes com o MinHook
+// assim que a DLL carrega. So liga se a DLL for o ImGui 1.72 (o mesmo dos headers usados aqui); com outra
+// versao, nao faz nada e diz no log.
+// No imgui antigo (moonloader\lib\imgui.lua + MoonImGui.dll, Dear ImGui 1.52): o MoonImGui.dll e um modulo C
+// do Lua aberto por cada script; a skin desvia o luaopen_MoonImGui e roda no lua_State do script o
+// moon_patch.lua (embutido), que padroniza pela API Lua do proprio moon_imgui. So liga no ImGui 1.52.
 //
 // Scripts da casa (o nome do arquivo tem "trok": Kill List, vitrine, mods novos) ficam intocados: tema e
-// fonte. O nome vem do proprio mimgui, que guarda config\mimgui\<script>.ini no contexto de cada script.
+// fonte. No mimgui, o nome vem do config\mimgui\<script>.ini que ele guarda no contexto de cada script; no
+// imgui antigo, do thisScript() do moonloader.
 //
 // /trokskin liga e desliga o tema na hora (a fonte so muda quando os scripts recarregam) e anota no log
 // cada janela que viu e o que fez com ela.
@@ -86,7 +91,7 @@ void LoadConfig() {
     if (GetFileAttributesA(g_iniPath) == INVALID_FILE_ATTRIBUTES) {
         FILE* f = fopen(g_iniPath, "w");
         if (f) {
-            fputs("; Trok Skin: visual da casa nos menus feitos com mimgui.\n"
+            fputs("; Trok Skin: visual da casa nos menus feitos com mimgui e com o imgui antigo do moonloader.\n"
                   "[skin]\n"
                   "; 1 liga, 0 desliga. O tema tambem liga e desliga no jogo com /trokskin.\n"
                   "tema=1\n"
@@ -311,6 +316,20 @@ struct Script {
 };
 std::unordered_map<ImGuiContext*, Script> g_scripts;
 
+// Por que o script fica como esta (da casa: "trok" no nome; ou listado em manter_scripts=), ou nullptr.
+const char* UntouchedReason(const std::string& name) {
+    std::string low = Lower(name);
+    if (low.find("trok") != std::string::npos) {
+        return "da casa: fica como esta";
+    }
+    for (const std::string& k : g_keptScripts) {
+        if (k == low || k + ".lua" == low) {
+            return "em manter_scripts: fica como esta";
+        }
+    }
+    return nullptr;
+}
+
 // So com o contexto do script ativo (le o IO dele).
 Script& ScriptOf(ImGuiContext* ctx) {
     auto found = g_scripts.find(ctx);
@@ -331,15 +350,9 @@ Script& ScriptOf(ImGuiContext* ctx) {
             script.name = base;
         }
     }
-    std::string low = Lower(script.name);
-    bool house = low.find("trok") != std::string::npos;
-    bool listed = false;
-    for (const std::string& k : g_keptScripts) {
-        listed = listed || k == low || k + ".lua" == low;
-    }
-    script.untouched = house || listed;
-    Log("script do mimgui: %s (%s)", script.name.c_str(),
-        house ? "da casa: fica como esta" : listed ? "em manter_scripts: fica como esta" : "padronizado");
+    const char* reason = UntouchedReason(script.name);
+    script.untouched = reason != nullptr;
+    Log("script do mimgui: %s (%s)", script.name.c_str(), reason ? reason : "padronizado");
     return script;
 }
 
@@ -359,6 +372,9 @@ void NoteWindow(Script& script, const char* name, const char* decision) {
             }
             return;
         }
+    }
+    if (script.windows.size() >= 32) {
+        return; // titulo que muda a cada quadro (FPS no titulo...): o log nao enche
     }
     script.windows.emplace_back(shown, decision);
     Log("janela \"%s\" de %s: %s", shown.c_str(), script.name.c_str(), decision);
@@ -629,6 +645,22 @@ bool Replaceable(const char* path) {
     return false;
 }
 
+// Fator de tamanho para a fonte da casa ocupar a mesma largura de texto que a fonte do script; 0 = a fonte fica
+// a dela (nao deu para ler, ou a largura e diferente demais para trocar sem mexer no layout).
+float HouseRatio(const char* path, bool cyrillic) {
+    FontFile* source = LoadFontFile(path);
+    if (!source || !g_houseFont) {
+        return 0.0f;
+    }
+    float houseWidth = WidthPerPixel(*g_houseFont, cyrillic);
+    float ratio = houseWidth > 0 ? WidthPerPixel(*source, cyrillic) / houseWidth : 0.0f;
+    if (ratio < 0.8f || ratio > 1.25f) {
+        Log("fonte %s ficou (largura muito diferente da fonte da casa: %.2f)", path, ratio);
+        return 0.0f;
+    }
+    return ratio;
+}
+
 // O construtor do ImFontConfig mora no ImGui da DLL: sem config do script, a copia vem de um criado por ela.
 void CopyConfig(const ImFontConfig* cfg, ImFontConfig* out) {
     if (cfg) {
@@ -650,15 +682,8 @@ ImFont* __cdecl HookAddFontFromFileTTF(ImFontAtlas* atlas, const char* filename,
         return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
     }
     const std::string& owner = ScriptOf(ctx).name;
-    FontFile* source = LoadFontFile(filename);
-    if (!source) {
-        return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
-    }
-    bool cyrillic = HasCyrillic(ranges ? ranges : (cfg ? cfg->GlyphRanges : nullptr));
-    float houseWidth = WidthPerPixel(*g_houseFont, cyrillic);
-    float ratio = houseWidth > 0 ? WidthPerPixel(*source, cyrillic) / houseWidth : 0.0f;
-    if (ratio < 0.8f || ratio > 1.25f) {
-        Log("fonte %s ficou (largura muito diferente da fonte da casa: %.2f)", filename, ratio);
+    float ratio = HouseRatio(filename, HasCyrillic(ranges ? ranges : (cfg ? cfg->GlyphRanges : nullptr)));
+    if (ratio == 0.0f) {
         return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
     }
     alignas(ImFontConfig) unsigned char storage[sizeof(ImFontConfig)];
@@ -734,6 +759,218 @@ void __cdecl HookAddTextFontPtr(ImDrawList* list, const ImFont* font, float size
 void __cdecl HookCalcTextSizeA(ImVec2* out, ImFont* font, float size, float maxWidth, float wrapWidth,
                                const char* begin, const char* end, const char** remaining) {
     o_CalcTextSizeA(out, font, Compensated(font, size), maxWidth, wrapWidth, begin, end, remaining);
+}
+
+// ---------------------------------------------------------------- imgui antigo do moonloader (moon_imgui)
+
+// O moon_imgui (lib\imgui.lua + lib\MoonImGui.dll, Dear ImGui 1.52) e um modulo C do Lua: cada script que faz
+// require 'imgui' chama o luaopen_MoonImGui do DLL no seu proprio lua_State. A skin desvia essa funcao e, com a
+// tabela do modulo pronta, roda nesse lua_State o moon_patch.lua (embutido aqui), que padroniza pela API Lua do
+// proprio moon_imgui. Daqui o patch so recebe as regras (paleta, cantos, janelas mantidas, fonte) e o log.
+
+struct lua_State;
+typedef int(__cdecl* lua_CFunction)(lua_State*);
+constexpr int LUA_TTABLE = 5;
+
+// lua51.dll do moonloader (LuaJIT): so a API C publica do Lua 5.1, resolvida quando o MoonImGui.dll carrega.
+struct LuaApi {
+    int(__cdecl* loadbuffer)(lua_State*, const char*, size_t, const char*);
+    int(__cdecl* pcall)(lua_State*, int, int, int);
+    int(__cdecl* gettop)(lua_State*);
+    void(__cdecl* settop)(lua_State*, int);
+    void(__cdecl* pushvalue)(lua_State*, int);
+    int(__cdecl* type)(lua_State*, int);
+    const char*(__cdecl* tolstring)(lua_State*, int, size_t*);
+    double(__cdecl* tonumber)(lua_State*, int);
+    int(__cdecl* toboolean)(lua_State*, int);
+    void(__cdecl* pushnumber)(lua_State*, double);
+    void(__cdecl* pushboolean)(lua_State*, int);
+    void(__cdecl* pushnil)(lua_State*);
+    void(__cdecl* pushstring)(lua_State*, const char*);
+    void(__cdecl* pushcclosure)(lua_State*, lua_CFunction, int);
+    void(__cdecl* createtable)(lua_State*, int, int);
+    void(__cdecl* setfield)(lua_State*, int, const char*);
+    void(__cdecl* rawseti)(lua_State*, int, int);
+};
+LuaApi g_lua = {};
+
+const char kMoonPatch[] =
+#include "moon_patch.inc" // src/moon_patch.lua, embrulhado pelo build.sh
+    ;
+
+std::unordered_map<std::string, Script> g_moonScripts; // por arquivo do script (sobrevive ao Ctrl+R)
+
+const char* Arg(lua_State* L, int index) {
+    const char* s = g_lua.tolstring(L, index, nullptr);
+    return s ? s : "";
+}
+
+int __cdecl LuaLog(lua_State* L) {
+    Log("%s", Arg(L, 1));
+    return 0;
+}
+
+// skin.script(arquivo): registra o script; true = padronizar, false = fica como esta.
+int __cdecl LuaScript(lua_State* L) {
+    std::string name = Arg(L, 1);
+    if (name.empty()) {
+        name = "?";
+    }
+    Script& script = g_moonScripts[name];
+    script.name = name;
+    const char* reason = UntouchedReason(name);
+    script.untouched = reason != nullptr;
+    Log("script do imgui antigo: %s (%s)", name.c_str(), reason ? reason : "padronizado");
+    g_lua.pushboolean(L, !script.untouched);
+    return 1;
+}
+
+int __cdecl LuaTheme(lua_State* L) {
+    g_lua.pushboolean(L, g_theme);
+    return 1;
+}
+
+int __cdecl LuaKept(lua_State* L) {
+    g_lua.pushboolean(L, Kept(Arg(L, 1)));
+    return 1;
+}
+
+// skin.note(arquivo, titulo, decisao): o que a skin fez com a janela (log e resumo do /trokskin).
+int __cdecl LuaNote(lua_State* L) {
+    auto found = g_moonScripts.find(Arg(L, 1));
+    if (found != g_moonScripts.end()) {
+        NoteWindow(found->second, Arg(L, 2), Arg(L, 3));
+    }
+    return 0;
+}
+
+// skin.scalars(altura da tela): cantos e alinhamento do titulo da casa (WindowRounding, ChildWindowRounding,
+// FrameRounding, ScrollbarRounding, GrabRounding, WindowTitleAlign.x, .y).
+int __cdecl LuaScalars(lua_State* L) {
+    Look look;
+    HouseScalars(look, Scale(static_cast<float>(g_lua.tonumber(L, 1))));
+    const float values[] = {look.windowRounding, look.childRounding,      look.frameRounding,     look.scrollbarRounding,
+                            look.grabRounding,   look.windowTitleAlign.x, look.windowTitleAlign.y};
+    for (float v : values) {
+        g_lua.pushnumber(L, v);
+    }
+    return 7;
+}
+
+// Cores do ImGui 1.52 na ordem do imgui.Col do moon_imgui (1 = Text) -> cor da casa (indice do 1.72). Negativo:
+// botao de fechar do 1.52, um circulo sempre visivel (o X aparece com o mouse em cima): branco a 8, 16 e 24%.
+const int kMoonColors[43] = {
+    ImGuiCol_Text,         ImGuiCol_TextDisabled,       ImGuiCol_WindowBg,           ImGuiCol_ChildBg,
+    ImGuiCol_PopupBg,      ImGuiCol_Border,             ImGuiCol_BorderShadow,       ImGuiCol_FrameBg,
+    ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive,    ImGuiCol_TitleBg,            ImGuiCol_TitleBgActive,
+    ImGuiCol_TitleBgCollapsed, ImGuiCol_MenuBarBg,      ImGuiCol_ScrollbarBg,        ImGuiCol_ScrollbarGrab,
+    ImGuiCol_ScrollbarGrabHovered, ImGuiCol_ScrollbarGrabActive, ImGuiCol_PopupBg /* ComboBg */, ImGuiCol_CheckMark,
+    ImGuiCol_SliderGrab,   ImGuiCol_SliderGrabActive,   ImGuiCol_Button,             ImGuiCol_ButtonHovered,
+    ImGuiCol_ButtonActive, ImGuiCol_Header,             ImGuiCol_HeaderHovered,      ImGuiCol_HeaderActive,
+    ImGuiCol_Separator,    ImGuiCol_SeparatorHovered,   ImGuiCol_SeparatorActive,    ImGuiCol_ResizeGrip,
+    ImGuiCol_ResizeGripHovered, ImGuiCol_ResizeGripActive, -1 /* CloseButton */,      -2 /* CloseButtonHovered */,
+    -3 /* CloseButtonActive */, ImGuiCol_PlotLines,     ImGuiCol_PlotLinesHovered,   ImGuiCol_PlotHistogram,
+    ImGuiCol_PlotHistogramHovered, ImGuiCol_TextSelectedBg, ImGuiCol_ModalWindowDimBg /* ModalWindowDarkening */};
+// Fundos (WindowBg, ChildWindowBg, PopupBg, FrameBg x3, TitleBg x3, MenuBarBg, ComboBg) e cores com significado
+// (Text, TextDisabled, PlotLines x2, PlotHistogram x2), nos indices do imgui.Col.
+const int kMoonBackground[] = {3, 4, 5, 8, 9, 10, 11, 12, 13, 14, 19};
+const int kMoonSemantic[] = {1, 2, 38, 39, 40, 41};
+
+// skin.palette(): {cores = {{r, g, b, a} x 43}, fundo = {[i] = true}, significado = {[i] = true}}.
+int __cdecl LuaPalette(lua_State* L) {
+    g_lua.createtable(L, 0, 3);
+    g_lua.createtable(L, 43, 0);
+    for (int i = 0; i < 43; ++i) {
+        ImVec4 c = kMoonColors[i] >= 0 ? g_house[kMoonColors[i]] : White(0.08f * static_cast<float>(-kMoonColors[i]));
+        g_lua.createtable(L, 4, 0);
+        const float parts[] = {c.x, c.y, c.z, c.w};
+        for (int k = 0; k < 4; ++k) {
+            g_lua.pushnumber(L, parts[k]);
+            g_lua.rawseti(L, -2, k + 1);
+        }
+        g_lua.rawseti(L, -2, i + 1);
+    }
+    g_lua.setfield(L, -2, "cores");
+    g_lua.createtable(L, 0, 0);
+    for (int i : kMoonBackground) {
+        g_lua.pushboolean(L, 1);
+        g_lua.rawseti(L, -2, i);
+    }
+    g_lua.setfield(L, -2, "fundo");
+    g_lua.createtable(L, 0, 0);
+    for (int i : kMoonSemantic) {
+        g_lua.pushboolean(L, 1);
+        g_lua.rawseti(L, -2, i);
+    }
+    g_lua.setfield(L, -2, "significado");
+    return 1;
+}
+
+int __cdecl LuaFonts(lua_State* L) {
+    g_lua.pushboolean(L, g_fontOn && g_houseFont != nullptr);
+    return 1;
+}
+
+int __cdecl LuaReplaceable(lua_State* L) {
+    g_lua.pushboolean(L, Replaceable(Arg(L, 1)));
+    return 1;
+}
+
+// skin.ratio(caminho, cirilico): fator de tamanho da fonte da casa, ou nil se a fonte do script fica.
+int __cdecl LuaRatio(lua_State* L) {
+    float ratio = HouseRatio(Arg(L, 1), g_lua.toboolean(L, 2) != 0);
+    if (ratio == 0.0f) {
+        g_lua.pushnil(L);
+    } else {
+        g_lua.pushnumber(L, ratio);
+    }
+    return 1;
+}
+
+int __cdecl LuaHousePath(lua_State* L) {
+    g_lua.pushstring(L, g_housePath);
+    return 1;
+}
+
+void PushSkinTable(lua_State* L) {
+    static const struct {
+        const char* name;
+        lua_CFunction fn;
+    } functions[] = {{"log", LuaLog},         {"script", LuaScript},   {"theme", LuaTheme},
+                     {"kept", LuaKept},       {"note", LuaNote},       {"scalars", LuaScalars},
+                     {"palette", LuaPalette}, {"fonts", LuaFonts},     {"replaceable", LuaReplaceable},
+                     {"ratio", LuaRatio},     {"housePath", LuaHousePath}};
+    g_lua.createtable(L, 0, static_cast<int>(sizeof(functions) / sizeof(functions[0])));
+    for (const auto& f : functions) {
+        g_lua.pushcclosure(L, f.fn, 0);
+        g_lua.setfield(L, -2, f.name);
+    }
+}
+
+typedef int(__cdecl* LuaopenFn)(lua_State*);
+LuaopenFn o_luaopenMoonImGui = nullptr;
+
+// require 'MoonImGui' (de dentro do imgui.lua) em cada script: o DLL monta a tabela do modulo; a skin roda o
+// moon_patch.lua com ela antes de devolver. Erro no patch: o script fica como esta (e o log diz o motivo).
+int __cdecl HookLuaopenMoonImGui(lua_State* L) {
+    int results = o_luaopenMoonImGui(L);
+    int top = g_lua.gettop(L);
+    int module = top - results + 1;
+    if (results < 1 || g_lua.type(L, module) != LUA_TTABLE) {
+        Log("imgui antigo: o MoonImGui.dll nao devolveu a tabela do modulo -- script fica como esta");
+        return results;
+    }
+    if (g_lua.loadbuffer(L, kMoonPatch, sizeof(kMoonPatch) - 1, "=Trok Skin") != 0) {
+        Log("imgui antigo: o ajuste da skin nao carregou: %s", Arg(L, -1));
+    } else {
+        g_lua.pushvalue(L, module);
+        PushSkinTable(L);
+        if (g_lua.pcall(L, 2, 0, 0) != 0) {
+            Log("imgui antigo: erro ao ajustar um script (fica como esta): %s", Arg(L, -1));
+        }
+    }
+    g_lua.settop(L, top);
+    return results;
 }
 
 // ---------------------------------------------------------------- instalacao
@@ -826,26 +1063,112 @@ void Install(HMODULE dll) {
     LeaveCriticalSection(&g_installLock);
 }
 
-bool IsCimgui(HMODULE module) {
+volatile bool g_moonInstalled = false;
+volatile bool g_moonGaveUp = false;
+
+template <typename T> bool ResolveLua(HMODULE dll, const char* name, T& out) {
+    out = reinterpret_cast<T>(reinterpret_cast<void*>(GetProcAddress(dll, name)));
+    if (!out) {
+        Log("lua51.dll sem %s -- imgui antigo fica como esta", name);
+    }
+    return out != nullptr;
+}
+
+void InstallMoon(HMODULE dll) {
+    EnterCriticalSection(&g_installLock);
+    if (g_moonInstalled || g_moonGaveUp) {
+        LeaveCriticalSection(&g_installLock);
+        return;
+    }
+    g_moonGaveUp = true; // so uma tentativa por processo
+    // O MoonImGui.dll importa o lua51.dll do moonloader: ja esta carregado.
+    HMODULE lua = GetModuleHandleW(L"lua51.dll");
+    bool ok = lua != nullptr;
+    if (!ok) {
+        Log("imgui antigo: lua51.dll nao esta carregado -- fica como esta");
+    }
+    ok = ok && ResolveLua(lua, "luaL_loadbuffer", g_lua.loadbuffer) && ResolveLua(lua, "lua_pcall", g_lua.pcall) &&
+         ResolveLua(lua, "lua_gettop", g_lua.gettop) && ResolveLua(lua, "lua_settop", g_lua.settop) &&
+         ResolveLua(lua, "lua_pushvalue", g_lua.pushvalue) && ResolveLua(lua, "lua_type", g_lua.type) &&
+         ResolveLua(lua, "lua_tolstring", g_lua.tolstring) && ResolveLua(lua, "lua_tonumber", g_lua.tonumber) &&
+         ResolveLua(lua, "lua_toboolean", g_lua.toboolean) && ResolveLua(lua, "lua_pushnumber", g_lua.pushnumber) &&
+         ResolveLua(lua, "lua_pushboolean", g_lua.pushboolean) && ResolveLua(lua, "lua_pushnil", g_lua.pushnil) &&
+         ResolveLua(lua, "lua_pushstring", g_lua.pushstring) && ResolveLua(lua, "lua_pushcclosure", g_lua.pushcclosure) &&
+         ResolveLua(lua, "lua_createtable", g_lua.createtable) && ResolveLua(lua, "lua_setfield", g_lua.setfield) &&
+         ResolveLua(lua, "lua_rawseti", g_lua.rawseti);
+    void* target = ok ? reinterpret_cast<void*>(GetProcAddress(dll, "luaopen_MoonImGui")) : nullptr;
+    if (ok && !target) {
+        Log("MoonImGui.dll sem luaopen_MoonImGui -- imgui antigo fica como esta");
+        ok = false;
+    }
+    if (ok) {
+        // O DLL fica carregado ate o jogo fechar: se ele descarregasse (Ctrl+R) o desvio ficaria solto.
+        HMODULE pinned = nullptr;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                           static_cast<LPCWSTR>(target), &pinned);
+        MH_STATUS status = MH_CreateHook(target, reinterpret_cast<void*>(HookLuaopenMoonImGui),
+                                         reinterpret_cast<void**>(&o_luaopenMoonImGui));
+        if (status == MH_OK) {
+            status = MH_EnableHook(target);
+            if (status != MH_OK) {
+                MH_RemoveHook(target);
+            }
+        }
+        if (status != MH_OK) {
+            Log("nao deu para desviar luaopen_MoonImGui (%d) -- imgui antigo fica como esta", status);
+            ok = false;
+        }
+    }
+    if (ok) {
+        g_moonInstalled = true;
+        Log("skin ligada no imgui antigo do moonloader (MoonImGui.dll)%s",
+            g_houseFont ? "" : " -- sem a fonte da casa, so o tema");
+    }
+    LeaveCriticalSection(&g_installLock);
+}
+
+bool ModuleIs(HMODULE module, const wchar_t* file) {
     wchar_t path[MAX_PATH];
     DWORD n = GetModuleFileNameW(module, path, MAX_PATH);
     if (!n || n >= MAX_PATH) {
         return false;
     }
     const wchar_t* slash = wcsrchr(path, L'\\');
-    return _wcsicmp(slash ? slash + 1 : path, L"cimguidx9.dll") == 0;
+    return _wcsicmp(slash ? slash + 1 : path, file) == 0;
 }
 
-// O LuaJIT carrega a DLL do mimgui com LoadLibraryExA, que termina aqui: os desvios entram antes de
-// qualquer script usar a DLL.
+bool Pending() {
+    return (!g_installed && !g_gaveUp) || (!g_moonInstalled && !g_moonGaveUp);
+}
+
+// Se o mimgui ou o imgui antigo ja estao carregados (o .asi entrou tarde), instala agora.
+void InstallLoaded() {
+    if (!g_installed && !g_gaveUp) {
+        if (HMODULE dll = GetModuleHandleW(L"cimguidx9.dll")) {
+            Install(dll);
+        }
+    }
+    if (!g_moonInstalled && !g_moonGaveUp) {
+        if (HMODULE dll = GetModuleHandleW(L"MoonImGui.dll")) {
+            InstallMoon(dll);
+        }
+    }
+}
+
+// O LuaJIT carrega a DLL do mimgui (ffi.load) e o MoonImGui.dll (require) com LoadLibraryExA, que termina aqui:
+// os desvios entram antes de qualquer script usar a DLL.
 typedef HMODULE(WINAPI* LoadLibraryExWFn)(LPCWSTR, HANDLE, DWORD);
 LoadLibraryExWFn o_LoadLibraryExW = nullptr;
 
 HMODULE WINAPI HookLoadLibraryExW(LPCWSTR name, HANDLE file, DWORD flags) {
     HMODULE module = o_LoadLibraryExW(name, file, flags);
     const DWORD dataOnly = LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE | LOAD_LIBRARY_AS_IMAGE_RESOURCE;
-    if (module && !g_installed && !g_gaveUp && !(flags & dataOnly) && IsCimgui(module)) {
-        Install(module);
+    if (module && !(flags & dataOnly) && Pending()) {
+        if (!g_installed && !g_gaveUp && ModuleIs(module, L"cimguidx9.dll")) {
+            Install(module);
+        } else if (!g_moonInstalled && !g_moonGaveUp && ModuleIs(module, L"MoonImGui.dll")) {
+            InstallMoon(module);
+        }
     }
     return module;
 }
@@ -871,20 +1194,19 @@ void Chat(const char* text) {
 }
 
 void __cdecl CmdTrokSkin(const char*) {
-    if (!g_installed) {
-        Chat("{FF8A8A}[Trok Skin]{FFFFFF} o mimgui ainda nao carregou ou nao e o suportado. Veja o "
-             "{FFD27A}Trok Skin.log{FFFFFF}.");
+    if (!g_installed && !g_moonInstalled) {
+        Chat("{FF8A8A}[Trok Skin]{FFFFFF} nenhum menu com mimgui ou com o imgui antigo carregou ainda (ou a versao "
+             "nao e a suportada). Veja o {FFD27A}Trok Skin.log{FFFFFF}.");
         return;
     }
     g_theme = !g_theme;
     Log("/trokskin: tema %s", g_theme ? "ligado" : "desligado");
     // Resumo: o que cada script tem na tela e o que a skin faz com cada janela.
     int themed = 0;
-    for (auto& entry : g_scripts) {
-        const Script& script = entry.second;
+    auto summarize = [&themed](const Script& script) {
         if (script.untouched) {
             Log("  %s: fica como esta (da casa ou manter_scripts)", script.name.c_str());
-            continue;
+            return;
         }
         if (script.windows.empty()) {
             Log("  %s: nenhuma janela desenhada ate agora", script.name.c_str());
@@ -893,6 +1215,12 @@ void __cdecl CmdTrokSkin(const char*) {
             Log("  %s: janela \"%s\" -> %s", script.name.c_str(), w.first.c_str(), w.second.c_str());
             themed += w.second == "padronizada" || w.second == "tema desligado";
         }
+    };
+    for (auto& entry : g_scripts) {
+        summarize(entry.second);
+    }
+    for (auto& entry : g_moonScripts) {
+        summarize(entry.second);
     }
     Chat(g_theme ? "{FFFFFF}[Trok Skin] visual da casa {8AFF8A}ligado{FFFFFF}."
                  : "{FFFFFF}[Trok Skin] visual da casa {FF8A8A}desligado{FFFFFF} (a fonte volta ao recarregar os "
@@ -936,19 +1264,16 @@ void Start();
 
 DWORD WINAPI Boot(LPVOID) {
     Start();
-    // Se o mimgui ja estava carregado (o .asi entrou tarde), instala agora; senao o desvio do LoadLibrary pega.
-    for (int i = 0; i < 20 && !g_installed && !g_gaveUp; ++i) {
-        if (HMODULE dll = GetModuleHandleW(L"cimguidx9.dll")) {
-            Install(dll);
-        }
+    // Se o mimgui ou o imgui antigo ja estavam carregados (o .asi entrou tarde), instala agora; senao o desvio do
+    // LoadLibrary pega.
+    for (int i = 0; i < 20 && Pending(); ++i) {
+        InstallLoaded();
         Sleep(250);
     }
     RegisterCommand();
-    // Reserva: confere de vez em quando se a DLL apareceu por outro caminho.
-    while (!g_installed && !g_gaveUp) {
-        if (HMODULE dll = GetModuleHandleW(L"cimguidx9.dll")) {
-            Install(dll);
-        }
+    // Reserva: confere de vez em quando se as DLLs apareceram por outro caminho.
+    while (Pending()) {
+        InstallLoaded();
         Sleep(1000);
     }
     return 0;
@@ -983,9 +1308,9 @@ void Start() {
     if (target && MH_CreateHook(target, reinterpret_cast<void*>(HookLoadLibraryExW),
                                 reinterpret_cast<void**>(&o_LoadLibraryExW)) == MH_OK &&
         MH_EnableHook(target) == MH_OK) {
-        Log("esperando o mimgui carregar");
+        Log("esperando o mimgui ou o imgui antigo carregar");
     } else {
-        Log("sem desvio no LoadLibrary -- vou procurar o mimgui de tempos em tempos");
+        Log("sem desvio no LoadLibrary -- vou procurar o mimgui e o imgui antigo de tempos em tempos");
     }
 }
 
@@ -1004,7 +1329,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         } else {
             g_logPath[0] = 0;
         }
-        Log("Trok Skin .asi v1.1.0");
+        Log("Trok Skin .asi v1.2.0");
         InitializeCriticalSection(&g_installLock);
         CreateThread(nullptr, 0, Boot, nullptr, 0, nullptr);
     }
