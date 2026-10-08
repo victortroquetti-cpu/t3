@@ -5,3 +5,7 @@ trok-ui/asi/test/out/
 trok-ui/skin/third_party/
 trok-ui/skin/build/
 trok-ui/skin/test/out/
+
+# Trok Shadows
+trok-shadows/build/
+trok-shadows/test/out/
