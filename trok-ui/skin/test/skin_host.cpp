@@ -6,11 +6,13 @@
 //   alternar  carrega tambem um samp.dll falso (0.3.7 R1) e, depois da primeira carga, digita /trokskin
 //             duas vezes, salvando a tela depois de cada uma (out_desligado.bmp e out_religado.bmp)
 //
-// Scripts:
-//   "Painel A"  tema claro do proprio script (StyleColorsLight) e cantos retos
-//   "Painel B"  tema escuro padrao; empurra fundo vermelho antes do Begin; botao e texto vermelhos dentro
-//   "HUD"       fundo transparente, sem titulo; texto com tamanho explicito (AddText/CalcTextSize)
-//   "Casa"      janela da casa (id ##trokCasa) com estilo proprio: a skin nao pode mudar nada nela
+// Scripts (os arquivos ficam em moonloader\, como no jogo: a skin le o de cada script):
+//   "Painel A"  Trok_Painel_A.lua: tema claro do proprio script (StyleColorsLight) e cantos retos. Tem "trok" no
+//               nome, mas nao usa o kit: e padronizado (o nome do arquivo nao conta)
+//   "Painel B"  painel_b.lua: tema escuro padrao; empurra fundo vermelho antes do Begin; botao e texto vermelhos
+//   "HUD"       hud.lua: fundo transparente, sem titulo; texto com tamanho explicito (AddText/CalcTextSize)
+//   "Casa"      casa.lua: mod da casa renomeado (sem "trok" no nome), com janela ##trokCasa e estilo proprio: a
+//               skin nao pode mudar nada nele
 // Depois de desenhar, descarrega e recarrega a DLL (como o Ctrl+R do moonloader) e desenha de novo.
 
 #include <windows.h>
@@ -168,12 +170,15 @@ void Init(Script& s, const char* systemFont) {
     g.SetCurrentContext(s.ctx);
     g.ImplWin32_Init(g_hwnd, &s.ticks, &s.time);
     ImGuiIO* io = g.GetIO();
-    // O mimgui grava o nome do arquivo do script aqui, antes de qualquer fonte (a skin le daqui).
-    const char* file = strcmp(s.name, "Painel A") == 0   ? "painel_a.lua"
+    // O mimgui grava <moonloader>\config\mimgui\<arquivo do script>.ini aqui, antes de qualquer fonte (a skin
+    // tira dali o nome e o arquivo do script).
+    const char* file = strcmp(s.name, "Painel A") == 0   ? "Trok_Painel_A.lua"
                        : strcmp(s.name, "Painel B") == 0 ? "painel_b.lua"
                        : strcmp(s.name, "HUD") == 0      ? "hud.lua"
-                                                         : "Trok_Casa.lua";
-    snprintf(s.ini, sizeof(s.ini), "C:\\GTA\\moonloader\\config\\mimgui\\%s.ini", file);
+                                                         : "casa.lua";
+    char dir[MAX_PATH];
+    GetCurrentDirectoryA(MAX_PATH, dir);
+    snprintf(s.ini, sizeof(s.ini), "%s\\moonloader\\config\\mimgui\\%s.ini", dir, file);
     io->IniFilename = s.ini;
     io->LogFilename = nullptr;
     g.AddFontFromFileTTF(io->Fonts, systemFont, 14.0f, nullptr, g.GetGlyphRangesCyrillic(io->Fonts));

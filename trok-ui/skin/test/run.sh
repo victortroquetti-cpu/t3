@@ -57,6 +57,7 @@ run() {
     rm -rf "$dir"
     mkdir -p "$dir/moonloader/resource/trok"
     cp "$OUT/skin_host.exe" "dist/Trok Skin.asi" "$dir/"
+    cp test/moonloader/*.lua "$dir/moonloader/" # a skin le o arquivo de cada script (mod da casa ou nao)
     cp "$OUT/$dll" "$dir/cimguidx9.dll"
     python3 ../asi/test/smoke/make_fake_samp.py "$dir/samp.dll"
     if [ -n "${TROK_FONT:-}" ]; then cp "$TROK_FONT" "$dir/moonloader/resource/trok/font.ttf"; fi

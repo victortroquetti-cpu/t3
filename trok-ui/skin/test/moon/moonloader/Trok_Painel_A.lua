@@ -1,4 +1,5 @@
--- "Painel A": tema claro do proprio script e cantos retos (aplicado uma vez, ao carregar).
+-- "Painel A": tema claro do proprio script e cantos retos (aplicado uma vez, ao carregar). Tem "trok" no nome do
+-- arquivo, mas nao usa o kit da casa: tem que ser padronizado (o nome nao conta).
 local imgui = require 'imgui'
 local teste = require 'trok_teste'
 local s = teste.state()

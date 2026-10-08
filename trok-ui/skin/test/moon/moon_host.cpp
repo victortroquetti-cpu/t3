@@ -9,10 +9,10 @@
 //             duas vezes, salvando a tela depois de cada uma (out_desligado.bmp e out_religado.bmp)
 //
 // Scripts (moonloader\*.lua), os mesmos papeis do teste do mimgui:
-//   painel_a.lua   "Painel A": tema claro do proprio script e cantos retos
-//   painel_b.lua   "Painel B": tema padrao; empurra fundo vermelho antes do Begin; botao e texto vermelhos dentro
-//   hud.lua        "HUD": fundo transparente, sem titulo
-//   Trok_Casa.lua  janela da casa (##trokCasa) com estilo proprio: a skin nao pode mudar nada nela
+//   Trok_Painel_A.lua  "Painel A": tema claro do proprio script e cantos retos; "trok" no nome, sem o kit
+//   painel_b.lua       "Painel B": tema padrao; fundo vermelho empurrado antes do Begin; botao e texto vermelhos
+//   hud.lua            "HUD": fundo transparente, sem titulo
+//   casa.lua           mod da casa com outro nome (usa resource\\trok, janela ##trokCasa): nada pode mudar nele
 // Depois de desenhar, fecha os scripts e carrega de novo (como o Ctrl+R do moonloader) e desenha outra vez.
 
 #include <windows.h>
@@ -52,7 +52,7 @@ IDirect3DDevice9* g_device = nullptr;
 bool g_record = false;
 char g_fonts[MAX_PATH];
 
-const char* kScripts[] = {"painel_a.lua", "painel_b.lua", "hud.lua", "Trok_Casa.lua"};
+const char* kScripts[] = {"Trok_Painel_A.lua", "painel_b.lua", "hud.lua", "casa.lua"};
 constexpr int kCount = 4;
 
 template <typename T> void Get(HMODULE dll, const char* name, T& out) {

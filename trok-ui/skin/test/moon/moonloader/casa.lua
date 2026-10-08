@@ -1,5 +1,7 @@
--- Script da casa ("trok" no nome) com janela ##trokCasa e estilo proprio: a skin nao muda nada nele.
+-- Mod da casa com o nome trocado (sem o nome da casa no arquivo), com janela ##trokCasa e estilo proprio: a skin
+-- reconhece pela pasta da casa, que ele usa como todo mod Lua da casa, e nao muda nada nele.
 local imgui = require 'imgui'
+local FONTE_DA_CASA = '\\resource\\trok\\font.ttf' -- como no Kill List: getWorkingDirectory() .. este caminho
 local teste = require 'trok_teste'
 local check = imgui.ImBool(true)
 imgui.Process = true

@@ -12,15 +12,15 @@
 -- escreve o estilo. Qualquer erro aqui desliga a skin so neste script e devolve o visual dele.
 local imgui, skin = ...
 
--- Nome do arquivo do script (o mesmo criterio do mimgui: "trok" no nome = script da casa).
-local file
+-- O script: o nome do arquivo (log, manter_scripts) e o caminho, para o .asi ver se e um mod da casa pelo que ele
+-- tem dentro (pasta resource\trok ou janela ##trok), com qualquer nome.
+local path, file
+pcall(function() path = thisScript().path end)
 pcall(function() file = thisScript().filename end)
-if type(file) ~= 'string' or file == '' then
-    pcall(function() file = thisScript().path:match('[^\\/]+$') end)
-end
-if type(file) ~= 'string' or file == '' then file = '?' end
-if not skin.script(file) then
-    return -- da casa ("trok" no nome) ou em manter_scripts: fica como esta
+if type(path) ~= 'string' then path = '' end
+if type(file) ~= 'string' or file == '' then file = path:match('[^\\/]+$') or '?' end
+if not skin.script(file, path) then
+    return -- mod da casa ou em manter_scripts: fica como esta
 end
 
 local version = type(imgui.GetVersion) == 'function' and imgui.GetVersion() or '?'

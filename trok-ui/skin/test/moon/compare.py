@@ -108,17 +108,20 @@ check(img['tema'].getpixel((40, 300))[0] > img['tema'].getpixel((44, 300))[0], '
 check(img['tema'].getpixel((240, 60))[0] > img['tema'].getpixel((240, 61))[0], 'tema: divisor embaixo do titulo')
 check(dark(img['tema'].getpixel((100, 50))), 'tema: barra de titulo no fundo da casa')
 
-# Script da casa (Trok_Casa.lua, janela ##trokCasa): a skin nao muda nada nele, nem a fonte.
+# Mod da casa com outro nome (casa.lua): a skin reconhece pela pasta resource\\trok que ele usa, nao pelo nome, e
+# nao muda nada nele, nem a fonte.
 casa = (940, 200, 1241, 501)
 check(same_image(img['tema'].crop(casa), img['base'].crop(casa)), 'casa: janela ##trok identica a sem a skin, pixel a pixel')
 check(same_image(img['completo'].crop(casa), img['base'].crop(casa)), 'casa: com fonte=1 o script da casa segue identico (fonte dele intocada)')
-check('script do imgui antigo: Trok_Casa.lua (da casa: fica como esta)' in log('tema'), 'casa: script com "trok" no nome reconhecido (log)')
-check(not any('de Trok_Casa.lua ->' in line for line in log('completo').splitlines()), 'casa: nenhuma fonte do script da casa trocada (log)')
+check('script do imgui antigo: casa.lua (da casa (usa a pasta resource\\trok): fica como esta)' in log('tema'), 'casa: mod da casa sem "trok" no nome reconhecido pela pasta da casa (log)')
+check(not any('de casa.lua ->' in line for line in log('completo').splitlines()), 'casa: nenhuma fonte do script da casa trocada (log)')
+# "trok" no nome nao basta: Trok_Painel_A.lua nao usa o kit e e padronizado.
+check('script do imgui antigo: Trok_Painel_A.lua (padronizado)' in log('tema'), 'nome: script com "trok" no nome, sem o kit, e padronizado (log)')
 
 # Log que explica: cada script e cada janela com a decisao.
-for line in ('script do imgui antigo: painel_a.lua (padronizado)', 'janela "Painel A" de painel_a.lua: padronizada',
+for line in ('script do imgui antigo: Trok_Painel_A.lua (padronizado)', 'janela "Painel A" de Trok_Painel_A.lua: padronizada',
              'janela "HUD" de hud.lua: fundo transparente (HUD): fica como esta',
-             'fonte C:\\windows\\Fonts\\trebucbd.ttf 14.0 px de painel_a.lua -> fonte da casa'):
+             'fonte C:\\windows\\Fonts\\trebucbd.ttf 14.0 px de Trok_Painel_A.lua -> fonte da casa'):
     check(line in log('completo'), f'log: "{line}"')
 
 # Script inteiro mantido (manter_scripts=painel_b.lua): Painel B igual ao original, fonte incluida.
@@ -162,7 +165,7 @@ check(rects('versao') == base, 'versao: retangulos identicos aos sem a skin')
 check(same_image(image('alternar', 'out_desligado.bmp'), img['base']), '/trokskin: desligado na hora = sem a skin, pixel a pixel')
 check(same_image(image('alternar', 'out_religado.bmp'), img['tema']), '/trokskin: religado = tema, pixel a pixel')
 check('/trokskin: tema desligado' in log('alternar') and '/trokskin: tema ligado' in log('alternar'), '/trokskin: registrado e usado (log)')
-check('  painel_a.lua: janela "Painel A" -> padronizada' in log('alternar'), '/trokskin: resumo por script e janela no log')
+check('  Trok_Painel_A.lua: janela "Painel A" -> padronizada' in log('alternar'), '/trokskin: resumo por script e janela no log')
 
 # Pasta do GTA com acento: a fonte da casa abre do mesmo jeito (caminho em UTF-8 para o ImGui).
 check('-> fonte da casa' in log('acentua\u00e7\u00e3o'), 'acento: fonte da casa carregou numa pasta com acento (log)')

@@ -15,9 +15,10 @@
 // do Lua aberto por cada script; a skin desvia o luaopen_MoonImGui e roda no lua_State do script o
 // moon_patch.lua (embutido), que padroniza pela API Lua do proprio moon_imgui. So liga no ImGui 1.52.
 //
-// Scripts da casa (o nome do arquivo tem "trok": Kill List, vitrine, mods novos) ficam intocados: tema e
-// fonte. No mimgui, o nome vem do config\mimgui\<script>.ini que ele guarda no contexto de cada script; no
-// imgui antigo, do thisScript() do moonloader.
+// Scripts da casa (Kill List, vitrine, mods novos com o kit) ficam intocados, tema e fonte. A skin reconhece pelo
+// que o mod tem dentro, nao pelo nome do arquivo (que pode mudar): usa a pasta resource\trok (fonte e icones da
+// casa) ou abre janela com id ##trok. O arquivo vem do config\mimgui\<script>.ini que o mimgui guarda no
+// contexto de cada script, e do thisScript() do moonloader no imgui antigo.
 //
 // /trokskin liga e desliga o tema na hora (a fonte so muda quando os scripts recarregam) e anota no log
 // cada janela que viu e o que fez com ela.
@@ -87,6 +88,17 @@ std::string Trim(const std::string& s) {
     return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
 }
 
+// Abre um caminho que pode vir em UTF-8 (o nosso, o do ImGui) ou no codigo de pagina do Windows (scripts).
+FILE* OpenPath(const char* path) {
+    wchar_t wide[MAX_PATH * 2];
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wide, MAX_PATH * 2) > 0) {
+        if (FILE* file = _wfopen(wide, L"rb")) {
+            return file;
+        }
+    }
+    return fopen(path, "rb");
+}
+
 void LoadConfig() {
     if (GetFileAttributesA(g_iniPath) == INVALID_FILE_ATTRIBUTES) {
         FILE* f = fopen(g_iniPath, "w");
@@ -99,8 +111,8 @@ void LoadConfig() {
                   "fonte=1\n"
                   "; Janelas que ficam como o autor fez: o titulo que aparece na janela, separados por |\n"
                   "manter=\n"
-                  "; Scripts inteiros que ficam como estao: o nome do arquivo, separados por | (os da casa,\n"
-                  "; com \"trok\" no nome, ja ficam sozinhos)\n"
+                  "; Scripts inteiros que ficam como estao: o nome do arquivo, separados por | (os da casa, que\n"
+                  "; usam a pasta resource\\trok ou janelas ##trok, ja ficam sozinhos, com qualquer nome)\n"
                   "manter_scripts=\n",
                   f);
             fclose(f);
@@ -316,18 +328,49 @@ struct Script {
 };
 std::unordered_map<ImGuiContext*, Script> g_scripts;
 
-// Por que o script fica como esta (da casa: "trok" no nome; ou listado em manter_scripts=), ou nullptr.
-const char* UntouchedReason(const std::string& name) {
-    std::string low = Lower(name);
-    if (low.find("trok") != std::string::npos) {
-        return "da casa: fica como esta";
+// Mod da casa, pelo que tem dentro (o nome do arquivo pode mudar a vontade): usa a pasta da casa
+// (moonloader\resource\trok, a fonte e os icones do kit) ou abre janela com id ##trok. Le o arquivo do script; no
+// compilado (.luac) os textos aparecem do mesmo jeito.
+const char* HouseReason(const std::string& scriptPath) {
+    FILE* file = scriptPath.empty() ? nullptr : OpenPath(scriptPath.c_str());
+    if (!file) {
+        return nullptr;
     }
+    std::string text;
+    char buffer[65536];
+    size_t n = 0;
+    while (text.size() < (8u << 20) && (n = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        text.append(buffer, n);
+    }
+    fclose(file);
+    text = Lower(text);
+    // "resource", uma ou mais barras (no fonte Lua a barra vem dobrada: \\resource\\trok\\), "trok", barra.
+    for (size_t at = text.find("resource"); at != std::string::npos; at = text.find("resource", at + 8)) {
+        size_t p = at + 8;
+        size_t slashes = 0;
+        for (; p < text.size() && (text[p] == '\\' || text[p] == '/'); ++p) {
+            ++slashes;
+        }
+        if (slashes && text.compare(p, 4, "trok") == 0 && p + 4 < text.size() &&
+            (text[p + 4] == '\\' || text[p + 4] == '/')) {
+            return "da casa (usa a pasta resource\\trok): fica como esta";
+        }
+    }
+    if (text.find("##trok") != std::string::npos) {
+        return "da casa (tem janela ##trok): fica como esta";
+    }
+    return nullptr;
+}
+
+// Por que o script fica como esta (listado em manter_scripts= ou mod da casa), ou nullptr se e padronizado.
+const char* UntouchedReason(const std::string& name, const std::string& path) {
+    std::string low = Lower(name);
     for (const std::string& k : g_keptScripts) {
         if (k == low || k + ".lua" == low) {
             return "em manter_scripts: fica como esta";
         }
     }
-    return nullptr;
+    return HouseReason(path);
 }
 
 // So com o contexto do script ativo (le o IO dele).
@@ -339,6 +382,7 @@ Script& ScriptOf(ImGuiContext* ctx) {
     Script& script = g_scripts[ctx];
     const char* ini = p_igGetIO()->IniFilename;
     script.name = "?";
+    std::string file; // <moonloader>\<script>: o mimgui grava <moonloader>\config\mimgui\<script>.ini
     if (ini && *ini) {
         std::string path = ini;
         size_t slash = path.find_last_of("\\/");
@@ -348,9 +392,13 @@ Script& ScriptOf(ImGuiContext* ctx) {
         }
         if (!base.empty()) {
             script.name = base;
+            size_t config = Lower(path).rfind("\\config\\mimgui\\");
+            if (config != std::string::npos) {
+                file = path.substr(0, config) + "\\" + base;
+            }
         }
     }
-    const char* reason = UntouchedReason(script.name);
+    const char* reason = UntouchedReason(script.name, file);
     script.untouched = reason != nullptr;
     Log("script do mimgui: %s (%s)", script.name.c_str(), reason ? reason : "padronizado");
     return script;
@@ -554,17 +602,6 @@ struct Replaced {
     float ratio;
 };
 std::unordered_map<const ImFont*, Replaced> g_replaced;
-
-// Abre um caminho que pode vir em UTF-8 (o nosso, o do ImGui) ou no codigo de pagina do Windows (scripts).
-FILE* OpenPath(const char* path) {
-    wchar_t wide[MAX_PATH * 2];
-    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wide, MAX_PATH * 2) > 0) {
-        if (FILE* file = _wfopen(wide, L"rb")) {
-            return file;
-        }
-    }
-    return fopen(path, "rb");
-}
 
 FontFile* LoadFontFile(const char* path) {
     std::string key = Lower(path);
@@ -810,7 +847,7 @@ int __cdecl LuaLog(lua_State* L) {
     return 0;
 }
 
-// skin.script(arquivo): registra o script; true = padronizar, false = fica como esta.
+// skin.script(arquivo, caminho): registra o script; true = padronizar, false = fica como esta.
 int __cdecl LuaScript(lua_State* L) {
     std::string name = Arg(L, 1);
     if (name.empty()) {
@@ -818,7 +855,7 @@ int __cdecl LuaScript(lua_State* L) {
     }
     Script& script = g_moonScripts[name];
     script.name = name;
-    const char* reason = UntouchedReason(name);
+    const char* reason = UntouchedReason(name, Arg(L, 2));
     script.untouched = reason != nullptr;
     Log("script do imgui antigo: %s (%s)", name.c_str(), reason ? reason : "padronizado");
     g_lua.pushboolean(L, !script.untouched);
@@ -1329,7 +1366,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         } else {
             g_logPath[0] = 0;
         }
-        Log("Trok Skin .asi v1.2.0");
+        Log("Trok Skin .asi v1.2.1");
         InitializeCriticalSection(&g_installLock);
         CreateThread(nullptr, 0, Boot, nullptr, 0, nullptr);
     }
