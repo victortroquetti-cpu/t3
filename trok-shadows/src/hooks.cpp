@@ -87,6 +87,19 @@ void* g_updateOwner = nullptr;  // dono da sombra em tempo real sendo desenhada 
 void* g_castOwner = nullptr;    // dono da sombra sendo projetada no mundo (CastRealTimeShadowSectorList)
 bool g_inRealtimeCast = false;  // projetando uma sombra em tempo real (o buffer so tem polys dela)
 u32 g_lightElevation = 0;       // angulo de elevacao que o jogo calculou para a luz da sombra
+bool g_clumpRendered = false;   // CShadowCamera::Update(RpClump*) desenhou e deixou a camera aberta (os NOPs)
+
+// Limite de sombras em tempo real: so pedem sombra as entidades mais perto da camera (raio do quadro anterior).
+constexpr int kMaxCandidates = 256;
+float g_candidateDist[kMaxCandidates]; // distancia^2 de quem pediu sombra neste quadro
+int g_candidateCount = 0;
+int g_candidatesSeen = 0;          // pedidos neste quadro (inclusive acima de kMaxCandidates)
+float g_limitRadiusSq = 1e30f;     // pedidos alem deste raio^2 ficam com a sombra simples
+
+// Diagnostico (vai para o log uma vez).
+bool g_loggedBusy = false, g_loggedDoubleUpdate = false, g_loggedCamera = false;
+u32 g_slotFrame[MANAGER_SLOTS];
+int g_updateRestores = 0; // vezes que a atualizacao das sombras em tempo real foi religada
 
 void* g_stencilPool = nullptr;
 int g_stencilPoolCount = 0;
@@ -208,6 +221,66 @@ void DoShadowThisFrame(void* physical) {
                                                              physical);
 }
 
+// Distancia^2 ate a camera no plano (como o jogo mede em CShadows::StoreRealTimeShadow).
+float DistanceSqToCamera(const void* entity) {
+    const float* a = EntityPosition(entity);
+    const float* b = EntityPosition(reinterpret_cast<void*>(THE_CAMERA));
+    const float dx = a[0] - b[0], dy = a[1] - b[1];
+    return dx * dx + dy * dy;
+}
+
+// O jogador e o veiculo dele sempre ganham sombra.
+bool IsPlayerOrPlayerVehicle(const void* entity) {
+    void* player = At<void*>(PLAYER_PED);
+    return player && (entity == player || entity == VehicleOf(player));
+}
+
+// Pedido de sombra em tempo real, com dois filtros:
+//   - alem de MaxDistance o jogo nao desenha a sombra, mas ela ocupava uma das 16 vagas e era redesenhada todo
+//     quadro (o Shadows Extender pedia sombra para todo pedestre e veiculo carregado): quem esta longe nao pede;
+//   - so as MaxRealTimeShadows entidades mais perto pedem (raio do quadro anterior). Quem ja tem sombra ganha uma
+//     folga de ~14% no raio, para nao perder a vaga na borda. O jogador e o veiculo dele sempre pedem.
+bool AllowShadow(void* entity) {
+    if (!g_cfg.realtimeEnabled) {
+        return false;
+    }
+    const float d2 = DistanceSqToCamera(entity);
+    if (d2 > g_cfg.realtimeMaxDistance * g_cfg.realtimeMaxDistance) {
+        return false;
+    }
+    const float rank = IsPlayerOrPlayerVehicle(entity) ? 0.0f : d2;
+    g_candidatesSeen++;
+    if (g_candidateCount < kMaxCandidates) {
+        g_candidateDist[g_candidateCount++] = rank;
+    }
+    const bool hasShadow = Field<void*>(entity, PHYSICAL_SHADOW_DATA) != nullptr;
+    return rank <= g_limitRadiusSq * (hasShadow ? 1.3f : 1.0f);
+}
+
+void RequestShadow(void* entity) {
+    if (AllowShadow(entity)) {
+        DoShadowThisFrame(entity);
+    }
+}
+
+// Silhueta de um clump na camera da sombra, como CShadowCamera::Update(RpClump*) faz com o dono: sem textura, luz
+// nem cor na geometria durante o desenho.
+void* __cdecl SilhouetteAtomic(void* atomic, void* data) {
+    if (!(Field<uint8_t>(atomic, ATOMIC_FLAGS) & 4)) {
+        return atomic;
+    }
+    void* geometry = Field<void*>(atomic, ATOMIC_GEOMETRY);
+    const u32 flags = geometry ? Field<u32>(geometry, GEOMETRY_FLAGS) : 0;
+    if (geometry) {
+        Field<u32>(geometry, GEOMETRY_FLAGS) = flags & ~SHADOW_GEOMETRY_FLAGS;
+    }
+    Fn<AtomicCallbackFn>(game::atomicQuickRender)(atomic, data);
+    if (geometry) {
+        Field<u32>(geometry, GEOMETRY_FLAGS) = flags;
+    }
+    return atomic;
+}
+
 void RenderStateSet(int state, uintptr_t value) {
     Fn<RenderStateSetFn>(RwRenderStateSet)(state, value);
 }
@@ -267,8 +340,8 @@ void __cdecl StencilRectHook(void* rect, uint8_t* color) {
 // Os PreRender dos veiculos: pede sombra em tempo real e, se o INI deixar, a sombra simples do jogo.
 template <int N>
 void __cdecl VehicleShadowHook(void* vehicle, u32 type) {
-    if (HasRwObject(vehicle)) {
-        DoShadowThisFrame(vehicle);
+    if (g_cfg.vehicleRealtime && HasRwObject(vehicle)) {
+        RequestShadow(vehicle);
     }
     if (!g_cfg.disableVehicleDefaultShadow) {
         Original<VehicleShadowFn>(static_cast<CallId>(C_VEHICLE_1 + N))(vehicle, type);
@@ -277,16 +350,23 @@ void __cdecl VehicleShadowHook(void* vehicle, u32 type) {
 
 // ------------------------------------------------------------------------------------------------ pedestres
 // CPed::PreRenderAfterTest: depois de atualizar os ossos, todo pedestre pede sombra em tempo real (o pedido
-// condicional do jogo, mais abaixo na funcao, vira NOP).
+// condicional do jogo, mais abaixo na funcao, vira NOP). Dentro de um veiculo com sombra em tempo real, o
+// pedestre entra na sombra do veiculo (TrokShadowExtras): duas sombras separadas escureciam dobrado onde se
+// cruzavam (moto e piloto).
 void __thiscall PedRpHAnimHook(void* ped) {
     Original<ThisFn>(C_PED_RPHANIM)(ped);
-    if (HasRwObject(ped)) {
-        DoShadowThisFrame(ped);
+    if (!HasRwObject(ped)) {
+        return;
     }
+    void* vehicle = VehicleOf(ped);
+    if (vehicle && g_cfg.vehicleRealtime && HasRwObject(vehicle)) {
+        return;
+    }
+    RequestShadow(ped);
 }
 
 void __thiscall CutsceneShadowHook(void* manager, void* physical) {
-    if (physical && HasRwObject(physical)) {
+    if (physical && HasRwObject(physical) && AllowShadow(physical)) {
         Original<DoShadowFn>(C_CUTSCENE_SHADOW)(manager, physical);
     }
 }
@@ -297,6 +377,21 @@ void* __thiscall ShadowUpdateHook(void* shadow) {
     g_updateOwner = owner;
     if (!owner || !HasRwObject(owner)) {
         return nullptr;
+    }
+    // Diagnostico: a mesma sombra atualizada duas vezes no mesmo quadro (o Update do gerente rodando duas vezes,
+    // por outro mod) faz a sombra apagar e voltar.
+    const u32 frame = At<u32>(TIMER_FRAME_COUNTER);
+    void** slots = reinterpret_cast<void**>(REALTIME_SHADOW_MAN + MANAGER_SHADOWS);
+    for (int i = 0; i < MANAGER_SLOTS; i++) {
+        if (slots[i] == shadow) {
+            if (g_slotFrame[i] == frame + 1 && !g_loggedDoubleUpdate) {
+                g_loggedDoubleUpdate = true;
+                Log("diagnostico: uma sombra em tempo real foi atualizada 2 vezes no mesmo quadro (outro mod chama o "
+                    "CRealTimeShadowManager::Update?)");
+            }
+            g_slotFrame[i] = frame + 1; // +1: o quadro 0 nao se confunde com "nunca"
+            break;
+        }
     }
     return Original<ShadowUpdateFn>(C_SHADOW_UPDATE)(shadow);
 }
@@ -395,8 +490,11 @@ void* __cdecl ShadowAtomicCallback(void* atomic, void* data) {
     return atomic;
 }
 
+// So roda dentro do RwCameraBeginUpdate que deu certo em CShadowCamera::Update(RpClump*): a camera fica aberta
+// (os NOPs) ate o TrokShadowExtras fechar.
 void* __cdecl ForAllAtomicsHook(void* clump, void* callback, void* data) {
     (void)callback;
+    g_clumpRendered = true;
     return Original<ForAllAtomicsFn>(C_FOR_ALL_ATOMICS)(clump, reinterpret_cast<void*>(&ShadowAtomicCallback), data);
 }
 
@@ -554,6 +652,37 @@ void ApplyToggles() {
     g_morePlayers.Set(g_cfg.moreThanOnePlayer);
 }
 
+// O SA-MP desliga a atualizacao das sombras em tempo real: apaga a chamada em Idle (0x53EA08, NOPs) e poe um ret no
+// comeco de CRealTimeShadowManager::Update. Sem ela, nenhuma sombra em tempo real e desenhada. O mod religa (como o
+// Shadows Extender) quando o jogo inicia e confere de novo a cada quadro. So mexe se cada byte for o do jogo ou o
+// que o SA-MP poe: um gancho de outro mod nesses lugares fica como esta.
+bool OnlyDisabled(uintptr_t addr, const uint8_t* vanilla, int size, uint8_t off) {
+    for (int i = 0; i < size; i++) {
+        const uint8_t b = At<uint8_t>(addr + i);
+        if (b != vanilla[i] && b != off) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool RestoreRealtimeUpdate() {
+    // mov ecx, offset g_realTimeShadowMan; call CRealTimeShadowManager::Update
+    static const uint8_t idleCall[10] = {0xB9, 0x50, 0x03, 0xC4, 0x00, 0xE8, 0x9E, 0x80, 0x1C, 0x00};
+    static const uint8_t prologue[5] = {0x51, 0x53, 0x57, 0x8B, 0xF9}; // push ecx; push ebx; push edi; mov edi, ecx
+    bool changed = false;
+    if (memcmp(reinterpret_cast<void*>(0x53EA08), idleCall, 10) && OnlyDisabled(0x53EA08, idleCall, 10, 0x90)) {
+        patch::Write(0x53EA08, idleCall, 10);
+        changed = true;
+    }
+    if (memcmp(reinterpret_cast<void*>(CRealTimeShadowManager_Update), prologue, 5) &&
+        OnlyDisabled(CRealTimeShadowManager_Update, prologue, 5, 0xC3)) {
+        patch::Write(CRealTimeShadowManager_Update, prologue, 5);
+        changed = true;
+    }
+    return changed;
+}
+
 void ApplyLiveValues() {
     g_stencilMaxDistance = g_cfg.stencilMaxDistance;
     g_stencilMaxDistanceSq = g_cfg.stencilMaxDistance * g_cfg.stencilMaxDistance;
@@ -565,21 +694,85 @@ void ApplyLiveValues() {
 } // namespace
 
 // Chamado pelo TrokExtrasStub em CRealTimeShadow::Update, com a camera da sombra ainda aberta (os NOPs em
-// CShadowCamera::Update): desenha os extras do pedestre, inverte o raster e fecha a camera, como o jogo faria.
+// CShadowCamera::Update): desenha os extras, inverte o raster e fecha a camera, como o jogo faria.
 // So a sombra de clump passa por aqueles NOPs; a de atomic (e a que o RwCameraBeginUpdate recusou) chega aqui
 // com a camera fechada e fica como esta (o Shadows Extender invertia e fechava de novo).
 extern "C" void TrokShadowExtras(void* shadow) {
-    void* camera = Field<void*>(shadow, RTSHADOW_CAMERA);
-    void* globals = At<void*>(RW_ENGINE_INSTANCE);
-    if (!camera || !globals || *static_cast<void**>(globals) != camera) {
+    if (!g_clumpRendered) {
         return;
     }
+    g_clumpRendered = false;
+    void* camera = Field<void*>(shadow, RTSHADOW_CAMERA);
+    void* globals = At<void*>(RW_ENGINE_INSTANCE);
+    if (!g_loggedCamera && globals && *static_cast<void**>(globals) != camera) {
+        g_loggedCamera = true;
+        Log("diagnostico: a camera atual do RenderWare nao e a da sombra (0x%08X, sombra 0x%08X)",
+            static_cast<unsigned>(reinterpret_cast<uintptr_t>(*static_cast<void**>(globals))),
+            static_cast<unsigned>(reinterpret_cast<uintptr_t>(camera)));
+    }
     void* owner = Field<void*>(shadow, RTSHADOW_OWNER);
-    if (owner && EntityType(owner) == ENTITY_PED && HasRwObject(owner)) {
-        DrawPedExtras(owner);
+    if (owner && HasRwObject(owner)) {
+        if (EntityType(owner) == ENTITY_PED) {
+            if (g_cfg.weaponsInShadow) {
+                DrawPedExtras(owner);
+            }
+        } else if (EntityType(owner) == ENTITY_VEHICLE) {
+            // Quem esta no veiculo entra na sombra dele (uma sombra so: nada de escurecer dobrado onde as duas
+            // sombras se cruzavam).
+            for (int i = 0; i < 9; i++) {
+                void* ped = Field<void*>(owner, i == 0 ? VEHICLE_DRIVER : VEHICLE_PASSENGERS + (i - 1) * 4);
+                if (!ped || !HasRwObject(ped) || VehicleOf(ped) != owner) {
+                    continue;
+                }
+                Fn<ForAllAtomicsFn>(game::RpClumpForAllAtomics)(Field<void*>(ped, ENTITY_RWOBJECT),
+                                                                reinterpret_cast<void*>(&SilhouetteAtomic), nullptr);
+                if (g_cfg.weaponsInShadow) {
+                    DrawPedExtras(ped);
+                }
+            }
+        }
     }
     Fn<ThisFn>(CShadowCamera_InvertRaster)(static_cast<uint8_t*>(shadow) + RTSHADOW_CAMERA);
     Fn<PtrFn>(game::RwCameraEndUpdate)(camera);
+}
+
+// Uma vez por quadro (evento de quadro, antes do CRealTimeShadowManager::Update): raio do limite de sombras em tempo
+// real a partir das distancias de quem pediu sombra no quadro anterior; e a atualizacao das sombras ligada.
+void HooksFrame() {
+    if (!g_applied) {
+        return;
+    }
+    if (RestoreRealtimeUpdate() && ++g_updateRestores <= 3) {
+        Log("religado de novo: alguem desligou a atualizacao das sombras em tempo real com o jogo aberto (%dx)",
+            g_updateRestores);
+    }
+    const int limit = g_cfg.maxRealtime;
+    if (g_candidateCount > limit) {
+        // A limit-esima menor distancia (selecao parcial; ate 256 entradas).
+        float* d = g_candidateDist;
+        for (int i = 0; i < limit; i++) {
+            int best = i;
+            for (int j = i + 1; j < g_candidateCount; j++) {
+                if (d[j] < d[best]) {
+                    best = j;
+                }
+            }
+            const float t = d[i];
+            d[i] = d[best];
+            d[best] = t;
+        }
+        g_limitRadiusSq = d[limit - 1];
+    } else {
+        g_limitRadiusSq = 1e30f;
+    }
+    if (g_candidatesSeen > MANAGER_SLOTS && !g_loggedBusy) {
+        g_loggedBusy = true;
+        Log("diagnostico: %d entidades pediram sombra em tempo real num quadro (o jogo tem %d vagas) -- o limite "
+            "MaxRealTimeShadows=%d fica com as mais perto",
+            g_candidatesSeen, MANAGER_SLOTS, limit);
+    }
+    g_candidateCount = 0;
+    g_candidatesSeen = 0;
 }
 
 // ------------------------------------------------------------------------------------------------ API
@@ -703,17 +896,21 @@ void HooksApply() {
     // --- Arma, paraquedas e mochila a jato na sombra ---
     // CShadowCamera::Update(RpClump*) deixa a camera aberta (InvertRaster e RwCameraEndUpdate viram NOP) e o
     // mod desenha os extras e fecha a camera logo depois, em CRealTimeShadow::Update.
-    const bool cameraCallsOk = At<uint8_t>(0x705C57) == 0xE8 && At<uint8_t>(0x705C5F) == 0xE8;
+    // O RpClumpForAllAtomics trocado (0x705C4A) marca que a camera ficou aberta: sem ele, nada de NOP.
+    static const CallId extrasCalls[] = {C_FOR_ALL_ATOMICS};
+    const bool cameraCallsOk = At<uint8_t>(0x705C57) == 0xE8 && At<uint8_t>(0x705C5F) == 0xE8 &&
+                               CheckCalls(extrasCalls, 1);
     if (cameraCallsOk) {
         if (patch::CallTarget(0x705C57) != CShadowCamera_InvertRaster ||
             patch::CallTarget(0x705C5F) != game::RwCameraEndUpdate) {
             Log("  aviso: 0x705C57/0x705C5F chamam 0x%08X/0x%08X (outro mod?)",
                 static_cast<unsigned>(patch::CallTarget(0x705C57)), static_cast<unsigned>(patch::CallTarget(0x705C5F)));
         }
+        Install(C_FOR_ALL_ATOMICS, reinterpret_cast<const void*>(&ForAllAtomicsHook));
         patch::Fill(0x705C57, 0x90, 5);
         patch::Fill(0x705C5F, 0x90, 5);
         patch::SetJump(0x706676, reinterpret_cast<const void*>(&TrokExtrasStub));
-        Log("aplicado: arma, paraquedas e mochila a jato na sombra");
+        Log("aplicado: arma, paraquedas, mochila a jato e quem esta no veiculo dentro da sombra");
     } else {
         Log("  pulado: arma na sombra (0x705C57/0x705C5F diferentes do 1.0 US)");
     }
@@ -751,15 +948,14 @@ void HooksApply() {
 
     static const uintptr_t quadSites[] = {0x707EF7, 0x707F05, 0x707F13, 0x707F21};
     static const uintptr_t projectionSites[] = {0x70A211, 0x70A228};
-    static const CallId projectionCalls[] = {C_MATRIX_TRANSLATE, C_COL_SPHERE, C_STORE_SHADOW, C_FOR_ALL_ATOMICS};
-    if (PointersOk(quadSites, 4) && PointersOk(projectionSites, 2) && CheckCalls(projectionCalls, 4)) {
+    static const CallId projectionCalls[] = {C_MATRIX_TRANSLATE, C_COL_SPHERE, C_STORE_SHADOW};
+    if (PointersOk(quadSites, 4) && PointersOk(projectionSites, 2) && CheckCalls(projectionCalls, 3)) {
         PointTo(quadSites, 4, &kShadowQuadScale);
         PointTo(projectionSites, 2, &kProjectionScale);
         patch::Fill(0x70A0C9, 0x90, 5);
         Install(C_MATRIX_TRANSLATE, reinterpret_cast<const void*>(&MatrixTranslateHook));
         Install(C_COL_SPHERE, reinterpret_cast<const void*>(&ColSphereSetHook));
         Install(C_STORE_SHADOW, reinterpret_cast<const void*>(&StoreShadowHook));
-        Install(C_FOR_ALL_ATOMICS, reinterpret_cast<const void*>(&ForAllAtomicsHook));
         Log("aplicado: tamanho, raio e alcance da projecao");
     }
 
@@ -802,18 +998,9 @@ void HooksApplyLive(const Config& before) {
 }
 
 void HooksRestoreRealtimeUpdate() {
-    // O SA-MP desliga a atualizacao das sombras em tempo real: tira a chamada em Idle (0x53EA08) e poe um ret
-    // no comeco de CRealTimeShadowManager::Update. O Shadows Extender regravava os dois; aqui tambem.
-    static const uint8_t idleCall[10] = {0xB9, 0x50, 0x03, 0xC4, 0x00, 0xE8, 0x9E, 0x80, 0x1C, 0x00};
-    static const uint8_t prologue[5] = {0x51, 0x53, 0x57, 0x8B, 0xF9};
-    const bool idleOk = !memcmp(reinterpret_cast<void*>(0x53EA08), idleCall, 10);
-    const bool prologueOk = !memcmp(reinterpret_cast<void*>(CRealTimeShadowManager_Update), prologue, 5);
-    if (idleOk && prologueOk) {
-        return;
+    if (RestoreRealtimeUpdate()) {
+        Log("religado: atualizacao das sombras em tempo real (estava desligada -- o SA-MP faz isso)");
     }
-    patch::Write(0x53EA08, idleCall, 10);
-    patch::Write(CRealTimeShadowManager_Update, prologue, 5);
-    Log("religado: atualizacao das sombras em tempo real (estava desligada -- o SA-MP faz isso)");
 }
 
 void HooksShutdown() {

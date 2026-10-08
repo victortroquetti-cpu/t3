@@ -28,6 +28,9 @@ constexpr uintptr_t STENCIL_FIRST_AVAILABLE = 0xC6A168; // CStencilShadows::pFir
 constexpr uintptr_t STENCIL_FIRST_ACTIVE = 0xC6A16C;    // CStencilShadows::pFirstActiveStencilShadowObject
 constexpr uintptr_t REALTIME_SHADOW_MAN = 0xC40350;     // g_realTimeShadowMan
 constexpr uintptr_t CAR_ENVMAP_OBJ_PIPELINE = 0xC02D24; // CCustomCarEnvMapPipeline::ObjPipeline
+constexpr uintptr_t TIMER_FRAME_COUNTER = 0xB7CB4C;     // CTimer::m_FrameCounter
+constexpr uintptr_t THE_CAMERA = 0xB6F028;              // TheCamera (CPlaceable: posicao como a de uma entidade)
+constexpr uintptr_t PLAYER_PED = 0xB7CD98;              // CWorld::Players[0].m_pPed
 constexpr uintptr_t VEC_PARACHUTE_OFFSET = 0x8D60B0;    // vetores do proprio jogo para o paraquedas e a 2a pistola
 constexpr uintptr_t VEC_PARACHUTE_AXIS = 0x8D2338;
 constexpr uintptr_t VEC_TWIN_AXIS = 0x8D60A4;
@@ -100,6 +103,17 @@ constexpr uint32_t ATOMIC_RENDER_CB = 0x48;     // RpAtomic::renderCallBack
 constexpr uint32_t ATOMIC_PIPELINE = 0x6C;      // RpAtomic::pipeline
 constexpr uint32_t OBJECT_PARENT = 0x04;        // RwObject::parent (frame de um clump)
 constexpr uint32_t FRAME_MODELLING = 0x10;      // RwFrame::modelling (RwMatrix, 64 bytes)
+constexpr uint32_t ATOMIC_GEOMETRY = 0x18;      // RpAtomic::geometry
+constexpr uint32_t GEOMETRY_FLAGS = 0x08;       // RpGeometry::flags
+// Flags que CShadowCamera::Update(RpClump*) tira da geometria para desenhar a silhueta (textura, luz, cor).
+constexpr uint32_t SHADOW_GEOMETRY_FLAGS = 0xEC;
+constexpr uint32_t PHYSICAL_SHADOW_DATA = 0x134; // CPhysical::m_pShadowData (CRealTimeShadow*)
+constexpr uint32_t PED_FLAGS_IN_VEHICLE = 0x46D; // CPed: byte dos flags com bInVehicle no bit 0
+constexpr uint32_t PED_VEHICLE = 0x58C;          // CPed::m_pVehicle
+constexpr uint32_t VEHICLE_DRIVER = 0x460;       // CVehicle::m_pDriver
+constexpr uint32_t VEHICLE_PASSENGERS = 0x464;   // CVehicle::m_apPassengers[8]
+constexpr uint32_t MANAGER_SHADOWS = 0x04;       // CRealTimeShadowManager::m_apShadows[16]
+constexpr int MANAGER_SLOTS = 16;
 
 constexpr int ENTITY_VEHICLE = 2;
 constexpr int ENTITY_PED = 3;
@@ -138,6 +152,14 @@ inline int EntityType(const void* entity) {
 
 inline bool HasRwObject(const void* entity) {
     return Field<void*>(entity, ENTITY_RWOBJECT) != nullptr;
+}
+
+// Pedestre dentro de um veiculo (devolve o veiculo).
+inline void* VehicleOf(const void* ped) {
+    if (!(Field<uint8_t>(ped, PED_FLAGS_IN_VEHICLE) & 1)) {
+        return nullptr;
+    }
+    return Field<void*>(ped, PED_VEHICLE);
 }
 
 // Helicoptero ou aviao: usam os limites "InAir".

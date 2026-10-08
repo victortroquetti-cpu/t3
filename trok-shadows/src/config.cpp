@@ -127,6 +127,10 @@ void ReadAll(Config& c, const char* ini, bool sampLoaded) {
     c.cloudsFactor = ReadFloat(ini, S_REALTIME, "ShadowIntensityCloudsFactor", 0.4f);
     const int multi = ReadAuto(ini, S_REALTIME, "MoreThanOnePlayer");
     c.moreThanOnePlayer = multi < 0 ? sampLoaded : multi != 0;
+    c.realtimeEnabled = ReadBool(ini, S_REALTIME, "EnableRealTimeShadows", true);
+    c.vehicleRealtime = ReadBool(ini, S_REALTIME, "VehicleRealTimeShadows", true);
+    c.weaponsInShadow = ReadBool(ini, S_REALTIME, "WeaponsInShadow", true);
+    c.maxRealtime = ReadInt(ini, S_REALTIME, "MaxRealTimeShadows", 12);
 
     c.autoReload = ReadBool(ini, S_GERAL, "recarregar", true);
 
@@ -149,6 +153,8 @@ void ReadAll(Config& c, const char* ini, bool sampLoaded) {
     Clamp(c.sunZLimit, -1.0f, 2.0f, "ShadowSunZLimit");
     Clamp(c.zLimit, 0.1f, 100.0f, "ShadowZDistanceLimit");
     Clamp(c.zLimitInAir, 0.1f, 100.0f, "ShadowZDistanceLimitInAir");
+    // O jogo tem 16 vagas de sombra em tempo real.
+    Clamp(c.maxRealtime, 1, 16, "MaxRealTimeShadows");
     Clamp(c.nightFactor, 0.0f, 1.0f, "ShadowIntensityNightFactor");
     Clamp(c.cloudsFactor, 0.0f, 1.0f, "ShadowIntensityCloudsFactor");
     if (!c.createBlur1) {
@@ -259,6 +265,17 @@ bool WriteIni(const char* path, const Config& c, bool multiAuto) {
                 c.moreThanOnePlayer);
     }
     fprintf(f,
+            "; 0 = sem sombra em tempo real (fica a sombra simples do jogo).\r\n"
+            "EnableRealTimeShadows=%d\r\n"
+            "; 1 = veículos com sombra em tempo real (quem está dentro entra na sombra do veículo).\r\n"
+            "VehicleRealTimeShadows=%d\r\n"
+            "; 1 = arma, paraquedas e mochila a jato aparecem na sombra.\r\n"
+            "WeaponsInShadow=%d\r\n"
+            "; Quantas sombras em tempo real ao mesmo tempo, as mais perto da câmera (1 a 16). Cada uma é desenhada\r\n"
+            ";     de novo a cada quadro: menos = mais FPS. O jogo tem 16 vagas e dá a vaga para quem pede primeiro.\r\n"
+            "MaxRealTimeShadows=%d\r\n",
+            c.realtimeEnabled, c.vehicleRealtime, c.weaponsInShadow, c.maxRealtime);
+    fprintf(f,
             "\r\n[GERAL]\r\n"
             "; 1 = aplica este arquivo assim que você salva, com o jogo aberto.\r\n"
             "recarregar=%d\r\n",
@@ -293,6 +310,20 @@ void ConfigLoad(Config& cfg, const char* iniPath, const char* oldIniPath, bool s
     ReadAll(cfg, iniPath, sampLoaded);
 }
 
+void ConfigUpgrade(const char* iniPath, const Config& cfg) {
+    static const char* const added[] = {"EnableRealTimeShadows", "VehicleRealTimeShadows", "WeaponsInShadow",
+                                        "MaxRealTimeShadows"};
+    char buf[64];
+    for (const char* key : added) {
+        if (!ReadRaw(iniPath, S_REALTIME, key, buf, sizeof(buf))) {
+            if (WriteIni(iniPath, cfg, ReadAuto(iniPath, S_REALTIME, "MoreThanOnePlayer") < 0)) {
+                Log("INI atualizado com as opcoes novas (os valores que ja estavam ficaram)");
+            }
+            return;
+        }
+    }
+}
+
 void ConfigLog(const Config& c) {
     Log("  stencil: MaxShadows=%d MaxDistance=%g FlagIgnoreSomeShadows=%d DisableBuildingShadows=%d "
         "DisplayShadowsAtLowSettings=%d cor=%d,%d,%d,%d",
@@ -308,4 +339,6 @@ void ConfigLog(const Config& c) {
         "SemSombraSimples=%d MaisDeUmJogador=%d recarregar=%d",
         c.realtimeLowSettings, c.enableShader, c.combineWithStencil, c.drawVehicleDefaultWithRealTime,
         c.disableVehicleDefaultShadow, c.moreThanOnePlayer, c.autoReload);
+    Log("  tempo real: Ligada=%d Veiculos=%d Arma=%d Maximo=%d", c.realtimeEnabled, c.vehicleRealtime,
+        c.weaponsInShadow, c.maxRealtime);
 }

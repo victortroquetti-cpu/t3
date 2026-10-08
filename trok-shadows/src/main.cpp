@@ -55,6 +55,7 @@ void OnInitRw() {
         return;
     }
     ConfigLoad(g_cfg, g_iniPath, g_oldIniPath, SampLoaded());
+    ConfigUpgrade(g_iniPath, g_cfg);
     ConfigFileTime(g_iniPath, &g_iniTime);
     Log("INI: %s", g_iniPath);
     ConfigLog(g_cfg);
@@ -111,6 +112,7 @@ extern "C" void TrokOnEvent(int id) {
         OnInitGame();
         break;
     case EVENT_GAME_PROCESS:
+        HooksFrame();
         CheckIniChanged();
         break;
     }

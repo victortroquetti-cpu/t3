@@ -4,10 +4,11 @@
 // gravadores: o teste confere argumentos, ordem e convencao de chamada (o que o Shadows Extender fazia).
 //
 // Roda dentro do launcher.exe (test/launcher.c), que ocupa a faixa de enderecos do gta_sa.exe.
-// Uso: launcher.exe completo | errado | conflito
+// Uso: launcher.exe completo | errado | conflito | atualizar
 //   completo: tudo (precisa de shadows.ini na pasta: o mod importa os valores dele)
 //   errado:   memoria zerada (outro exe): o mod tem que ficar desligado sem escrever nada
 //   conflito: um "shadows.asi" carregado antes: o mod tem que ficar desligado e avisar
+//   atualizar: INI da versao 1.0 (sem as chaves novas): o mod reescreve com os mesmos valores e as chaves novas
 
 #include <windows.h>
 #include <d3d9.h>
@@ -221,7 +222,10 @@ void* __cdecl RecForAllAtomics(void* clump, void* cb, void* data) {
     return clump;
 }
 void* __cdecl RecQuickRender(void* atomic, void* data) {
-    Record("atomicQuickRender", 2, (u32)(uintptr_t)atomic, (u32)At<u32>((uintptr_t)atomic + 0x6C));
+    // a[2] = flags da geometria durante o desenho (a silhueta tira textura, luz e cor).
+    void* geometry = At<void*>((uintptr_t)atomic + 0x18);
+    Record("atomicQuickRender", 3, (u32)(uintptr_t)atomic, (u32)At<u32>((uintptr_t)atomic + 0x6C),
+           geometry ? At<u32>((uintptr_t)geometry + 8) : 0xFFFFFFFFu);
     (void)data;
     return atomic;
 }
@@ -456,6 +460,24 @@ bool LogHas(const char* text) {
     fclose(f);
     buf[n] = 0;
     return strstr(buf, text) != nullptr;
+}
+
+bool FileHas(const char* path, const char* text) {
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        return false;
+    }
+    static char buf[65536];
+    const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[n] = 0;
+    return strstr(buf, text) != nullptr;
+}
+
+void WriteIni(const char* text) {
+    FILE* f = fopen("Trok Shadows.ini", "wb");
+    fputs(text, f);
+    fclose(f);
 }
 
 // Troca a importacao de MessageBoxW do .asi (a caixa travaria o teste).
@@ -790,6 +812,21 @@ void TestAtomics(void* ped, void* heli) {
           "helice: ALPHATESTFUNCTIONREF = 0xFE durante o desenho e volta ao valor de antes");
 }
 
+void EnterExtras(uint8_t* shadow) {
+    g_inEsi = (u32)(uintptr_t)shadow;
+    g_inEdi = (u32)(uintptr_t)(shadow + 8);
+    g_inEax = 0x1;
+    g_inEdx = 0x22222222;
+    g_inEbx = 0x33333333;
+    HostEnterExtras();
+}
+
+// O clump do dono desenhado na camera da sombra (o gancho de 0x705C4A marca a camera aberta).
+void ClumpRendered() {
+    reinterpret_cast<void*(__cdecl*)(void*, void*, void*)>(Target(0x705C4A))(reinterpret_cast<void*>(0x8888),
+                                                                            reinterpret_cast<void*>(0x705620), nullptr);
+}
+
 void TestStubs(void* ped) {
     printf("\n-- trechos em assembly\n");
     // Sol: z = max(z, 0.5 * noite + 0.6), eax e edx intactos, ecx = edi.
@@ -812,37 +849,200 @@ void TestStubs(void* ped) {
     }
     At<float>(0x8D12C0) = 0.0f;
 
-    // Extras: camera fechada -> nada; aberta -> InvertRaster(&sombra->camera) e RwCameraEndUpdate(camera).
+    // Extras: sem o clump desenhado (sombra de atomic, ou BeginUpdate recusado) -> nada; com ele ->
+    // InvertRaster(&sombra->camera) e RwCameraEndUpdate(camera).
     void* camera = reinterpret_cast<void*>(0x4242);
     uint8_t* shadow = static_cast<uint8_t*>(NewShadow(ped, camera));
+    g_globals.curCamera = camera; // RwCameraBeginUpdate deixa a camera da sombra como a atual
+    EnterExtras(shadow);          // consome uma marca que tenha sobrado de outro teste
     for (int open = 0; open < 2; open++) {
-        g_globals.curCamera = open ? camera : nullptr;
+        if (open) {
+            ClumpRendered();
+        }
         ClearRec();
-        g_inEsi = (u32)(uintptr_t)shadow;
-        g_inEdi = (u32)(uintptr_t)(shadow + 8);
-        g_inEax = 0x1;
-        g_inEdx = 0x22222222;
-        g_inEbx = 0x33333333;
-        HostEnterExtras();
+        EnterExtras(shadow);
         const bool regs = g_outEax == 0x4242 && (g_outEcx & 0xFF) == 0xA5 && g_outEdx == 0x22222222 &&
                           g_outEbx == 0x33333333 && g_outEsi == (u32)(uintptr_t)shadow &&
                           g_outEdi == (u32)(uintptr_t)(shadow + 8) && g_outEbp == 0x0BADF00D;
         if (!open) {
-            Check(regs && g_recCount == 0, "extras com a camera fechada: nada (registradores do jogo intactos)");
+            Check(regs && g_recCount == 0, "extras sem o clump desenhado: nada (registradores do jogo intactos)");
         } else {
             const Rec* inv = FindRec("InvertRaster");
             const Rec* end = FindRec("RwCameraEndUpdate");
             Check(regs && inv && inv->a[0] == (u32)(uintptr_t)(shadow + 8) && end && end->a[0] == 0x4242,
-                  "extras com a camera aberta: InvertRaster(&camera) e RwCameraEndUpdate(camera)");
+                  "extras com o clump desenhado: InvertRaster(&camera) e RwCameraEndUpdate(camera)");
         }
     }
+    Check(!LogHas("nao e a da sombra"), "camera aberta e a da sombra: nada no log");
     g_globals.curCamera = nullptr;
+    ClumpRendered();
+    EnterExtras(shadow);
+    Check(LogHas("nao e a da sombra"), "camera aberta diferente da sombra: avisa no log");
 }
 
-void WriteIni(const char* text) {
-    FILE* f = fopen("Trok Shadows.ini", "wb");
-    fputs(text, f);
-    fclose(f);
+// Moto com piloto e garupa: os dois entram na sombra da moto, em silhueta, e nao pedem sombra propria.
+void TestOccupants() {
+    printf("\n-- quem esta no veiculo entra na sombra dele\n");
+    uint8_t* bike = static_cast<uint8_t*>(NewEntity(2, true, 9));
+    uint8_t* rider = static_cast<uint8_t*>(NewEntity(3, true));
+    uint8_t* passenger = static_cast<uint8_t*>(NewEntity(3, true));
+    for (uint8_t* p : {rider, passenger}) {
+        At<uint8_t>((uintptr_t)p + 0x46D) = 1; // bInVehicle
+        At<void*>((uintptr_t)p + 0x58C) = bike;
+    }
+    // Clumps diferentes para saber quem foi desenhado.
+    At<void*>((uintptr_t)rider + 0x18) = reinterpret_cast<void*>(0xA001);
+    At<void*>((uintptr_t)passenger + 0x18) = reinterpret_cast<void*>(0xA002);
+    At<void*>((uintptr_t)bike + 0x460) = rider;
+    At<void*>((uintptr_t)bike + 0x464 + 4 * 2) = passenger; // garupa no 3o lugar
+
+    ClearRec();
+    reinterpret_cast<void(__thiscall*)(void*)>(Target(0x5E6664))(rider);
+    Check(CountRec("UpdateRpHAnim") == 1 && CountRec("DoShadowThisFrame") == 0,
+          "piloto na moto: nao pede sombra propria");
+
+    uint8_t* shadow = static_cast<uint8_t*>(NewShadow(bike, reinterpret_cast<void*>(0x4343)));
+    EnterExtras(shadow);
+    ClumpRendered();
+    ClearRec();
+    EnterExtras(shadow);
+    const Rec* first = FindRec("RpClumpForAllAtomics", 0);
+    const Rec* second = FindRec("RpClumpForAllAtomics", 1);
+    Check(CountRec("RpClumpForAllAtomics") == 2 && first && first->a[0] == 0xA001 && second && second->a[0] == 0xA002,
+          "a sombra da moto desenha o piloto e a garupa");
+    Check(FindRec("InvertRaster") && FindRec("RwCameraEndUpdate"), "e depois inverte e fecha a camera");
+
+    // O callback da silhueta: tira textura, luz e cor (0xEC) so durante o desenho.
+    if (first) {
+        Fake* atomic = new Fake();
+        Fake* geometry = new Fake();
+        memset(atomic, 0, sizeof(*atomic));
+        memset(geometry, 0, sizeof(*geometry));
+        const uintptr_t a = reinterpret_cast<uintptr_t>(atomic);
+        At<uint8_t>(a + 2) = 4;
+        At<void*>(a + 0x18) = geometry;
+        At<u32>((uintptr_t)geometry + 8) = 0xFF;
+        ClearRec();
+        reinterpret_cast<void*(__cdecl*)(void*, void*)>(first->a[1])(atomic, nullptr);
+        const Rec* qr = FindRec("atomicQuickRender");
+        Check(qr && qr->a[2] == 0x13 && At<u32>((uintptr_t)geometry + 8) == 0xFF,
+              "silhueta: flags 0xFF viram 0x13 no desenho e voltam (%02X)", qr ? qr->a[2] : 0);
+    }
+
+    // Sem sombra em tempo real de veiculo, o piloto volta a pedir a sua.
+    Sleep(1100);
+    WriteIni("[REALTIME_SHADOWS]\r\nVehicleRealTimeShadows=0\r\nCombineRealTimeShadowsWithStencil=1\r\n"
+             "[GERAL]\r\nrecarregar=1\r\n");
+    FireEvent(0x53E981);
+    ClearRec();
+    reinterpret_cast<void(__thiscall*)(void*)>(Target(0x5E6664))(rider);
+    reinterpret_cast<void(__cdecl*)(void*, u32)>(Target(0x6ABCF5))(bike, 0);
+    Check(CountRec("DoShadowThisFrame") == 1 && FindRec("DoShadowThisFrame")->a[1] == (u32)(uintptr_t)rider,
+          "VehicleRealTimeShadows=0: o piloto pede a sombra dele e a moto nao");
+    Sleep(1100);
+    WriteIni("[REALTIME_SHADOWS]\r\nCombineRealTimeShadowsWithStencil=1\r\nMaxDistance=100\r\n"
+             "[GERAL]\r\nrecarregar=1\r\n");
+    FireEvent(0x53E981);
+}
+
+// MaxRealTimeShadows: das 20 entidades que pedem sombra, so as 12 mais perto ganham (raio do quadro anterior). Alem
+// de MaxDistance (100) ninguem pede: o jogo nao desenharia a sombra.
+void TestLimit() {
+    printf("\n-- limite de sombras em tempo real\n");
+    void* cars[21];
+    for (int i = 0; i < 21; i++) {
+        cars[i] = NewEntity(2, true, 0);
+        // 10 m, 14 m, ... 86 m da camera (na origem), o 21o a 150 m. A altura (60 m) nao conta: o jogo mede no plano.
+        At<float>((uintptr_t)cars[i] + 0x04) = i < 20 ? 10.0f + 4.0f * i : 150.0f;
+        At<float>((uintptr_t)cars[i] + 0x08) = 0.0f;
+        At<float>((uintptr_t)cars[i] + 0x0C) = 60.0f;
+    }
+    auto requestAll = [&] {
+        for (void* c : cars) {
+            reinterpret_cast<void(__cdecl*)(void*, u32)>(Target(0x6ABCF5))(c, 0);
+        }
+    };
+    FireEvent(0x53E981); // zera o quadro
+    ClearRec();
+    requestAll();
+    bool skipFar = true;
+    for (int i = 0; i < CountRec("DoShadowThisFrame"); i++) {
+        skipFar = skipFar && FindRec("DoShadowThisFrame", i)->a[1] != (u32)(uintptr_t)cars[20];
+    }
+    Check(CountRec("DoShadowThisFrame") == 20 && skipFar, "primeiro quadro: sem raio ainda, os 20 pedem (o de 150 m nao)");
+    FireEvent(0x53E981);
+    ClearRec();
+    requestAll();
+    bool nearest = CountRec("DoShadowThisFrame") == 12;
+    for (int i = 0; nearest && i < 12; i++) {
+        nearest = FindRec("DoShadowThisFrame", i)->a[1] == (u32)(uintptr_t)cars[i];
+    }
+    Check(nearest, "depois: so as 12 mais perto (%d)", CountRec("DoShadowThisFrame"));
+    Check(LogHas("diagnostico: 20 entidades pediram sombra"), "log: mais pedidos que vagas (distancia no plano)");
+
+    // Quem ja tem sombra ganha uma folga no raio: o 13o (58 m) com sombra continua.
+    At<void*>((uintptr_t)cars[12] + 0x134) = reinterpret_cast<void*>(0x5151);
+    FireEvent(0x53E981);
+    ClearRec();
+    requestAll();
+    Check(CountRec("DoShadowThisFrame") == 13 && FindRec("DoShadowThisFrame", 12)->a[1] == (u32)(uintptr_t)cars[12],
+          "o 13o, que ja tem sombra, nao perde a vaga na borda");
+
+    // O jogador e o veiculo dele sempre ganham (dentro de MaxDistance).
+    void* player = NewEntity(3, true);
+    At<void*>(0xB7CD98) = player;
+    At<uint8_t>((uintptr_t)player + 0x46D) = 1;
+    At<void*>((uintptr_t)player + 0x58C) = cars[19];
+    FireEvent(0x53E981);
+    ClearRec();
+    requestAll();
+    Check(FindRec("DoShadowThisFrame", CountRec("DoShadowThisFrame") - 1)->a[1] == (u32)(uintptr_t)cars[19],
+          "o veiculo do jogador (86 m) ganha mesmo fora das 12 mais perto");
+    At<void*>((uintptr_t)player + 0x58C) = cars[20];
+    ClearRec();
+    requestAll();
+    Check(CountRec("DoShadowThisFrame") == 13, "mas a 150 m (alem de MaxDistance) nao pede");
+    At<void*>(0xB7CD98) = nullptr;
+    At<void*>((uintptr_t)cars[12] + 0x134) = nullptr;
+    FireEvent(0x53E981);
+    FireEvent(0x53E981);
+}
+
+// O SA-MP desligando a atualizacao das sombras com o jogo aberto: o mod religa no quadro seguinte. Um gancho de outro
+// mod no mesmo lugar fica.
+void TestUpdateRestore() {
+    printf("\n-- atualizacao das sombras em tempo real desligada de novo\n");
+    memset(Mem(0x53EA08), 0x90, 10);
+    Mem(0x706AB0)[0] = 0xC3;
+    FireEvent(0x53E981);
+    Check(Bytes(0x53EA08, {0xB9, 0x50, 0x03, 0xC4, 0x00, 0xE8, 0x9E, 0x80, 0x1C, 0x00}) &&
+              Bytes(0x706AB0, {0x51, 0x53, 0x57, 0x8B, 0xF9}),
+          "religada no quadro seguinte");
+    Check(LogHas("religado de novo"), "log: religado de novo");
+    PutCall(0x53EA0D, reinterpret_cast<uintptr_t>(&FakeGameProcess)); // call para fora do exe
+    PutJump(0x706AB0, reinterpret_cast<void*>(&FakeGameProcess));       // jmp no comeco da funcao
+    uint8_t idle[10], start[5];
+    memcpy(idle, Mem(0x53EA08), 10);
+    memcpy(start, Mem(0x706AB0), 5);
+    FireEvent(0x53E981);
+    Check(!memcmp(idle, Mem(0x53EA08), 10) && !memcmp(start, Mem(0x706AB0), 5),
+          "gancho de outro mod na chamada e no comeco da funcao: fica");
+    Put(0x53EA08, {0xB9, 0x50, 0x03, 0xC4, 0x00, 0xE8, 0x9E, 0x80, 0x1C, 0x00});
+    Put(0x706AB0, {0x51, 0x53, 0x57, 0x8B, 0xF9});
+}
+
+void TestDoubleUpdate(void* ped) {
+    printf("\n-- diagnostico do Update duas vezes no quadro\n");
+    void* shadow = NewShadow(ped, nullptr);
+    At<void*>(0xC40350 + 4) = shadow; // m_apShadows[0]
+    At<u32>(0xB7CB4C) = 500;
+    reinterpret_cast<void*(__thiscall*)(void*)>(Target(0x706B29))(shadow);
+    At<u32>(0xB7CB4C) = 501;
+    reinterpret_cast<void*(__thiscall*)(void*)>(Target(0x706B29))(shadow);
+    Check(!LogHas("2 vezes no mesmo quadro"), "um Update por quadro: nada no log");
+    reinterpret_cast<void*(__thiscall*)(void*)>(Target(0x706B29))(shadow);
+    Check(LogHas("2 vezes no mesmo quadro"), "dois no mesmo quadro: avisa no log");
+    At<void*>(0xC40350 + 4) = nullptr;
 }
 
 int RunFull() {
@@ -884,6 +1084,10 @@ int RunFull() {
     TestShader(ped, heli, true);
     TestAtomics(ped, heli);
     TestStubs(ped);
+    TestOccupants();
+    TestLimit();
+    TestDoubleUpdate(ped);
+    TestUpdateRestore();
 
     // INI mudado com o jogo aberto (guarda antes o INI que o mod criou, para conferir o formato).
     printf("\n-- INI recarregado com o jogo aberto\n");
@@ -934,6 +1138,31 @@ int RunWrong(uintptr_t gameBegin) {
     return 0;
 }
 
+// INI da versao 1.0 (sem as chaves novas): o mod reescreve com os mesmos valores e as chaves novas.
+int RunUpgrade() {
+    SetupGame();
+    WriteIni("[STENCIL_SHADOWS]\r\nMaxShadows=200\r\nMaxDistance=77.0\r\n[REALTIME_SHADOWS]\r\nMaxDistance=60.0\r\n"
+             "MoreThanOnePlayer=auto\r\n[GERAL]\r\nrecarregar=1\r\n");
+    HMODULE mod = LoadLibraryA("Trok Shadows.asi");
+    Check(mod != nullptr, "LoadLibrary do .asi");
+    if (!mod) {
+        return 1;
+    }
+    PatchImport(mod, "USER32.dll", "MessageBoxW", reinterpret_cast<void*>(&FakeMessageBoxW));
+    FireEvent(0x5BD779);
+    const char* ini = "Trok Shadows.ini";
+    Check(LogHas("INI atualizado com as opcoes novas"), "log: INI atualizado");
+    Check(FileHas(ini, "EnableRealTimeShadows=1") && FileHas(ini, "VehicleRealTimeShadows=1") &&
+              FileHas(ini, "WeaponsInShadow=1") && FileHas(ini, "MaxRealTimeShadows=12") &&
+              FileHas(ini, "; Quantas sombras em tempo real"),
+          "chaves novas no INI, com comentario");
+    Check(FileHas(ini, "MaxShadows=200") && FileHas(ini, "MaxDistance=77.0") && FileHas(ini, "MaxDistance=60.0") &&
+              FileHas(ini, "MoreThanOnePlayer=auto"),
+          "os valores de antes ficaram");
+    Check(Near(At<float>(0x8D5240), 60.0f), "MaxDistance tempo real 60 aplicado");
+    return 0;
+}
+
 int RunConflict() {
     HMODULE old = LoadLibraryA("shadows.asi");
     Check(old != nullptr, "shadows.asi falso carregado antes");
@@ -959,6 +1188,8 @@ extern "C" __declspec(dllexport) int HostMain(const char* mode, uintptr_t gameBe
         RunWrong(gameBegin);
     } else if (!strcmp(mode, "conflito")) {
         RunConflict();
+    } else if (!strcmp(mode, "atualizar")) {
+        RunUpgrade();
     } else {
         RunFull();
     }

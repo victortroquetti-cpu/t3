@@ -5,7 +5,7 @@
 #include <windows.h>
 #include <cstdint>
 
-#define TROK_SHADOWS_VERSION "1.0"
+#define TROK_SHADOWS_VERSION "1.1"
 
 // ---------------------------------------------------------------- log (log.cpp)
 void LogOpen(const char* path);
@@ -95,6 +95,11 @@ struct Config {
     float nightFactor;
     float cloudsFactor;
     bool moreThanOnePlayer;
+    // Novos do Trok Shadows
+    bool realtimeEnabled;  // sombra em tempo real ligada (desligada: a sombra simples do jogo)
+    bool vehicleRealtime;  // veiculos com sombra em tempo real
+    bool weaponsInShadow;  // arma, paraquedas e mochila a jato na sombra
+    int maxRealtime;       // quantas sombras em tempo real ao mesmo tempo (as mais perto da camera)
     // [GERAL]
     bool autoReload;
 };
@@ -104,6 +109,8 @@ extern Config g_cfg;
 // Le o INI. Se ele nao existir, cria (com os valores do shadows.ini antigo, se houver). Devolve os avisos de
 // valores corrigidos pelo log.
 void ConfigLoad(Config& cfg, const char* iniPath, const char* oldIniPath, bool sampLoaded);
+// INI de uma versao anterior (sem as chaves novas): reescreve com os mesmos valores e as chaves novas comentadas.
+void ConfigUpgrade(const char* iniPath, const Config& cfg);
 void ConfigLog(const Config& cfg);
 bool ConfigFileTime(const char* path, FILETIME* out);
 
@@ -120,6 +127,7 @@ void HooksInstallEvents();    // eventos (DllMain)
 void HooksApply();            // todos os recursos (depois do RenderWare iniciar)
 void HooksApplyLive(const Config& before); // o que muda com o jogo aberto
 void HooksRestoreRealtimeUpdate(); // religa a atualizacao das sombras em tempo real (o SA-MP desliga)
+void HooksFrame();            // uma vez por quadro: limite de sombras em tempo real e diagnostico
 void HooksShutdown();
 
 // Chamado pelos stubs (stubs.cpp) a cada evento.

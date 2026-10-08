@@ -2,7 +2,7 @@
 
 O **Shadows Extender 2.0** (DK22Pac, 2014) refeito com código aberto. Faz tudo o que ele fazia, com as mesmas chaves no INI, e corrige o que estava errado nele.
 
-> **Estado:** compilado e testado no Wine, sem o jogo: as 90 conferências do `test/run.sh` passam. **Ainda não foi testado dentro do GTA.**
+> **Estado:** versão 1.1, compilada e testada no Wine, sem o jogo: as 113 conferências do `test/run.sh` passam. A 1.0 já rodou no GTA; a 1.1 traz as correções para os dois problemas achados nela (ver [Versões](#versões)) e ainda não foi testada dentro do jogo.
 
 ## O que muda em relação ao Shadows Extender
 
@@ -14,6 +14,9 @@ O **Shadows Extender 2.0** (DK22Pac, 2014) refeito com código aberto. Faz tudo 
 - **Confere o jogo antes de mexer.** Só liga no `gta_sa.exe` 1.0 US e confere cada ponto antes de escrever. Se outro mod já desviou a mesma chamada, encadeia com ele em vez de apagar o gancho dele.
 - **Avisa se o `shadows.asi` antigo também estiver na pasta.** Com os dois, um bagunçaria o outro, então o Trok Shadows fica desligado e mostra uma mensagem.
 - **Corrige valores fora da faixa e avisa no log.** `CreateBlur1=0`, que travava o jogo, vira 1.
+- **Não escurece dobrado no veículo.** Quem está dentro de um veículo com sombra em tempo real entra na sombra dele: uma sombra só. No original, piloto e moto tinham cada um a sua, e onde as duas se cruzavam ficava mais escuro.
+- **As sombras não somem por falta de vaga.** O jogo tem 16 vagas de sombra em tempo real. O original pedia sombra para todo pedestre e veículo carregado, até os que estavam longe demais para a sombra aparecer: eles ocupavam as vagas e quem estava perto ficava sem sombra. Aqui só pede quem está dentro de `MaxDistance`, e só os `MaxRealTimeShadows` mais perto da câmera.
+- **Liga e desliga a sombra em tempo real, a dos veículos e a arma na sombra** pelo INI, com o jogo aberto.
 - **`MoreThanOnePlayer=auto`** liga sozinho quando o SA-MP está aberto.
 - **Log** em `Trok Shadows.log`, ao lado do `.asi`, com tudo o que foi aplicado ou pulado.
 
@@ -28,7 +31,7 @@ O **Shadows Extender 2.0** (DK22Pac, 2014) refeito com código aberto. Faz tudo 
 
 ## INI (`Trok Shadows.ini`)
 
-As seções e chaves são as do Shadows Extender. O arquivo criado pelo mod explica cada uma.
+As seções e chaves são as do Shadows Extender, mais quatro novas. O arquivo criado pelo mod explica cada uma. Um INI da versão 1.0 ganha as chaves novas sozinho, com os mesmos valores nas outras.
 
 | Seção | Chave | O que faz | Jogo | Na hora? |
 |---|---|---|---|---|
@@ -53,6 +56,10 @@ As seções e chaves são as do Shadows Extender. O arquivo criado pelo mod expl
 | | `EnableShadowsShader` | usa o shader do mod (cor própria e modo combinado) | — | sim |
 | | `ShadowIntensityNightFactor` `ShadowIntensityCloudsFactor` | quanto da força sobra à noite e com nuvens | — | sim |
 | | `MoreThanOnePlayer` | sombra em tempo real para todos os jogadores (`auto` = com o SA-MP) | 0 | sim |
+| | `EnableRealTimeShadows` | sombra em tempo real ligada (0 = fica a sombra simples do jogo) — *nova* | — | sim |
+| | `VehicleRealTimeShadows` | veículos com sombra em tempo real; quem está dentro entra na sombra do veículo — *nova* | — | sim |
+| | `WeaponsInShadow` | arma, paraquedas e mochila a jato na sombra — *nova* | — | sim |
+| | `MaxRealTimeShadows` | quantas sombras em tempo real ao mesmo tempo, as mais perto da câmera (1–16; padrão 12) — *nova* | 16 vagas | sim |
 | `GERAL` | `recarregar` | aplica o INI quando você salva | — | sim |
 
 A força final é `A × máx(1 − nuvens, fator de nuvens) × máx(1 − noite, fator de noite)`. Nuvens vem de `CWeather::CloudCoverage`. Noite vem do equilíbrio dia/noite dos prédios: 0 das 7h às 20h, 1 das 21h às 6h.
@@ -78,9 +85,10 @@ Todos os endereços são do `gta_sa.exe` 1.0 US. Os nomes vêm do [gta-reversed]
 - **Resolução, desfoque e degradê:** os `push` de `CRealTimeShadow::Create` (`0x7064C2`, `0x7064F9`) e de `CRealTimeShadowManager::Init` (`0x706810`–`0x706832`), mais `0x8D5218` e `0x8D521C`.
 - **Veículos:** o `StoreShadowForVehicle` dos `PreRender` de cinco classes de veículo (`0x6ABCF5`, `0x6BD667`, `0x6C0B21`, `0x6C58A0`, `0x6CA73A`) passa a pedir também a sombra em tempo real. O teste da sombra simples fica em `0x70BDAB`.
 - **Todo pedestre:** o pedido de sombra em `CPed::PreRenderAfterTest` sai do teste de qualidade e de veículo (`0x5E6664`, NOP em `0x5E68A2`). As cutscenes estão em `0x5B1F3C`.
-- **Arma, pistolas duplas, paraquedas e mochila a jato na sombra:**
-  - `CShadowCamera::Update(RpClump*)` deixa a câmera aberta (NOP em `0x705C57` e `0x705C5F`);
-  - em `CRealTimeShadow::Update` (`0x706676`), o mod desenha esses objetos na posição do osso da mão (ou das costas, no paraquedas) e fecha a câmera.
+- **Quem pede sombra:** só quem está dentro de `MaxDistance` (medida no plano, como o jogo mede), e só os `MaxRealTimeShadows` mais perto da câmera, pelo raio do quadro anterior. Quem já tem sombra ganha uma folga de ~14% no raio, para não perder a vaga na borda. O jogador e o veículo dele sempre pedem. Quem está dentro de um veículo com sombra em tempo real não pede: entra na sombra do veículo.
+- **Arma, pistolas duplas, paraquedas, mochila a jato e quem está no veículo na sombra:**
+  - `CShadowCamera::Update(RpClump*)` deixa a câmera aberta (NOP em `0x705C57` e `0x705C5F`; o `RpClumpForAllAtomics` dela, em `0x705C4A`, marca que a câmera ficou aberta);
+  - em `CRealTimeShadow::Update` (`0x706676`), o mod desenha esses objetos na posição do osso da mão (ou das costas, no paraquedas), desenha a silhueta de quem está no veículo (motorista e até 8 passageiros) e fecha a câmera.
 - **Luz segue o sol:** o jogo calcula a elevação da luz e não usa. O mod guarda essa elevação (`0x707E4F`) e a usa na rotação da luz (`0x70596A`). `ShadowSunZLimit` limita a altura do sol (`0x707E2B`).
 - **Projeção:**
   - quadrado da sombra 2.15 no lugar de 1.5 (`0x707EF7`–`0x707F21`);
@@ -93,9 +101,11 @@ Todos os endereços são do `gta_sa.exe` 1.0 US. Os nomes vêm do [gta-reversed]
 - **Qualidade gráfica:** `0x706BCC` e `0x5E6766`.
 - **SA-MP:**
   - `MoreThanOnePlayer` (`0x7069F5`);
-  - quando o jogo termina de iniciar, o mod religa `CRealTimeShadowManager::Update` (`0x53EA08`, `0x706AB0`), que o SA-MP desliga.
+  - quando o jogo termina de iniciar, o mod religa `CRealTimeShadowManager::Update` (`0x53EA08`, `0x706AB0`), que o SA-MP desliga, e confere de novo a cada quadro. Só mexe se cada byte for o do jogo ou o que o SA-MP põe (NOP, `ret`): o gancho de outro mod nesses lugares fica.
 
-**Pontos de entrada:** depois de `CGame::InitialiseRenderWare` (`0x5BD779`), em `CGame::ShutdownRenderWare` (`0x53BC21`), quando o jogo termina de iniciar (`0x748CFB`) e a cada quadro (`0x53E981`, para ver se o INI mudou).
+**Pontos de entrada:** depois de `CGame::InitialiseRenderWare` (`0x5BD779`), em `CGame::ShutdownRenderWare` (`0x53BC21`), quando o jogo termina de iniciar (`0x748CFB`) e a cada quadro (`0x53E981`: limite de sombras, atualização ligada e INI mudado).
+
+**Diagnóstico no log** (uma vez cada): mais pedidos de sombra que vagas num quadro; uma sombra atualizada duas vezes no mesmo quadro (outro mod chamando `CRealTimeShadowManager::Update`); câmera aberta que não é a da sombra; atualização desligada de novo com o jogo aberto.
 
 ## Compilar
 
@@ -120,8 +130,21 @@ O `test/launcher.exe` ocupa a faixa de endereços do `gta_sa.exe` (`0x400000`–
 - **Assembly:** os trechos em assembly mantêm os registradores do jogo.
 - **Shaders:** o device D3D9 do Wine aceita os dois.
 - **INI na hora:** salvar o INI com o "jogo" aberto muda os valores e o liga/desliga.
+- **Veículo:** a moto desenha o piloto e a garupa em silhueta na sombra dela, e eles não pedem sombra própria.
+- **Limite:** de 20 veículos pedindo sombra, só os 12 mais perto ganham; quem já tem sombra não perde a vaga na borda; o veículo do jogador sempre ganha; além de `MaxDistance` ninguém pede.
+- **SA-MP:** a atualização desligada de novo com o jogo aberto volta no quadro seguinte; o gancho de outro mod no mesmo lugar fica.
 - **Outro exe:** o mod não escreve nada.
 - **Conflito:** com o `shadows.asi` também carregado, o mod fica desligado e avisa.
+- **INI da 1.0:** ganha as chaves novas, com os mesmos valores nas outras.
+
+## Versões
+
+- **1.1**
+  - Piloto, garupa e passageiros entram na sombra do veículo: nada de escurecer dobrado onde as duas sombras se cruzavam (o Shadows Extender também fazia isso).
+  - Para as sombras que piscavam e sumiam: só pede sombra quem está dentro de `MaxDistance`, e só os `MaxRealTimeShadows` mais perto. A atualização das sombras é religada se alguém a desligar de novo com o jogo aberto.
+  - Chaves novas: `EnableRealTimeShadows`, `VehicleRealTimeShadows`, `WeaponsInShadow`, `MaxRealTimeShadows`.
+  - Diagnósticos no log.
+- **1.0** — primeira versão.
 
 ## Créditos
 

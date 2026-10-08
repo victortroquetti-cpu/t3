@@ -41,4 +41,5 @@ run() {
 run completo
 run errado
 run conflito
+run atualizar
 exit $status
