@@ -6,6 +6,7 @@ Dois mods de visualização com **todos os controles de menu da casa**, um em **
 |---|---|---|
 | Lua | `lua/Trok UI Showcase.lua` | `/trokuilua` |
 | .asi | `asi/dist/Trok UI Showcase.asi` | `/trokui` (sem SA-MP 0.3.7 R1: **F10**) |
+| Trok Skin (.asi) | `skin/dist/Trok Skin.asi` | sozinho; `/trokskin` liga e desliga (ver [Trok Skin](#trok-skin-o-visual-da-casa-nos-mods-dos-outros)) |
 
 Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diálogos**), diálogos de exemplo, confirmação, notificações e o modo de mover.
 
@@ -130,6 +131,32 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 ![Diálogos](docs/06-dialogos.png)
 ![Confirmação](docs/07-confirmacao.png) ![Mover](docs/08-mover.png)
 
+## Trok Skin: o visual da casa nos mods dos outros
+
+`skin/dist/Trok Skin.asi` padroniza os menus de qualquer mod Lua feito com **mimgui**, sem editar os mods. Copie para a pasta do GTA (ou `scripts\`) e pronto. Funciona com o mimgui 1.7.x (Dear ImGui 1.72) e confere a versão sozinho: com qualquer outra, não encosta em nada e diz o motivo no `Trok Skin.log`.
+
+![Sem a skin e com a skin](docs/09-skin.png)
+
+**O que muda em todo menu mimgui:**
+- **Cores da casa:** fundo 12,12,12, borda branca, texto 240, campos e botões discretos, check e bolinha do slider brancos, abas e listas no mesmo tom.
+- **Cantos e títulos:** cantos arredondados, título centralizado com o divisor embaixo e campos com contorno.
+- **Fonte da casa** (`moonloader\resource\trok\font.ttf`) no lugar das fontes de interface do Windows: a Trebuchet padrão do mimgui, Arial, Tahoma, Verdana, Segoe UI e Calibri. O tamanho é ajustado para o texto ocupar a mesma largura. Letras que a fonte da casa não tem vêm da fonte original, então nada vira `?`.
+
+**O que não muda:**
+- **O layout.** Espaçamentos, tamanhos e bordas de janela ficam como o autor fez; os controles ficam exatamente no mesmo lugar (o teste confere os 52 retângulos).
+- **HUDs com fundo transparente**, por cima do jogo.
+- **Cores com significado** que o script põe dentro da janela, como um texto vermelho de erro ou um botão vermelho de "apagar".
+- **Janelas da casa**, com id começando em `##trok` (Kill List, vitrine, mods novos com o kit).
+- **Fontes próprias do mod** (decorativas, de ícones, da pasta dele).
+
+**Controles:**
+- `/trokskin` liga e desliga o visual na hora, para comparar. Desligado, cada script volta a ser exatamente o que era. A fonte só volta ao recarregar os scripts (Ctrl+R).
+- `Trok Skin.ini` (criado ao lado do .asi): `tema=1`, `fonte=1` e `manter=Título|Outro título`, para janelas que devem ficar como o autor fez.
+
+**Limites:** só vale para mimgui. O imgui antigo (moon_imgui), menus desenhados com `renderDrawBox` e os `.asi` de outros ficam como estão. Como o layout não muda, menus de outros não ganham o que depende de saber o significado de cada opção (linhas numeradas, marca do padrão, dicas de tecla). A setinha de recolher do ImGui continua: no 1.72 ela só some mudando o comportamento da janela.
+
+**Como funciona:** o mimgui carrega uma DLL nativa só (`lib\mimgui\cimguidx9.dll`) que todos os scripts chamam. A skin desvia, com o MinHook, as funções dessa DLL que importam: início de quadro, abertura de janela, fontes e texto com tamanho explícito. O desvio entra no momento em que a DLL carrega, antes de qualquer script usar. A DLL fica presa na memória, para os desvios sobreviverem ao Ctrl+R.
+
 ## Reaproveitar nos próximos mods
 
 - **Lua:** copie o bloco "TROK UI" do topo de `Trok UI Showcase.lua` (até "Fim do kit"). Chame `ui.buildFonts()` no `imgui.OnInitialize`, envolva cada quadro com `ui.beginFrame()` / `ui.endFrame()` e monte a janela com `ui.pushStyle()`, `ui.beginShell(...)`, `ui.rows(...)`, `ui.endShell(...)` e `ui.popStyle()`. O teclado vem do `onWindowMessage` (veja o fim do arquivo).
@@ -146,10 +173,19 @@ Duas regras que custaram caro na primeira versão:
 - **.asi num GTA de mentira:** `asi/test/smoke/run.sh` roda o .asi no Wine 32 bits (com Xvfb) com um processo que expõe o device d3d9 nos endereços do `gta_sa.exe` e carrega um `samp.dll` falso com os endereços do 0.3.7 R1. Depois digita `/trokui` duas vezes e confere os pixels do back buffer: o menu tem que abrir por cima de tudo e fechar, e o cursor do SA-MP tem que ir para o modo 2 e voltar. Com o menu aberto, confere também quais teclas chegam ao jogo: o T chega, a seta não, e com o chat aberto tudo chega. São 5 cenários: device direto; proxy estilo SA-MP com dois ganchos de vtable na regra do Dialogs/Radar (lida no binário do Dialogs 2.28); sem `0xC8CF88`; só pela classe da janela; e um wrapper que esconde o device real.
 - **Capturas sem o jogo:** `asi/test/run.sh <pasta>` roda a vitrine num rasterizador por software e salva PNGs de cada tela. Com `TROK_FONT=…/font.ttf TROK_ICONS=…/lucide.ttf`, usa a fonte e os ícones da casa (foi assim que as imagens acima foram geradas).
 - **Lua sem o jogo:** `cd lua && luajit test/mock_run.lua` roda todas as abas, popups, diálogos e o modo de mover num mimgui simulado. O teste confere se cada Push tem o seu Pop, se cada Begin tem End, os canais do draw list, os ids repetidos e os tipos dos argumentos. Também confere que nenhum campo mostra o rótulo do ImGui (o id tem que começar com `##`), que o mimgui inicializa sozinho e as regras do chat acima.
+- **Trok Skin:** `skin/build.sh` gera `skin/dist/Trok Skin.asi`. `skin/test/run.sh` compila o `cimguidx9.dll` do mimgui 1.7.1 a partir das fontes dele e roda, no Wine, um "moonloader" de mentira com quatro scripts: um com tema claro, um com fundo vermelho empurrado e texto e botão vermelhos, um HUD transparente e uma janela `##trok`. São 47 verificações. Entre elas:
+  - os retângulos de todos os controles ficam idênticos com o tema;
+  - a tela desligada é idêntica, pixel a pixel, à sem a skin;
+  - `/trokskin` desliga e religa na hora;
+  - a janela `manter` e a da casa ficam intactas;
+  - o texto com a fonte da casa tem a mesma largura (até 6%);
+  - tudo continua igual depois de descarregar e recarregar a DLL;
+  - um ImGui de outra versão é recusado;
+  - a fonte abre numa pasta com acento.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
 > O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.
 
 ## Terceiros
 
-O .asi inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.
+O .asi inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.
