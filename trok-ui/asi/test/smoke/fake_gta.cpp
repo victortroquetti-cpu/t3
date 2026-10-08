@@ -6,7 +6,9 @@
 //    um proxy estilo SA-MP (marcador verde) e dois mods de vtable com a regra do Trok Dialogs e do Trok
 //    Radar (marcadores vermelho e azul) encadeiam no Present da vtable do device real;
 //  - digita /trokui (chama o callback que o .asi registrou), salva o back buffer e confere os pixels:
-//    o menu tem que aparecer por cima de tudo e sumir no segundo /trokui.
+//    o menu tem que aparecer por cima de tudo e sumir no segundo /trokui;
+//  - com o menu aberto, confere quais teclas chegam ao "jogo" (o WndProc da janela, abaixo do .asi): o T
+//    tem que chegar (abre o chat do SA-MP), a seta nao, e com o chat aberto tudo chega.
 //
 // Uso: fake_gta.exe <asi> <direto|samp-mods|wrapper> [so-janela-do-d3d|so-classe]
 //   wrapper           como samp-mods, mas o proxy esconde o device real (GetBackBuffer falha), como um
@@ -36,6 +38,8 @@ constexpr int H = 900;
 constexpr D3DCOLOR CLEAR = D3DCOLOR_XRGB(20, 90, 40);
 
 int g_failures = 0;
+int g_gameKeysT = 0;
+int g_gameKeysDown = 0;
 IDirect3DDevice9* g_real = nullptr;
 HMODULE g_d3d9 = nullptr;
 DWORD g_shot[W * H];
@@ -51,6 +55,22 @@ void Check(bool ok, const char* what) {
 void Marker(IDirect3DDevice9* device, LONG x, D3DCOLOR color) {
     D3DRECT r = {x, 10, x + 20, 30};
     device->Clear(1, &r, D3DCLEAR_TARGET, color, 1.0f, 0);
+}
+
+// O WndProc do "jogo": conta as teclas que passaram pelo .asi.
+LRESULT CALLBACK GameWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_KEYDOWN && wParam == 'T') {
+        ++g_gameKeysT;
+    }
+    if (msg == WM_KEYDOWN && wParam == VK_DOWN) {
+        ++g_gameKeysDown;
+    }
+    return DefWindowProcA(hwnd, msg, wParam, lParam);
+}
+
+void Tap(HWND hwnd, WPARAM vk) {
+    SendMessageA(hwnd, WM_KEYDOWN, vk, 1);
+    SendMessageA(hwnd, WM_KEYUP, vk, 0xC0000001);
 }
 
 // ---------------------------------------------------------------- proxy estilo SA-MP
@@ -282,7 +302,7 @@ int main(int argc, char** argv) {
     }
 
     WNDCLASSA wc = {};
-    wc.lpfnWndProc = DefWindowProcA;
+    wc.lpfnWndProc = GameWndProc;
     wc.hInstance = GetModuleHandleA(nullptr);
     wc.lpszClassName = "Grand theft auto San Andreas";
     RegisterClassA(&wc);
@@ -383,6 +403,15 @@ int main(int argc, char** argv) {
                 Check(Dominant(20, 20, 0) && Dominant(50, 20, 2) && Dominant(80, 20, 1),
                       "marcadores do proxy e dos mods de vtable continuam na tela");
             }
+            int seenT = g_gameKeysT, seenDown = g_gameKeysDown;
+            Tap(hwnd, 'T');
+            Tap(hwnd, VK_DOWN);
+            Check(g_gameKeysT == seenT + 1, "T chega ao SA-MP com o menu aberto (abre o chat)");
+            Check(g_gameKeysDown == seenDown, "seta fica no menu");
+            field(0x14 + 0x14E0) = 1; // CInput: chat aberto
+            Tap(hwnd, VK_DOWN);
+            field(0x14 + 0x14E0) = 0;
+            Check(g_gameKeysDown == seenDown + 1, "com o chat do SA-MP aberto a seta vai para o chat");
             reinterpret_cast<CmdProc>(field(4))("");
             ++step;
         }

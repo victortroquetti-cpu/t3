@@ -86,7 +86,7 @@ local function makeFont(size, isIcon)
     function f:FindGlyphNoFallback(cp)
         check(isNum(cp), 'FindGlyphNoFallback')
         if isIcon and glyphs[cp] then
-            return { X0 = 1, Y0 = 2, X1 = size - 1, Y1 = size - 2, U0 = 0.1, V0 = 0.1, U1 = 0.2, V1 = 0.2 }
+            return { AdvanceX = size, X0 = 1, Y0 = 2, X1 = size - 1, Y1 = size - 2, U0 = 0.1, V0 = 0.1, U1 = 0.2, V1 = 0.2 }
         end
         return nil
     end
@@ -193,8 +193,15 @@ imgui.InvisibleButton = function(id, size)
     end
     return false
 end
-imgui.InputText = function(id, buf, size, flags) item(id); check(type(size) == 'number', 'InputText tamanho'); return false end
-imgui.InputTextMultiline = function(id, buf, size, sz, flags) item(id); check(isVec(sz), 'Multiline tamanho'); return false end
+-- O kit desenha os proprios rotulos: o do ImGui tem que comecar com "##" (senao aparece ao lado do campo).
+imgui.InputText = function(id, buf, size, flags)
+    item(id); check(type(size) == 'number', 'InputText tamanho')
+    check(id:sub(1, 2) == '##', 'InputText com rotulo visivel: ' .. id); return false
+end
+imgui.InputTextMultiline = function(id, buf, size, sz, flags)
+    item(id); check(isVec(sz), 'Multiline tamanho')
+    check(id:sub(1, 2) == '##', 'InputTextMultiline com rotulo visivel: ' .. id); return false
+end
 imgui.IsItemHovered = function() return frame.hovered[frame.lastId] == true end
 imgui.IsItemActive = function() return frame.active ~= nil and frame.active[frame.lastId] == true end
 imgui.IsItemClicked = function() return false end
@@ -262,7 +269,11 @@ isSampAvailable = function() return true end
 sampRegisterChatCommand = function(name, cb) commands[name] = cb end
 chatMessages = {}
 sampAddChatMessage = function(text) chatMessages[#chatMessages + 1] = text end
-consumeWindowMessage = function() end
+consumed = 0
+consumeWindowMessage = function() consumed = consumed + 1 end
+chatOpen, dialogOpen = false, false
+sampIsChatInputActive = function() return chatOpen end
+sampIsDialogActive = function() return dialogOpen end
 thisScript = function() return { version = '1.0.0' } end
 wait = coroutine.yield
 
@@ -392,6 +403,42 @@ run(2, { keys = { [0x1B] = true } })
 -- Fecha.
 run(3, { keys = { [0x1B] = true } })
 run(20)
+
+-- Chat do SA-MP com a vitrine aberta: T e F6 passam, digitando num campo o T fica, e com o chat aberto
+-- nada e consumido (nem nos 150 ms depois de ele fechar).
+commands.trokuilua('')
+run(3)
+local function sent(msg, vk)
+    local before = consumed
+    onWindowMessage(msg, vk, 0)
+    if msg == 0x100 then onWindowMessage(0x101, vk, 0) end
+    return consumed > before
+end
+check(not sent(0x100, 0x54) and not sent(0x102, 0x74), 'T nao chegou ao SA-MP com a vitrine aberta')
+check(not sent(0x100, 0x75), 'F6 nao chegou ao SA-MP com a vitrine aberta')
+check(sent(0x100, 0x28), 'seta para baixo deveria ficar na vitrine')
+io.WantTextInput = true
+check(sent(0x100, 0x54) and sent(0x102, 0x74), 'T digitado num campo da vitrine vazou para o SA-MP')
+io.WantTextInput = false
+chatOpen = true
+check(not sent(0x100, 0x28) and not sent(0x100, 0x0D) and not sent(0x102, 0x31), 'vitrine segurou tecla com o chat aberto')
+chatOpen = false
+check(not sent(0x100, 0x0D), 'o Enter que fecha o chat caiu na vitrine')
+-- Chat aberto um tempo sem teclas (o jogador parou de digitar) e o Enter vem depois do SA-MP fechar.
+chatOpen = true
+local t1 = os.clock()
+while os.clock() - t1 < 0.2 do end
+run(1)
+chatOpen = false
+check(not sent(0x100, 0x0D), 'o Enter que fecha o chat depois de uma pausa caiu na vitrine')
+dialogOpen = true
+check(not sent(0x100, 0x28), 'vitrine segurou tecla com dialogo do servidor aberto')
+dialogOpen = false
+local t0 = os.clock()
+while os.clock() - t0 < 0.2 do end
+check(sent(0x100, 0x28), 'a vitrine nao pegou o teclado de volta depois do chat')
+run(3, { keys = { [0x1B] = true } })
+run(5)
 
 local names = {}
 for k in pairs(seen) do names[#names + 1] = k end

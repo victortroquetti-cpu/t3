@@ -21,6 +21,7 @@
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
 #include "showcase.h"
+#include "trok_ui.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -38,7 +39,10 @@ constexpr DWORD SAMP_R1_ENTRY = 0x31DF13;
 constexpr DWORD SAMP_INFO = 0x21A0F8;
 constexpr DWORD SAMP_CHAT = 0x21A0E4;
 constexpr DWORD SAMP_INPUT = 0x21A0E8;
+constexpr DWORD SAMP_DIALOG = 0x21A0B8;
 constexpr DWORD SAMP_MISC = 0x21A10C;
+constexpr DWORD SAMP_INPUT_ENABLED = 0x14E0; // CInput: chat aberto (o Trok Dialogs le o mesmo campo)
+constexpr DWORD SAMP_DIALOG_ACTIVE = 0x28;   // CDialog: dialogo do servidor na tela
 constexpr DWORD SAMP_CHAT_ADD_ENTRY = 0x64010;
 constexpr DWORD SAMP_ADD_COMMAND = 0x65AD0;
 constexpr DWORD SAMP_SET_CURSOR = 0x9BD30;
@@ -71,6 +75,7 @@ bool g_inPresent = false;
 bool g_firstDraw = true;
 const char* g_hookMode = "nenhum";
 volatile LONG g_togglePending = 0;
+DWORD g_sampKeyboardTick = 0;
 volatile LONG g_presentCalls = 0;
 volatile DWORD g_lastPresent = 0;
 float g_fontScreenH = 0.0f;
@@ -171,6 +176,21 @@ void __cdecl CmdTrokUI(const char*) {
     }
 }
 
+// O teclado e do SA-MP? (chat aberto ou dialogo do servidor na tela). Vale tambem por 150 ms depois de o
+// chat fechar: o Enter que manda a mensagem nao pode cair na vitrine.
+bool SampOwnsKeyboard() {
+    if (g_sampR1) {
+        BYTE* input = *reinterpret_cast<BYTE**>(g_samp + SAMP_INPUT);
+        BYTE* dialog = *reinterpret_cast<BYTE**>(g_samp + SAMP_DIALOG);
+        if ((input && *reinterpret_cast<int*>(input + SAMP_INPUT_ENABLED)) ||
+            (dialog && *reinterpret_cast<int*>(dialog + SAMP_DIALOG_ACTIVE))) {
+            g_sampKeyboardTick = GetTickCount();
+            return true;
+        }
+    }
+    return g_sampKeyboardTick && GetTickCount() - g_sampKeyboardTick < 150;
+}
+
 // O WindowsMouse da casa le esta propriedade: 1 = maozinha, 2 = I de texto, ausente = seta.
 void PublishCursor(int request) {
     static int published = -1;
@@ -187,7 +207,13 @@ void PublishCursor(int request) {
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (g_ready) {
-        ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        // Com o chat ou um dialogo do SA-MP aberto, a vitrine nao ve as teclas apertadas nem as segura
+        // (as soltas sempre chegam ao ImGui, para nenhuma tecla ficar presa).
+        bool pressed = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN || msg == WM_CHAR;
+        bool sampKeys = pressed && SampOwnsKeyboard();
+        if (!sampKeys) {
+            ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        }
 
         // F10 chega como WM_SYSKEYDOWN (e a tecla do menu do Windows).
         if (g_useF10 && (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) && wParam == VK_F10 && !(lParam & (1 << 30))) {
@@ -197,7 +223,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         // Com o menu aberto o jogo nao recebe teclas nem cliques. Teclas soltas (WM_KEYUP) sempre passam:
         // o GTA le o teclado pelas mensagens da janela e uma tecla sem "soltar" ficaria presa.
-        if (showcase::CapturesInput() && !PauseMenuOpen()) {
+        // T e F6 (e o "t" que vem junto) seguem para o SA-MP abrir o chat, menos digitando num campo.
+        bool typing = ImGui::GetIO().WantTextInput || tui::CapturingKey();
+        bool chatKey = (msg == WM_KEYDOWN && (wParam == 'T' || wParam == VK_F6)) ||
+                       (msg == WM_CHAR && (wParam == 't' || wParam == 'T'));
+        if (showcase::CapturesInput() && !PauseMenuOpen() && !sampKeys && !(chatKey && !typing)) {
             switch (msg) {
             case WM_KEYDOWN:
             case WM_CHAR:
@@ -325,6 +355,8 @@ void RenderOverlay(IDirect3DDevice9* device) {
     if (device->TestCooperativeLevel() != D3D_OK) {
         return;
     }
+    // Todo quadro, para a folga de 150 ms valer mesmo se o Enter que fecha o chat vier depois de uma pausa.
+    SampOwnsKeyboard();
 
     if (InterlockedExchange(&g_togglePending, 0)) {
         if (PauseMenuOpen()) {

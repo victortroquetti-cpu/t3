@@ -20,24 +20,26 @@ Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diál
 ## Fonte e ícones
 
 - **Texto:** `font.ttf` em 3 tamanhos: corpo **16u**, título **20u** e descrição **13.5u** (números, valores, dicas, versão).
-- **Ícones:** `lucide.ttf` em **18u** (e **13u** para os pequenos: check, lupa, setinha da lista suspensa).
+- **Ícones:** `lucide.ttf` em **18u** (e **13u** para os pequenos: check, lupa, setinha da lista suspensa). A 13u o traço do Lucide fica abaixo de 1 px, então a fonte pequena é carregada com `RasterizerMultiply = 1.6` para ter o mesmo peso da de 18u.
 - **Escala:** `u = max(0.55, altura_da_tela / 1080 * 0.85)`. Toda medida deste guia está em `u`.
 
-O kit usa os códigos oficiais do Lucide. O `lucide.ttf` da casa (o mesmo embutido no Dialogs e no Radar) é um recorte com 6 ícones. O kit usa o glifo quando ele existe; quando não existe, desenha no mesmo traço:
+O `lucide.ttf` de `moonloader\resource\trok` é o Lucide completo: 1.796 ícones, nos códigos `U+E038` a `U+E74E` (área de uso particular). O `lucide-static` 1.53.0 traz 77 a mais, e os códigos antigos não mudam. O Dialogs e o Radar embutem um recorte com só 6 deles. O kit usa os códigos oficiais e desenha o glifo quando ele existe. Se o arquivo faltar, ou se for o recorte, desenha um substituto no mesmo traço:
 
-| Ícone | Código | No lucide da casa? | Onde aparece |
+| Ícone | Código | No recorte do Dialogs/Radar? | Onde aparece |
 |---|---|---|---|
 | x (fechar) | `U+0078` (oficial `U+E1B2`) | sim | X do cabeçalho, limpar busca |
-| chevron-right | `U+E06F` | sim | setas `<  >`, lista suspensa (espelhado/girado para as outras direções), token `>` |
+| chevron-right | `U+E06F` | sim | setas `<  >`, token `>` |
 | chevrons-right | `U+E073` | sim | token `>>` e `»` no texto do servidor |
 | arrow-right | `U+E049` | sim | tokens `->` e `=>` no texto do servidor |
 | eye / eye-off | `U+E0BA` / `U+E0BB` | sim | campo de senha |
 | check | `U+E06C` | não (vetor) | caixa de marcar, item escolhido da lista suspensa |
 | search | `U+E151` | não (vetor) | campo de busca |
 | info | `U+E0F9` | não (vetor) | linha com dica (i) |
-| chevron-left / down / up | `U+E06E` / `U+E06D` / `U+E070` | não (usa o chevron-right espelhado/girado) | setas e lista suspensa |
+| chevron-left / down / up | `U+E06E` / `U+E06D` / `U+E070` | não (chevron-right espelhado/girado) | setas e lista suspensa |
 
-Para ter todos como glifo, gere o recorte com os códigos acima (por exemplo, `pyftsubset lucide.ttf --unicodes=U+0078,U+E049,U+E06C-E070,U+E073,U+E0BA,U+E0BB,U+E0F9,U+E151,U+E1B2`, mantendo o `x` em `U+0078`). O kit já procura esses códigos.
+Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https://lucide.dev/icons) e o código no `lucide.css` do pacote `lucide-static`. No Windows, o Mapa de Caracteres (`charmap`) com a fonte `lucide` mostra os glifos a partir de `U+E000`. O visualizador de fontes do Windows só mostra o X, porque só usa letras na amostra: o `x` é o único ícone mapeado numa letra; as outras letras são vazias e servem às ligaduras da fonte.
+
+**Centralize pelo grid, não pela caixa do glifo.** O `lucide.ttf` grava a caixa de cada glifo a partir de `(0,0)` (o `x`, por exemplo, diz `0,0–791,792`, mas a tinta vai de 209 a 791). A caixa que o ImGui monta sobra à esquerda e embaixo, e centralizá-la joga o ícone até 2 px para cima e para a direita. O `GlyphQuad` (C++) e o `glyphQuad` (Lua) centralizam pelo grid de 24 do Lucide: metade do avanço na horizontal e metade da altura da fonte na vertical. Girar e espelhar também é em volta desse centro. A largura das setas no meio do texto vem do desenho do Lucide (tinta + 1u de cada lado), não da caixa.
 
 ## Guia de estilo
 
@@ -80,7 +82,12 @@ Para ter todos como glifo, gere o recorte com os códigos acima (por exemplo, `p
    - **Todos:** **Restaurar** aparece à esquerda do controle quando o valor sai do padrão, e a dica mostra qual é o padrão.
 3. **Botões e cliques:** primeiro os botões invisíveis do controle (eles ganham o hover), depois o fundo da linha, e o desenho por último. Nada usa os widgets cinza do ImGui.
 4. **Primeiro quadro sem teclado:** o Enter que mandou o comando (ou abriu a tela) não aciona nada dentro dela.
-5. **Bloqueio de teclas:** com o menu aberto, o jogo não recebe teclas nem cliques. As teclas soltas (*key up*) sempre passam, para nenhuma tecla ficar presa no GTA. Com o menu de pausa aberto, nada é bloqueado.
+5. **Bloqueio de teclas:** com o menu aberto, o jogo não recebe teclas nem cliques, com três exceções:
+   - As teclas soltas (*key up*) sempre passam, para nenhuma tecla ficar presa no GTA.
+   - **T** e **F6** passam para o SA-MP abrir o chat, menos quando se digita num campo do menu.
+   - Com o chat ou um diálogo do servidor aberto, o menu larga o teclado (e continua largado por 150 ms depois de o chat fechar, para o Enter que manda a mensagem não acionar nada). O .asi lê o chat aberto em `CInput+0x14E0` e o diálogo em `CDialog+0x28`, os mesmos campos do Dialogs; o Lua usa `sampIsChatInputActive()` e `sampIsDialogActive()`.
+
+   Com o menu de pausa aberto, nada é bloqueado.
 6. **Cursor:** o pedido de cursor é publicado na propriedade `TrokCursor.Pedido` da janela do jogo (1 = mãozinha, 2 = I de texto), como no Kill List. No .asi, o cursor do SA-MP fica no modo 2, como no Dialogs.
 7. **Texto do servidor:** cores `{RRGGBB}` e as setas `>`, `>>`/`»`, `->`/`=>` viram ícones do lucide, como no Trok Dialogs.
 
@@ -136,9 +143,9 @@ Duas regras que custaram caro na primeira versão:
 ## Compilar e testar
 
 - **.asi:** `asi/build.sh` baixa o Dear ImGui 1.89.9 e o MinHook e compila com MinGW (i686), gerando `asi/dist/Trok UI Showcase.asi`.
-- **.asi num GTA de mentira:** `asi/test/smoke/run.sh` roda o .asi no Wine 32 bits (com Xvfb) com um processo que expõe o device d3d9 nos endereços do `gta_sa.exe` e carrega um `samp.dll` falso com os endereços do 0.3.7 R1. Depois digita `/trokui` duas vezes e confere os pixels do back buffer: o menu tem que abrir por cima de tudo e fechar, e o cursor do SA-MP tem que ir para o modo 2 e voltar. São 5 cenários: device direto; proxy estilo SA-MP com dois ganchos de vtable na regra do Dialogs/Radar (lida no binário do Dialogs 2.28); sem `0xC8CF88`; só pela classe da janela; e um wrapper que esconde o device real.
+- **.asi num GTA de mentira:** `asi/test/smoke/run.sh` roda o .asi no Wine 32 bits (com Xvfb) com um processo que expõe o device d3d9 nos endereços do `gta_sa.exe` e carrega um `samp.dll` falso com os endereços do 0.3.7 R1. Depois digita `/trokui` duas vezes e confere os pixels do back buffer: o menu tem que abrir por cima de tudo e fechar, e o cursor do SA-MP tem que ir para o modo 2 e voltar. Com o menu aberto, confere também quais teclas chegam ao jogo: o T chega, a seta não, e com o chat aberto tudo chega. São 5 cenários: device direto; proxy estilo SA-MP com dois ganchos de vtable na regra do Dialogs/Radar (lida no binário do Dialogs 2.28); sem `0xC8CF88`; só pela classe da janela; e um wrapper que esconde o device real.
 - **Capturas sem o jogo:** `asi/test/run.sh <pasta>` roda a vitrine num rasterizador por software e salva PNGs de cada tela. Com `TROK_FONT=…/font.ttf TROK_ICONS=…/lucide.ttf`, usa a fonte e os ícones da casa (foi assim que as imagens acima foram geradas).
-- **Lua sem o jogo:** `cd lua && luajit test/mock_run.lua` roda todas as abas, popups, diálogos e o modo de mover num mimgui simulado. O teste confere se cada Push tem o seu Pop, se cada Begin tem End, os canais do draw list, os ids repetidos e os tipos dos argumentos.
+- **Lua sem o jogo:** `cd lua && luajit test/mock_run.lua` roda todas as abas, popups, diálogos e o modo de mover num mimgui simulado. O teste confere se cada Push tem o seu Pop, se cada Begin tem End, os canais do draw list, os ids repetidos e os tipos dos argumentos. Também confere que nenhum campo mostra o rótulo do ImGui (o id tem que começar com `##`), que o mimgui inicializa sozinho e as regras do chat acima.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
 > O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.

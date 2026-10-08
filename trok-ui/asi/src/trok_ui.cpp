@@ -4,6 +4,7 @@
 
 #include <windows.h>
 #include <algorithm>
+#include <utility>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -103,8 +104,11 @@ void PopPopupStyle() {
 
 // ---------------------------------------------------------------- icones
 
-// Desenha o glifo do lucide como um quadrado de textura centrado em c (quarterTurns gira 90 graus
-// no sentido horario; mirror espelha na horizontal). Devolve false se a fonte nao tem o glifo.
+// Desenha o glifo do lucide centrado em c. O centro e o do grid de 24 do lucide (a caixa em: metade do
+// avanco e metade da altura da fonte), nao o da caixa do glifo: o lucide.ttf grava a caixa de cada glifo
+// a partir de (0,0), entao a caixa que o ImGui monta sobra a esquerda e embaixo, e centraliza-la jogaria
+// o icone para cima e para a direita. quarterTurns gira 90 graus no sentido horario e mirror espelha na
+// horizontal, os dois em volta desse centro. Devolve false se a fonte nao tem o glifo.
 bool GlyphQuad(ImDrawList* dl, ImFont* font, ImWchar cp, ImVec2 c, ImU32 color, int quarterTurns,
                bool mirror = false) {
     if (!font) {
@@ -114,14 +118,19 @@ bool GlyphQuad(ImDrawList* dl, ImFont* font, ImWchar cp, ImVec2 c, ImU32 color, 
     if (!g || !g->Visible) {
         return false;
     }
-    float hw = (g->X1 - g->X0) * 0.5f, hh = (g->Y1 - g->Y0) * 0.5f;
-    bool swap = quarterTurns % 2 == 1;
-    // Encosta o canto em pixel inteiro para o icone nao borrar.
-    float ex = swap ? hh : hw, ey = swap ? hw : hh;
-    c.x = std::round(c.x - ex) + ex;
-    c.y = std::round(c.y - ey) + ey;
-    const ImVec2 corners[4] = {ImVec2(-hw, -hh), ImVec2(hw, -hh), ImVec2(hw, hh), ImVec2(-hw, hh)};
-    float u0 = mirror ? g->U1 : g->U0, u1 = mirror ? g->U0 : g->U1;
+    float ax = g->AdvanceX * 0.5f, ay = font->FontSize * 0.5f;
+    // Origem do glifo em pixel inteiro, como no texto, para o icone nao borrar.
+    c.x = std::round(c.x - ax) + ax;
+    c.y = std::round(c.y - ay) + ay;
+    float l = g->X0 - ax, r = g->X1 - ax, t = g->Y0 - ay, b = g->Y1 - ay;
+    float u0 = g->U0, u1 = g->U1;
+    if (mirror) {
+        float left = -r;
+        r = -l;
+        l = left;
+        std::swap(u0, u1);
+    }
+    const ImVec2 corners[4] = {ImVec2(l, t), ImVec2(r, t), ImVec2(r, b), ImVec2(l, b)};
     const ImVec2 uvs[4] = {ImVec2(u0, g->V0), ImVec2(u1, g->V0), ImVec2(u1, g->V1), ImVec2(u0, g->V1)};
     ImVec2 p[4];
     for (int i = 0; i < 4; ++i) {
@@ -234,7 +243,11 @@ void BuildFonts(float screenHeight, const char* gameDir) {
         iconCfg.OversampleH = 2;
         iconCfg.OversampleV = 2;
         fonts.icon = io.Fonts->AddFontFromFileTTF(icons, 18 * u, &iconCfg, iconRanges);
-        fonts.iconSmall = io.Fonts->AddFontFromFileTTF(icons, 13 * u, &iconCfg, iconRanges);
+        // A 13u o traco do lucide fica abaixo de 1 px e o icone sai cinza: reforca a cobertura para ele
+        // ter o mesmo peso dos icones de 18u.
+        ImFontConfig smallCfg = iconCfg;
+        smallCfg.RasterizerMultiply = 1.6f;
+        fonts.iconSmall = io.Fonts->AddFontFromFileTTF(icons, 13 * u, &smallCfg, iconRanges);
     }
     io.Fonts->Build();
 }
@@ -339,21 +352,11 @@ void DrawIcon(ImDrawList* dl, Icon icon, ImVec2 c, ImU32 color, bool small) {
     }
 }
 
+// Largura das setas no meio do texto: a tinta no grid de 24 do lucide (com as pontas redondas) mais 1u de
+// folga de cada lado. Vem do desenho do lucide, nao da caixa do glifo (que no lucide.ttf comeca em 0).
 float IconWidth(Icon icon, bool small) {
-    ImFont* font = small ? fonts.iconSmall : fonts.icon;
-    ImWchar cp = 0;
-    switch (icon) {
-    case Icon::ArrowRight: cp = glyph::ARROW_RIGHT; break;
-    case Icon::ChevronRight: cp = glyph::CHEVRON_RIGHT; break;
-    case Icon::ChevronsRight: cp = glyph::CHEVRONS_RIGHT; break;
-    default: break;
-    }
-    if (font && cp) {
-        if (const ImFontGlyph* g = font->FindGlyphNoFallback(cp)) {
-            return g->X1 - g->X0;
-        }
-    }
-    return (icon == Icon::ArrowRight ? 12.0f : 10.0f) * u;
+    float units = icon == Icon::ArrowRight ? 16.0f : icon == Icon::ChevronsRight ? 14.0f : 8.0f;
+    return (small ? 13.0f : 18.0f) * u * units / 24.0f + 2.0f * u;
 }
 
 ImVec2 RichText(ImDrawList* dl, ImFont* font, float x, float y, ImU32 color, const char* text, bool draw) {

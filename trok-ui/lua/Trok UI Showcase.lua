@@ -134,7 +134,13 @@ function ui.buildFonts()
         cfg.OversampleH = 2
         cfg.OversampleV = 2
         ui.fonts.icon = io.Fonts:AddFontFromFileTTF(icons, 18 * u, cfg, ui.iconRanges)
-        ui.fonts.iconSmall = io.Fonts:AddFontFromFileTTF(icons, 13 * u, cfg, ui.iconRanges)
+        -- A 13u o traco do lucide fica abaixo de 1 px e o icone sai cinza: reforca a cobertura para ele
+        -- ter o mesmo peso dos icones de 18u.
+        local smallCfg = imgui.ImFontConfig()
+        smallCfg.OversampleH = 2
+        smallCfg.OversampleV = 2
+        smallCfg.RasterizerMultiply = 1.6
+        ui.fonts.iconSmall = io.Fonts:AddFontFromFileTTF(icons, 13 * u, smallCfg, ui.iconRanges)
     end
 end
 
@@ -195,8 +201,11 @@ end
 
 -- ---------------------------------------------------------------- icones (lucide)
 
--- Desenha o glifo do lucide como um quadrado de textura centrado em (cx, cy). turns gira 90 graus no
--- sentido horario; mirror espelha na horizontal. Devolve false se a fonte nao tem o glifo.
+-- Desenha o glifo do lucide centrado em (cx, cy). O centro e o do grid de 24 do lucide (a caixa em: metade
+-- do avanco e metade da altura da fonte), nao o da caixa do glifo: o lucide.ttf grava a caixa de cada
+-- glifo a partir de (0,0), entao a caixa que o mimgui monta sobra a esquerda e embaixo, e centraliza-la
+-- jogaria o icone para cima e para a direita. turns gira 90 graus no sentido horario e mirror espelha na
+-- horizontal, os dois em volta desse centro. Devolve false se a fonte nao tem o glifo.
 local function glyphQuad(dl, font, cp, cx, cy, color, turns, mirror)
     if not font then
         return false
@@ -206,19 +215,17 @@ local function glyphQuad(dl, font, cp, cx, cy, color, turns, mirror)
         return false
     end
     turns = turns or 0
-    local hw, hh = (g.X1 - g.X0) * 0.5, (g.Y1 - g.Y0) * 0.5
-    local ex, ey = hw, hh
-    if turns % 2 == 1 then
-        ex, ey = hh, hw
-    end
-    -- Encosta o canto em pixel inteiro para o icone nao borrar.
-    cx = math.floor(cx - ex + 0.5) + ex
-    cy = math.floor(cy - ey + 0.5) + ey
+    local ax, ay = g.AdvanceX * 0.5, font.FontSize * 0.5
+    -- Origem do glifo em pixel inteiro, como no texto, para o icone nao borrar.
+    cx = math.floor(cx - ax + 0.5) + ax
+    cy = math.floor(cy - ay + 0.5) + ay
+    local l, r, t, b = g.X0 - ax, g.X1 - ax, g.Y0 - ay, g.Y1 - ay
     local u0, u1 = g.U0, g.U1
     if mirror then
+        l, r = -r, -l
         u0, u1 = u1, u0
     end
-    local corners = { { -hw, -hh }, { hw, -hh }, { hw, hh }, { -hw, hh } }
+    local corners = { { l, t }, { r, t }, { r, b }, { l, b } }
     local p = {}
     for i = 1, 4 do
         local x, y = corners[i][1], corners[i][2]
@@ -359,18 +366,12 @@ function ui.icon(dl, name, cx, cy, color, small)
     end
 end
 
-local ICON_GLYPH = { seta = GLYPH.ARROW_RIGHT, direita = GLYPH.CHEVRON_RIGHT, duplo = GLYPH.CHEVRONS_RIGHT }
+-- Largura das setas no meio do texto: a tinta no grid de 24 do lucide (com as pontas redondas) mais 1u de
+-- folga de cada lado. Vem do desenho do lucide, nao da caixa do glifo (que no lucide.ttf comeca em 0).
+local ICON_UNITS = { seta = 16, direita = 8, duplo = 14 }
 
 function ui.iconWidth(name, small)
-    local font = small and ui.fonts.iconSmall or ui.fonts.icon
-    local cp = ICON_GLYPH[name]
-    if font and cp then
-        local g = font:FindGlyphNoFallback(cp)
-        if g ~= nil then
-            return g.X1 - g.X0
-        end
-    end
-    return (name == 'seta' and 12 or 10) * ui.u
+    return (small and 13 or 18) * ui.u * (ICON_UNITS[name] or 8) / 24 + 2 * ui.u
 end
 
 local function spinner(dl, cx, cy, radius, time)
@@ -894,14 +895,17 @@ local function field(dl, id, buffer, placeholder, kind, x, y, w, h, focusNow, mu
         imgui.SetKeyboardFocusHere()
     end
     local flags = (kind == 'senha' and not reveal) and imgui.InputTextFlags.Password or 0
+    -- O ImGui escreve ao lado do campo o que vem antes do primeiro "##" (o id "Texto##entrada1" mostrava
+    -- "Texto"): o rotulo comeca com "##" para nao aparecer nada.
+    local label = '##' .. id
     local changed
     if multiline then
         imgui.PushStyleVarVec2(imgui.StyleVar.FramePadding, vec(10 * u, 7 * u))
-        changed = imgui.InputTextMultiline(id, buffer, ffi.sizeof(buffer), vec(w - leftPad, h), flags)
+        changed = imgui.InputTextMultiline(label, buffer, ffi.sizeof(buffer), vec(w - leftPad, h), flags)
         imgui.PopStyleVar()
     else
         imgui.SetNextItemWidth(w - leftPad - iconW)
-        changed = imgui.InputText(id, buffer, ffi.sizeof(buffer), flags)
+        changed = imgui.InputText(label, buffer, ffi.sizeof(buffer), flags)
     end
     local active = imgui.IsItemActive()
     local hovered = imgui.IsItemHovered()
@@ -2469,7 +2473,21 @@ end
 -- Teclado lido direto das mensagens da janela (como o WndProc do .asi): com a vitrine aberta o jogo
 -- e o SA-MP nao recebem as teclas, mas o mimgui continua recebendo. Teclas soltas (WM_KEYUP) sempre
 -- passam: sem o "soltar" a tecla ficaria presa no GTA. Setas repetem enquanto seguradas.
+-- Excecoes: T e F6 abrem o chat do SA-MP (menos digitando num campo da vitrine), e com o chat ou um
+-- dialogo do servidor aberto a vitrine larga o teclado para nao reagir ao que se digita la.
 local held = {}
+local CHAT_KEYS = { [0x54] = true, [0x75] = true } -- T, F6
+local sampKeyboardAt = -1
+
+-- O teclado e do SA-MP? Vale tambem por 150 ms depois de o chat fechar: o Enter que manda a mensagem
+-- nao pode cair na vitrine.
+local function sampOwnsKeyboard()
+    if sampIsChatInputActive() or sampIsDialogActive() then
+        sampKeyboardAt = os.clock()
+        return true
+    end
+    return os.clock() - sampKeyboardAt < 0.15
+end
 
 local function onKey(vk, repeated)
     if ui.capturing then
@@ -2515,8 +2533,14 @@ function onWindowMessage(msg, wparam, lparam)
     if keyDown then
         held[wparam] = true
     end
-    if not uiActive() or isPauseMenuActive() then
+    -- So as mensagens que a vitrine usa (tecla apertada, caractere, roda): o resto nem consulta o SA-MP.
+    local used = keyDown or msg == 0x102 or msg == 0x20A
+    if not used or not uiActive() or isPauseMenuActive() or sampOwnsKeyboard() then
         return
+    end
+    local typing = imgui.GetIO().WantTextInput or ui.capturing ~= nil
+    if not typing and ((keyDown and CHAT_KEYS[wparam]) or (msg == 0x102 and (wparam == 0x74 or wparam == 0x54))) then
+        return -- T/F6 (e o "t" que vem junto) seguem para o SA-MP abrir o chat
     end
     if keyDown then
         onKey(wparam, bit.band(lparam, 0x40000000) ~= 0)
@@ -2542,6 +2566,8 @@ function main()
     local waitingSince, warned = nil, false
     while true do
         wait(0)
+        -- Todo quadro, para a folga de 150 ms valer mesmo se o Enter que fecha o chat vier depois de uma pausa.
+        sampOwnsKeyboard()
         if not uiActive() or isPauseMenuActive() then
             pending = {}
             releaseCursor()
