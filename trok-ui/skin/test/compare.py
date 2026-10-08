@@ -158,5 +158,24 @@ check('  Trok_Painel_A.lua: janela "Painel A" -> padronizada' in log('alternar')
 check('-> fonte da casa' in log('acentua\u00e7\u00e3o'), 'acento: fonte da casa carregou numa pasta com acento (log)')
 check(same_image(image('acentua\u00e7\u00e3o'), img['completo']), 'acento: tela identica a da pasta sem acento')
 
+# Versao de teste (Trok Skin Layout.asi, layout=1): fonte e espacamentos da casa, os mesmos numeros do kit.
+lay = rects('layout')
+u = 800 / 1080 * 0.85  # escala da casa na tela do teste
+text, field, save = lay[(0, 'Painel A|texto')], lay[(0, 'Painel A|campo')], lay[(0, 'Painel A|salvar')]
+check('layout LIGADO' in log('layout'), 'layout: a versao Layout ja vem com layout=1 (log)')
+check('-- skin desligada' not in log('layout') and 'nao deu para desviar' not in log('layout'), 'layout: nenhum erro no log')
+check(abs((text[3] - text[1]) - 16 * u) < 0.1, f'layout: texto com o tamanho da casa ({text[3] - text[1]:.2f} px = 16 x escala)')
+check(abs((field[3] - field[1]) - 24 * u) < 0.1, f'layout: campo com a altura da casa ({field[3] - field[1]:.2f} px = 24 x escala)')
+check(abs((save[1] - text[3]) - 6 * u) < 0.5, f'layout: espaco entre linhas da casa ({save[1] - text[3]:.2f} px ~ 6 x escala)')
+check(abs(text[0] - (40 + 18 * u)) < 0.5, 'layout: margem da janela da casa (18 x escala)')
+check(lay[(0, 'HUD|texto')][:2] == base[(0, 'HUD|texto')][:2], 'layout: HUD no mesmo lugar (espacamentos do autor)')
+check(image('layout').getpixel((1230, 150)) == (20, 90, 40), 'layout: HUD continua transparente')
+check(all(lay[k] == base[k] for k in base if k[1].startswith('Casa|')), 'layout: mod da casa intocado (retangulos)')
+check(same_image(image('layout').crop(casa), img['base'].crop(casa)), 'layout: mod da casa intocado, pixel a pixel')
+ratio = lay[(0, 'HUD|largura_explicita')][0] / completo[(0, 'HUD|largura_explicita')][0]
+check(abs(ratio - 16 * u / (14 * 1.007)) < 0.03, f'layout: texto com tamanho explicito acompanha ({ratio:.3f})')
+again = {k[1]: v for k, v in lay.items() if k[0] == 1}
+check(again == {k[1]: v for k, v in lay.items() if k[0] == 0}, 'layout: depois de recarregar os retangulos sao os mesmos')
+
 print('PASSOU' if failures == 0 else f'FALHOU ({failures})')
 sys.exit(1 if failures else 0)

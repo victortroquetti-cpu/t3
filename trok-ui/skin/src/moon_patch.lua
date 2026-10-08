@@ -7,7 +7,7 @@
 --    casa como base do estilo, como o igNewFrame do mimgui);
 --  - imgui.Begin: antes de cada janela, padroniza (ou devolve ao visual do script, se ela fica como esta) e liga a
 --    borda da janela e dos campos (ShowBorders, o FrameBorderSize do 1.52);
---  - AddFontFromFileTTF no atlas do script: fonte da casa no lugar das fontes de sistema.
+--  - as fontes no atlas do script: fonte da casa no lugar das fontes de sistema (e, com layout=1, o tamanho da casa).
 -- Nunca mexe na pilha do ImGui (no 1.52, push sem pop no lugar certo dispara assert e trava o jogo): so le e
 -- escreve o estilo. Qualquer erro aqui desliga a skin so neste script e devolve o visual dele.
 local imgui, skin = ...
@@ -38,8 +38,14 @@ end
 
 local SHOW_BORDERS = 128 -- ImGuiWindowFlags_ShowBorders: borda da janela, dos campos e o divisor do titulo
 local COUNT = 43         -- cores do ImGui 1.52 (imgui.Col vai de 1 a 43)
-local SCALARS = {'WindowRounding', 'ChildWindowRounding', 'FrameRounding', 'ScrollbarRounding', 'GrabRounding'}
 local WINDOW_BG = 3
+-- Campos do estilo que a skin troca: cantos e alinhamento do titulo sempre; daqui em diante (LAYOUT_*), os
+-- espacamentos, so com layout=1. Os pares sao ImVec2 (x, y).
+local FLOATS = {'WindowRounding', 'ChildWindowRounding', 'FrameRounding', 'ScrollbarRounding', 'GrabRounding',
+                'IndentSpacing', 'ScrollbarSize', 'GrabMinSize'}
+local PAIRS = {'WindowTitleAlign', 'WindowPadding', 'FramePadding', 'ItemSpacing', 'ItemInnerSpacing'}
+local LAYOUT_FLOAT, LAYOUT_PAIR = 6, 2
+local NF, NP = #FLOATS, #PAIRS
 
 local palette = skin.palette() -- {cores = {{r, g, b, a}, ...}, fundo = {[i] = true}, significado = {[i] = true}}
 local house = {}
@@ -55,23 +61,26 @@ local function transparent(i, alpha)
     return alpha < (i == WINDOW_BG and 0.5 or 0.1)
 end
 
--- Visual: os campos do estilo que a skin troca (cantos, alinhamento do titulo e cores). Espacamentos e tamanhos
--- ficam como o script deixou.
 local function newLook()
-    return {s = {0, 0, 0, 0, 0}, ax = 0, ay = 0, c = {}}
+    local look = {s = {}, p = {}, c = {}}
+    for i = 1, NF do look.s[i] = 0 end
+    for i = 1, NP * 2 do look.p[i] = 0 end
+    return look
 end
 
 local function copy(from, to)
-    for i = 1, #SCALARS do to.s[i] = from.s[i] end
-    to.ax, to.ay = from.ax, from.ay
+    for i = 1, NF do to.s[i] = from.s[i] end
+    for i = 1, NP * 2 do to.p[i] = from.p[i] end
     for i = 1, COUNT * 4 do to.c[i] = from.c[i] end
 end
 
 -- style: o ImGuiStyle pela API do moon_imgui (cores de 1 a 43) ou pela FFI (cores de 0 a 42, base = -1).
 local function read(style, base, look)
-    for i = 1, #SCALARS do look.s[i] = style[SCALARS[i]] end
-    local align = style.WindowTitleAlign
-    look.ax, look.ay = align.x, align.y
+    for i = 1, NF do look.s[i] = style[FLOATS[i]] end
+    for i = 1, NP do
+        local v = style[PAIRS[i]]
+        look.p[i * 2 - 1], look.p[i * 2] = v.x, v.y
+    end
     local colors, c = style.Colors, look.c
     for i = 1, COUNT do
         local v = colors[i + base]
@@ -83,19 +92,25 @@ local function near(a, b)
     return math.abs(a - b) < 1e-5
 end
 
+local function samePair(a, b, i)
+    return near(a[i * 2 - 1], b[i * 2 - 1]) and near(a[i * 2], b[i * 2])
+end
+
 local function sameColor(a, b, i)
     local k = i * 4
     return near(a[k - 3], b[k - 3]) and near(a[k - 2], b[k - 2]) and near(a[k - 1], b[k - 1]) and near(a[k], b[k])
 end
 
--- Escreve so o que mudou (as cores sao referencias para o estilo do contexto).
+-- Escreve so o que mudou (pares e cores sao referencias para o estilo do contexto).
 local function write(style, base, want, cur)
-    for i = 1, #SCALARS do
-        if not near(want.s[i], cur.s[i]) then style[SCALARS[i]] = want.s[i] end
+    for i = 1, NF do
+        if not near(want.s[i], cur.s[i]) then style[FLOATS[i]] = want.s[i] end
     end
-    if not near(want.ax, cur.ax) or not near(want.ay, cur.ay) then
-        local align = style.WindowTitleAlign
-        align.x, align.y = want.ax, want.ay
+    for i = 1, NP do
+        if not samePair(want.p, cur.p, i) then
+            local v = style[PAIRS[i]]
+            v.x, v.y = want.p[i * 2 - 1], want.p[i * 2]
+        end
     end
     local colors, w = style.Colors, want.c
     for i = 1, COUNT do
@@ -140,9 +155,11 @@ end
 local fast = nil -- nil: ainda nao conferido; true: FFI; false: API
 
 local function sameLook(a, b)
-    if a.ax ~= b.ax or a.ay ~= b.ay then return false end
-    for i = 1, #SCALARS do
+    for i = 1, NF do
         if a.s[i] ~= b.s[i] then return false end
+    end
+    for i = 1, NP * 2 do
+        if a.p[i] ~= b.p[i] then return false end
     end
     for i = 1, COUNT * 4 do
         if a.c[i] ~= b.c[i] then return false end
@@ -159,10 +176,10 @@ local function checkFast(style)
         read(ptr, -1, viaFfi)
         if not sameLook(viaApi, viaFfi) then return false end
         -- Outros campos do layout, para nao aceitar um deslocamento por acaso.
-        for _, field in ipairs({'Alpha', 'IndentSpacing', 'ScrollbarSize', 'GrabMinSize', 'CurveTessellationTol'}) do
+        for _, field in ipairs({'Alpha', 'CurveTessellationTol'}) do
             if style[field] ~= ptr[field] then return false end
         end
-        for _, field in ipairs({'WindowPadding', 'FramePadding', 'ItemSpacing', 'ButtonTextAlign'}) do
+        for _, field in ipairs({'TouchExtraPadding', 'ButtonTextAlign'}) do
             local a, b = style[field], ptr[field]
             if a.x ~= b.x or a.y ~= b.y then return false end
         end
@@ -182,18 +199,57 @@ local function styleRef()
     return style, 0
 end
 
+-- Estado deste script: o visual dele (orig), para o tema poder desligar na hora, e o que a skin escreveu no
+-- comeco do quadro (applied), para perceber o que o script mudou depois.
+local orig, applied, cur, want = nil, newLook(), newLook(), newLook()
+local houseLook = newLook() -- cantos, alinhamento e espacamentos da casa para a tela atual (a cada quadro)
+local layoutOn = false      -- layout=1: espacamentos da casa tambem
+local theme = true          -- tema ligado neste quadro (/trokskin vale a partir do quadro seguinte)
+local dead = false
+local notes, noted = {}, 0
+
+local function loadHouse(height)
+    local s, p = houseLook.s, houseLook.p
+    s[1], s[2], s[3], s[4], s[5], p[1], p[2] = skin.scalars(height)
+    local indent, scroll, grab, wpx, wpy, fpx, fpy, isx, isy, iix, iiy = skin.spacing(height)
+    layoutOn = indent ~= nil
+    if layoutOn then
+        s[6], s[7], s[8] = indent, scroll, grab
+        p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10] = wpx, wpy, fpx, fpy, isx, isy, iix, iiy
+    end
+end
+
+-- Cantos e alinhamento da casa e, com layout=1, os espacamentos.
+local function setHouseFields(look)
+    local lastF, lastP = layoutOn and NF or LAYOUT_FLOAT - 1, layoutOn and NP or LAYOUT_PAIR - 1
+    for i = 1, lastF do look.s[i] = houseLook.s[i] end
+    for i = 1, lastP * 2 do look.p[i] = houseLook.p[i] end
+end
+
 local function setHouseColor(look, i)
     local k = i * 4
     look.c[k - 3], look.c[k - 2], look.c[k - 1], look.c[k] = house[k - 3], house[k - 2], house[k - 1], house[k]
 end
 
--- Estado deste script: o visual dele (orig), para o tema poder desligar na hora, e o que a skin escreveu no
--- comeco do quadro (applied), para perceber o que o script mudou depois.
-local orig, applied, cur, want = nil, newLook(), newLook(), newLook()
-local houseLook = newLook() -- cantos e alinhamento da casa para a tela atual (calculado a cada quadro)
-local theme = true          -- tema ligado neste quadro (/trokskin vale a partir do quadro seguinte)
-local dead = false
-local notes, noted = {}, 0
+-- Volta ao visual do script o que ele nao empurrou para esta janela (com push, fica o que ele empurrou).
+-- spacingOnly: so os espacamentos (HUD com layout=1).
+local function keepScript(spacingOnly)
+    for i = spacingOnly and LAYOUT_FLOAT or 1, NF do
+        if near(cur.s[i], applied.s[i]) then want.s[i] = orig.s[i] end
+    end
+    for i = spacingOnly and LAYOUT_PAIR or 1, NP do
+        if samePair(cur.p, applied.p, i) then
+            want.p[i * 2 - 1], want.p[i * 2] = orig.p[i * 2 - 1], orig.p[i * 2]
+        end
+    end
+    if spacingOnly then return end
+    for i = 1, COUNT do
+        if sameColor(cur.c, applied.c, i) then
+            local k = i * 4
+            want.c[k - 3], want.c[k - 2], want.c[k - 1], want.c[k] = orig.c[k - 3], orig.c[k - 2], orig.c[k - 1], orig.c[k]
+        end
+    end
+end
 
 -- Anota (log e /trokskin) a decisao de cada janela quando ela aparece ou muda. Titulo que muda a cada quadro
 -- (FPS no titulo...) nao enche o log: depois de 32 janelas, so as ja vistas.
@@ -229,11 +285,13 @@ local function applyFrame()
         copy(cur, applied)
     else
         -- O que o script mudou desde a ultima escrita da skin passa a ser o visual dele.
-        for i = 1, #SCALARS do
+        for i = 1, NF do
             if not near(cur.s[i], applied.s[i]) then orig.s[i] = cur.s[i] end
         end
-        if not near(cur.ax, applied.ax) or not near(cur.ay, applied.ay) then
-            orig.ax, orig.ay = cur.ax, cur.ay
+        for i = 1, NP do
+            if not samePair(cur.p, applied.p, i) then
+                orig.p[i * 2 - 1], orig.p[i * 2] = cur.p[i * 2 - 1], cur.p[i * 2]
+            end
         end
         for i = 1, COUNT do
             if not sameColor(cur.c, applied.c, i) then
@@ -243,12 +301,10 @@ local function applyFrame()
         end
     end
     theme = skin.theme()
-    local hs = houseLook.s
-    hs[1], hs[2], hs[3], hs[4], hs[5], houseLook.ax, houseLook.ay = skin.scalars(imgui.GetIO().DisplaySize.y)
+    loadHouse(imgui.GetIO().DisplaySize.y)
     copy(orig, want)
     if theme then
-        for i = 1, #SCALARS do want.s[i] = hs[i] end
-        want.ax, want.ay = houseLook.ax, houseLook.ay
+        setHouseFields(want)
         for i = 1, COUNT do
             if not transparent(i, orig.c[i * 4]) then setHouseColor(want, i) end
         end
@@ -273,6 +329,13 @@ local function applyWindow(name, flags)
     local title = tostring(name)
     if transparent(WINDOW_BG, style.Colors[WINDOW_BG + base].w) then
         note(title, 'fundo transparente (HUD): fica como esta')
+        if layoutOn then
+            -- O HUD fica onde o autor pos: os espacamentos voltam aos dele (a fonte vale para o script inteiro).
+            read(style, base, cur)
+            copy(cur, want)
+            keepScript(true)
+            write(style, base, want, cur)
+        end
         return nil
     end
     read(style, base, cur)
@@ -280,24 +343,11 @@ local function applyWindow(name, flags)
     note(title, kept and 'mantida (##trok ou manter=)' or theme and 'padronizada' or 'tema desligado')
     copy(cur, want)
     if kept or not theme then
-        -- Sem push do script, o campo volta ao valor dele; com push, fica o que ele empurrou.
-        for i = 1, #SCALARS do
-            if near(cur.s[i], applied.s[i]) then want.s[i] = orig.s[i] end
-        end
-        if near(cur.ax, applied.ax) and near(cur.ay, applied.ay) then
-            want.ax, want.ay = orig.ax, orig.ay
-        end
-        for i = 1, COUNT do
-            if sameColor(cur.c, applied.c, i) then
-                local k = i * 4
-                want.c[k - 3], want.c[k - 2], want.c[k - 1], want.c[k] = orig.c[k - 3], orig.c[k - 2], orig.c[k - 1], orig.c[k]
-            end
-        end
+        keepScript(false)
         write(style, base, want, cur)
         return nil
     end
-    for i = 1, #SCALARS do want.s[i] = houseLook.s[i] end
-    want.ax, want.ay = houseLook.ax, houseLook.ay
+    setHouseFields(want)
     for i = 1, COUNT do
         -- Cores com significado (texto vermelho, grafico verde) ficam como o script empurrou.
         if not palette.significado[i] and not transparent(i, cur.c[i * 4]) then setHouseColor(want, i) end
@@ -309,47 +359,57 @@ local function applyWindow(name, flags)
     return flags + SHOW_BORDERS
 end
 
--- Fonte da casa no atlas deste script (o metatable e o mesmo para todo ImFontAtlas do script). Liga no primeiro
--- SwitchContext/BeginFrame, com o contexto do script ativo.
+-- Fontes do atlas deste script (o metatable e o mesmo para todo ImFontAtlas do script). Liga no primeiro
+-- SwitchContext/BeginFrame, com o contexto do script ativo. A regra de cada fonte vem do .asi (skin.font): normal,
+-- so as fontes de sistema viram a fonte da casa, com a mesma largura de texto; com layout=1, a primeira fonte do
+-- atlas vai para o tamanho de texto da casa e todas as outras acompanham.
 local fontsReady = not skin.fonts()
+local layoutFonts = skin.spacing(1080) ~= nil
 
 local function patchFonts()
     fontsReady = true
     local atlas = imgui.GetIO().Fonts
     local mt = getmetatable(atlas)
     local index = type(mt) == 'table' and mt.__index
-    local add = type(index) == 'function' and index(atlas, 'AddFontFromFileTTF')
-    if type(add) ~= 'function' then
+    local function method(name)
+        if type(index) ~= 'function' then return nil end
+        local ok, fn = pcall(index, atlas, name)
+        return ok and type(fn) == 'function' and fn or nil
+    end
+    local add = method('AddFontFromFileTTF')
+    if not add then
         skin.log('imgui antigo: ' .. file .. ': atlas de fontes diferente do esperado -- fonte fica como esta')
         return
     end
 
-    local function replace(self, path, size, ...)
+    local function replace(self, fontPath, size, ...)
         local cfg, ranges = ...
-        if type(path) ~= 'string' or type(size) ~= 'number' or not skin.replaceable(path) then return nil end
-        if cfg ~= nil and cfg.MergeMode then return nil end
-        local ratio = skin.ratio(path, ranges ~= nil) -- nil: a fonte fica (o log ja diz o motivo)
-        if not ratio then return nil end
-        local houseSize = size * ratio
+        if type(fontPath) ~= 'string' or type(size) ~= 'number' then return nil end
+        local merge = cfg ~= nil and cfg.MergeMode == true
+        local houseSize, face = skin.font(file, fontPath, size, ranges ~= nil, merge)
+        if not houseSize then return nil end
+        if not face then
+            return add(self, fontPath, houseSize, ...) -- layout=1: so o tamanho
+        end
         local font = add(self, skin.housePath(), houseSize, ...)
         if not font then
-            skin.log('fonte da casa nao carregou; ' .. path .. ' ficou')
+            skin.log('fonte da casa nao carregou; ' .. fontPath .. ' ficou')
             return nil
         end
         -- Glifos que a fonte da casa nao tem vem da fonte original (o ImGui nao sobrescreve os que ja existem).
-        local merge = cfg
-        if merge == nil then merge = imgui.ImFontConfig() end
-        merge.MergeMode = true
+        local fallback = cfg
+        if fallback == nil then fallback = imgui.ImFontConfig() end
+        fallback.MergeMode = true
         local ok, err
         if ranges ~= nil then
-            ok, err = pcall(add, self, path, houseSize, merge, ranges)
+            ok, err = pcall(add, self, fontPath, houseSize, fallback, ranges)
         else
-            ok, err = pcall(add, self, path, houseSize, merge)
+            ok, err = pcall(add, self, fontPath, houseSize, fallback)
         end
         if cfg ~= nil then cfg.MergeMode = false end
         if not ok then skin.log('fonte de reserva nao entrou: ' .. tostring(err)) end
-        skin.log(string.format('fonte %s %.1f px de %s -> fonte da casa %.1f px (mesma largura de texto)', path, size,
-                               file, houseSize))
+        skin.log(string.format('fonte %s %.1f px de %s -> fonte da casa %.1f px (%s)', fontPath, size, file, houseSize,
+                               layoutFonts and 'tamanho da casa' or 'mesma largura de texto'))
         return font
     end
 
@@ -362,8 +422,44 @@ local function patchFonts()
         return add(self, ...)
     end
 
+    -- Fontes da memoria (icones embutidos etc.): so o tamanho, e so com layout=1. sizeArg: posicao do tamanho.
+    local function memoryFont(original, sizeArg)
+        return function(self, ...)
+            local n, args = select('#', ...), {...}
+            if not dead and type(args[sizeArg]) == 'number' then
+                local ok, newSize = pcall(function()
+                    local cfg = args[sizeArg + 1]
+                    return skin.font(file, nil, args[sizeArg], false, type(cfg) == 'userdata' and cfg.MergeMode == true)
+                end)
+                if ok and newSize then
+                    args[sizeArg] = newSize
+                    return original(self, unpack(args, 1, n))
+                end
+            end
+            return original(self, ...)
+        end
+    end
+
+    local wrapped = {AddFontFromFileTTF = addFont}
+    for name, sizeArg in pairs({AddFontFromMemoryTTF = 3, AddFontFromMemoryCompressedTTF = 3,
+                                AddFontFromMemoryCompressedBase85TTF = 2}) do
+        local original = method(name)
+        if original then wrapped[name] = memoryFont(original, sizeArg) end
+    end
+    -- Atlas limpo: a proxima fonte e a nova referencia de tamanho (layout=1).
+    for _, name in ipairs({'Clear', 'ClearFonts'}) do
+        local original = method(name)
+        if original then
+            wrapped[name] = function(self, ...)
+                pcall(skin.resetFonts, file)
+                return original(self, ...)
+            end
+        end
+    end
+
     mt.__index = function(self, key)
-        if key == 'AddFontFromFileTTF' then return addFont end
+        local fn = wrapped[key]
+        if fn then return fn end
         return index(self, key)
     end
 end

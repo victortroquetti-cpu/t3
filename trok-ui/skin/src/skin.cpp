@@ -5,7 +5,8 @@
 //  - a fonte da casa no lugar das fontes de sistema (Trebuchet do mimgui, Arial, Tahoma...), com o tamanho
 //    ajustado para o texto ocupar a mesma largura. Glifos que a fonte da casa nao tem vem da fonte original.
 // Nada que mexe no layout e alterado: espacamentos, tamanhos e bordas de janela ficam como o script deixou.
-// HUDs com fundo transparente ficam exatamente como o autor fez.
+// HUDs com fundo transparente ficam exatamente como o autor fez. A versao de teste "Trok Skin Layout.asi"
+// (layout=1) tambem leva o tamanho das fontes e os espacamentos do kit da casa, e ai o layout muda.
 //
 // Como, no mimgui: ele carrega uma DLL nativa so (moonloader\lib\mimgui\cimguidx9.dll, Dear ImGui 1.72 +
 // cimgui) e todo script chama as funcoes exportadas dela. A skin desvia algumas dessas funcoes com o MinHook
@@ -53,6 +54,12 @@ char g_housePath[MAX_PATH * 3] = {};
 HMODULE g_module = nullptr;
 volatile bool g_theme = true;
 volatile bool g_fontOn = true;
+// layout=1 (versao de teste, "Trok Skin Layout.asi"): tambem o tamanho das fontes e os espacamentos da casa. Mexe no
+// layout dos menus. Sem a linha no .ini, vale o padrao com que a versao foi compilada.
+#ifndef TROK_LAYOUT_PADRAO
+#define TROK_LAYOUT_PADRAO 0
+#endif
+volatile bool g_layout = TROK_LAYOUT_PADRAO != 0;
 std::vector<std::string> g_kept;        // titulos (minusculos) das janelas que ficam como o autor fez
 std::vector<std::string> g_keptScripts; // arquivos (minusculos) de scripts que ficam como estao
 
@@ -113,13 +120,16 @@ void LoadConfig() {
                   "manter=\n"
                   "; Scripts inteiros que ficam como estao: o nome do arquivo, separados por | (os da casa, que\n"
                   "; usam a pasta resource\\trok ou janelas ##trok, ja ficam sozinhos, com qualquer nome)\n"
-                  "manter_scripts=\n",
+                  "manter_scripts=\n"
+                  "; layout=1 tambem padroniza o tamanho das fontes e os espacamentos (mexe no layout dos menus).\n"
+                  "; Sem a linha, vale o padrao da versao: desligado no Trok Skin.asi, ligado no Trok Skin Layout.asi.\n",
                   f);
             fclose(f);
         }
     }
     g_theme = GetPrivateProfileIntA("skin", "tema", 1, g_iniPath) != 0;
     g_fontOn = GetPrivateProfileIntA("skin", "fonte", 1, g_iniPath) != 0;
+    g_layout = GetPrivateProfileIntA("skin", "layout", TROK_LAYOUT_PADRAO, g_iniPath) != 0;
     auto readList = [](const char* key, std::vector<std::string>& out) {
         char raw[2048] = {};
         GetPrivateProfileStringA("skin", key, "", raw, sizeof(raw), g_iniPath);
@@ -139,8 +149,10 @@ void LoadConfig() {
     };
     readList("manter", g_kept);
     readList("manter_scripts", g_keptScripts);
-    Log("config: tema %s, fonte %s, %d janela(s) e %d script(s) mantidos", g_theme ? "ligado" : "desligado",
-        g_fontOn ? "ligada" : "desligada", static_cast<int>(g_kept.size()), static_cast<int>(g_keptScripts.size()));
+    Log("config: tema %s, fonte %s, layout %s, %d janela(s) e %d script(s) mantidos", g_theme ? "ligado" : "desligado",
+        g_fontOn ? "ligada" : "desligada",
+        g_layout ? "LIGADO (tamanho de fonte e espacamentos da casa: mexe no layout)" : "desligado",
+        static_cast<int>(g_kept.size()), static_cast<int>(g_keptScripts.size()));
 }
 
 // ---------------------------------------------------------------- funcoes do cimguidx9.dll
@@ -155,6 +167,8 @@ typedef void(__cdecl* NewFrameFn)();
 typedef bool(__cdecl* BeginFn)(const char*, bool*, ImGuiWindowFlags);
 typedef void(__cdecl* DestroyContextFn)(ImGuiContext*);
 typedef ImFont*(__cdecl* AddFontFromFileFn)(ImFontAtlas*, const char*, float, const ImFontConfig*, const ImWchar*);
+typedef ImFont*(__cdecl* AddFontFromMemoryFn)(ImFontAtlas*, void*, int, float, const ImFontConfig*, const ImWchar*);
+typedef ImFont*(__cdecl* AddFontFromBase85Fn)(ImFontAtlas*, const char*, float, const ImFontConfig*, const ImWchar*);
 typedef void(__cdecl* AtlasFn)(ImFontAtlas*);
 typedef void(__cdecl* AddTextFontFn)(ImDrawList*, const ImFont*, float, const ImVec2, ImU32, const char*, const char*,
                                      float, const ImVec4*);
@@ -171,6 +185,9 @@ NewFrameFn o_igNewFrame = nullptr;
 BeginFn o_igBegin = nullptr;
 DestroyContextFn o_igDestroyContext = nullptr;
 AddFontFromFileFn o_AddFontFromFileTTF = nullptr;
+AddFontFromMemoryFn o_AddFontFromMemoryTTF = nullptr;
+AddFontFromMemoryFn o_AddFontFromMemoryCompressedTTF = nullptr;
+AddFontFromBase85Fn o_AddFontFromBase85 = nullptr;
 AtlasFn o_AtlasClear = nullptr;
 AtlasFn o_AtlasClearFonts = nullptr;
 AtlasFn o_AtlasDestroy = nullptr;
@@ -179,13 +196,15 @@ CalcTextSizeFn o_CalcTextSizeA = nullptr;
 
 // ---------------------------------------------------------------- tema da casa
 
-// Campos do estilo que a skin troca: so os que nao mexem no layout (cantos, borda dos campos, alinhamento
-// do titulo e cores). Espacamentos, tamanhos e as bordas de janela, filha e popup ficam como o script
-// deixou (a borda da janela filha muda o recuo dela, por isso nao entra).
+// Campos do estilo que a skin troca: os que nao mexem no layout (cantos, borda dos campos, alinhamento do
+// titulo e cores) e, so com layout=1, os espacamentos da casa. As bordas de janela, filha e popup ficam como o
+// script deixou (a borda da janela filha muda o recuo dela, por isso nao entra).
 struct Look {
     float windowRounding, childRounding, popupRounding, frameRounding, scrollbarRounding, grabRounding, tabRounding;
     float frameBorderSize;
     ImVec2 windowTitleAlign;
+    ImVec2 windowPadding, framePadding, itemSpacing, itemInnerSpacing; // layout=1
+    float indentSpacing, scrollbarSize, grabMinSize;                    // layout=1
     ImVec4 colors[ImGuiCol_COUNT];
 };
 
@@ -199,6 +218,13 @@ void Read(const ImGuiStyle& s, Look& l) {
     l.tabRounding = s.TabRounding;
     l.frameBorderSize = s.FrameBorderSize;
     l.windowTitleAlign = s.WindowTitleAlign;
+    l.windowPadding = s.WindowPadding;
+    l.framePadding = s.FramePadding;
+    l.itemSpacing = s.ItemSpacing;
+    l.itemInnerSpacing = s.ItemInnerSpacing;
+    l.indentSpacing = s.IndentSpacing;
+    l.scrollbarSize = s.ScrollbarSize;
+    l.grabMinSize = s.GrabMinSize;
     memcpy(l.colors, s.Colors, sizeof(l.colors));
 }
 
@@ -212,6 +238,13 @@ void Write(ImGuiStyle& s, const Look& l) {
     s.TabRounding = l.tabRounding;
     s.FrameBorderSize = l.frameBorderSize;
     s.WindowTitleAlign = l.windowTitleAlign;
+    s.WindowPadding = l.windowPadding;
+    s.FramePadding = l.framePadding;
+    s.ItemSpacing = l.itemSpacing;
+    s.ItemInnerSpacing = l.itemInnerSpacing;
+    s.IndentSpacing = l.indentSpacing;
+    s.ScrollbarSize = l.scrollbarSize;
+    s.GrabMinSize = l.grabMinSize;
     memcpy(s.Colors, l.colors, sizeof(l.colors));
 }
 
@@ -310,9 +343,24 @@ void HouseScalars(Look& l, float u) {
     l.windowTitleAlign = ImVec2(0.5f, 0.5f);
 }
 
+// Espacamentos da casa (layout=1), os do kit: margem da janela 18x16; campo de 24 com texto de 16 (folga de 4 em
+// cima e embaixo); linhas de 28 com 2 de intervalo (6 entre um campo e outro); recuo 12. Mexem no layout.
+void HouseSpacing(Look& l, float u) {
+    l.windowPadding = ImVec2(18 * u, 16 * u);
+    l.framePadding = ImVec2(10 * u, 4 * u);
+    l.itemSpacing = ImVec2(10 * u, 6 * u);
+    l.itemInnerSpacing = ImVec2(8 * u, 6 * u);
+    l.indentSpacing = 12 * u;
+    l.scrollbarSize = 6 * u;
+    l.grabMinSize = 10 * u;
+}
+
 void House(const Look& script, Look& out, float u) {
     out = script;
     HouseScalars(out, u);
+    if (g_layout) {
+        HouseSpacing(out, u);
+    }
     for (int i = 0; i < ImGuiCol_COUNT; ++i) {
         bool transparent = IsBackground(i) && script.colors[i].w < 0.5f;
         out.colors[i] = transparent ? script.colors[i] : g_house[i];
@@ -323,7 +371,8 @@ void House(const Look& script, Look& out, float u) {
 // criar o contexto, antes de qualquer fonte: e dali que sai o nome do script.
 struct Script {
     std::string name;                                    // "meu_mod.lua" ("?" se o script apagou o IniFilename antes)
-    bool untouched = false;                              // da casa ("trok" no nome) ou em manter_scripts=
+    bool untouched = false;                              // mod da casa ou em manter_scripts=
+    float sizeFactor = 0.0f; // layout=1: tamanho de texto da casa / primeira fonte do atlas (0 = ainda nao carregou)
     std::vector<std::pair<std::string, std::string>> windows; // titulo -> o que a skin fez (para o log)
 };
 std::unordered_map<ImGuiContext*, Script> g_scripts;
@@ -452,11 +501,20 @@ void Absorb(State& st, const Look& cur) {
     ABSORB(grabRounding)
     ABSORB(tabRounding)
     ABSORB(frameBorderSize)
+    ABSORB(indentSpacing)
+    ABSORB(scrollbarSize)
+    ABSORB(grabMinSize)
 #undef ABSORB
-    if (cur.windowTitleAlign.x != st.applied.windowTitleAlign.x ||
-        cur.windowTitleAlign.y != st.applied.windowTitleAlign.y) {
-        st.orig.windowTitleAlign = cur.windowTitleAlign;
+#define ABSORB2(f)                                                                                                \
+    if (cur.f.x != st.applied.f.x || cur.f.y != st.applied.f.y) {                                                 \
+        st.orig.f = cur.f;                                                                                        \
     }
+    ABSORB2(windowTitleAlign)
+    ABSORB2(windowPadding)
+    ABSORB2(framePadding)
+    ABSORB2(itemSpacing)
+    ABSORB2(itemInnerSpacing)
+#undef ABSORB2
     for (int i = 0; i < ImGuiCol_COUNT; ++i) {
         if (!Same(cur.colors[i], st.applied.colors[i])) {
             st.orig.colors[i] = cur.colors[i];
@@ -520,6 +578,44 @@ bool Kept(const char* name) {
     return false;
 }
 
+// Volta ao visual do script o que ele nao empurrou para esta janela (com push, fica o que ele empurrou).
+// spacingOnly: so os espacamentos (HUD com layout=1).
+void KeepScript(Look& want, const Look& cur, const State& st, bool spacingOnly) {
+#define KEEP(f)                                                                                                   \
+    if (cur.f == st.applied.f) {                                                                                  \
+        want.f = st.orig.f;                                                                                       \
+    }
+#define KEEP2(f)                                                                                                  \
+    if (cur.f.x == st.applied.f.x && cur.f.y == st.applied.f.y) {                                                 \
+        want.f = st.orig.f;                                                                                       \
+    }
+    KEEP2(windowPadding)
+    KEEP2(framePadding)
+    KEEP2(itemSpacing)
+    KEEP2(itemInnerSpacing)
+    KEEP(indentSpacing)
+    KEEP(scrollbarSize)
+    KEEP(grabMinSize)
+    if (!spacingOnly) {
+        KEEP(windowRounding)
+        KEEP(childRounding)
+        KEEP(popupRounding)
+        KEEP(frameRounding)
+        KEEP(scrollbarRounding)
+        KEEP(grabRounding)
+        KEEP(tabRounding)
+        KEEP(frameBorderSize)
+        KEEP2(windowTitleAlign)
+        for (int i = 0; i < ImGuiCol_COUNT; ++i) {
+            if (Same(cur.colors[i], st.applied.colors[i])) {
+                want.colors[i] = st.orig.colors[i];
+            }
+        }
+    }
+#undef KEEP
+#undef KEEP2
+}
+
 // Antes de cada janela: o script pode ter mudado cores ou cantos depois do inicio do quadro (ou empurrado
 // para esta janela). Janela padronizada volta ao tema; janela mantida (manter= ou da casa, ##trok...) volta
 // ao visual do script. HUD (fundo transparente) fica intocado.
@@ -534,6 +630,14 @@ void ApplyWindow(const char* name, ImGuiWindowFlags flags) {
     ImGuiStyle* style = p_igGetStyle();
     if ((flags & ImGuiWindowFlags_NoBackground) || style->Colors[ImGuiCol_WindowBg].w < 0.5f) {
         NoteWindow(script, name, "fundo transparente (HUD): fica como esta");
+        if (g_layout) {
+            // O HUD fica onde o autor pos: os espacamentos voltam aos dele (a fonte vale para o script inteiro).
+            Look cur;
+            Read(*style, cur);
+            Look want = cur;
+            KeepScript(want, cur, st, true);
+            Write(*style, want);
+        }
         return;
     }
     bool kept = Kept(name);
@@ -542,31 +646,13 @@ void ApplyWindow(const char* name, ImGuiWindowFlags flags) {
     Read(*style, cur);
     Look want = cur;
     if (!g_theme || kept) {
-        // Sem push do script, o campo volta ao valor dele; com push, fica o que ele empurrou.
-#define KEEP(f)                                                                                                   \
-    if (cur.f == st.applied.f) {                                                                                  \
-        want.f = st.orig.f;                                                                                       \
-    }
-        KEEP(windowRounding)
-        KEEP(childRounding)
-        KEEP(popupRounding)
-        KEEP(frameRounding)
-        KEEP(scrollbarRounding)
-        KEEP(grabRounding)
-        KEEP(tabRounding)
-        KEEP(frameBorderSize)
-#undef KEEP
-        if (cur.windowTitleAlign.x == st.applied.windowTitleAlign.x &&
-            cur.windowTitleAlign.y == st.applied.windowTitleAlign.y) {
-            want.windowTitleAlign = st.orig.windowTitleAlign;
-        }
-        for (int i = 0; i < ImGuiCol_COUNT; ++i) {
-            if (Same(cur.colors[i], st.applied.colors[i])) {
-                want.colors[i] = st.orig.colors[i];
-            }
-        }
+        KeepScript(want, cur, st, false);
     } else {
-        HouseScalars(want, Scale(p_igGetIO()->DisplaySize.y));
+        float u = Scale(p_igGetIO()->DisplaySize.y);
+        HouseScalars(want, u);
+        if (g_layout) {
+            HouseSpacing(want, u);
+        }
         for (int i = 0; i < ImGuiCol_COUNT; ++i) {
             bool transparent = IsBackground(i) && cur.colors[i].w < 0.5f;
             if (!transparent && !IsSemantic(i)) {
@@ -698,6 +784,68 @@ float HouseRatio(const char* path, bool cyrillic) {
     return ratio;
 }
 
+// Altura da tela do jogo, para a escala da casa quando as fontes carregam (antes do primeiro quadro do script):
+// a janela do GTA; senao a maior janela visivel deste processo; senao 1080.
+BOOL CALLBACK LargestWindow(HWND window, LPARAM param) {
+    DWORD pid = 0;
+    GetWindowThreadProcessId(window, &pid);
+    RECT r;
+    if (pid == GetCurrentProcessId() && IsWindowVisible(window) && GetClientRect(window, &r)) {
+        auto* best = reinterpret_cast<std::pair<HWND, LONG>*>(param);
+        if (r.bottom * r.right > best->second) {
+            *best = {window, r.bottom * r.right};
+        }
+    }
+    return TRUE;
+}
+
+float ScreenHeight() {
+    HWND window = FindWindowA("Grand theft auto San Andreas", nullptr);
+    DWORD pid = 0;
+    if (window) {
+        GetWindowThreadProcessId(window, &pid);
+    }
+    if (!window || pid != GetCurrentProcessId()) {
+        std::pair<HWND, LONG> best = {nullptr, 0};
+        EnumWindows(LargestWindow, reinterpret_cast<LPARAM>(&best));
+        window = best.first;
+    }
+    RECT r;
+    return window && GetClientRect(window, &r) && r.bottom > 0 ? static_cast<float>(r.bottom) : 1080.0f;
+}
+
+// layout=1: a primeira fonte do atlas do script (a padrao do mimgui ou do imgui antigo, Trebuchet 14) vai para o
+// tamanho de texto da casa (16 x escala da tela, como no kit); as outras fontes acompanham na mesma proporcao,
+// para o titulo do mod continuar maior que o texto.
+float LayoutFactor(Script& script, float size) {
+    if (script.sizeFactor <= 0.0f) {
+        script.sizeFactor = 16.0f * Scale(ScreenHeight()) / size;
+        Log("layout: %s: primeira fonte %.1f px -> %.1f px (tamanho de texto da casa); as outras na mesma proporcao",
+            script.name.c_str(), size, size * script.sizeFactor);
+    }
+    return script.sizeFactor;
+}
+
+// Como fica uma fonte que o script carrega: o tamanho novo (0 = fica como esta) e, em *face, se ela vira a fonte
+// da casa. path nulo = fonte da memoria (so muda de tamanho, com layout=1). Normal: so as fontes de sistema mudam,
+// para a fonte da casa com a mesma largura de texto. layout=1: tudo vai para o tamanho da casa.
+float FontPlan(Script& script, const char* path, float size, bool cyrillic, bool merge, bool* face) {
+    *face = false;
+    if (script.untouched || size <= 0.0f) {
+        return 0.0f;
+    }
+    float factor = g_layout ? LayoutFactor(script, size) : 1.0f;
+    bool system = path && !merge && g_fontOn && g_houseFont && Replaceable(path);
+    if (system && g_layout) {
+        *face = LoadFontFile(path) != nullptr; // a fonte original entra de reserva: tem que abrir
+    } else if (system) {
+        float ratio = HouseRatio(path, cyrillic);
+        *face = ratio != 0.0f;
+        return *face ? size * ratio : 0.0f;
+    }
+    return *face || factor != 1.0f ? size * factor : 0.0f;
+}
+
 // O construtor do ImFontConfig mora no ImGui da DLL: sem config do script, a copia vem de um criado por ela.
 void CopyConfig(const ImFontConfig* cfg, ImFontConfig* out) {
     if (cfg) {
@@ -709,24 +857,35 @@ void CopyConfig(const ImFontConfig* cfg, ImFontConfig* out) {
     p_ImFontConfig_destroy(fresh);
 }
 
+// Fonte do script so com outro tamanho (layout=1): texto com tamanho explicito acompanha (Compensated).
+ImFont* Resized(ImFontAtlas* atlas, ImFont* font, float size, float newSize, const ImFontConfig* cfg) {
+    if (font && !(cfg && cfg->MergeMode)) { // a mesclada devolve a fonte de destino, que ja tem o seu fator
+        g_replaced[font] = Replaced{atlas, newSize / size};
+    }
+    return font;
+}
+
 ImFont* __cdecl HookAddFontFromFileTTF(ImFontAtlas* atlas, const char* filename, float size, const ImFontConfig* cfg,
                                        const ImWchar* ranges) {
-    if (!g_fontOn || !g_houseFont || !filename || (cfg && cfg->MergeMode) || !Replaceable(filename)) {
-        return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
-    }
     ImGuiContext* ctx = p_igGetCurrentContext();
-    if (!ctx || ScriptOf(ctx).untouched) {
+    if (!ctx || !filename) {
         return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
     }
-    const std::string& owner = ScriptOf(ctx).name;
-    float ratio = HouseRatio(filename, HasCyrillic(ranges ? ranges : (cfg ? cfg->GlyphRanges : nullptr)));
-    if (ratio == 0.0f) {
+    Script& script = ScriptOf(ctx);
+    bool face = false;
+    float houseSize = FontPlan(script, filename, size, HasCyrillic(ranges ? ranges : (cfg ? cfg->GlyphRanges : nullptr)),
+                               cfg && cfg->MergeMode, &face);
+    if (houseSize == 0.0f) {
         return o_AddFontFromFileTTF(atlas, filename, size, cfg, ranges);
     }
+    if (!face) {
+        return Resized(atlas, o_AddFontFromFileTTF(atlas, filename, houseSize, cfg, ranges), size, houseSize, cfg);
+    }
+    const std::string& owner = script.name;
+    float ratio = houseSize / size;
     alignas(ImFontConfig) unsigned char storage[sizeof(ImFontConfig)];
     ImFontConfig& base = *reinterpret_cast<ImFontConfig*>(storage);
     CopyConfig(cfg, &base);
-    float houseSize = size * ratio;
     ImFont* font = o_AddFontFromFileTTF(atlas, g_housePath, houseSize, &base, ranges);
     if (!font) {
         Log("fonte da casa nao carregou; %s ficou", filename);
@@ -738,9 +897,41 @@ ImFont* __cdecl HookAddFontFromFileTTF(ImFontAtlas* atlas, const char* filename,
     fallback.DstFont = nullptr;
     o_AddFontFromFileTTF(atlas, filename, houseSize, &fallback, ranges);
     g_replaced[font] = Replaced{atlas, ratio};
-    Log("fonte %s %.1f px de %s -> fonte da casa %.1f px (mesma largura de texto)", filename, size, owner.c_str(),
-        houseSize);
+    Log("fonte %s %.1f px de %s -> fonte da casa %.1f px (%s)", filename, size, owner.c_str(), houseSize,
+        g_layout ? "tamanho da casa" : "mesma largura de texto");
     return font;
+}
+
+// Fontes da memoria (icones embutidos no script etc.): so mudam de tamanho, e so com layout=1.
+float MemoryFontSize(float size, const ImFontConfig* cfg) {
+    ImGuiContext* ctx = p_igGetCurrentContext();
+    if (!g_layout || !ctx) {
+        return size;
+    }
+    bool face = false;
+    float newSize = FontPlan(ScriptOf(ctx), nullptr, size, false, cfg && cfg->MergeMode, &face);
+    return newSize == 0.0f ? size : newSize;
+}
+
+ImFont* __cdecl HookAddFontFromMemoryTTF(ImFontAtlas* atlas, void* data, int bytes, float size, const ImFontConfig* cfg,
+                                         const ImWchar* ranges) {
+    float newSize = MemoryFontSize(size, cfg);
+    ImFont* font = o_AddFontFromMemoryTTF(atlas, data, bytes, newSize, cfg, ranges);
+    return newSize == size ? font : Resized(atlas, font, size, newSize, cfg);
+}
+
+ImFont* __cdecl HookAddFontFromMemoryCompressedTTF(ImFontAtlas* atlas, void* data, int bytes, float size,
+                                                   const ImFontConfig* cfg, const ImWchar* ranges) {
+    float newSize = MemoryFontSize(size, cfg);
+    ImFont* font = o_AddFontFromMemoryCompressedTTF(atlas, data, bytes, newSize, cfg, ranges);
+    return newSize == size ? font : Resized(atlas, font, size, newSize, cfg);
+}
+
+ImFont* __cdecl HookAddFontFromBase85(ImFontAtlas* atlas, const char* data, float size, const ImFontConfig* cfg,
+                                      const ImWchar* ranges) {
+    float newSize = MemoryFontSize(size, cfg);
+    ImFont* font = o_AddFontFromBase85(atlas, data, newSize, cfg, ranges);
+    return newSize == size ? font : Resized(atlas, font, size, newSize, cfg);
 }
 
 void ForgetAtlas(ImFontAtlas* atlas) {
@@ -749,13 +940,24 @@ void ForgetAtlas(ImFontAtlas* atlas) {
     }
 }
 
+// O script limpou o atlas: a proxima fonte dele e a nova referencia de tamanho (layout=1).
+void ResetLayoutFactor(ImFontAtlas* atlas) {
+    ImGuiContext* ctx = p_igGetCurrentContext();
+    auto found = ctx ? g_scripts.find(ctx) : g_scripts.end();
+    if (found != g_scripts.end() && p_igGetIO()->Fonts == atlas) {
+        found->second.sizeFactor = 0.0f;
+    }
+}
+
 void __cdecl HookAtlasClear(ImFontAtlas* atlas) {
     ForgetAtlas(atlas);
+    ResetLayoutFactor(atlas);
     o_AtlasClear(atlas);
 }
 
 void __cdecl HookAtlasClearFonts(ImFontAtlas* atlas) {
     ForgetAtlas(atlas);
+    ResetLayoutFactor(atlas);
     o_AtlasClearFonts(atlas);
 }
 
@@ -943,25 +1145,58 @@ int __cdecl LuaPalette(lua_State* L) {
     return 1;
 }
 
+// skin.fonts(): a skin mexe nas fontes do script (troca pela da casa ou, com layout=1, muda o tamanho)?
 int __cdecl LuaFonts(lua_State* L) {
-    g_lua.pushboolean(L, g_fontOn && g_houseFont != nullptr);
+    g_lua.pushboolean(L, (g_fontOn && g_houseFont != nullptr) || g_layout);
     return 1;
 }
 
-int __cdecl LuaReplaceable(lua_State* L) {
-    g_lua.pushboolean(L, Replaceable(Arg(L, 1)));
-    return 1;
-}
-
-// skin.ratio(caminho, cirilico): fator de tamanho da fonte da casa, ou nil se a fonte do script fica.
-int __cdecl LuaRatio(lua_State* L) {
-    float ratio = HouseRatio(Arg(L, 1), g_lua.toboolean(L, 2) != 0);
-    if (ratio == 0.0f) {
+// skin.font(arquivo do script, caminho ou nil, tamanho, cirilico, mesclada): o tamanho novo e se vira a fonte da
+// casa (a mesma regra do mimgui, FontPlan), ou nil se a fonte fica como esta.
+int __cdecl LuaFont(lua_State* L) {
+    auto found = g_moonScripts.find(Arg(L, 1));
+    const int LUA_TSTRING = 4;
+    const char* path = g_lua.type(L, 2) == LUA_TSTRING ? Arg(L, 2) : nullptr;
+    bool face = false;
+    float size = found == g_moonScripts.end()
+                     ? 0.0f
+                     : FontPlan(found->second, path, static_cast<float>(g_lua.tonumber(L, 3)),
+                                g_lua.toboolean(L, 4) != 0, g_lua.toboolean(L, 5) != 0, &face);
+    if (size == 0.0f) {
         g_lua.pushnil(L);
-    } else {
-        g_lua.pushnumber(L, ratio);
+        return 1;
     }
-    return 1;
+    g_lua.pushnumber(L, size);
+    g_lua.pushboolean(L, face);
+    return 2;
+}
+
+// skin.resetFonts(arquivo): o script limpou o atlas; a proxima fonte e a nova referencia de tamanho (layout=1).
+int __cdecl LuaResetFonts(lua_State* L) {
+    auto found = g_moonScripts.find(Arg(L, 1));
+    if (found != g_moonScripts.end()) {
+        found->second.sizeFactor = 0.0f;
+    }
+    return 0;
+}
+
+// skin.spacing(altura da tela): espacamentos da casa com layout=1 (IndentSpacing, ScrollbarSize, GrabMinSize,
+// WindowPadding.x/y, FramePadding.x/y, ItemSpacing.x/y, ItemInnerSpacing.x/y), ou nil com o layout desligado.
+int __cdecl LuaSpacing(lua_State* L) {
+    if (!g_layout) {
+        g_lua.pushnil(L);
+        return 1;
+    }
+    Look look;
+    HouseSpacing(look, Scale(static_cast<float>(g_lua.tonumber(L, 1))));
+    const float values[] = {look.indentSpacing,      look.scrollbarSize,    look.grabMinSize,
+                            look.windowPadding.x,    look.windowPadding.y,  look.framePadding.x,
+                            look.framePadding.y,     look.itemSpacing.x,    look.itemSpacing.y,
+                            look.itemInnerSpacing.x, look.itemInnerSpacing.y};
+    for (float v : values) {
+        g_lua.pushnumber(L, v);
+    }
+    return 11;
 }
 
 int __cdecl LuaHousePath(lua_State* L) {
@@ -973,10 +1208,10 @@ void PushSkinTable(lua_State* L) {
     static const struct {
         const char* name;
         lua_CFunction fn;
-    } functions[] = {{"log", LuaLog},         {"script", LuaScript},   {"theme", LuaTheme},
-                     {"kept", LuaKept},       {"note", LuaNote},       {"scalars", LuaScalars},
-                     {"palette", LuaPalette}, {"fonts", LuaFonts},     {"replaceable", LuaReplaceable},
-                     {"ratio", LuaRatio},     {"housePath", LuaHousePath}};
+    } functions[] = {{"log", LuaLog},         {"script", LuaScript},     {"theme", LuaTheme},
+                     {"kept", LuaKept},       {"note", LuaNote},         {"scalars", LuaScalars},
+                     {"spacing", LuaSpacing}, {"palette", LuaPalette},   {"fonts", LuaFonts},
+                     {"font", LuaFont},       {"resetFonts", LuaResetFonts}, {"housePath", LuaHousePath}};
     g_lua.createtable(L, 0, static_cast<int>(sizeof(functions) / sizeof(functions[0])));
     for (const auto& f : functions) {
         g_lua.pushcclosure(L, f.fn, 0);
@@ -1067,14 +1302,29 @@ void Install(HMODULE dll) {
              Hook(dll, "igDestroyContext", reinterpret_cast<void*>(HookDestroyContext), o_igDestroyContext) &&
              Hook(dll, "ImFontAtlas_AddFontFromFileTTF", reinterpret_cast<void*>(HookAddFontFromFileTTF),
                   o_AddFontFromFileTTF) &&
+             Hook(dll, "ImFontAtlas_AddFontFromMemoryTTF", reinterpret_cast<void*>(HookAddFontFromMemoryTTF),
+                  o_AddFontFromMemoryTTF) &&
+             Hook(dll, "ImFontAtlas_AddFontFromMemoryCompressedTTF",
+                  reinterpret_cast<void*>(HookAddFontFromMemoryCompressedTTF), o_AddFontFromMemoryCompressedTTF) &&
+             Hook(dll, "ImFontAtlas_AddFontFromMemoryCompressedBase85TTF", reinterpret_cast<void*>(HookAddFontFromBase85),
+                  o_AddFontFromBase85) &&
              Hook(dll, "ImFontAtlas_Clear", reinterpret_cast<void*>(HookAtlasClear), o_AtlasClear) &&
              Hook(dll, "ImFontAtlas_ClearFonts", reinterpret_cast<void*>(HookAtlasClearFonts), o_AtlasClearFonts) &&
              Hook(dll, "ImFontAtlas_destroy", reinterpret_cast<void*>(HookAtlasDestroy), o_AtlasDestroy) &&
              Hook(dll, "ImDrawList_AddTextFontPtr", reinterpret_cast<void*>(HookAddTextFontPtr), o_AddTextFontPtr) &&
              Hook(dll, "ImFont_CalcTextSizeA_nonUDT", reinterpret_cast<void*>(HookCalcTextSizeA), o_CalcTextSizeA);
-        static const char* hooked[] = {"igNewFrame",           "igBegin",           "igDestroyContext",
-                                       "ImFontAtlas_AddFontFromFileTTF", "ImFontAtlas_Clear", "ImFontAtlas_ClearFonts",
-                                       "ImFontAtlas_destroy",  "ImDrawList_AddTextFontPtr", "ImFont_CalcTextSizeA_nonUDT"};
+        static const char* hooked[] = {"igNewFrame",
+                                       "igBegin",
+                                       "igDestroyContext",
+                                       "ImFontAtlas_AddFontFromFileTTF",
+                                       "ImFontAtlas_AddFontFromMemoryTTF",
+                                       "ImFontAtlas_AddFontFromMemoryCompressedTTF",
+                                       "ImFontAtlas_AddFontFromMemoryCompressedBase85TTF",
+                                       "ImFontAtlas_Clear",
+                                       "ImFontAtlas_ClearFonts",
+                                       "ImFontAtlas_destroy",
+                                       "ImDrawList_AddTextFontPtr",
+                                       "ImFont_CalcTextSizeA_nonUDT"};
         for (const char* name : hooked) {
             if (void* t = reinterpret_cast<void*>(GetProcAddress(dll, name))) {
                 targets.push_back(t);
@@ -1366,7 +1616,17 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         } else {
             g_logPath[0] = 0;
         }
-        Log("Trok Skin .asi v1.2.1");
+        char file[MAX_PATH] = {};
+        GetModuleFileNameA(module, file, MAX_PATH);
+        const char* base = strrchr(file, '\\') ? strrchr(file, '\\') + 1 : file;
+        Log("Trok Skin .asi v1.3.0 (%s)", base);
+        // Uma copia so por jogo: com o Trok Skin.asi e o Trok Skin Layout.asi juntos na pasta, a que carregar
+        // depois fica desligada (as duas desviariam as mesmas funcoes).
+        CreateMutexA(nullptr, FALSE, "TrokSkin.UmaCopia");
+        if (GetLastError() == ERROR_ALREADY_EXISTS) {
+            Log("outra copia do Trok Skin ja esta ligada neste jogo -- esta (%s) fica desligada; deixe so um .asi", base);
+            return TRUE;
+        }
         InitializeCriticalSection(&g_installLock);
         CreateThread(nullptr, 0, Boot, nullptr, 0, nullptr);
     }

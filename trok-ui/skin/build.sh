@@ -38,8 +38,12 @@ for f in buffer.c hook.c trampoline.c hde/hde32.c; do
     MINHOOK_OBJECTS="$MINHOOK_OBJECTS $obj"
 done
 
-$CXX -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Wno-unused-function -I$IMGUI -I$MINHOOK/include -Ibuild -shared \
-    -o "dist/Trok Skin.asi" src/skin.cpp $MINHOOK_OBJECTS \
-    -static -static-libgcc -static-libstdc++ -s -luser32
-
-echo "ok: dist/Trok Skin.asi ($(stat -c %s "dist/Trok Skin.asi") bytes)"
+# Duas versoes do mesmo codigo: a normal (nao mexe no layout) e a de teste "Layout", que ja vem com layout=1
+# (tamanho de fonte e espacamentos da casa). No .ini, a linha layout= vale para as duas.
+for variant in "Trok Skin:0" "Trok Skin Layout:1"; do
+    name=${variant%:*}
+    $CXX -std=c++17 -O2 -DNDEBUG -DTROK_LAYOUT_PADRAO=${variant#*:} -Wall -Wextra -Wno-unused-function -I$IMGUI \
+        -I$MINHOOK/include -Ibuild -shared -o "dist/$name.asi" src/skin.cpp $MINHOOK_OBJECTS \
+        -static -static-libgcc -static-libstdc++ -s -luser32
+    echo "ok: dist/$name.asi ($(stat -c %s "dist/$name.asi") bytes)"
+done
