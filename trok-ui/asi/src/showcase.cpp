@@ -133,7 +133,11 @@ void Backdrop(const char* id) {
     if (ImGui::IsWindowAppearing()) {
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
     }
-    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(0, 0), io.DisplaySize, IM_COL32(0, 0, 0, 110));
+    // Sem o recorte da janela (meio WindowPadding nas laterais), o veu cobre a tela inteira.
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->PushClipRectFullScreen();
+    dl->AddRectFilled(ImVec2(0, 0), io.DisplaySize, IM_COL32(0, 0, 0, 110));
+    dl->PopClipRect();
     ImGui::End();
     ImGui::PopStyleVar();
 }

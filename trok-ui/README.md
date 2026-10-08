@@ -13,8 +13,8 @@ Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diál
 
 ## Instalar
 
-- **Lua:** copie `Trok UI Showcase.lua` para `moonloader\`. Precisa de mimgui e SAMPFUNCS, como o Kill List.
-- **.asi:** copie `Trok UI Showcase.asi` para a pasta do GTA, ao lado do `gta_sa.exe`. O log fica em `Trok UI Showcase.log`, na mesma pasta.
+- **Lua:** copie `Trok UI Showcase.lua` para `moonloader\`. Precisa de mimgui e SAMPFUNCS, como o Kill List. Comando: `/trokuilua`. Se o mimgui não iniciar em 2 s, o chat avisa e o motivo fica em `moonloader\moonloader.log`.
+- **.asi:** copie `Trok UI Showcase.asi` para a pasta do GTA (ao lado do `gta_sa.exe`) ou para `scripts\`. Comando: `/trokui` (sem SA-MP 0.3.7 R1, F10). O log fica em `Trok UI Showcase.log`, ao lado do .asi. Se o desenho não estiver ativo quando você digitar `/trokui`, o chat avisa.
 - **Fontes da casa (os dois mods):** `moonloader\resource\trok\font.ttf` (Gotham Medium) e `moonloader\resource\trok\lucide.ttf`, os mesmos arquivos que o Kill List já usa. Sem eles, o texto cai para Arial e os ícones viram desenhos vetoriais no mesmo traço.
 
 ## Fonte e ícones
@@ -128,11 +128,21 @@ Para ter todos como glifo, gere o recorte com os códigos acima (por exemplo, `p
 - **Lua:** copie o bloco "TROK UI" do topo de `Trok UI Showcase.lua` (até "Fim do kit"). Chame `ui.buildFonts()` no `imgui.OnInitialize`, envolva cada quadro com `ui.beginFrame()` / `ui.endFrame()` e monte a janela com `ui.pushStyle()`, `ui.beginShell(...)`, `ui.rows(...)`, `ui.endShell(...)` e `ui.popStyle()`. O teclado vem do `onWindowMessage` (veja o fim do arquivo).
 - **.asi:** inclua `asi/src/trok_ui.h` e `trok_ui.cpp`. O `main.cpp` tem o gancho de Present/Reset, o WndProc, o `/comando` do SA-MP R1 e o cursor, prontos para copiar.
 
+Duas regras que custaram caro na primeira versão:
+
+- **.asi — não troque o slot do Present na vtable.** O Dialogs e o Radar encadeiam nesse slot do device real e, quando acham um laço, consertam a corrente apontando direto para o d3d9; um terceiro gancho no mesmo slot pode ser cortado. O `main.cpp` acha o device real pelo back buffer (como o Dialogs), lê o Present/Reset originais do arquivo em disco do módulo dono da vtable (d3d9.dll, ou dxvk/ReShade) e desvia esse código com o MinHook. Assim o desenho fica no fim de qualquer corrente, por cima de tudo. Desenhe entre `BeginScene`/`EndScene` (no Present a cena do jogo já fechou) e pegue a janela como o Dialogs: `0xC9C05C`, depois `0xC8CF88`, depois a classe `Grand theft auto San Andreas`.
+- **Lua — o `imgui.OnInitialize` só roda quando algum `OnFrame` pede para desenhar.** Algum quadro tem que pedir enquanto o renderer não está pronto (`return not rendererReady or ...`), como no Kill List. Sem isso o mimgui nunca inicia e nada aparece.
+
 ## Compilar e testar
 
-- **.asi:** `asi/build.sh` baixa o Dear ImGui 1.89.9 e compila com MinGW (i686), gerando `asi/dist/Trok UI Showcase.asi`.
+- **.asi:** `asi/build.sh` baixa o Dear ImGui 1.89.9 e o MinHook e compila com MinGW (i686), gerando `asi/dist/Trok UI Showcase.asi`.
+- **.asi num GTA de mentira:** `asi/test/smoke/run.sh` roda o .asi no Wine 32 bits (com Xvfb) com um processo que expõe o device d3d9 nos endereços do `gta_sa.exe` e carrega um `samp.dll` falso com os endereços do 0.3.7 R1. Depois digita `/trokui` duas vezes e confere os pixels do back buffer: o menu tem que abrir por cima de tudo e fechar, e o cursor do SA-MP tem que ir para o modo 2 e voltar. São 5 cenários: device direto; proxy estilo SA-MP com dois ganchos de vtable na regra do Dialogs/Radar (lida no binário do Dialogs 2.28); sem `0xC8CF88`; só pela classe da janela; e um wrapper que esconde o device real.
 - **Capturas sem o jogo:** `asi/test/run.sh <pasta>` roda a vitrine num rasterizador por software e salva PNGs de cada tela. Com `TROK_FONT=…/font.ttf TROK_ICONS=…/lucide.ttf`, usa a fonte e os ícones da casa (foi assim que as imagens acima foram geradas).
 - **Lua sem o jogo:** `cd lua && luajit test/mock_run.lua` roda todas as abas, popups, diálogos e o modo de mover num mimgui simulado. O teste confere se cada Push tem o seu Pop, se cada Begin tem End, os canais do draw list, os ids repetidos e os tipos dos argumentos.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
-> Nenhum dos dois foi testado dentro do GTA ainda. Os testes acima rodam fora do jogo. Os endereços do SA-MP (0.3.7 R1) e do GTA (1.0 US) são os mesmos que os mods da casa usam.
+> O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.
+
+## Terceiros
+
+O .asi inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.

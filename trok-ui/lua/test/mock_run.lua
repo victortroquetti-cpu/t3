@@ -54,6 +54,7 @@ local function drawList(name)
     function dl:ChannelsSetCurrent(i) check(self.split > 0 and i < self.split, name .. ': canal ' .. i .. ' fora do split ' .. self.split); self.current = i end
     function dl:ChannelsMerge() check(self.split > 0, name .. ': Merge sem Split'); self.split = 0; frame.channels[self] = nil end
     function dl:PushClipRectFullScreen() frame.clip = frame.clip + 1 end
+    function dl:PushClipRect(a, b, intersect) vecs(a, b); check(type(intersect) == 'boolean', 'PushClipRect intersect'); frame.clip = frame.clip + 1 end
     function dl:PopClipRect() frame.clip = frame.clip - 1 end
     return dl
 end
@@ -259,6 +260,8 @@ isSampfuncsLoaded = function() return true end
 isSampLoaded = function() return true end
 isSampAvailable = function() return true end
 sampRegisterChatCommand = function(name, cb) commands[name] = cb end
+chatMessages = {}
+sampAddChatMessage = function(text) chatMessages[#chatMessages + 1] = text end
 consumeWindowMessage = function() end
 thisScript = function() return { version = '1.0.0' } end
 wait = coroutine.yield
@@ -266,8 +269,8 @@ wait = coroutine.yield
 local chunk = assert(loadfile(SCRIPT))
 chunk()
 assert(initCallback, 'sem imgui.OnInitialize')
-initCallback()
-check(#fontFiles >= 5, 'fontes da casa nao carregadas (' .. #fontFiles .. ')')
+-- Como no mimgui: o OnInitialize so roda no primeiro quadro em que algum OnFrame pede para desenhar.
+local initialized = false
 
 local mainThread = coroutine.create(main)
 local function step(opts)
@@ -285,8 +288,23 @@ local function step(opts)
     frame.hovered = opts.hover or {}
     frame.active = opts.active
     frame.mouseDown = opts.mouseDown
-    for _, f in ipairs(frames) do
-        if f.cond() then
+    local wants = {}
+    for i, f in ipairs(frames) do
+        wants[i] = f.cond()
+    end
+    if not initialized then
+        for i = 1, #frames do
+            if wants[i] then
+                initialized = true
+                local okInit, errInit = pcall(initCallback)
+                if not okInit then fail('OnInitialize: ' .. tostring(errInit)) end
+                check(#fontFiles >= 5, 'fontes da casa nao carregadas (' .. #fontFiles .. ')')
+                break
+            end
+        end
+    end
+    for i, f in ipairs(frames) do
+        if initialized and wants[i] then
             local ok2, err2 = pcall(f.draw, f)
             if not ok2 then fail('quadro: ' .. tostring(err2)) end
         end
@@ -313,8 +331,10 @@ local function run(n, opts)
     for _ = 2, n do step({ hover = opts.hover, typing = opts.typing, active = opts.active, mouseDown = opts.mouseDown }) end
 end
 
--- Abre como o /trokuilua (com Enter apertado no mesmo quadro).
+-- Primeiro quadro depois de carregar: o mimgui precisa inicializar sozinho.
 step()
+check(initialized, 'o mimgui nunca inicializou: nenhum OnFrame pediu para desenhar')
+-- Abre como o /trokuilua (com Enter apertado no mesmo quadro).
 assert(commands.trokuilua, 'comando /trokuilua nao registrado')
 commands.trokuilua('')
 run(2, { keys = { [0x0D] = true } })
@@ -382,6 +402,7 @@ for _, t in ipairs({ 'Restaurar', 'Pressione uma tecla', 'Resposta do di\195\161
     'VK78', 'Posi\195\167\195\163o salva' }) do
     check(texts[t], 'texto esperado nunca apareceu: ' .. t)
 end
+check(#chatMessages == 0, 'aviso no chat com o mimgui funcionando: ' .. tostring(chatMessages[1]))
 if failures == 0 then
     print('ok: todas as abas, popups, dialogos e modo de mover rodaram sem erro e com as pilhas equilibradas')
 else

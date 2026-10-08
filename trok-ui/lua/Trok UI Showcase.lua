@@ -697,9 +697,13 @@ function ui.endShell(hints, alignRight)
     local footerY = pos.y + size.y - footerH
     local padX = 18 * u
 
+    -- O ImGui recorta o conteudo da janela a meio WindowPadding (9u) das laterais; a faixa do rodape
+    -- e o divisor vao de borda a borda, entao saem desse recorte.
+    dl:PushClipRect(pos, vec(pos.x + size.x, pos.y + size.y), false)
     dl:AddRectFilled(vec(pos.x + 1, footerY), vec(pos.x + size.x - 1, pos.y + size.y - 1), rgba(0, 0, 0, 46),
         10 * u, imgui.DrawCornerFlags.Bot)
     dl:AddLine(vec(pos.x + 1, footerY + 0.5), vec(pos.x + size.x - 1, footerY + 0.5), pal('separator'), 1)
+    dl:PopClipRect()
 
     local keyGap, hintGap = 6 * u, 22 * u
     local total = 0
@@ -2397,12 +2401,17 @@ imgui.OnInitialize(function()
     rendererReady = true
 end)
 
--- Notificacoes ficam na tela mesmo com o menu fechado, sem cursor.
+-- Notificacoes ficam na tela mesmo com o menu fechado, sem cursor. Este quadro tambem liga o mimgui:
+-- o OnInitialize so roda quando algum quadro pede para desenhar, entao ele pede enquanto o renderer
+-- nao esta pronto (o mesmo truque do Trok Kill List).
 local toastFrame = imgui.OnFrame(
     function()
-        return rendererReady and #ui.toasts > 0 and not isPauseMenuActive()
+        return not rendererReady or (#ui.toasts > 0 and not isPauseMenuActive())
     end,
     function(frame)
+        if not rendererReady then
+            return
+        end
         frame.HideCursor = not uiActive()
         ui.drawToasts()
     end
@@ -2453,6 +2462,8 @@ local function toggleMenu()
     S.confirm = false
     S.menuAge = 0
     pending = {}
+    print('[Trok UI Showcase] vitrine ' .. (S.open and 'aberta' or 'fechada') ..
+        (rendererReady and '' or ' (mimgui ainda nao iniciou)'))
 end
 
 -- Teclado lido direto das mensagens da janela (como o WndProc do .asi): com a vitrine aberta o jogo
@@ -2527,11 +2538,21 @@ function main()
     sampRegisterChatCommand('trokuilua', toggleMenu)
     print('[Trok UI Showcase] v' .. thisScript().version .. ' iniciada. /trokuilua abre a vitrine.')
 
+    -- Se a vitrine foi aberta e o mimgui nao iniciou em 2 s, avisa no chat em vez de ficar mudo.
+    local waitingSince, warned = nil, false
     while true do
         wait(0)
         if not uiActive() or isPauseMenuActive() then
             pending = {}
             releaseCursor()
+        end
+        if uiActive() and not rendererReady and not warned then
+            waitingSince = waitingSince or os.clock()
+            if os.clock() - waitingSince > 2 then
+                warned = true
+                print('[Trok UI Showcase] o mimgui nao iniciou em 2 s')
+                sampAddChatMessage('[Trok UI] o mimgui nao iniciou. Me envie o arquivo moonloader\\moonloader.log', 0xFF8A8A)
+            end
         end
     end
 end

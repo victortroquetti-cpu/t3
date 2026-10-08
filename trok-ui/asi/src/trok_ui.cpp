@@ -556,9 +556,13 @@ int EndShell(const std::vector<Hint>& hints, bool alignRight) {
     float footerY = pos.y + size.y - footerH;
     float padX = 18 * u;
 
+    // O ImGui recorta o conteudo da janela a meio WindowPadding (9u) das laterais; a faixa do rodape
+    // e o divisor vao de borda a borda, entao saem desse recorte.
+    dl->PushClipRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), false);
     dl->AddRectFilled(ImVec2(pos.x + 1, footerY), ImVec2(pos.x + size.x - 1, pos.y + size.y - 1),
                       IM_COL32(0, 0, 0, 46), 10 * u, ImDrawFlags_RoundCornersBottom);
     dl->AddLine(ImVec2(pos.x + 1, footerY + 0.5f), ImVec2(pos.x + size.x - 1, footerY + 0.5f), col::separator, 1.0f);
+    dl->PopClipRect();
 
     float keyGap = 6 * u, hintGap = 22 * u;
     float total = 0.0f;
