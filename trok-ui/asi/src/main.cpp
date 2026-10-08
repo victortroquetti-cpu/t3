@@ -211,7 +211,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         // (as soltas sempre chegam ao ImGui, para nenhuma tecla ficar presa).
         bool pressed = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN || msg == WM_CHAR;
         bool sampKeys = pressed && SampOwnsKeyboard();
-        if (!sampKeys) {
+        // O Tab e do SA-MP (abre o placar): o ImGui da vitrine nunca o ve (senao pularia para um campo de texto)
+        // e ele sempre segue para o jogo, ate digitando.
+        bool tabKey = wParam == VK_TAB && (pressed || msg == WM_KEYUP || msg == WM_SYSKEYUP);
+        if (!sampKeys && !tabKey) {
             ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
         }
 
@@ -223,11 +226,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         // Com o menu aberto o jogo nao recebe teclas nem cliques. Teclas soltas (WM_KEYUP) sempre passam:
         // o GTA le o teclado pelas mensagens da janela e uma tecla sem "soltar" ficaria presa.
-        // T e F6 (e o "t" que vem junto) seguem para o SA-MP abrir o chat, menos digitando num campo.
+        // T e F6 (e o "t" que vem junto) seguem para o SA-MP abrir o chat, menos digitando num campo; o Tab
+        // (placar do SA-MP) segue sempre.
         bool typing = ImGui::GetIO().WantTextInput || tui::CapturingKey();
         bool chatKey = (msg == WM_KEYDOWN && (wParam == 'T' || wParam == VK_F6)) ||
                        (msg == WM_CHAR && (wParam == 't' || wParam == 'T'));
-        if (showcase::CapturesInput() && !PauseMenuOpen() && !sampKeys && !(chatKey && !typing)) {
+        if (showcase::CapturesInput() && !PauseMenuOpen() && !sampKeys && !tabKey && !(chatKey && !typing)) {
             switch (msg) {
             case WM_KEYDOWN:
             case WM_CHAR:

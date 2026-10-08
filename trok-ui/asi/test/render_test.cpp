@@ -2,6 +2,7 @@
 // software e grava PPMs. Uso: ./render_test <pasta de saida>
 #include "imgui.h"
 #include "showcase.h"
+#include "trok_ui.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -91,6 +92,17 @@ static void Click(float x, float y) {
     io.AddMouseButtonEvent(0, true); Frame(); io.AddMouseButtonEvent(0, false); Frame();
 }
 static void Idle(int n) { for (int i = 0; i < n; ++i) Frame(); }
+// Troca de aba com um clique (o Tab e do SA-MP: abre o placar). As 5 abas dividem a largura do menu, que fica no
+// meio da tela; depois o mouse volta para onde estava, para as telas seguintes nao mudarem. Leva 5 quadros (a tecla
+// levava 2): quem chama espera 3 a menos depois, para as animacoes chegarem iguais as telas.
+static void ClickTab(int i, float backX, float backY) {
+    float u = tui::u;
+    float width = 640 * u, height = std::min(H * 0.72f, 540 * u);
+    float x = W * 0.5f - std::ceil(width) * 0.5f + 18 * u, y = H * 0.5f - std::ceil(height) * 0.5f + tui::HeaderHeight();
+    float tabW = (width - 36 * u) / 5;
+    Click(x + tabW * (i + 0.5f), y + tui::TabsHeight() * 0.5f);
+    Mouse(backX, backY);
+}
 
 int main(int argc, char** argv) {
     std::string dir = argc > 1 ? argv[1] : ".";
@@ -126,16 +138,16 @@ int main(int argc, char** argv) {
     Key(ImGuiKey_Escape); Key(ImGuiKey_DownArrow); Key(ImGuiKey_Enter); Idle(20);
     Frame(true, dir + "/04b_dropdown.ppm");
     Key(ImGuiKey_Escape); Idle(5);
-    Key(ImGuiKey_Tab); Idle(30);
+    ClickTab(1, 800, 330); Idle(27);
     Frame(true, dir + "/05_texto.ppm");
     Key(ImGuiKey_DownArrow); Key(ImGuiKey_Enter);
     io.AddInputCharactersUTF8("segredo123"); Idle(10);
     Frame(true, dir + "/06_texto_digitando.ppm");
     Key(ImGuiKey_Escape); Idle(5);
-    Key(ImGuiKey_Tab); Idle(30);
+    ClickTab(2, 800, 330); Idle(27);
     Key(ImGuiKey_3); Idle(10);
     Frame(true, dir + "/07_listas.ppm");
-    Key(ImGuiKey_Tab); Idle(30);
+    ClickTab(3, 800, 330); Idle(27);
     Mouse(700, 480); Idle(40);
     Frame(true, dir + "/08_avisos.ppm");
     for (int i = 0; i < 6; ++i) Key(ImGuiKey_DownArrow);
@@ -144,7 +156,7 @@ int main(int argc, char** argv) {
     Key(ImGuiKey_Escape); Idle(5);
     Key(ImGuiKey_UpArrow); Key(ImGuiKey_Enter); Idle(15);
     Frame(true, dir + "/10_toast.ppm");
-    Key(ImGuiKey_Tab); Idle(20);
+    ClickTab(4, 700, 480); Idle(17);
     Key(ImGuiKey_DownArrow); Key(ImGuiKey_DownArrow); Key(ImGuiKey_Enter); Idle(20);
     io.AddInputCharactersUTF8("abc123"); Idle(5);
     Frame(true, dir + "/11_dialogo_senha.ppm");
@@ -158,7 +170,7 @@ int main(int argc, char** argv) {
     Key(ImGuiKey_UpArrow); Key(ImGuiKey_UpArrow); Key(ImGuiKey_UpArrow); Key(ImGuiKey_UpArrow); Key(ImGuiKey_Enter); Idle(15);
     Frame(true, dir + "/14_dialogo_mensagem.ppm");
     Key(ImGuiKey_Enter); Idle(10);
-    Key(ImGuiKey_Tab); Idle(20);
+    ClickTab(0, 700, 480); Idle(17);
     for (int i = 0; i < 12; ++i) Key(ImGuiKey_UpArrow);
     Key(ImGuiKey_Enter); Idle(10);
     Frame(true, dir + "/15_mover.ppm");

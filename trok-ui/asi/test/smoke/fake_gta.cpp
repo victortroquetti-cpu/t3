@@ -8,7 +8,8 @@
 //  - digita /trokui (chama o callback que o .asi registrou), salva o back buffer e confere os pixels:
 //    o menu tem que aparecer por cima de tudo e sumir no segundo /trokui;
 //  - com o menu aberto, confere quais teclas chegam ao "jogo" (o WndProc da janela, abaixo do .asi): o T
-//    tem que chegar (abre o chat do SA-MP), a seta nao, e com o chat aberto tudo chega.
+//    tem que chegar (abre o chat do SA-MP), o Tab tambem (abre o placar), a seta nao, e com o chat aberto tudo
+//    chega.
 //
 // Uso: fake_gta.exe <asi> <direto|samp-mods|wrapper> [so-janela-do-d3d|so-classe]
 //   wrapper           como samp-mods, mas o proxy esconde o device real (GetBackBuffer falha), como um
@@ -40,6 +41,7 @@ constexpr D3DCOLOR CLEAR = D3DCOLOR_XRGB(20, 90, 40);
 int g_failures = 0;
 int g_gameKeysT = 0;
 int g_gameKeysDown = 0;
+int g_gameKeysTab = 0;
 IDirect3DDevice9* g_real = nullptr;
 HMODULE g_d3d9 = nullptr;
 DWORD g_shot[W * H];
@@ -64,6 +66,9 @@ LRESULT CALLBACK GameWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     }
     if (msg == WM_KEYDOWN && wParam == VK_DOWN) {
         ++g_gameKeysDown;
+    }
+    if (msg == WM_KEYDOWN && wParam == VK_TAB) {
+        ++g_gameKeysTab;
     }
     return DefWindowProcA(hwnd, msg, wParam, lParam);
 }
@@ -403,10 +408,12 @@ int main(int argc, char** argv) {
                 Check(Dominant(20, 20, 0) && Dominant(50, 20, 2) && Dominant(80, 20, 1),
                       "marcadores do proxy e dos mods de vtable continuam na tela");
             }
-            int seenT = g_gameKeysT, seenDown = g_gameKeysDown;
+            int seenT = g_gameKeysT, seenDown = g_gameKeysDown, seenTab = g_gameKeysTab;
             Tap(hwnd, 'T');
             Tap(hwnd, VK_DOWN);
+            Tap(hwnd, VK_TAB);
             Check(g_gameKeysT == seenT + 1, "T chega ao SA-MP com o menu aberto (abre o chat)");
+            Check(g_gameKeysTab == seenTab + 1, "Tab chega ao SA-MP com o menu aberto (abre o placar)");
             Check(g_gameKeysDown == seenDown, "seta fica no menu");
             field(0x14 + 0x14E0) = 1; // CInput: chat aberto
             Tap(hwnd, VK_DOWN);

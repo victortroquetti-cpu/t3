@@ -2113,7 +2113,8 @@ local function tabDialogs(r)
     if r:action('Tabela com cabe\195\167alho', 'Abrir') then openDialog('tabela') end
 end
 
-local MENU_HINTS = { { 'Setas', 'Ajustar' }, { 'Tab', 'Trocar de aba' }, { 'Esc', 'Fechar', true } }
+-- Sem dica de Tab: no SA-MP o Tab abre o placar (as abas trocam com o mouse).
+local MENU_HINTS = { { 'Setas', 'Ajustar' }, { 'Esc', 'Fechar', true } }
 
 local function drawMenu()
     local u = ui.u
@@ -2121,9 +2122,6 @@ local function drawMenu()
     S.menuAge = S.menuAge + 1
     -- Com a confirmacao aberta, as teclas sao dela (o menu nao pode consumi-las antes).
     local keys = S.confirm and {} or takeKeys(not fresh and keyboardFree())
-    if keys.tab then
-        S.tab = (S.tab - 1 + (keys.shift and #TABS - 1 or 1)) % #TABS + 1
-    end
 
     local _, screenY = getScreenResolution()
     local width = 640 * u
@@ -2175,7 +2173,7 @@ local function drawMenu()
     local clicked = ui.endShell(MENU_HINTS)
     ui.popStyle()
 
-    if not keep or clicked == 3 or keys.escape then
+    if not keep or clicked == 2 or keys.escape then
         S.open = false
     end
 end
@@ -2426,6 +2424,10 @@ imgui.OnFrame(
     function()
         return rendererReady and uiActive() and not isPauseMenuActive()
     end,
+    function()
+        -- O Tab e do SA-MP (placar): o ImGui da vitrine nunca o ve apertado (senao pularia para um campo de texto).
+        imgui.GetIO().KeysDown[0x09] = false -- VK_TAB
+    end,
     function(frame)
         frame.HideCursor = false
         frame.LockPlayer = true
@@ -2448,7 +2450,7 @@ imgui.OnFrame(
 -- ---------------------------------------------------------------- teclado e comando
 
 local VK = {
-    TAB = 0x09, ENTER = 0x0D, SHIFT = 0x10, ESC = 0x1B, SPACE = 0x20,
+    TAB = 0x09, ENTER = 0x0D, ESC = 0x1B, SPACE = 0x20,
     LEFT = 0x25, UP = 0x26, RIGHT = 0x27, DOWN = 0x28, BACK = 0x08,
 }
 
@@ -2473,8 +2475,9 @@ end
 -- Teclado lido direto das mensagens da janela (como o WndProc do .asi): com a vitrine aberta o jogo
 -- e o SA-MP nao recebem as teclas, mas o mimgui continua recebendo. Teclas soltas (WM_KEYUP) sempre
 -- passam: sem o "soltar" a tecla ficaria presa no GTA. Setas repetem enquanto seguradas.
--- Excecoes: T e F6 abrem o chat do SA-MP (menos digitando num campo da vitrine), e com o chat ou um
--- dialogo do servidor aberto a vitrine larga o teclado para nao reagir ao que se digita la.
+-- Excecoes: T e F6 abrem o chat do SA-MP (menos digitando num campo da vitrine), o Tab abre o placar do
+-- SA-MP (sempre: a vitrine nao usa o Tab), e com o chat ou um dialogo do servidor aberto a vitrine larga o
+-- teclado para nao reagir ao que se digita la.
 local held = {}
 local CHAT_KEYS = { [0x54] = true, [0x75] = true } -- T, F6
 local sampKeyboardAt = -1
@@ -2516,9 +2519,6 @@ local function onKey(vk, repeated)
         else
             pending.escape = true
         end
-    elseif vk == VK.TAB then
-        pending.tab = true
-        pending.shift = held[VK.SHIFT] == true
     elseif vk >= 0x31 and vk <= 0x39 then pending.digit = vk - 0x30
     elseif vk >= 0x61 and vk <= 0x69 then pending.digit = vk - 0x60
     end
@@ -2537,6 +2537,9 @@ function onWindowMessage(msg, wparam, lparam)
     local used = keyDown or msg == 0x102 or msg == 0x20A
     if not used or not uiActive() or isPauseMenuActive() or sampOwnsKeyboard() then
         return
+    end
+    if wparam == VK.TAB and (keyDown or msg == 0x102) then
+        return -- Tab (e o "\t" que vem junto) segue para o SA-MP abrir o placar
     end
     local typing = imgui.GetIO().WantTextInput or ui.capturing ~= nil
     if not typing and ((keyDown and CHAT_KEYS[wparam]) or (msg == 0x102 and (wparam == 0x74 or wparam == 0x54))) then
