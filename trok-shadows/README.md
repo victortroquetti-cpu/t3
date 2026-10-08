@@ -2,7 +2,7 @@
 
 O **Shadows Extender 2.0** (DK22Pac, 2014) refeito com código aberto. Faz tudo o que ele fazia, com as mesmas chaves no INI, e corrige o que estava errado nele.
 
-> **Estado:** versão 1.1, compilada e testada no Wine, sem o jogo: as 113 conferências do `test/run.sh` passam. A 1.0 já rodou no GTA; a 1.1 traz as correções para os dois problemas achados nela (ver [Versões](#versões)) e ainda não foi testada dentro do jogo.
+> **Estado:** versão 1.2, compilada e testada no Wine, sem o jogo: as 128 conferências do `test/run.sh` passam. A 1.0 já rodou no GTA; a 1.1 e a 1.2 trazem as correções para os problemas achados nela (ver [Versões](#versões)) e ainda não foram testadas dentro do jogo.
 
 ## O que muda em relação ao Shadows Extender
 
@@ -16,6 +16,9 @@ O **Shadows Extender 2.0** (DK22Pac, 2014) refeito com código aberto. Faz tudo 
 - **Corrige valores fora da faixa e avisa no log.** `CreateBlur1=0`, que travava o jogo, vira 1.
 - **Não escurece dobrado no veículo.** Quem está dentro de um veículo com sombra em tempo real entra na sombra dele: uma sombra só. No original, piloto e moto tinham cada um a sua, e onde as duas se cruzavam ficava mais escuro.
 - **As sombras não somem por falta de vaga.** O jogo tem 16 vagas de sombra em tempo real. O original pedia sombra para todo pedestre e veículo carregado, até os que estavam longe demais para a sombra aparecer: eles ocupavam as vagas e quem estava perto ficava sem sombra. Aqui só pede quem está dentro de `MaxDistance`, e só os `MaxRealTimeShadows` mais perto da câmera.
+- **A sombra não some embaixo do mapping nem do modelo.** O jogo projeta a sombra na *colisão* dos prédios e do chão do mapa original, nunca nos objetos (o mapping do SA-MP), e desenha por cima com teste de profundidade. Num piso de mapping a sombra ficava no chão embaixo dele, e onde o modelo visível fica um pouco acima da colisão ela sumia embaixo dos polígonos (uns ficavam certos, outros não). Aqui ela também cai nos objetos e aparece até `ShadowSurfaceOffset` cm acima da colisão, sem escurecer dobrado.
+- **Acende e apaga devagar, como no jogo.** O shader do Shadows Extender ignorava a força que o jogo dá a cada sombra: ela aparecia e sumia de uma vez quando trocava de dono e era cortada seca no fim da distância. Agora ela acende e apaga em meio segundo e enfraquece da metade de `MaxDistance` até o fim.
+- **Sombra de quem está logo fora da tela.** O jogo só guarda a sombra de quem está na tela (esfera de 2 m). Com a sombra comprida do mod, a de quem estava na beirada sumia de uma vez ao virar a câmera; a esfera agora vai até o raio da projeção (máximo 15 m).
 - **Liga e desliga a sombra em tempo real, a dos veículos e a arma na sombra** pelo INI, com o jogo aberto.
 - **`MoreThanOnePlayer=auto`** liga sozinho quando o SA-MP está aberto.
 - **Log** em `Trok Shadows.log`, ao lado do `.asi`, com tudo o que foi aplicado ou pulado.
@@ -31,7 +34,7 @@ O **Shadows Extender 2.0** (DK22Pac, 2014) refeito com código aberto. Faz tudo 
 
 ## INI (`Trok Shadows.ini`)
 
-As seções e chaves são as do Shadows Extender, mais quatro novas. O arquivo criado pelo mod explica cada uma. Um INI da versão 1.0 ganha as chaves novas sozinho, com os mesmos valores nas outras.
+As seções e chaves são as do Shadows Extender, mais seis novas. O arquivo criado pelo mod explica cada uma. Um INI da versão 1.0 ganha as chaves novas sozinho, com os mesmos valores nas outras.
 
 | Seção | Chave | O que faz | Jogo | Na hora? |
 |---|---|---|---|---|
@@ -60,6 +63,8 @@ As seções e chaves são as do Shadows Extender, mais quatro novas. O arquivo c
 | | `VehicleRealTimeShadows` | veículos com sombra em tempo real; quem está dentro entra na sombra do veículo — *nova* | — | sim |
 | | `WeaponsInShadow` | arma, paraquedas e mochila a jato na sombra — *nova* | — | sim |
 | | `MaxRealTimeShadows` | quantas sombras em tempo real ao mesmo tempo, as mais perto da câmera (1–16; padrão 12) — *nova* | 16 vagas | sim |
+| | `ShadowOnObjects` | a sombra em tempo real também cai nos objetos (mapping do SA-MP) — *nova* | 0 | sim |
+| | `ShadowSurfaceOffset` | até quantos cm acima da colisão a sombra ainda aparece por cima do modelo (0–30; padrão 6) — *nova* | 0 | sim |
 | `GERAL` | `recarregar` | aplica o INI quando você salva | — | sim |
 
 A força final é `A × máx(1 − nuvens, fator de nuvens) × máx(1 − noite, fator de noite)`. Nuvens vem de `CWeather::CloudCoverage`. Noite vem do equilíbrio dia/noite dos prédios: 0 das 7h às 20h, 1 das 21h às 6h.
@@ -95,7 +100,10 @@ Todos os endereços são do `gta_sa.exe` 1.0 US. Os nomes vêm do [gta-reversed]
   - raio (`0x70A2C8`) e distância vertical (`0x707F2C`) do INI;
   - constantes do Shadows Extender em `CastShadowEntityXYZ` (`0x70A0C9`, `0x70A1AC`, `0x70A211`, `0x70A228`), copiadas como estão.
 - **O que entra na sombra:** o LOD de veículo fica fora. No modo combinado, as hélices só fazem sombra onde são quase opacas (`0x705C4A`).
-- **Shader:** cada sombra em tempo real projetada (`0x70AD0D`) é desenhada com o pixel shader do mod, e o buffer cheio também (`0x7082A4`, `0x7082BD`).
+- **Shader:** cada sombra em tempo real projetada (`0x70AD0D`) é desenhada com o pixel shader do mod, e o buffer cheio também (`0x7082A4`, `0x7082BD`). A força leva em conta o acender/apagar da sombra (`m_nIntensity`) e a distância, como a cor dos vértices fazia no jogo.
+- **Objetos:** em `0x70AD0D` o jogo passa a lista de prédios do setor. O mod roda a mesma função de novo com a lista de objetos do setor de repetição (`CWorld::ms_aRepeatSectors`, `0xB992B8`): as duas listas começam com `{item, próximo}`.
+- **Acima da colisão:** antes de desenhar, cada vértice da sombra (buffer em `0xC4D958`) anda na direção da câmera pela linha de visão, o bastante para subir `ShadowSurfaceOffset` cm acima do polígono dele: na tela a sombra fica no mesmo lugar, só mais perto na profundidade. Fora do modo combinado, o primeiro polígono da sombra em cada pixel marca o stencil e os outros dela ali não escurecem de novo; um segundo desenho, que não pinta nada, apaga a marca.
+- **Fora da tela:** a chamada de `CCamera::IsSphereVisible` dentro de `CShadows::StoreRealTimeShadow` é achada na instalação (a única para `0x420D40` entre `0x707CA0` e `0x707F31`) e recebe o raio da projeção no lugar dos 2 m.
   - fora do modo combinado: `(1 − cor) × força × sombra`, escurecendo na direção da cor;
   - no modo combinado: só marca o stencil, e o retângulo do stencil escurece tudo junto.
 - **Qualidade gráfica:** `0x706BCC` e `0x5E6766`.
@@ -136,9 +144,14 @@ O `test/launcher.exe` ocupa a faixa de endereços do `gta_sa.exe` (`0x400000`–
 - **Outro exe:** o mod não escreve nada.
 - **Conflito:** com o `shadows.asi` também carregado, o mod fica desligado e avisa.
 - **INI da 1.0:** ganha as chaves novas, com os mesmos valores nas outras.
+- **Objetos e colisão:** a função do jogo roda de novo com a lista de objetos certa; os vértices sobem 6 cm na linha de visão; fora do modo combinado, o stencil marca e apaga; acender, apagar e distância mudam a força; a esfera da tela vai a 15 m.
 
 ## Versões
 
+- **1.2**
+  - A sombra em tempo real também cai nos objetos (mapping do SA-MP) e não some mais embaixo de polígonos que ficam um pouco acima da colisão (`ShadowOnObjects`, `ShadowSurfaceOffset`), sem escurecer dobrado.
+  - A sombra acende e apaga devagar e enfraquece com a distância, como no jogo (o shader do Shadows Extender ignorava isso: ela piscava ao trocar de dono).
+  - A sombra de quem está logo fora da tela não some mais de uma vez.
 - **1.1**
   - Piloto, garupa e passageiros entram na sombra do veículo: nada de escurecer dobrado onde as duas sombras se cruzavam (o Shadows Extender também fazia isso).
   - Para as sombras que piscavam e sumiam: só pede sombra quem está dentro de `MaxDistance`, e só os `MaxRealTimeShadows` mais perto. A atualização das sombras é religada se alguém a desligar de novo com o jogo aberto.

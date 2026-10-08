@@ -157,8 +157,32 @@ void __cdecl FakeInitGame() {
 void __cdecl FakeGameProcess() {
     Record("GameProcess original", 0);
 }
+// Buffer de desenho do jogo (RenderBuffer): o "Cast" falso guarda um triangulo e o "Render" falso grava quantos
+// vertices havia e a posicao do primeiro, e zera o buffer como o do jogo.
+const uintptr_t kTempVerticesStored = 0xC4B950, kTempIndicesStored = 0xC4B954, kTempIndices = 0xC4B958,
+                kTempVertices = 0xC4D958;
+float g_castTriangle[3][3] = {{-1, 10, -10}, {1, 10, -10}, {0, 12, -10}}; // chao 10 m abaixo da camera (origem)
+bool g_castAddsTriangle = true;
+
 void __cdecl RecRender() {
-    Record("RenderStuffInBuffer", 0);
+    const float* p = reinterpret_cast<float*>(kTempVertices);
+    Record("RenderStuffInBuffer", 4, (u32)At<uint16_t>(kTempVerticesStored), FBits(p[0]), FBits(p[1]), FBits(p[2]));
+    At<uint16_t>(kTempVerticesStored) = 0;
+    At<uint16_t>(kTempIndicesStored) = 0;
+}
+
+void StoreTriangle() {
+    const int base = At<uint16_t>(kTempVerticesStored);
+    const int idx = At<uint16_t>(kTempIndicesStored);
+    for (int i = 0; i < 3; i++) {
+        float* v = reinterpret_cast<float*>(kTempVertices + (base + i) * 36);
+        v[0] = g_castTriangle[i][0];
+        v[1] = g_castTriangle[i][1];
+        v[2] = g_castTriangle[i][2];
+        At<uint16_t>(kTempIndices + (idx + i) * 2) = static_cast<uint16_t>(base + i);
+    }
+    At<uint16_t>(kTempVerticesStored) = static_cast<uint16_t>(base + 3);
+    At<uint16_t>(kTempIndicesStored) = static_cast<uint16_t>(idx + 3);
 }
 int __cdecl RecRenderStateSet(int state, u32 value) {
     Record("RwRenderStateSet", 2, (u32)state, value);
@@ -173,6 +197,13 @@ void __cdecl RecCast(u32 a0, u32 a1, u32 a2, u32 a3, u32 a4, u32 a5, u32 a6, u32
                      u32 a12, u32 a13, u32 a14, u32 a15, u32 a16, u32 a17, u32 a18) {
     Record("CastRealTimeShadowSectorList", 19, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15,
            a16, a17, a18);
+    if (g_castAddsTriangle) {
+        StoreTriangle();
+    }
+}
+bool __thiscall RecSphereVisible(void* camera, const float* center, u32 radius) {
+    Record("IsSphereVisible", 3, (u32)(uintptr_t)camera, (u32)(uintptr_t)center, radius);
+    return true;
 }
 void __cdecl RecStore(u32 a0, u32 a1, u32 a2, u32 a3, u32 a4, u32 a5, u32 a6, u32 a7, u32 a8, u32 a9, u32 a10, u32 a11,
                       u32 a12, u32 a13, u32 a14, u32 a15) {
@@ -392,6 +423,7 @@ void SetupGame() {
     Put(0x70BDAB, {0x0F, 0x85, 0x10, 0x00, 0x00, 0x00});
     Put(0x5E68A2, {0xB9, 0x50, 0x03, 0xC4, 0x00, 0x56}); // mov ecx, offset g_realTimeShadowMan; push esi
     PutCall(0x5E68A8, 0x706BA0);
+    PutCall(0x707D20, 0x420D40); // CShadows::StoreRealTimeShadow: TheCamera.IsSphereVisible(posicao, 2)
 
     // Constantes do jogo (em .rdata) apontadas pelas instrucoes.
     At<float>(0x858000) = 50.0f;
@@ -430,6 +462,7 @@ void SetupGame() {
     PutJump(0x532B20, reinterpret_cast<void*>(&RecUpdateRpHAnim));
     PutJump(0x5E4280, reinterpret_cast<void*>(&RecBonePos));
     PutJump(0x70F9E0, reinterpret_cast<void*>(&RecStencilInit));
+    PutJump(0x420D40, reinterpret_cast<void*>(&RecSphereVisible));
     PutJump(0x70667B, reinterpret_cast<void*>(&HostBackExtras));
     PutJump(0x707E30, reinterpret_cast<void*>(&HostBackSun));
 
@@ -531,6 +564,7 @@ void* NewShadow(void* owner, void* camera) {
     memset(s, 0, sizeof(*s));
     At<void*>((uintptr_t)s + 0x00) = owner;
     At<void*>((uintptr_t)s + 0x08) = camera;
+    At<uint8_t>((uintptr_t)s + 0x05) = 100;  // m_nIntensity: acesa
     At<uint8_t>((uintptr_t)s + 0x10) = 0xA5; // m_bBlurred (o stub repete "mov cl, [esi+10h]")
     return s;
 }
@@ -542,12 +576,14 @@ void TestPatches() {
     printf("\n-- remendos depois do evento RenderWare iniciado\n");
     const uintptr_t hooked[] = {0x53BCAB, 0x71167F, 0x6ABCF5, 0x6BD667, 0x6C0B21, 0x6C58A0, 0x6CA73A,
                                 0x707E4F, 0x70596A, 0x70A1AC, 0x7082A4, 0x7082BD, 0x70AD0D, 0x705C4A,
-                                0x707F2C, 0x70A2C8, 0x5B1F3C, 0x5E6664, 0x706B29, 0x707CF1};
+                                0x707F2C, 0x70A2C8, 0x5B1F3C, 0x5E6664, 0x706B29, 0x707CF1, 0x707D20};
     int inDll = 0;
     for (uintptr_t s : hooked) {
         inDll += Mem(s)[0] == 0xE8 && !InExe(Target(s));
     }
-    Check(inDll == 20, "20 chamadas desviadas para o .asi (%d)", inDll);
+    Check(inDll == 21, "21 chamadas desviadas para o .asi (%d)", inDll);
+    Check(LogHas("aplicado: sombra de quem esta logo fora da tela (0x707D20)"),
+          "chamada da camera achada dentro de CShadows::StoreRealTimeShadow");
     Check(Mem(0x706676)[0] == 0xE9 && !InExe(Target(0x706676)), "jmp do extras em 0x706676");
     Check(Mem(0x707E2B)[0] == 0xE9 && !InExe(Target(0x707E2B)), "jmp do sol em 0x707E2B");
     Check(AllNop(0x705C57, 5) && AllNop(0x705C5F, 5), "InvertRaster/EndUpdate de CShadowCamera::Update viram NOP");
@@ -735,7 +771,24 @@ void TestShader(void* ped, void* heli, bool combine) {
                 Check(pc && Near(FReal(pc->a[1]), 5 / 255.0f) && Near(FReal(pc->a[2]), 12 / 255.0f) &&
                           Near(FReal(pc->a[3]), 20 / 255.0f) && Near(FReal(pc->a[4]), 80 / 255.0f * 0.75f),
                       "c0 = cor do INI e forca com nuvens (%.4f)", pc ? FReal(pc->a[4]) : 0);
-                Check(CountRec("RwRenderStateSet") == 0, "sem estados de stencil");
+                // Uma vez so por pixel: marca o stencil, desenha; apaga a marca sem pintar; volta a mistura.
+                const u32 states[15][2] = {{21, 1}, {27, 0xFF}, {28, 0xFF}, {22, 1}, {23, 1}, {25, 6}, {26, 0x5A},
+                                           {24, 3}, {10, 1},   {11, 2},    {25, 3},  {24, 2}, {10, 0x55}, {11, 0x55},
+                                           {21, 0}};
+                bool ok = CountRec("RwRenderStateSet") == 15;
+                for (int i = 0; ok && i < 15; i++) {
+                    const Rec* r = FindRec("RwRenderStateSet", i);
+                    ok = r && r->a[0] == states[i][0] && r->a[1] == states[i][1];
+                }
+                Check(ok, "desfocada: marca o stencil (NOTEQUAL/REPLACE), apaga a marca (EQUAL/ZERO) e volta a mistura");
+                const Rec* r1 = FindRec("RenderStuffInBuffer", 0);
+                const Rec* r2 = FindRec("RenderStuffInBuffer", 1);
+                Check(r1 && r2 && r1->a[0] == 3 && r2->a[0] == 3, "os mesmos 3 vertices desenhados duas vezes");
+                // Vertice (-1, 10, -10) com a camera na origem: anda pela linha de visao ate subir 6 cm.
+                Check(r1 && Near(FReal(r1->a[1]), -0.994f) && Near(FReal(r1->a[2]), 9.94f) &&
+                          Near(FReal(r1->a[3]), -9.94f),
+                      "sombra 6 cm acima da colisao, no mesmo ponto da tela (%.5f, %.5f, %.5f)", r1 ? FReal(r1->a[1]) : 0,
+                      r1 ? FReal(r1->a[2]) : 0, r1 ? FReal(r1->a[3]) : 0);
             }
             int render = -1, unset = -1, set = -1;
             for (int i = 0; i < g_recCount; i++) {
@@ -1045,6 +1098,119 @@ void TestDoubleUpdate(void* ped) {
     At<void*>(0xC40350 + 4) = nullptr;
 }
 
+typedef void(__cdecl* CastFn)(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32,
+                              u32);
+
+// Projeta a sombra sh com a lista list, como RenderStoredShadows faz em 0x70AD0D.
+void CastAt(u32 list, void* sh) {
+    u32 a[19];
+    for (int i = 0; i < 19; i++) a[i] = 100 + i;
+    a[0] = list;
+    a[17] = (u32)(uintptr_t)sh;
+    reinterpret_cast<CastFn>(Target(0x70AD0D))(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11],
+                                               a[12], a[13], a[14], a[15], a[16], a[17], a[18]);
+}
+
+// CShadows::StoreRealTimeShadow pergunta se a esfera de 2 m em volta do dono esta na tela: cresce ate o raio da
+// projecao (ShadowBoundSphereInAir=20 no INI do teste, limite 15).
+void TestSphere() {
+    printf("\n-- sombra de quem esta logo fora da tela\n");
+    float center[3] = {1, 2, 3};
+    auto ask = [&](float r) -> const Rec* {
+        ClearRec();
+        reinterpret_cast<bool(__thiscall*)(void*, const float*, u32)>(Target(0x707D20))(reinterpret_cast<void*>(0xB6F028),
+                                                                                       center, FBits(r));
+        return FindRec("IsSphereVisible");
+    };
+    const Rec* a = ask(2.0f);
+    Check(a && a->a[0] == 0xB6F028 && a->a[1] == (u32)(uintptr_t)center && Near(FReal(a->a[2]), 15.0f),
+          "esfera de 2 m vira 15 m (thiscall, mesma camera e centro)");
+    const Rec* b = ask(30.0f);
+    Check(b && Near(FReal(b->a[2]), 30.0f), "esfera maior que isso fica como esta");
+}
+
+// Modo combinado: acendendo ou apagando, so a parte mais forte da sombra entra no stencil.
+void TestFadeCombine(void* ped) {
+    printf("\n-- modo combinado: sombra acendendo\n");
+    void* sh = NewShadow(ped, nullptr);
+    At<uint8_t>((uintptr_t)sh + 5) = 50;
+    ClearRec();
+    CastAt(100, sh);
+    int set127 = -1, render = -1, back = -1;
+    for (int i = 0; i < g_recCount; i++) {
+        if (!strcmp(g_rec[i].name, "RwRenderStateSet") && g_rec[i].a[0] == 30 && g_rec[i].a[1] == 127) set127 = i;
+        if (!strcmp(g_rec[i].name, "RenderStuffInBuffer")) render = i;
+        if (!strcmp(g_rec[i].name, "RwRenderStateSet") && g_rec[i].a[0] == 30 && g_rec[i].a[1] == 0x55) back = i;
+    }
+    Check(set127 >= 0 && set127 < render && render < back,
+          "intensidade 50%%: ALPHATESTFUNCTIONREF 127 no desenho e volta ao valor de antes");
+}
+
+// Modo desfocado: a forca segue m_nIntensity e a distancia (metade de MaxDistance ate o fim), como no jogo.
+void TestFade() {
+    printf("\n-- a sombra acende, apaga e enfraquece com a distancia\n");
+    auto alphaFor = [&](void* owner, int intensity) -> float {
+        void* sh = NewShadow(owner, nullptr);
+        At<uint8_t>((uintptr_t)sh + 5) = static_cast<uint8_t>(intensity);
+        ClearRec();
+        CastAt(100, sh);
+        const Rec* pc = FindRec("SetPixelShaderConstantF");
+        return pc ? FReal(pc->a[4]) : -1.0f;
+    };
+    const float full = 80 / 255.0f * 0.75f;
+    void* nearPed = NewEntity(3, true); // (1, 2, 3)
+    void* midPed = NewEntity(3, true);
+    void* farPed = NewEntity(3, true);
+    At<float>((uintptr_t)midPed + 0x04) = 30.0f;
+    At<float>((uintptr_t)midPed + 0x08) = 0.0f;
+    At<float>((uintptr_t)farPed + 0x04) = 50.0f;
+    At<float>((uintptr_t)farPed + 0x08) = 0.0f;
+    const float a = alphaFor(nearPed, 100), b = alphaFor(nearPed, 50), c = alphaFor(midPed, 100),
+                d = alphaFor(farPed, 100);
+    Check(Near(a, full), "acesa e perto: forca inteira (%.4f)", a);
+    Check(Near(b, full * 0.5f), "acendendo (intensidade 50): metade (%.4f)", b);
+    Check(Near(c, full * 0.5f), "a 30 m com MaxDistance 40: metade (%.4f)", c);
+    Check(Near(d, 0.0f), "a 50 m: nada (%.4f)", d);
+}
+
+// A sombra tambem cai nos objetos (mapping do SA-MP): a funcao do jogo roda de novo com a lista de objetos do setor de
+// repeticao, e os polys dos dois saem numa descarga so.
+void TestObjects(void* ped) {
+    printf("\n-- sombra nos objetos (mapping do SA-MP)\n");
+    void* sh = NewShadow(ped, nullptr);
+    const u32 buildings = 0xB7D0B8 + (20 * 120 + 10) * 8; // setor x = 10, y = 20
+    ClearRec();
+    CastAt(buildings, sh);
+    const Rec* c1 = FindRec("CastRealTimeShadowSectorList", 0);
+    const Rec* c2 = FindRec("CastRealTimeShadowSectorList", 1);
+    // Setor de repeticao (10 & 15, 20 & 15) = (10, 4): 0xB992B8 + (4 * 16 + 10) * 12 + 8 (lista de objetos).
+    Check(CountRec("CastRealTimeShadowSectorList") == 2 && c1 && c1->a[0] == buildings && c2 && c2->a[0] == 0xB99638 &&
+              c2->a[1] == 101 && c2->a[17] == (u32)(uintptr_t)sh && c2->a[18] == 118,
+          "predios do setor e depois os objetos do setor de repeticao, com os mesmos argumentos");
+    const Rec* r = FindRec("RenderStuffInBuffer", 0);
+    Check(r && r->a[0] == 6 && CountRec("RenderStuffInBuffer") == 2, "uma descarga so, com os polys dos dois");
+    ClearRec();
+    CastAt(buildings + 4, sh); // a lista de dummies do setor, nao a de predios
+    CastAt(0x1234, sh);
+    Check(CountRec("CastRealTimeShadowSectorList") == 2, "lista que nao e a de predios de um setor: nada de objetos");
+
+    Sleep(1100);
+    WriteIni("[REALTIME_SHADOWS]\r\nCombineRealTimeShadowsWithStencil=0\r\nMaxDistance=40\r\nShadowOnObjects=0\r\n"
+             "[GERAL]\r\nrecarregar=1\r\n");
+    FireEvent(0x53E981);
+    ClearRec();
+    CastAt(buildings, sh);
+    Check(CountRec("CastRealTimeShadowSectorList") == 1, "ShadowOnObjects=0: so os predios, como o jogo");
+    Sleep(1100);
+    WriteIni("[REALTIME_SHADOWS]\r\nCombineRealTimeShadowsWithStencil=0\r\nMaxDistance=40\r\nShadowSurfaceOffset=0\r\n"
+             "[GERAL]\r\nrecarregar=1\r\n");
+    FireEvent(0x53E981);
+    ClearRec();
+    CastAt(100, sh);
+    r = FindRec("RenderStuffInBuffer", 0);
+    Check(r && Near(FReal(r->a[1]), -1.0f) && Near(FReal(r->a[3]), -10.0f), "ShadowSurfaceOffset=0: polys onde o jogo pos");
+}
+
 int RunFull() {
     if (!CreateRealDevice()) {
         printf("aviso: sem device D3D9 no Wine, shaders nao testados\n");
@@ -1084,6 +1250,8 @@ int RunFull() {
     TestShader(ped, heli, true);
     TestAtomics(ped, heli);
     TestStubs(ped);
+    TestSphere();
+    TestFadeCombine(ped);
     TestOccupants();
     TestLimit();
     TestDoubleUpdate(ped);
@@ -1119,6 +1287,8 @@ int RunFull() {
     void* ped2 = NewEntity(3, true);
     void* heli2 = NewEntity(2, true, 3);
     TestShader(ped2, heli2, false);
+    TestFade();
+    TestObjects(ped2);
 
     ClearRec();
     FireEvent(0x53BC21);

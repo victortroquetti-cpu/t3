@@ -31,6 +31,23 @@ constexpr uintptr_t CAR_ENVMAP_OBJ_PIPELINE = 0xC02D24; // CCustomCarEnvMapPipel
 constexpr uintptr_t TIMER_FRAME_COUNTER = 0xB7CB4C;     // CTimer::m_FrameCounter
 constexpr uintptr_t THE_CAMERA = 0xB6F028;              // TheCamera (CPlaceable: posicao como a de uma entidade)
 constexpr uintptr_t PLAYER_PED = 0xB7CD98;              // CWorld::Players[0].m_pPed
+// Buffer de desenho temporario (RenderBuffer): os polys de cada sombra projetada ficam aqui ate a descarga.
+constexpr uintptr_t TEMP_VERTICES_STORED = 0xC4B950; // uiTempBufferVerticesStored (16 bits usados)
+constexpr uintptr_t TEMP_INDICES_STORED = 0xC4B954;  // uiTempBufferIndicesStored
+constexpr uintptr_t TEMP_INDICES = 0xC4B958;         // aTempBufferIndices[4096] (uint16)
+constexpr uintptr_t TEMP_VERTICES = 0xC4D958;        // TempBufferVertices.m_3d[2048] (RwIm3DVertex, 36 bytes)
+constexpr int TEMP_MAX_VERTICES = 2048;
+constexpr int TEMP_MAX_INDICES = 4096;
+constexpr uint32_t IM3D_VERTEX_SIZE = 36; // posicao (0), normal (12), cor (24), u (28), v (32)
+// Setores do mundo: os predios (onde o jogo projeta as sombras) e os setores de repeticao (objetos, como o mapping do
+// SA-MP, que o jogo nunca usava para receber sombra).
+constexpr uintptr_t WORLD_SECTORS = 0xB7D0B8;        // CWorld::ms_aSectors[120][120] (CSector: Buildings, Dummies)
+constexpr uintptr_t WORLD_REPEAT_SECTORS = 0xB992B8; // CWorld::ms_aRepeatSectors[16][16] (Vehicles, Peds, Objects)
+constexpr int SECTORS_X = 120;
+constexpr int SECTORS_Y = 120;
+constexpr uint32_t SECTOR_SIZE = 8;
+constexpr uint32_t REPEAT_SECTOR_SIZE = 12;
+constexpr uint32_t REPEAT_SECTOR_OBJECTS = 8;
 constexpr uintptr_t VEC_PARACHUTE_OFFSET = 0x8D60B0;    // vetores do proprio jogo para o paraquedas e a 2a pistola
 constexpr uintptr_t VEC_PARACHUTE_AXIS = 0x8D2338;
 constexpr uintptr_t VEC_TWIN_AXIS = 0x8D60A4;
@@ -44,6 +61,8 @@ constexpr uintptr_t CRealTimeShadow_Update = 0x706600;
 constexpr uintptr_t CRealTimeShadow_SetLightProperties = 0x705900;
 constexpr uintptr_t CShadowCamera_InvertRaster = 0x705660;
 constexpr uintptr_t CShadows_StoreShadowToBeRendered = 0x707390;
+constexpr uintptr_t CShadows_StoreRealTimeShadow = 0x707CA0;
+constexpr uintptr_t CCamera_IsSphereVisible = 0x420D40; // (const CVector&, float)
 constexpr uintptr_t CShadows_StoreShadowForVehicle = 0x70BDA0;
 constexpr uintptr_t CShadows_CastRealTimeShadowSectorList = 0x70A7E0;
 constexpr uintptr_t RenderBuffer_RenderStuffInBuffer = 0x707800;
@@ -97,6 +116,7 @@ constexpr uint32_t WEAPONINFO_FLAGS = 0x18;     // CWeaponInfo::m_nFlags; bit 11
 constexpr uint32_t VEHICLE_SUBTYPE = 0x594;     // CVehicle::m_nVehicleSubType
 constexpr uint32_t JETPACK_CLUMP = 0x40;        // CTaskSimpleJetPack: clump da mochila
 constexpr uint32_t RTSHADOW_OWNER = 0x00;       // CRealTimeShadow::m_pOwner
+constexpr uint32_t RTSHADOW_INTENSITY = 0x05;   // CRealTimeShadow::m_nIntensity (0 a 100: acende e apaga 3 por quadro)
 constexpr uint32_t RTSHADOW_CAMERA = 0x08;      // CRealTimeShadow::m_camera (CShadowCamera: RwCamera* no offset 0)
 constexpr uint32_t ATOMIC_FLAGS = 0x02;         // RpAtomic::object.object.flags (bit 2 = rpATOMICRENDER)
 constexpr uint32_t ATOMIC_RENDER_CB = 0x48;     // RpAtomic::renderCallBack
@@ -125,10 +145,12 @@ constexpr int BONE_R_HAND = 24;
 constexpr int BONE_L_HAND = 34;
 constexpr uint32_t WEAPONFLAG_TWIN_PISTOL = 0x800;
 
-// RwRenderState usados no modo combinado.
+// RwRenderState usados no desenho da sombra em tempo real.
 constexpr int RS_SRCBLEND = 10;
 constexpr int RS_DESTBLEND = 11;
 constexpr int RS_STENCILENABLE = 21;
+constexpr int RS_STENCILFAIL = 22;
+constexpr int RS_STENCILZFAIL = 23;
 constexpr int RS_STENCILPASS = 24;
 constexpr int RS_STENCILFUNCTION = 25;
 constexpr int RS_STENCILFUNCTIONREF = 26;

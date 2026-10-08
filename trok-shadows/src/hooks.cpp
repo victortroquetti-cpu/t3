@@ -13,6 +13,7 @@
 #include "game.h"
 
 #include <d3d9.h>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -62,6 +63,7 @@ typedef void(__thiscall* RenderJetPackFn)(void* task, void* ped);
 typedef int(__cdecl* RenderStateSetFn)(int state, uintptr_t value);
 typedef int(__cdecl* RenderStateGetFn)(int state, void* out);
 typedef void(__cdecl* SetShaderFn)(void* shader);
+typedef bool(__thiscall* SphereVisibleFn)(void* camera, const void* center, u32 radius);
 
 template <class F>
 F Fn(uintptr_t addr) {
@@ -82,9 +84,11 @@ float g_stencilMaxDistance = 50.0f;
 float g_stencilMaxDistanceSq = 2500.0f;
 const float kShadowQuadScale = 2.15f; // jogo: 1.5 (tamanho do quadrado da sombra em tempo real)
 const float kProjectionScale = 1.15f;  // CastShadowEntityXYZ (valor do Shadows Extender)
+constexpr u32 kShadowMark = 0x5A;      // marca do stencil da sombra desfocada (apagada logo depois do desenho)
 
 void* g_updateOwner = nullptr;  // dono da sombra em tempo real sendo desenhada na camera (CRealTimeShadow::Update)
 void* g_castOwner = nullptr;    // dono da sombra sendo projetada no mundo (CastRealTimeShadowSectorList)
+void* g_castShadow = nullptr;   // a sombra em tempo real sendo projetada
 bool g_inRealtimeCast = false;  // projetando uma sombra em tempo real (o buffer so tem polys dela)
 u32 g_lightElevation = 0;       // angulo de elevacao que o jogo calculou para a luz da sombra
 bool g_clumpRendered = false;   // CShadowCamera::Update(RpClump*) desenhou e deixou a camera aberta (os NOPs)
@@ -128,6 +132,7 @@ enum CallId {
     C_PED_RPHANIM,
     C_SHADOW_UPDATE,
     C_BONE_POSITION,
+    C_SPHERE_VISIBLE, // endereco achado na instalacao (procura a chamada dentro de CShadows::StoreRealTimeShadow)
     C_COUNT
 };
 
@@ -153,6 +158,7 @@ patch::Call g_calls[C_COUNT] = {
     {"sombra dos pedestres", 0x5E6664, CEntity_UpdateRpHAnim, 0, false},
     {"atualizar sombra", 0x706B29, CRealTimeShadow_Update, 0, false},
     {"posicao do pedestre", 0x707CF1, CPed_GetBonePosition, 0, false},
+    {"sombra de quem esta fora da tela", 0, CCamera_IsSphereVisible, 0, false},
 };
 
 patch::Call g_events[EVENT_COUNT] = {
@@ -540,27 +546,119 @@ void __cdecl StoreShadowHook(u32 a0, u32 a1, u32 a2, u32 a3, u32 a4, u32 a5, u32
 }
 
 // ------------------------------------------------------------------------------------------------ shader
+// Quanto da sombra aparece agora. O jogo acende e apaga a sombra em tempo real aos poucos (m_nIntensity, 3 por quadro)
+// e a enfraquece da metade de MaxDistance ate o fim, pela cor dos vertices. O shader do Shadows Extender nao usa essa
+// cor: a sombra aparecia e sumia de uma vez (piscava ao trocar de dono) e era cortada seca no fim da distancia.
+float ShadowFade(void* shadow) {
+    if (!shadow) {
+        return 1.0f;
+    }
+    float fade = Field<uint8_t>(shadow, RTSHADOW_INTENSITY) / 100.0f;
+    fade = fade > 1.0f ? 1.0f : fade;
+    void* owner = Field<void*>(shadow, RTSHADOW_OWNER);
+    const float half = g_cfg.realtimeMaxDistance * 0.5f;
+    if (owner && half > 0.0f) {
+        const float d = sqrtf(DistanceSqToCamera(owner));
+        if (d > half) {
+            const float f = 1.0f - (d - half) / half;
+            fade *= f > 0.0f ? f : 0.0f;
+        }
+    }
+    return fade;
+}
+
+// A sombra e projetada na colisao, e o modelo que aparece fica as vezes um pouco acima dela: ali a sombra sumia
+// embaixo dos polys do modelo. Cada vertice anda na direcao da camera pela linha de visao (na tela a sombra fica no
+// mesmo lugar, so mais perto na profundidade), o bastante para passar offset metros acima da superficie dele.
+void PullTowardCamera(int vertices, int indices, float offset) {
+    static uint8_t done[TEMP_MAX_VERTICES];
+    if (vertices > TEMP_MAX_VERTICES || indices > TEMP_MAX_INDICES) {
+        return;
+    }
+    memset(done, 0, vertices);
+    const float* cam = EntityPosition(reinterpret_cast<void*>(THE_CAMERA));
+    uint8_t* base = reinterpret_cast<uint8_t*>(TEMP_VERTICES);
+    const uint16_t* index = reinterpret_cast<const uint16_t*>(TEMP_INDICES);
+    for (int t = 0; t + 2 < indices; t += 3) {
+        const int tri[3] = {index[t], index[t + 1], index[t + 2]};
+        if (tri[0] >= vertices || tri[1] >= vertices || tri[2] >= vertices) {
+            continue;
+        }
+        const float* a = reinterpret_cast<float*>(base + tri[0] * IM3D_VERTEX_SIZE);
+        const float* b = reinterpret_cast<float*>(base + tri[1] * IM3D_VERTEX_SIZE);
+        const float* c = reinterpret_cast<float*>(base + tri[2] * IM3D_VERTEX_SIZE);
+        const float ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+        const float vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+        float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const float nl = sqrtf(nx * nx + ny * ny + nz * nz);
+        if (nl < 1e-6f) {
+            continue;
+        }
+        nx /= nl;
+        ny /= nl;
+        nz /= nl;
+        for (int i : tri) {
+            if (done[i]) {
+                continue;
+            }
+            done[i] = 1;
+            float* p = reinterpret_cast<float*>(base + i * IM3D_VERTEX_SIZE);
+            float dx = cam[0] - p[0], dy = cam[1] - p[1], dz = cam[2] - p[2];
+            const float d = sqrtf(dx * dx + dy * dy + dz * dz);
+            if (d < 0.5f) {
+                continue;
+            }
+            dx /= d;
+            dy /= d;
+            dz /= d;
+            // Olhando a superficie de lado, a linha de visao precisa andar mais para subir a mesma altura.
+            const float facing = fabsf(nx * dx + ny * dy + nz * dz);
+            float k = offset / (facing > 0.2f ? facing : 0.2f);
+            k = k > d * 0.25f ? d * 0.25f : k;
+            p[0] += dx * k;
+            p[1] += dy * k;
+            p[2] += dz * k;
+        }
+    }
+}
+
+u32 RenderStateGet(int state) {
+    u32 value = 0;
+    Fn<RenderStateGetFn>(game::RwRenderStateGet)(state, &value);
+    return value;
+}
+
 // Descarrega o buffer com os polys de uma sombra em tempo real usando o pixel shader do mod.
 void FlushRealtimeShadow(VoidFn render) {
+    const int vertices = At<uint16_t>(TEMP_VERTICES_STORED);
+    const int indices = At<uint16_t>(TEMP_INDICES_STORED);
     IDirect3DDevice9* device = At<IDirect3DDevice9*>(RW_D3D_DEVICE);
     const bool shader = ShaderOn() && device;
-    const bool combine = shader && g_cfg.combineWithStencil;
-    if (shader) {
-        // O RenderWare acha que nao ha pixel shader e nao troca o do mod durante o desenho.
-        At<void*>(RW_LAST_PIXEL_SHADER) = nullptr;
-        float color[4];
-        if (combine) {
-            color[0] = color[1] = color[2] = 0.0f;
-            color[3] = 1.0f;
-        } else {
-            color[0] = g_cfg.realtimeColor[0] / 255.0f;
-            color[1] = g_cfg.realtimeColor[1] / 255.0f;
-            color[2] = g_cfg.realtimeColor[2] / 255.0f;
-            color[3] = g_cfg.realtimeColor[3] / 255.0f * Weather();
-        }
-        device->SetPixelShader(static_cast<IDirect3DPixelShader9*>(combine ? ShaderStencil() : ShaderRealtime()));
-        device->SetPixelShaderConstantF(0, color, 1);
+    if (!shader || !vertices || !indices) {
+        render(); // sem o shader, o jogo desenha como sempre (o fade vem da cor dos vertices)
+        return;
     }
+    const bool combine = g_cfg.combineWithStencil;
+    const float fade = ShadowFade(g_castShadow);
+    if (g_cfg.surfaceOffset > 0) {
+        PullTowardCamera(vertices, indices, g_cfg.surfaceOffset * 0.01f);
+    }
+
+    // O RenderWare acha que nao ha pixel shader e nao troca o do mod durante o desenho.
+    At<void*>(RW_LAST_PIXEL_SHADER) = nullptr;
+    float color[4];
+    if (combine) {
+        color[0] = color[1] = color[2] = 0.0f;
+        color[3] = 1.0f;
+    } else {
+        color[0] = g_cfg.realtimeColor[0] / 255.0f;
+        color[1] = g_cfg.realtimeColor[1] / 255.0f;
+        color[2] = g_cfg.realtimeColor[2] / 255.0f;
+        color[3] = g_cfg.realtimeColor[3] / 255.0f * Weather() * fade;
+    }
+    device->SetPixelShader(static_cast<IDirect3DPixelShader9*>(combine ? ShaderStencil() : ShaderRealtime()));
+    device->SetPixelShaderConstantF(0, color, 1);
+
     if (combine) {
         // Nao pinta nada: so soma 1 no stencil onde a sombra passa no teste de alfa. O retangulo do stencil
         // depois escurece tudo junto, com a cor de STENCIL_SHADOWS_COLOR.
@@ -572,25 +670,84 @@ void FlushRealtimeShadow(VoidFn render) {
         RenderStateSet(RS_STENCILFUNCTION, 7); // rwSTENCILFUNCTIONGREATEREQUAL
         RenderStateSet(RS_STENCILFUNCTIONREF, 0);
         RenderStateSet(RS_STENCILPASS, 4); // rwSTENCILOPERATIONINCRSAT
-    }
-    render();
-    if (shader) {
-        device->SetPixelShader(nullptr);
-    }
-    if (combine) {
+        // Acendendo ou apagando: so a parte mais forte da sombra entra no stencil (ela cresce e encolhe).
+        const u32 alphaRef = RenderStateGet(RS_ALPHATESTFUNCTIONREF);
+        const u32 fadeRef = static_cast<u32>((1.0f - fade) * 255.0f);
+        if (fadeRef > alphaRef) {
+            RenderStateSet(RS_ALPHATESTFUNCTIONREF, fadeRef);
+        }
+        render();
+        if (fadeRef > alphaRef) {
+            RenderStateSet(RS_ALPHATESTFUNCTIONREF, alphaRef);
+        }
+        RenderStateSet(RS_STENCILENABLE, 0);
+    } else {
+        // Uma vez so por pixel: o primeiro poly da sombra em cada pixel marca o stencil e os outros polys dela no
+        // mesmo pixel (o chao embaixo de um piso, a colisao de baixo de uma rua) nao escurecem de novo. Depois um
+        // segundo desenho, que nao pinta nada, apaga a marca: as sombras stencil acham o stencil limpo.
+        const u32 srcBlend = RenderStateGet(RS_SRCBLEND), destBlend = RenderStateGet(RS_DESTBLEND);
+        RenderStateSet(RS_STENCILENABLE, 1);
+        RenderStateSet(RS_STENCILFUNCTIONMASK, 0xFF);
+        RenderStateSet(RS_STENCILFUNCTIONWRITEMASK, 0xFF);
+        RenderStateSet(RS_STENCILFAIL, 1);   // rwSTENCILOPERATIONKEEP
+        RenderStateSet(RS_STENCILZFAIL, 1);  // rwSTENCILOPERATIONKEEP
+        RenderStateSet(RS_STENCILFUNCTION, 6); // rwSTENCILFUNCTIONNOTEQUAL
+        RenderStateSet(RS_STENCILFUNCTIONREF, kShadowMark);
+        RenderStateSet(RS_STENCILPASS, 3); // rwSTENCILOPERATIONREPLACE
+        render();
+        At<uint16_t>(TEMP_VERTICES_STORED) = static_cast<uint16_t>(vertices); // o render zerou o buffer
+        At<uint16_t>(TEMP_INDICES_STORED) = static_cast<uint16_t>(indices);
+        RenderStateSet(RS_SRCBLEND, 1);  // rwBLENDZERO
+        RenderStateSet(RS_DESTBLEND, 2); // rwBLENDONE
+        RenderStateSet(RS_STENCILFUNCTION, 3); // rwSTENCILFUNCTIONEQUAL
+        RenderStateSet(RS_STENCILPASS, 2);     // rwSTENCILOPERATIONZERO
+        render();
+        RenderStateSet(RS_SRCBLEND, srcBlend);
+        RenderStateSet(RS_DESTBLEND, destBlend);
         RenderStateSet(RS_STENCILENABLE, 0);
     }
+    device->SetPixelShader(nullptr);
+}
+
+// Lista de objetos (CObject: o mapping do SA-MP, os objetos do mapa perto) do setor cuja lista de predios o jogo
+// passou. O jogo so projetava a sombra nos predios: num piso de mapping ela ficava no chao, embaixo dele. As duas
+// listas comecam com {item, proximo}, entao a mesma funcao do jogo percorre as duas. 0 se nao for de um setor.
+uintptr_t SectorObjects(uintptr_t buildings) {
+    const uintptr_t end = WORLD_SECTORS + SECTORS_X * SECTORS_Y * SECTOR_SIZE;
+    if (buildings < WORLD_SECTORS || buildings >= end || (buildings - WORLD_SECTORS) % SECTOR_SIZE) {
+        return 0;
+    }
+    const u32 index = static_cast<u32>((buildings - WORLD_SECTORS) / SECTOR_SIZE);
+    const u32 x = index % SECTORS_X, y = index / SECTORS_X;
+    return WORLD_REPEAT_SECTORS + ((y & 15) * 16 + (x & 15)) * REPEAT_SECTOR_SIZE + REPEAT_SECTOR_OBJECTS;
 }
 
 void __cdecl CastRealTimeHook(u32 a0, u32 a1, u32 a2, u32 a3, u32 a4, u32 a5, u32 a6, u32 a7, u32 a8, u32 a9,
                               u32 a10, u32 a11, u32 a12, u32 a13, u32 a14, u32 a15, u32 a16, u32 realtime, u32 a18) {
     void* shadow = reinterpret_cast<void*>(realtime);
+    g_castShadow = shadow;
     g_castOwner = shadow ? Field<void*>(shadow, RTSHADOW_OWNER) : nullptr;
     g_inRealtimeCast = true;
-    Original<CastRealTimeFn>(C_CAST_REALTIME)(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15,
-                                              a16, realtime, a18);
+    CastRealTimeFn cast = Original<CastRealTimeFn>(C_CAST_REALTIME);
+    cast(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, realtime, a18);
+    const uintptr_t objects = g_cfg.shadowOnObjects ? SectorObjects(a0) : 0;
+    if (objects) {
+        cast(static_cast<u32>(objects), a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, realtime,
+             a18);
+    }
     g_inRealtimeCast = false;
     FlushRealtimeShadow(Fn<VoidFn>(RenderBuffer_RenderStuffInBuffer));
+    g_castShadow = nullptr;
+}
+
+// CShadows::StoreRealTimeShadow so guarda a sombra de quem esta na tela (esfera de 2 m em volta). Com a sombra
+// comprida do mod, a de quem estava logo fora da tela sumia de uma vez: a esfera cresce ate o raio da projecao.
+bool __thiscall SphereVisibleHook(void* camera, const void* center, u32 radius) {
+    float r;
+    memcpy(&r, &radius, 4);
+    float reach = g_cfg.boundSphere > g_cfg.boundSphereInAir ? g_cfg.boundSphere : g_cfg.boundSphereInAir;
+    reach = reach > 15.0f ? 15.0f : reach;
+    return Original<SphereVisibleFn>(C_SPHERE_VISIBLE)(camera, center, Bits(r > reach ? r : reach));
 }
 
 // RenderBuffer::StartStoring com o buffer cheio.
@@ -618,6 +775,23 @@ bool CheckCalls(const CallId* ids, int count) {
 
 void Install(CallId id, const void* hook) {
     g_calls[id].Install(hook);
+}
+
+// A unica chamada (E8) para target entre begin e end. 0 se nao tiver ou se tiver mais de uma.
+uintptr_t FindCall(uintptr_t begin, uintptr_t end, uintptr_t target) {
+    if (!patch::Readable(begin, end - begin)) {
+        return 0;
+    }
+    uintptr_t found = 0;
+    for (uintptr_t a = begin; a + 5 <= end; a++) {
+        if (At<uint8_t>(a) == 0xE8 && patch::CallTarget(a) == target) {
+            if (found) {
+                return 0;
+            }
+            found = a;
+        }
+    }
+    return found;
 }
 
 void PointTo(const uintptr_t* sites, int count, const float* value) {
@@ -957,6 +1131,17 @@ void HooksApply() {
         Install(C_COL_SPHERE, reinterpret_cast<const void*>(&ColSphereSetHook));
         Install(C_STORE_SHADOW, reinterpret_cast<const void*>(&StoreShadowHook));
         Log("aplicado: tamanho, raio e alcance da projecao");
+    }
+
+    // --- Sombra de quem esta logo fora da tela ---
+    // CShadows::StoreRealTimeShadow pergunta a camera se a esfera de 2 m em volta do dono esta na tela.
+    const uintptr_t sphereSite = FindCall(CShadows_StoreRealTimeShadow, 0x707F31, CCamera_IsSphereVisible);
+    if (sphereSite) {
+        g_calls[C_SPHERE_VISIBLE].site = sphereSite;
+        Install(C_SPHERE_VISIBLE, reinterpret_cast<const void*>(&SphereVisibleHook));
+        Log("aplicado: sombra de quem esta logo fora da tela (0x%06X)", static_cast<unsigned>(sphereSite));
+    } else {
+        Log("  pulado: sombra de quem esta fora da tela (a chamada da camera nao foi achada)");
     }
 
     // --- Shader: cor da sombra em tempo real e modo combinado ---

@@ -5,7 +5,7 @@
 #include <windows.h>
 #include <cstdint>
 
-#define TROK_SHADOWS_VERSION "1.1"
+#define TROK_SHADOWS_VERSION "1.2"
 
 // ---------------------------------------------------------------- log (log.cpp)
 void LogOpen(const char* path);
@@ -100,6 +100,9 @@ struct Config {
     bool vehicleRealtime;  // veiculos com sombra em tempo real
     bool weaponsInShadow;  // arma, paraquedas e mochila a jato na sombra
     int maxRealtime;       // quantas sombras em tempo real ao mesmo tempo (as mais perto da camera)
+    bool shadowOnObjects;  // sombra em tempo real tambem nos objetos (mapping do SA-MP), nao so nos predios do mapa
+    int surfaceOffset;     // cm: a sombra aparece por cima do modelo ate essa altura acima da colisao
+    bool moreThanOnePlayerAuto; // MoreThanOnePlayer=auto no INI (fica auto ao salvar)
     // [GERAL]
     bool autoReload;
 };
