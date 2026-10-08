@@ -5,7 +5,10 @@ local s = teste.state()
 local open = imgui.ImBool(true)
 imgui.Process = true
 
+HOST_VALUES = function() return teste.values(s, open) end
+
 function imgui.OnDrawFrame()
+    if not open.v then return end -- a janela so e desenhada enquanto esta aberta (o X ou o Esc fecham)
     imgui.SetNextWindowPos(imgui.ImVec2(480, 40), imgui.Cond.Always)
     imgui.SetNextWindowSize(imgui.ImVec2(400, 520), imgui.Cond.Always)
     -- No ImGui 1.52 o push feito antes do Begin so pode sair depois do End (senao o End dispara um assert).

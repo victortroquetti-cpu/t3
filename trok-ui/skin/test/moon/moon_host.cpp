@@ -3,13 +3,21 @@
 // imgui.lua de verdade desenha no evento onD3DPresent. O host imita so o que o imgui.lua usa da API do
 // moonloader (moonloader\prelude.lua) e salva o retangulo de cada controle e capturas da tela.
 //
-// Uso: moon_host.exe <saida> [skin] [alternar]
+// Uso: moon_host.exe <saida> [skin] [alternar|cliques]
 //   skin      carrega o Trok Skin.asi antes (como o ASI Loader); a config vem do Trok Skin.ini ao lado
 //   alternar  carrega tambem um samp.dll falso (0.3.7 R1) e, depois da primeira carga, digita /trokskin
 //             duas vezes, salvando a tela depois de cada uma (out_desligado.bmp e out_religado.bmp)
+//   cliques   carrega o samp.dll falso e, depois da primeira carga, usa mouse e teclado simulados (mensagens da
+//             janela, como o moonloader manda ao onWindowMessage de cada script: o script que segura uma mensagem
+//             esconde dos seguintes): no "Painel A", clica no interruptor e arrasta o slider; clica no "Painel A2"
+//             e aperta Esc; abre a lista do Painel A e aperta Esc (fecha a lista) e de novo (com o chat do SA-MP
+//             aberto e fechado); clica fora e aperta Esc; clica no X do "Painel B". Grava os valores em
+//             out_cliques.txt e as telas out_lista.bmp (lista aberta), out_lista_fechada.bmp e out_cliques.bmp
+//             (no fim).
 //
 // Scripts (moonloader\*.lua), os mesmos papeis do teste do mimgui:
-//   Trok_Painel_A.lua  "Painel A": tema claro do proprio script e cantos retos; "trok" no nome, sem o kit
+//   Trok_Painel_A.lua  "Painel A": tema claro do proprio script e cantos retos; "trok" no nome, sem o kit; abre
+//                      tambem a janela "Painel A2", sem botao de fechar
 //   painel_b.lua       "Painel B": tema padrao; fundo vermelho empurrado antes do Begin; botao e texto vermelhos
 //   hud.lua            "HUD": fundo transparente, sem titulo
 //   casa.lua           mod da casa com outro nome (usa resource\\trok, janela ##trokCasa): nada pode mudar nele
@@ -43,6 +51,7 @@ struct Lua {
     void(__cdecl* getfield)(lua_State*, int, const char*);
     void(__cdecl* pushnumber)(lua_State*, double);
     void(__cdecl* pushstring)(lua_State*, const char*);
+    int(__cdecl* toboolean)(lua_State*, int);
 };
 
 Lua lua;
@@ -82,13 +91,31 @@ void LoadLua() {
     Get(dll, "lua_getfield", lua.getfield);
     Get(dll, "lua_pushnumber", lua.pushnumber);
     Get(dll, "lua_pushstring", lua.pushstring);
+    Get(dll, "lua_toboolean", lua.toboolean);
 }
+
+// Onde o interruptor, o slider e a lista do "Painel A" ficaram no ultimo quadro (x0, y0, x1, y1), para os cliques.
+float g_check[4], g_slider[4], g_combo[4];
 
 // host_rect(script, controle, x0, y0, x1, y1): retangulo de um controle, so no quadro gravado.
 int __cdecl HostRect(lua_State* L) {
+    const char* script = lua.tolstring(L, 1, nullptr);
+    const char* what = lua.tolstring(L, 2, nullptr);
     if (g_record) {
-        fprintf(g_rects, "%s|%s %.2f %.2f %.2f %.2f\n", lua.tolstring(L, 1, nullptr), lua.tolstring(L, 2, nullptr),
-                lua.tonumber(L, 3), lua.tonumber(L, 4), lua.tonumber(L, 5), lua.tonumber(L, 6));
+        fprintf(g_rects, "%s|%s %.2f %.2f %.2f %.2f\n", script, what, lua.tonumber(L, 3), lua.tonumber(L, 4),
+                lua.tonumber(L, 5), lua.tonumber(L, 6));
+    }
+    float* r = nullptr;
+    if (strcmp(script, "Painel A") == 0) {
+        r = strcmp(what, "checkbox") == 0 ? g_check
+            : strcmp(what, "slider") == 0 ? g_slider
+            : strcmp(what, "combo") == 0  ? g_combo
+                                          : nullptr;
+    }
+    if (r) {
+        for (int i = 0; i < 4; ++i) {
+            r[i] = static_cast<float>(lua.tonumber(L, 3 + i));
+        }
     }
     return 0;
 }
@@ -187,6 +214,134 @@ bool Capture(const char* path) {
     return true;
 }
 
+// Uma mensagem da janela do jogo, como o moonloader: o onWindowMessage de cada script, na ordem em que carregaram,
+// ate um segurar (consumeWindowMessage). Devolve o script que segurou ou "jogo".
+const char* Message(lua_State** states, UINT msg, WPARAM wParam, LPARAM lParam) {
+    for (int i = 0; i < kCount; ++i) {
+        lua_State* L = states[i];
+        lua.getfield(L, LUA_GLOBALSINDEX, "__host_message");
+        lua.pushnumber(L, msg);
+        lua.pushnumber(L, static_cast<double>(wParam));
+        lua.pushnumber(L, static_cast<double>(static_cast<DWORD>(lParam)));
+        Check(L, lua.pcall(L, 3, 1, 0), kScripts[i]);
+        bool consumed = lua.toboolean(L, -1) != 0;
+        lua.settop(L, 0);
+        if (consumed) {
+            return kScripts[i];
+        }
+    }
+    return "jogo";
+}
+
+// Valores de um script (HOST_VALUES dele).
+void Values(FILE* f, lua_State* L, const char* when) {
+    lua.getfield(L, LUA_GLOBALSINDEX, "__host_values");
+    Check(L, lua.pcall(L, 0, 1, 0), "__host_values");
+    fprintf(f, "%s %s\n", when, lua.tolstring(L, -1, nullptr));
+    lua.settop(L, 0);
+}
+
+// Mouse em (x, y) com o botao esquerdo como pedido (WM_MOUSEMOVE e, se mudou, WM_LBUTTON*), e um quadro.
+bool g_mouseDown = false;
+void MouseAt(lua_State** states, int x, int y, bool down) {
+    SetCursorPos(x, y);
+    LPARAM pos = MAKELPARAM(x, y);
+    Message(states, WM_MOUSEMOVE, g_mouseDown ? MK_LBUTTON : 0, pos);
+    if (down != g_mouseDown) {
+        Message(states, down ? WM_LBUTTONDOWN : WM_LBUTTONUP, down ? MK_LBUTTON : 0, pos);
+        g_mouseDown = down;
+    }
+    Frame(states);
+}
+
+void Click(lua_State** states, int x, int y) {
+    MouseAt(states, x, y, false);
+    MouseAt(states, x, y, true);
+    MouseAt(states, x, y, false);
+}
+
+constexpr LPARAM KEY_DOWN = 0x00010001, KEY_REPEAT = 0x40010001, KEY_UP = static_cast<LPARAM>(0xC0010001);
+
+// Modo cliques: o "Painel A" usado com mouse e teclado; o "Painel B" fechado pelo X. Valores em <saida>_cliques.txt.
+void Clicks(lua_State** states, HMODULE samp, const char* out) {
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s_cliques.txt", out);
+    FILE* f = fopen(path, "w");
+    lua_State* a = states[0];
+    Values(f, a, "antes");
+    // Interruptor (ou caixa de marcar): clique perto do comeco do item, no meio da altura.
+    int cy = static_cast<int>((g_check[1] + g_check[3]) * 0.5f);
+    Click(states, static_cast<int>(g_check[0]) + 10, cy);
+    Values(f, a, "interruptor");
+    // Slider: aperta na ponta esquerda (vai ao minimo), arrasta ate a ponta direita (maximo) e solta.
+    int sy = static_cast<int>((g_slider[1] + g_slider[3]) * 0.5f);
+    int left = static_cast<int>(g_slider[0]) + 2, right = static_cast<int>(g_slider[2]) - 2;
+    MouseAt(states, left, sy, false);
+    MouseAt(states, left, sy, true);
+    Values(f, a, "slider_apertado");
+    MouseAt(states, right, sy, true);
+    MouseAt(states, right, sy, false);
+    Values(f, a, "slider_solto");
+    // Clique na janela sem X do mesmo script (o mais recente agora), com o Painel B ainda em foco no ImGui do script
+    // dele (o clique no Painel A nunca chegou la): o Esc nao e de nenhum dos dois e vai para o jogo.
+    Click(states, 240, 675);
+    Frame(states); // no quadro em que o arraste da janela termina, o ImGui ainda segura o teclado
+    fprintf(f, "esc_outro_script %s\n", Message(states, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(states);
+    Message(states, WM_KEYUP, VK_ESCAPE, KEY_UP);
+    Frame(states);
+    Values(f, states[1], "esc_outro_script painel_b");
+    // Lista suspensa: o clique abre a lista; o Esc fecha so a lista (a janela fica) e some para o jogo.
+    Click(states, static_cast<int>(g_combo[0]) + 20, static_cast<int>((g_combo[1] + g_combo[3]) * 0.5f));
+    Frame(states);
+    snprintf(path, sizeof(path), "%s_lista.bmp", out);
+    Capture(path);
+    fprintf(f, "esc_lista %s\n", Message(states, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(states);
+    Message(states, WM_KEYUP, VK_ESCAPE, KEY_UP);
+    Frame(states);
+    snprintf(path, sizeof(path), "%s_lista_fechada.bmp", out);
+    Capture(path);
+    Values(f, a, "esc_lista");
+    // Esc com o chat do SA-MP aberto (CInput do samp.dll falso): a tecla e do SA-MP, a janela fica.
+    BYTE* input = *reinterpret_cast<BYTE**>(reinterpret_cast<BYTE*>(samp) + 0x21A0E8);
+    *reinterpret_cast<int*>(input + 0x14E0) = 1;
+    Frame(states);
+    fprintf(f, "esc_chat %s\n", Message(states, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(states);
+    Message(states, WM_KEYUP, VK_ESCAPE, KEY_UP);
+    Frame(states);
+    Values(f, a, "esc_chat");
+    // Chat fechado e passada a folga de 150 ms: o Esc fecha o Painel A (em foco desde os cliques) e some para o
+    // jogo, a repeticao tambem; a tecla solta passa.
+    *reinterpret_cast<int*>(input + 0x14E0) = 0;
+    Frame(states);
+    Sleep(250);
+    Frame(states);
+    fprintf(f, "esc %s\n", Message(states, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(states);
+    Values(f, a, "esc");
+    fprintf(f, "esc_repeticao %s\n", Message(states, WM_KEYDOWN, VK_ESCAPE, KEY_REPEAT));
+    Frame(states);
+    fprintf(f, "esc_solto %s\n", Message(states, WM_KEYUP, VK_ESCAPE, KEY_UP));
+    Frame(states);
+    // Clique fora de todas as janelas (nenhuma fica em foco): o Esc vai para o jogo (o menu de pausa abre).
+    Click(states, 700, 700);
+    fprintf(f, "esc_sem_foco %s\n", Message(states, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(states);
+    Message(states, WM_KEYUP, VK_ESCAPE, KEY_UP);
+    Frame(states);
+    // X do Painel B (janela em 480,40 de 400x520): cabecalho de 44, X de 28 a 18 da borda, vezes a escala da tela.
+    float u = H / 1080.0f * 0.85f;
+    u = u < 0.55f ? 0.55f : u;
+    Click(states, static_cast<int>(480 + 400 - 26 * u + 0.5f), static_cast<int>(40 + 22 * u + 0.5f));
+    Frame(states);
+    Values(f, states[1], "x_painel_b");
+    fclose(f);
+    snprintf(path, sizeof(path), "%s_cliques.bmp", out);
+    Capture(path);
+}
+
 void Run(lua_State** states) {
     for (int i = 0; i < kCount; ++i) {
         states[i] = Open(kScripts[i]);
@@ -208,8 +363,9 @@ int main(int argc, char** argv) {
     }
     const char* out = argv[1];
     bool toggle = argc > 3 && strcmp(argv[3], "alternar") == 0;
-    HMODULE samp = toggle ? LoadLibraryA("samp.dll") : nullptr;
-    if (toggle && !samp) {
+    bool clicks = argc > 3 && strcmp(argv[3], "cliques") == 0;
+    HMODULE samp = toggle || clicks ? LoadLibraryA("samp.dll") : nullptr;
+    if ((toggle || clicks) && !samp) {
         printf("FALHA: samp.dll falso nao carregou\n");
         return 1;
     }
@@ -256,8 +412,9 @@ int main(int argc, char** argv) {
     Capture(path);
     g_device->Present(nullptr, nullptr, nullptr, nullptr);
 
-    if (toggle) {
-        // Campos do samp.dll falso (make_fake_samp.py): nome e callback do comando registrado.
+    if (toggle || clicks) {
+        // Campos do samp.dll falso (make_fake_samp.py): nome e callback do comando registrado. Registrado = a skin
+        // ja conferiu a versao do SA-MP (e passa a ver o chat e os dialogos dele).
         typedef void(__cdecl * CmdProc)(const char*);
         BYTE* data = reinterpret_cast<BYTE*>(samp) + 0x300000;
         for (int i = 0; i < 100 && !*reinterpret_cast<CmdProc*>(data + 4); ++i) {
@@ -269,6 +426,13 @@ int main(int argc, char** argv) {
             printf("FALHA: /trokskin nao registrado\n");
             return 1;
         }
+        if (clicks) {
+            Clicks(states, samp, out);
+        }
+    }
+    if (toggle) {
+        typedef void(__cdecl * CmdProc)(const char*);
+        CmdProc proc = *reinterpret_cast<CmdProc*>(reinterpret_cast<BYTE*>(samp) + 0x300004);
         const char* shots[] = {"desligado", "religado"};
         for (const char* shot : shots) {
             proc("");

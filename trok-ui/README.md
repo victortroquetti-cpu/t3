@@ -162,8 +162,23 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 **Versão de teste sem a barreira do layout: `skin/dist/Trok Skin Layout.asi`.** É o mesmo mod, já com `layout=1`, que também padroniza o que mexe no layout:
 - **Tamanho das fontes:** a primeira fonte de cada mod (a Trebuchet 14 do mimgui e do imgui antigo) vai para o tamanho de texto da casa, 16 × a escala da tela (13,6 px em 1080p, a mesma conta do Kill List). As outras fontes do mod, inclusive as embutidas, como ícones, acompanham na mesma proporção, então o título do mod continua maior que o texto.
 - **Espaçamentos do kit:** margem da janela 18 × 16, campos com 24 de altura, 6 entre um campo e outro (as linhas de 28 do kit), 8 entre o controle e o rótulo, recuo 12, barra de rolagem 6 e pegador do slider 10, tudo vezes a escala.
+- **Cara do kit:** cada janela padronizada troca a barra de título do ImGui pelo cabeçalho do kit: título centralizado na fonte de título, X à direita e a linha embaixo. Ganha também o rodapé do kit, a faixa escura com a linha em cima. As linhas separadoras do mod somem: no kit, as únicas linhas da janela são a do cabeçalho e a do rodapé. Os controles mais comuns são desenhados como no kit:
+  - a caixa de marcar vira o interruptor;
+  - o slider vira a trilha fina com a bolinha e o valor ao lado;
+  - a lista suspensa ganha a caixa e o chevron do kit;
+  - o cabeçalho recolhível ganha o chevron no lugar do triângulo.
+
+  Cada controle mantém o id e o que devolve ao mod.
+- **Esc fecha:** como nos menus da casa, o Esc fecha primeiro a lista aberta e depois a janela em foco, como o X, e o jogo não recebe a tecla (o menu de pausa não abre junto). Com menus de mods diferentes abertos, fecha o que você abriu ou clicou por último. Janela sem X não fecha. O Esc fica com o jogo quando:
+  - nenhuma janela com X está em foco;
+  - você está digitando num campo;
+  - o menu de pausa está aberto;
+  - o chat ou um diálogo do SA-MP está na tela.
+
+  A skin lê o chat e os diálogos do SA-MP 0.3.7 R1. Nas outras versões, o Esc que fecha o chat pode fechar o menu junto.
 - **O que continua igual:** mods da casa, janelas `##trok`, `manter` e `manter_scripts`. O HUD transparente fica no mesmo lugar: os espaçamentos dele voltam aos do autor, só a fonte acompanha o script.
-- **O risco:** janela de tamanho fixo, coluna em posição fixa ou botão de largura fixa podem cortar texto ou sobrar espaço. Janela que se ajusta ao conteúdo, como a do TKeyBinder, se acomoda sozinha.
+- **O risco:** janela de tamanho fixo, coluna em posição fixa ou botão de largura fixa podem cortar texto ou sobrar espaço. Na janela de tamanho fixo, o cabeçalho e o rodapé do kit tomam um pouco da altura e o fim do conteúdo passa a rolar. Janela que se ajusta ao conteúdo, como a do TKeyBinder, se acomoda sozinha.
+- **O Enter não seleciona:** menus do ImGui são de mouse e não têm linha selecionada. Para o Enter selecionar, os menus precisariam de navegação por teclado (setas movendo o destaque). Ela existe no mimgui, mas disputa as setas, o Enter e o espaço com o jogo, e o imgui antigo nem tem.
 
 Use **um dos dois** `.asi`, nunca os dois juntos: se os dois estiverem na pasta, o segundo a carregar se desliga e avisa no log. No `Trok Skin.ini`, a linha `layout=0` ou `layout=1` vale para qualquer um deles; sem a linha, vale o padrão de cada versão. O `/trokskin` desliga e religa os espaçamentos na hora; a fonte só volta ao recarregar os scripts.
 
@@ -171,11 +186,15 @@ Use **um dos dois** `.asi`, nunca os dois juntos: se os dois estiverem na pasta,
 
 *O TKeyBinder em 1080p: original (esquerda), com o Trok Skin (meio) e com o Trok Skin Layout (direita).*
 
-**Limites:** vale para mimgui e para o imgui antigo. Menus desenhados com `renderDrawBox` e os `.asi` ficam como estão. Como o layout não muda, menus de outros não ganham o que depende de saber o significado de cada opção (linhas numeradas, marca do padrão, dicas de tecla). A setinha de recolher do ImGui continua: ela só some mudando o comportamento da janela. No imgui antigo, texto desenhado com tamanho explícito (`AddText` com tamanho) não é compensado, e janelas filhas sem borda não ganham contorno nos campos (no 1.52 o contorno é da janela onde o campo está).
+**Limites:** vale para mimgui e para o imgui antigo. Menus desenhados com `renderDrawBox` e os `.asi` ficam como estão. Como o layout não muda, menus de outros não ganham o que depende de saber o significado de cada opção (linhas numeradas, marca do padrão, dicas de tecla). Na versão normal, a setinha de recolher do ImGui continua: ela só some mudando o comportamento da janela, o que a versão Layout faz ao trocar a barra de título pelo cabeçalho do kit. No imgui antigo, texto desenhado com tamanho explícito (`AddText` com tamanho) não é compensado, e janelas filhas sem borda não ganham contorno nos campos (no 1.52 o contorno é da janela onde o campo está).
 
 **Como funciona:**
 - **mimgui:** carrega uma DLL nativa só (`lib\mimgui\cimguidx9.dll`) que todos os scripts chamam. A skin desvia, com o MinHook, as funções dessa DLL que importam: início de quadro, abertura de janela, fontes e texto com tamanho explícito. O desvio entra no momento em que a DLL carrega, antes de qualquer script usar. A DLL fica presa na memória, para os desvios sobreviverem ao Ctrl+R.
 - **imgui antigo:** é um módulo C do Lua (`lib\MoonImGui.dll`) que cada script abre no seu próprio estado Lua pelo `require 'imgui'`. A skin desvia o `luaopen_MoonImGui` e, com a tabela do módulo pronta (antes do resto do `imgui.lua`), roda naquele script um ajuste em Lua (`skin/src/moon_patch.lua`, embutido no .asi). O ajuste troca três coisas, só pela API Lua do próprio moon_imgui: o renderizador (para saber o começo de cada quadro), o `imgui.Begin` e o `AddFontFromFileTTF` do atlas de fontes do script. Ler as 43 cores pela API custa uns 60 µs por janela. Por isso a skin lê o estilo pela FFI do LuaJIT, mas só depois de conferir que a FFI vê exatamente os mesmos valores que a API (senão fica na API); assim cai para uns 3 µs. O ajuste nunca mexe na pilha de push/pop do ImGui: no 1.52, um pop fora do lugar abre uma caixa de assert e trava o jogo. Qualquer erro desliga a skin só naquele script e devolve o visual dele.
+- **Kit e Esc (versão Layout):** os controles do kit e o cabeçalho reaproveitam o id e o retorno de cada controle do mod. Por isso o valor muda, o slider arrasta e o X fecha como antes, e o teste confere tudo com mouse e teclado simulados.
+  - **Como o Esc chega à skin:** no mimgui, pelo `ImGui_ImplWin32_WndProcHandler`, por onde passam as teclas de cada script. Para o jogo não receber a tecla, a skin liga o `io.WantCaptureKeyboard`, e o próprio mimgui segura a mensagem. No imgui antigo, pelo `DispatchWindowMessage` do renderizador, onde a skin chama o `consumeWindowMessage`.
+  - **Fechar só a lista aberta:** no mimgui, a skin manda o "cancelar" da navegação do ImGui. No 1.52, devolve o foco à janela, e o próprio ImGui fecha o popup que ficou sem foco.
+  - **Qual menu recebe o Esc:** cada script tem o seu ImGui, e o clique que um segura o outro nem vê. Então a skin, que é uma só para todos, guarda qual menu foi aberto ou clicado por último, e só esse recebe o Esc.
 
 ## Reaproveitar nos próximos mods
 
@@ -193,7 +212,7 @@ Duas regras que custaram caro na primeira versão:
 - **.asi num GTA de mentira:** `asi/test/smoke/run.sh` roda o .asi no Wine 32 bits (com Xvfb) com um processo que expõe o device d3d9 nos endereços do `gta_sa.exe` e carrega um `samp.dll` falso com os endereços do 0.3.7 R1. Depois digita `/trokui` duas vezes e confere os pixels do back buffer: o menu tem que abrir por cima de tudo e fechar, e o cursor do SA-MP tem que ir para o modo 2 e voltar. Com o menu aberto, confere também quais teclas chegam ao jogo: o T chega, a seta não, e com o chat aberto tudo chega. São 5 cenários: device direto; proxy estilo SA-MP com dois ganchos de vtable na regra do Dialogs/Radar (lida no binário do Dialogs 2.28); sem `0xC8CF88`; só pela classe da janela; e um wrapper que esconde o device real.
 - **Capturas sem o jogo:** `asi/test/run.sh <pasta>` roda a vitrine num rasterizador por software e salva PNGs de cada tela. Com `TROK_FONT=…/font.ttf TROK_ICONS=…/lucide.ttf`, usa a fonte e os ícones da casa (foi assim que as imagens acima foram geradas).
 - **Lua sem o jogo:** `cd lua && luajit test/mock_run.lua` roda todas as abas, popups, diálogos e o modo de mover num mimgui simulado. O teste confere se cada Push tem o seu Pop, se cada Begin tem End, os canais do draw list, os ids repetidos e os tipos dos argumentos. Também confere que nenhum campo mostra o rótulo do ImGui (o id tem que começar com `##`), que o mimgui inicializa sozinho e as regras do chat acima.
-- **Trok Skin:** `skin/build.sh` gera `skin/dist/Trok Skin.asi` e a versão de teste `skin/dist/Trok Skin Layout.asi` (o mesmo código, com `layout=1` de fábrica). `skin/test/run.sh` compila o `cimguidx9.dll` do mimgui 1.7.1 a partir das fontes dele e roda, no Wine, um "moonloader" de mentira com quatro scripts: um com tema claro (e "Trok" no nome, sem o kit), um com fundo vermelho empurrado e texto e botão vermelhos, um HUD transparente e um mod da casa renomeado (`casa.lua`, com janela `##trok`). São 70 verificações. Entre elas:
+- **Trok Skin:** `skin/build.sh` gera `skin/dist/Trok Skin.asi` e a versão de teste `skin/dist/Trok Skin Layout.asi` (o mesmo código, com `layout=1` de fábrica). `skin/test/run.sh` compila o `cimguidx9.dll` do mimgui 1.7.1 a partir das fontes dele e roda, no Wine, um "moonloader" de mentira com quatro scripts: um com tema claro (e "Trok" no nome, sem o kit), um com fundo vermelho empurrado e texto e botão vermelhos, um HUD transparente e um mod da casa renomeado (`casa.lua`, com janela `##trok`). São 122 verificações. Entre elas:
   - os retângulos de todos os controles ficam idênticos com o tema;
   - a tela desligada é idêntica, pixel a pixel, à sem a skin;
   - `/trokskin` desliga e religa na hora;
@@ -202,8 +221,15 @@ Duas regras que custaram caro na primeira versão:
   - tudo continua igual depois de descarregar e recarregar a DLL;
   - um ImGui de outra versão é recusado;
   - a fonte abre numa pasta com acento;
-  - a versão Layout dá ao texto, aos campos, ao espaço entre linhas e à margem exatamente as medidas do kit, deixa o HUD no lugar e o mod da casa idêntico, pixel a pixel.
-- **Trok Skin no imgui antigo:** `skin/test/moon/run.sh` compila o LuaJIT 2.1 como `lua51.dll` (precisa do gcc com multilib) e baixa o moon_imgui 1.1.5 (`imgui.lua` + `MoonImGui.dll`) de uma cópia pública, conferindo o SHA-256. Com `MOONIMGUI_DIR=…\moonloader\lib`, usa os do jogo. No Wine, cada script roda no seu estado Lua com o `imgui.lua` de verdade, como no moonloader, nos mesmos quatro papéis do teste do mimgui (o mod da casa renomeado usa a pasta `resource\trok`, como os de verdade). São 86 verificações: as mesmas do mimgui, mais o host terminar (um assert do 1.52 travaria numa caixa de mensagem), os campos que o 1.52 deixa a 30% irem para o fundo da casa, a borda e o divisor do título, o Ctrl+R com todos os scripts fechando e abrindo de novo, e a versão Layout com as mesmas medidas do kit.
+  - a versão Layout dá ao texto, aos campos, ao espaço entre linhas e à margem exatamente as medidas do kit, deixa o HUD no lugar e o mod da casa idêntico, pixel a pixel;
+  - a versão Layout tem o cabeçalho, o rodapé, o interruptor e o slider do kit, e não tem a linha separadora no meio;
+  - com mouse e teclado simulados (o clique e a tecla chegam como no jogo, e o script que segura um esconde dos outros):
+    - o interruptor e o slider mudam os valores do mod;
+    - o Esc fecha primeiro a lista aberta, depois a janela, e a tecla pega não chega ao jogo;
+    - o Esc nunca age com o chat do SA-MP aberto, nem no menu de outro script quando você mexeu por último em outro;
+    - o X do cabeçalho fecha;
+    - na versão normal, o Esc continua só do jogo.
+- **Trok Skin no imgui antigo:** `skin/test/moon/run.sh` compila o LuaJIT 2.1 como `lua51.dll` (precisa do gcc com multilib) e baixa o moon_imgui 1.1.5 (`imgui.lua` + `MoonImGui.dll`) de uma cópia pública, conferindo o SHA-256. Com `MOONIMGUI_DIR=…\moonloader\lib`, usa os do jogo. No Wine, cada script roda no seu estado Lua com o `imgui.lua` de verdade, como no moonloader, nos mesmos quatro papéis do teste do mimgui (o mod da casa renomeado usa a pasta `resource\trok`, como os de verdade). São 140 verificações: as mesmas do mimgui (com os mesmos cliques e teclas), mais o host terminar (um assert do 1.52 travaria numa caixa de mensagem), os campos que o 1.52 deixa a 30% irem para o fundo da casa, a borda e o divisor do título, o Ctrl+R com todos os scripts fechando e abrindo de novo, e a versão Layout com as mesmas medidas do kit.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
 > O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.

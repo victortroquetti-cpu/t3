@@ -177,5 +177,120 @@ check(abs(ratio - 16 * u / (14 * 1.007)) < 0.03, f'layout: texto com tamanho exp
 again = {k[1]: v for k, v in lay.items() if k[0] == 1}
 check(again == {k[1]: v for k, v in lay.items() if k[0] == 0}, 'layout: depois de recarregar os retangulos sao os mesmos')
 
+# Cara do kit (versao Layout): cabecalho do kit no lugar da barra de titulo, X, rodape, linhas so em cima e embaixo,
+# interruptor e slider do kit. As medidas sao as do kit vezes a escala da tela.
+kit = image('layout')
+bg = kit.getpixel((240, 530))  # fundo da janela padronizada
+
+
+def brighter(px, ref, by):
+    return sum(px) >= sum(ref) + 3 * by
+
+
+hy = 40 + 44 * u
+check('kit do layout ligado no mimgui' in log('layout') and 'Esc do kit ligado no mimgui' in log('layout'),
+      'kit: ligado no mimgui, com o Esc (log)')
+title = [x for y in range(41, int(hy)) for x in range(41, 410) if min(kit.getpixel((x, y))) > 150]
+tx = (min(title) + max(title)) / 2 if title else 0
+check(bool(title) and abs(tx - 240) <= 2, f'kit: titulo centralizado no cabecalho (centro em x={tx:.1f}; janela em 240)')
+check(lay[(0, 'Painel A|texto')][1] >= hy, 'kit: o conteudo comeca embaixo do cabecalho (44 x escala)')
+check(brighter(kit.getpixel((240, int(hy - 0.5))), bg, 5), 'kit: linha embaixo do cabecalho')
+xbox = [kit.getpixel((x, y)) for x in range(418, 430) for y in range(48, 60)]
+check(max(max(p) for p in xbox) > 100, 'kit: X no cabecalho, a direita (18 da borda)')
+fy = 40 + 520 - 36 * u
+check(brighter(kit.getpixel((240, int(fy) + 1)), bg, 4) and sum(kit.getpixel((240, int(fy) + 10))) < sum(bg),
+      'kit: rodape do kit (linha em cima e faixa mais escura, 36 x escala)')
+
+
+def gap(img, r):
+    """Pixels em x=240 entre a lista e o item selecionavel (onde o mod pos um Separator)."""
+    top, bottom = r[(0, 'Painel A|combo')][3], r[(0, 'Painel A|selecionavel')][1]
+    return [img.getpixel((240, y)) for y in range(int(top) + 1, int(bottom))]
+
+
+check(all(sum(p) <= sum(bg) + 6 for p in gap(kit, lay)), 'kit: sem linha separadora no meio (so a do cabecalho e a do rodape)')
+check(any(sum(p) >= sum(bg) + 30 for p in gap(img['completo'], completo)), 'versao normal: a linha separadora do mod continua')
+
+
+def bright(img, r, w):
+    x0, y0, x1, y1 = r
+    cy = int((y0 + y1) / 2)
+    return sum(1 for x in range(int(x0), int(x0) + w) for y in range(cy - 7, cy + 8) if min(img.getpixel((x, y))) > 200)
+
+
+track = bright(kit, lay[(0, 'Painel A|checkbox')], 26)
+box = bright(img['completo'], completo[(0, 'Painel A|checkbox')], 26)
+check(track > 150 and box < 120, f'kit: caixa de marcar virou o interruptor do kit, ligado ({track} px claros; a caixa do ImGui tem {box})')
+sx0, sy0, sx1, sy1 = lay[(0, 'Painel A|slider')]
+nx0, ny0, nx1, ny1 = completo[(0, 'Painel A|slider')]
+check(min(kit.getpixel((int(sx0) + 6, int((sy0 + sy1) / 2)))) > 200 and
+      max(img['completo'].getpixel((int(nx0) + 6, int((ny0 + ny1) / 2)))) < 60,
+      'kit: slider virou a trilha fina do kit (a parte preenchida e clara; no ImGui e o fundo do campo)')
+
+# Kit com mouse e teclado (cenario cliques): o interruptor e o slider mudam os valores do mod, o X e o Esc fecham.
+# Esc: primeiro a lista aberta, depois a janela; nunca com o chat do SA-MP aberto; nunca o menu de outro script
+# quando o jogador mexeu por ultimo em outro; a tecla pega nao chega ao jogo (nem as repeticoes), a solta chega.
+
+
+def clicks(run):
+    with open(os.path.join(OUT, run, 'out_cliques.txt'), encoding='utf-8') as f:
+        return [line.rstrip('\n') for line in f]
+
+
+def expect(run, steps):
+    got = clicks(run)
+    for i, (line, what) in enumerate(steps):
+        ok = i < len(got) and got[i] == line
+        check(ok, f'{run}: {what}' + ('' if ok else f' (esperado "{line}", veio "{got[i] if i < len(got) else "nada"}")'))
+    check(len(got) == len(steps), f'{run}: {len(steps)} passos registrados')
+
+
+A = 'Painel A'
+common = [
+    ('antes check=1 volume=65 aberto=1', 'valores iniciais do mod'),
+    ('interruptor check=0 volume=65 aberto=1', 'clique no interruptor desliga a opcao do mod'),
+    ('slider_apertado check=0 volume=0 aberto=1', 'apertar na ponta esquerda do slider leva ao minimo'),
+    ('slider_solto check=0 volume=100 aberto=1', 'arrastar ate a ponta direita leva ao maximo'),
+    ('esc_outro_script jogo', 'Esc depois de mexer na janela sem X: nao fecha o menu de outro script'),
+    ('esc_outro_script painel_b aberto=1', 'o Painel B (de outro script, ainda em foco no ImGui dele) continua aberto'),
+]
+expect('cliques', common + [
+    (f'esc_lista {A}', 'Esc com a lista aberta fica com o menu (o jogo nao recebe)'),
+    ('esc_lista check=0 volume=100 aberto=1', 'Esc com a lista aberta fecha so a lista'),
+    ('esc_chat jogo', 'Esc com o chat do SA-MP aberto fica com o SA-MP'),
+    ('esc_chat check=0 volume=100 aberto=1', 'o chat aberto nao deixa o Esc fechar o menu'),
+    (f'esc {A}', 'Esc fica com o menu (o menu de pausa nao abre)'),
+    ('esc check=0 volume=100 aberto=0', 'Esc fecha a janela, como o X'),
+    (f'esc_repeticao {A}', 'a repeticao do Esc tambem nao chega ao jogo'),
+    ('esc_solto jogo', 'a tecla solta chega ao jogo'),
+    ('esc_sem_foco jogo', 'Esc sem menu em foco vai para o jogo (menu de pausa)'),
+    ('x_painel_b aberto=0', 'X do cabecalho do kit fecha a janela'),
+])
+expect('cliques_normal', common + [
+    ('esc_lista jogo', 'Esc com a lista aberta segue para o jogo'),
+    ('esc_lista check=0 volume=100 aberto=1', 'Esc nao fecha nada'),
+    ('esc_chat jogo', 'Esc com o chat segue para o SA-MP'),
+    ('esc_chat check=0 volume=100 aberto=1', 'janela aberta'),
+    ('esc jogo', 'o Esc continua so do jogo'),
+    ('esc check=0 volume=100 aberto=1', 'o Esc nao fecha a janela'),
+    ('esc_repeticao jogo', 'repeticao do Esc vai para o jogo'),
+    ('esc_solto jogo', 'tecla solta vai para o jogo'),
+    ('esc_sem_foco jogo', 'Esc sem foco vai para o jogo'),
+    ('x_painel_b aberto=0', 'o X do ImGui fecha a janela'),
+])
+crc = rects('cliques')
+below = (41, int(crc[(0, 'Painel A|combo')][3]) + 2, 439, 530)  # embaixo da lista, onde ela abre
+start = image('cliques').crop(below)
+check(not same_image(image('cliques', 'out_lista.bmp').crop(below), start), 'cliques: o clique abriu a lista')
+check(same_image(image('cliques', 'out_lista_fechada.bmp').crop(below), start), 'cliques: o Esc fechou a lista (igual a antes de abrir, pixel a pixel)')
+check(not same_image(image('cliques_normal', 'out_lista_fechada.bmp').crop(below), image('cliques_normal').crop(below)),
+      'versao normal: o Esc nao fecha a lista')
+end = image('cliques', 'out_cliques.bmp')
+check(end.getpixel((240, 300)) == (20, 90, 40) and end.getpixel((680, 300)) == (20, 90, 40), 'cliques: Painel A (Esc) e Painel B (X) sumiram da tela')
+check(dark(end.getpixel((240, 700))), 'cliques: a janela sem X continua aberta')
+check(same_image(end.crop(casa), img['base'].crop(casa)), 'cliques: mod da casa intocado, pixel a pixel')
+check('Esc fechou a janela "Painel A" de Trok_Painel_A.lua' in log('cliques'), 'cliques: o fechamento pelo Esc aparece no log')
+check('Esc fechou' not in log('cliques_normal') and 'Esc do kit' not in log('cliques_normal'), 'versao normal: sem o Esc do kit')
+
 print('PASSOU' if failures == 0 else f'FALHOU ({failures})')
 sys.exit(1 if failures else 0)

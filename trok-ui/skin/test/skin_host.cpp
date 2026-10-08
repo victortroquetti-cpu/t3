@@ -1,14 +1,22 @@
 // Teste do Trok Skin no Wine: imita o moonloader com tres scripts do mimgui, usando o cimguidx9.dll de
 // verdade (o mesmo codigo do mimgui 1.7.1), e salva o retangulo de cada controle e uma captura da tela.
 //
-// Uso: skin_host.exe <saida> [skin] [alternar]
+// Uso: skin_host.exe <saida> [skin] [alternar|cliques]
 //   skin      carrega o Trok Skin.asi antes (como o ASI Loader); a config vem do Trok Skin.ini ao lado
 //   alternar  carrega tambem um samp.dll falso (0.3.7 R1) e, depois da primeira carga, digita /trokskin
 //             duas vezes, salvando a tela depois de cada uma (out_desligado.bmp e out_religado.bmp)
+//   cliques   carrega o samp.dll falso e, depois da primeira carga, usa mouse e teclado simulados: no "Painel A",
+//             clica no interruptor e arrasta o slider; clica no "Painel A2" e aperta Esc; abre a lista do Painel A
+//             e aperta Esc (fecha a lista) e de novo (com o chat do SA-MP aberto e fechado); clica fora e aperta
+//             Esc; clica no X do "Painel B". Grava os valores em out_cliques.txt e as telas out_lista.bmp (lista
+//             aberta), out_lista_fechada.bmp e out_cliques.bmp (no fim). Cliques e teclas passam pelo
+//             ImGui_ImplWin32_WndProcHandler de cada script, como no onWindowMessage do mimgui: o primeiro script
+//             com io.WantCaptureMouse ou io.WantCaptureKeyboard ligado segura a mensagem e os seguintes nem veem.
 //
 // Scripts (os arquivos ficam em moonloader\, como no jogo: a skin le o de cada script):
 //   "Painel A"  Trok_Painel_A.lua: tema claro do proprio script (StyleColorsLight) e cantos retos. Tem "trok" no
-//               nome, mas nao usa o kit: e padronizado (o nome do arquivo nao conta)
+//               nome, mas nao usa o kit: e padronizado (o nome do arquivo nao conta). Abre tambem a janela "Painel
+//               A2", sem botao de fechar
 //   "Painel B"  painel_b.lua: tema escuro padrao; empurra fundo vermelho antes do Begin; botao e texto vermelhos
 //   "HUD"       hud.lua: fundo transparente, sem titulo; texto com tamanho explicito (AddText/CalcTextSize)
 //   "Casa"      casa.lua: mod da casa renomeado (sem "trok" no nome), com janela ##trokCasa e estilo proprio: a
@@ -73,6 +81,7 @@ struct Api {
     void(__cdecl* AddTextFontPtr)(ImDrawList*, const ImFont*, float, const ImVec2, ImU32, const char*, const char*, float,
                                   const ImVec4*);
     void(__cdecl* CalcTextSizeA)(ImVec2*, ImFont*, float, float, float, const char*, const char*, const char**);
+    LRESULT(__cdecl* WndProcHandler)(HWND, UINT, WPARAM, LPARAM);
 };
 
 template <typename T> void Get(HMODULE dll, const char* name, T& out) {
@@ -132,6 +141,7 @@ bool LoadApi(Api& a) {
     Get(a.dll, "igGetFont", a.GetFont);
     Get(a.dll, "ImDrawList_AddTextFontPtr", a.AddTextFontPtr);
     Get(a.dll, "ImFont_CalcTextSizeA_nonUDT", a.CalcTextSizeA);
+    Get(a.dll, "ImGui_ImplWin32_WndProcHandler", a.WndProcHandler);
     return true;
 }
 
@@ -145,6 +155,9 @@ struct Script {
     float volume = 65;
     char nome[64] = "Victor_Trok";
     int modo = 1;
+    bool open = true; // a janela some quando o X (ou o Esc) fecha
+    // Onde o interruptor, o slider e a lista ficaram no ultimo quadro.
+    ImVec2 checkMin, checkMax, sliderMin, sliderMax, comboMin, comboMax;
 };
 
 Api g;
@@ -152,6 +165,14 @@ FILE* g_rects = nullptr;
 HWND g_hwnd = nullptr;
 IDirect3DDevice9* g_device = nullptr;
 bool g_record = false;
+
+// Mouse simulado (modo cliques). A posicao vale para todos os scripts (o mimgui le o cursor a cada quadro); o botao
+// chega por mensagem da janela, como no jogo (Mouse()).
+struct Mouse {
+    bool on = false;
+    float x = -1, y = -1;
+    bool down = false;
+} g_mouse;
 
 void Rect(const char* script, const char* what) {
     if (!g_record) {
@@ -206,12 +227,18 @@ void Widgets(Script& s) {
     Rect(s.name, "fechar");
     g.Checkbox("Ativar som", &s.check);
     Rect(s.name, "checkbox");
+    g.GetItemRectMin(&s.checkMin);
+    g.GetItemRectMax(&s.checkMax);
     g.SliderFloat("Volume", &s.volume, 0, 100, "%.0f", 1.0f);
     Rect(s.name, "slider");
+    g.GetItemRectMin(&s.sliderMin);
+    g.GetItemRectMax(&s.sliderMax);
     g.InputText("Nome", s.nome, sizeof(s.nome), 0, nullptr, nullptr);
     Rect(s.name, "campo");
     g.ComboStr("Modo", &s.modo, "Um\0Dois\0Tr\xc3\xaas\0\0", -1);
     Rect(s.name, "combo");
+    g.GetItemRectMin(&s.comboMin);
+    g.GetItemRectMax(&s.comboMax);
     g.Separator();
     g.Selectable("Item selecionado", true, 0, ImVec2(0, 0));
     Rect(s.name, "selecionavel");
@@ -265,14 +292,24 @@ void Draw(Script& s, int index) {
         g.End();
         return;
     }
+    if (strcmp(s.name, "Painel A") == 0) {
+        // Segunda janela do script, sem botao de fechar (o Esc nao fecha janela sem X).
+        g.SetNextWindowPos(ImVec2(40, 600), ImGuiCond_Always, ImVec2(0, 0));
+        g.SetNextWindowSize(ImVec2(400, 150), ImGuiCond_Always);
+        g.Begin("Painel A2", nullptr, 0);
+        g.Text("Janela sem X");
+        g.End();
+    }
+    if (!s.open) {
+        return; // como os scripts: a janela so e desenhada enquanto esta aberta
+    }
     g.SetNextWindowPos(ImVec2(40.0f + index * 440.0f, 40), ImGuiCond_Always, ImVec2(0, 0));
     g.SetNextWindowSize(ImVec2(400, 520), ImGuiCond_Always);
-    bool open = true;
     bool red = strcmp(s.name, "Painel B") == 0;
     if (red) {
         g.PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.55f, 0.08f, 0.08f, 1.0f)); // tema do script so nesta janela
     }
-    g.Begin(s.name, &open, 0);
+    g.Begin(s.name, &s.open, 0);
     if (red) {
         g.PopStyleColor(1);
     }
@@ -303,6 +340,9 @@ void Frame(Script* scripts, int count) {
         g.SetCurrentContext(s.ctx);
         g.ImplDX9_NewFrame(s.d3d);
         g.ImplWin32_NewFrame(g_hwnd, s.ticks, &s.time);
+        if (g_mouse.on) {
+            g.GetIO()->MousePos = ImVec2(g_mouse.x, g_mouse.y);
+        }
         g.NewFrame();
         Draw(s, i);
         g.Render();
@@ -361,6 +401,137 @@ void Run(Script* scripts, int count, const char* systemFont) {
     }
 }
 
+// Como o onWindowMessage do mimgui: a mensagem passa pelo ImGui de cada script, na ordem em que carregaram, e o
+// primeiro que fica com ela (io.WantCaptureKeyboard ligado logo depois) segura: os seguintes e o jogo nao recebem.
+// Devolve o script que segurou ou "jogo".
+const char* Key(Script* scripts, int count, UINT msg, WPARAM vk, LPARAM lParam) {
+    for (int i = 0; i < count; ++i) {
+        g.SetCurrentContext(scripts[i].ctx);
+        g.WndProcHandler(g_hwnd, msg, vk, lParam);
+        if (g.GetIO()->WantCaptureKeyboard) {
+            return scripts[i].name;
+        }
+    }
+    return "jogo";
+}
+
+// Como o onWindowMessage do mimgui com o mouse: o primeiro script com o mouse em cima de uma janela dele (ou com
+// popup aberto: io.WantCaptureMouse) segura o clique, e os scripts seguintes nem veem. Devolve quem segurou.
+const char* Mouse(Script* scripts, int count, UINT msg, LPARAM pos) {
+    for (int i = 0; i < count; ++i) {
+        g.SetCurrentContext(scripts[i].ctx);
+        g.WndProcHandler(g_hwnd, msg, msg == WM_LBUTTONDOWN ? MK_LBUTTON : 0, pos);
+        if (g.GetIO()->WantCaptureMouse) {
+            return scripts[i].name;
+        }
+    }
+    return "jogo";
+}
+
+// Mouse em (x, y) com o botao esquerdo como pedido, e um quadro.
+void MouseAt(Script* scripts, int count, float x, float y, bool down) {
+    g_mouse.on = true;
+    g_mouse.x = x;
+    g_mouse.y = y;
+    if (down != g_mouse.down) {
+        g_mouse.down = down;
+        Mouse(scripts, count, down ? WM_LBUTTONDOWN : WM_LBUTTONUP, MAKELPARAM(static_cast<int>(x), static_cast<int>(y)));
+    }
+    Frame(scripts, count);
+}
+
+void Click(Script* scripts, int count, float x, float y) {
+    MouseAt(scripts, count, x, y, false);
+    MouseAt(scripts, count, x, y, true);
+    MouseAt(scripts, count, x, y, false);
+}
+
+constexpr LPARAM KEY_DOWN = 0x00010001, KEY_REPEAT = 0x40010001, KEY_UP = 0xC0010001;
+
+// Modo cliques: o "Painel A" usado com mouse e teclado; o "Painel B" fechado pelo X. Valores em <saida>_cliques.txt.
+void Clicks(Script* scripts, int count, HMODULE samp, const char* out) {
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s_cliques.txt", out);
+    FILE* f = fopen(path, "w");
+    Script& a = scripts[0];
+    auto values = [&](const char* when) {
+        fprintf(f, "%s check=%d volume=%.0f aberto=%d\n", when, a.check, a.volume, a.open);
+    };
+    values("antes");
+    // Interruptor (ou caixa de marcar): clique perto do comeco do item, no meio da altura.
+    float cy = (a.checkMin.y + a.checkMax.y) * 0.5f;
+    Click(scripts, count, a.checkMin.x + 10, cy);
+    values("interruptor");
+    // Slider: aperta na ponta esquerda (vai ao minimo), arrasta ate a ponta direita (maximo) e solta.
+    float sy = (a.sliderMin.y + a.sliderMax.y) * 0.5f;
+    MouseAt(scripts, count, a.sliderMin.x + 2, sy, false);
+    MouseAt(scripts, count, a.sliderMin.x + 2, sy, true);
+    values("slider_apertado");
+    MouseAt(scripts, count, a.sliderMax.x - 2, sy, true);
+    MouseAt(scripts, count, a.sliderMax.x - 2, sy, false);
+    values("slider_solto");
+    // Clique na janela sem X do mesmo script (o mais recente agora), com o Painel B ainda em foco no ImGui do script
+    // dele (o clique no Painel A nunca chegou la): o Esc nao e de nenhum dos dois e vai para o jogo.
+    Click(scripts, count, 240, 675);
+    Frame(scripts, count); // no quadro em que o arraste da janela termina, o ImGui ainda segura o teclado
+    fprintf(f, "esc_outro_script %s\n", Key(scripts, count, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(scripts, count);
+    Key(scripts, count, WM_KEYUP, VK_ESCAPE, KEY_UP);
+    Frame(scripts, count);
+    fprintf(f, "esc_outro_script painel_b aberto=%d\n", scripts[1].open);
+    // Lista suspensa: o clique abre a lista; o Esc fecha so a lista (a janela fica) e some para o jogo.
+    Click(scripts, count, a.comboMin.x + 20, (a.comboMin.y + a.comboMax.y) * 0.5f);
+    Frame(scripts, count);
+    snprintf(path, sizeof(path), "%s_lista.bmp", out);
+    Capture(path);
+    fprintf(f, "esc_lista %s\n", Key(scripts, count, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(scripts, count);
+    Key(scripts, count, WM_KEYUP, VK_ESCAPE, KEY_UP);
+    Frame(scripts, count);
+    snprintf(path, sizeof(path), "%s_lista_fechada.bmp", out);
+    Capture(path);
+    values("esc_lista");
+    // Esc com o chat do SA-MP aberto (CInput do samp.dll falso): a tecla e do SA-MP, a janela fica.
+    BYTE* input = *reinterpret_cast<BYTE**>(reinterpret_cast<BYTE*>(samp) + 0x21A0E8);
+    *reinterpret_cast<int*>(input + 0x14E0) = 1;
+    Frame(scripts, count);
+    fprintf(f, "esc_chat %s\n", Key(scripts, count, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(scripts, count);
+    Key(scripts, count, WM_KEYUP, VK_ESCAPE, KEY_UP);
+    Frame(scripts, count);
+    values("esc_chat");
+    // Chat fechado e passada a folga de 150 ms: o Esc fecha o Painel A (em foco desde os cliques) e some para o
+    // jogo, a repeticao tambem; a tecla solta passa.
+    *reinterpret_cast<int*>(input + 0x14E0) = 0;
+    Frame(scripts, count);
+    Sleep(250);
+    Frame(scripts, count);
+    fprintf(f, "esc %s\n", Key(scripts, count, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(scripts, count);
+    values("esc");
+    fprintf(f, "esc_repeticao %s\n", Key(scripts, count, WM_KEYDOWN, VK_ESCAPE, KEY_REPEAT));
+    Frame(scripts, count);
+    fprintf(f, "esc_solto %s\n", Key(scripts, count, WM_KEYUP, VK_ESCAPE, KEY_UP));
+    Frame(scripts, count);
+    // Clique fora de todas as janelas (nenhuma fica em foco): o Esc vai para o jogo (o menu de pausa abre).
+    Click(scripts, count, 700, 700);
+    fprintf(f, "esc_sem_foco %s\n", Key(scripts, count, WM_KEYDOWN, VK_ESCAPE, KEY_DOWN));
+    Frame(scripts, count);
+    Key(scripts, count, WM_KEYUP, VK_ESCAPE, KEY_UP);
+    Frame(scripts, count);
+    // X do Painel B (janela em 480,40 de 400x520): cabecalho de 44, X de 28 a 18 da borda, vezes a escala da tela.
+    float u = H / 1080.0f * 0.85f;
+    u = u < 0.55f ? 0.55f : u;
+    Script& b = scripts[1];
+    Click(scripts, count, 480 + 400 - 26 * u, 40 + 22 * u);
+    Frame(scripts, count);
+    fprintf(f, "x_painel_b aberto=%d\n", b.open);
+    fclose(f);
+    snprintf(path, sizeof(path), "%s_cliques.bmp", out);
+    Capture(path);
+    g_mouse.on = false;
+}
+
 void Shutdown(Script* scripts, int count) {
     for (int i = 0; i < count; ++i) {
         g.SetCurrentContext(scripts[i].ctx);
@@ -378,8 +549,9 @@ int main(int argc, char** argv) {
     }
     const char* out = argv[1];
     bool toggle = argc > 3 && strcmp(argv[3], "alternar") == 0;
-    HMODULE samp = toggle ? LoadLibraryA("samp.dll") : nullptr;
-    if (toggle && !samp) {
+    bool clicks = argc > 3 && strcmp(argv[3], "cliques") == 0;
+    HMODULE samp = toggle || clicks ? LoadLibraryA("samp.dll") : nullptr;
+    if ((toggle || clicks) && !samp) {
         printf("FALHA: samp.dll falso nao carregou\n");
         return 1;
     }
@@ -435,8 +607,9 @@ int main(int argc, char** argv) {
     Capture(path);
     g_device->Present(nullptr, nullptr, nullptr, nullptr);
 
-    if (toggle) {
-        // Campos do samp.dll falso (make_fake_samp.py): nome e callback do comando registrado.
+    if (toggle || clicks) {
+        // Campos do samp.dll falso (make_fake_samp.py): nome e callback do comando registrado. Registrado = a skin
+        // ja conferiu a versao do SA-MP (e passa a ver o chat e os dialogos dele).
         typedef void(__cdecl * CmdProc)(const char*);
         BYTE* data = reinterpret_cast<BYTE*>(samp) + 0x300000;
         for (int i = 0; i < 100 && !*reinterpret_cast<CmdProc*>(data + 4); ++i) {
@@ -448,6 +621,13 @@ int main(int argc, char** argv) {
             printf("FALHA: /trokskin nao registrado\n");
             return 1;
         }
+        if (clicks) {
+            Clicks(scripts, 4, samp, out);
+        }
+    }
+    if (toggle) {
+        typedef void(__cdecl * CmdProc)(const char*);
+        CmdProc proc = *reinterpret_cast<CmdProc*>(reinterpret_cast<BYTE*>(samp) + 0x300004);
         const char* shots[] = {"desligado", "religado"};
         for (const char* shot : shots) {
             proc("");

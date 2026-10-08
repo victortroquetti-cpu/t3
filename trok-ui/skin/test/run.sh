@@ -76,5 +76,9 @@ run "acentuação" skin $'tema=1\nfonte=1'
 run manter_script skin $'tema=1\nfonte=1\nmanter_scripts=painel_b.lua'
 # Versao de teste (Trok Skin Layout.asi, layout=1 de fabrica): tamanho de fonte e espacamentos da casa.
 LAYOUT_ASI=1 run layout skin $'tema=1\nfonte=1'
+# Kit da versao Layout com mouse e teclado: interruptor, slider, Esc (com e sem o chat do SA-MP) e o X.
+LAYOUT_ASI=1 run cliques skin $'tema=1\nfonte=1' cimguidx9.dll cliques
+# Versao normal com os mesmos cliques: os controles sao os do ImGui e o Esc fica com o jogo.
+run cliques_normal skin $'tema=1\nfonte=1' cimguidx9.dll cliques
 
 python3 test/compare.py "$OUT"

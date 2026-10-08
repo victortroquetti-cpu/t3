@@ -22,7 +22,6 @@ end
 function isPauseMenuActive() return false end
 function showCursor() end
 function lockPlayerControl() end
-function consumeWindowMessage() end
 function wait() end
 function thisScript()
     return {filename = SCRIPT_FILE, name = SCRIPT_FILE:gsub('%.lua$', ''), path = 'moonloader\\' .. SCRIPT_FILE}
@@ -42,4 +41,22 @@ function __host_frame()
     for _, fn in ipairs(events.onD3DPresent or {}) do
         fn()
     end
+end
+
+-- Uma mensagem da janela do jogo (mouse ou teclado), como no moonloader: os onWindowMessage do script, ate um deles
+-- segurar a mensagem (consumeWindowMessage). Devolve true se o script segurou (o jogo e os outros scripts nao a veem).
+local consumed = false
+function consumeWindowMessage() consumed = true end
+function __host_message(msg, wparam, lparam)
+    consumed = false
+    for _, fn in ipairs(events.onWindowMessage or {}) do
+        fn(msg, wparam, lparam)
+        if consumed then break end
+    end
+    return consumed
+end
+
+-- Valores do script (o que o teste confere depois dos cliques): o script define HOST_VALUES.
+function __host_values()
+    return HOST_VALUES and HOST_VALUES() or ''
 end

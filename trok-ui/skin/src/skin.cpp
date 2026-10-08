@@ -27,6 +27,7 @@
 // autor fez) e manter_scripts=mod.lua|outro.lua (scripts inteiros que ficam como estao).
 
 #include <windows.h>
+#include <algorithm>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -165,6 +166,16 @@ typedef ImFontConfig*(__cdecl* FontConfigNewFn)();
 typedef void(__cdecl* FontConfigDestroyFn)(ImFontConfig*);
 typedef void(__cdecl* NewFrameFn)();
 typedef bool(__cdecl* BeginFn)(const char*, bool*, ImGuiWindowFlags);
+typedef void(__cdecl* EndFn)();
+typedef bool(__cdecl* CheckboxFn)(const char*, bool*);
+typedef bool(__cdecl* SliderFloatFn)(const char*, float*, float, float, const char*, float);
+typedef bool(__cdecl* SliderIntFn)(const char*, int*, int, int, const char*);
+typedef bool(__cdecl* ComboItemsGetter)(void*, int, const char**);
+typedef bool(__cdecl* ComboFn)(const char*, int*, const char* const*, int, int);
+typedef bool(__cdecl* ComboStrFn)(const char*, int*, const char*, int);
+typedef bool(__cdecl* ComboFnPtrFn)(const char*, int*, ComboItemsGetter, void*, int, int);
+typedef bool(__cdecl* CollapsingHeaderFn)(const char*, ImGuiTreeNodeFlags);
+typedef bool(__cdecl* CollapsingHeaderBoolFn)(const char*, bool*, ImGuiTreeNodeFlags);
 typedef void(__cdecl* DestroyContextFn)(ImGuiContext*);
 typedef ImFont*(__cdecl* AddFontFromFileFn)(ImFontAtlas*, const char*, float, const ImFontConfig*, const ImWchar*);
 typedef ImFont*(__cdecl* AddFontFromMemoryFn)(ImFontAtlas*, void*, int, float, const ImFontConfig*, const ImWchar*);
@@ -173,6 +184,11 @@ typedef void(__cdecl* AtlasFn)(ImFontAtlas*);
 typedef void(__cdecl* AddTextFontFn)(ImDrawList*, const ImFont*, float, const ImVec2, ImU32, const char*, const char*,
                                      float, const ImVec4*);
 typedef void(__cdecl* CalcTextSizeFn)(ImVec2*, ImFont*, float, float, float, const char*, const char*, const char**);
+typedef LRESULT(__cdecl* WndProcHandlerFn)(HWND, UINT, WPARAM, LPARAM);
+typedef bool(__cdecl* BeginComboFn)(const char*, const char*, ImGuiComboFlags);
+typedef bool(__cdecl* BeginPopupFn)(const char*, ImGuiWindowFlags);
+typedef bool(__cdecl* BeginPopupContextFn)(const char*, int);
+typedef bool(__cdecl* BeginPopupContextWindowFn)(const char*, int, bool);
 
 GetVersionFn p_igGetVersion = nullptr;
 GetCurrentContextFn p_igGetCurrentContext = nullptr;
@@ -183,6 +199,15 @@ FontConfigDestroyFn p_ImFontConfig_destroy = nullptr;
 // Originais (trampolins do MinHook).
 NewFrameFn o_igNewFrame = nullptr;
 BeginFn o_igBegin = nullptr;
+EndFn o_igEnd = nullptr;
+CheckboxFn o_igCheckbox = nullptr;
+SliderFloatFn o_igSliderFloat = nullptr;
+SliderIntFn o_igSliderInt = nullptr;
+ComboFn o_igCombo = nullptr;
+ComboStrFn o_igComboStr = nullptr;
+ComboFnPtrFn o_igComboFnPtr = nullptr;
+CollapsingHeaderFn o_igCollapsingHeader = nullptr;
+CollapsingHeaderBoolFn o_igCollapsingHeaderBoolPtr = nullptr;
 DestroyContextFn o_igDestroyContext = nullptr;
 AddFontFromFileFn o_AddFontFromFileTTF = nullptr;
 AddFontFromMemoryFn o_AddFontFromMemoryTTF = nullptr;
@@ -193,6 +218,12 @@ AtlasFn o_AtlasClearFonts = nullptr;
 AtlasFn o_AtlasDestroy = nullptr;
 AddTextFontFn o_AddTextFontPtr = nullptr;
 CalcTextSizeFn o_CalcTextSizeA = nullptr;
+WndProcHandlerFn o_WndProcHandler = nullptr;
+BeginComboFn o_igBeginCombo = nullptr;
+BeginPopupFn o_igBeginPopup = nullptr;
+BeginPopupContextFn o_igBeginPopupContextItem = nullptr;
+BeginPopupContextWindowFn o_igBeginPopupContextWindow = nullptr;
+BeginPopupContextFn o_igBeginPopupContextVoid = nullptr;
 
 // ---------------------------------------------------------------- tema da casa
 
@@ -373,9 +404,46 @@ struct Script {
     std::string name;                                    // "meu_mod.lua" ("?" se o script apagou o IniFilename antes)
     bool untouched = false;                              // mod da casa ou em manter_scripts=
     float sizeFactor = 0.0f; // layout=1: tamanho de texto da casa / primeira fonte do atlas (0 = ainda nao carregou)
+    ImFont* titleFont = nullptr; // layout=1: fonte da casa no tamanho de titulo do kit (cabecalho das janelas)
     std::vector<std::pair<std::string, std::string>> windows; // titulo -> o que a skin fez (para o log)
+    // Esc do kit (layout=1): a janela com X que estava em foco no ultimo quadro, a que o Esc mandou fechar (no
+    // proximo Begin dela) e se o Esc foi engolido ate soltar (as repeticoes tambem nao vao para o jogo). Com um
+    // popup de janela do kit aberto (lista, menu de contexto), o Esc fecha primeiro o popup (escCancel).
+    std::string escWindow;
+    DWORD escSeen = 0;
+    std::string escClose;
+    int escCloseFrames = 0;
+    bool escHeld = false;
+    bool escPopup = false;
+    bool escCancel = false;
+    // Entre scripts: quando o jogador mexeu por ultimo num menu do kit deste script (abriu ou clicou) e quando o
+    // script desenhou um menu do kit pela ultima vez. Cada script tem o seu ImGui e o clique que um segura o outro
+    // nem ve, entao dois menus podem estar "em foco" ao mesmo tempo: o Esc vai so para o mais recente.
+    unsigned escStamp = 0;
+    DWORD escLiveSeen = 0;
 };
 std::unordered_map<ImGuiContext*, Script> g_scripts;
+std::unordered_map<std::string, Script> g_moonScripts; // imgui antigo: por arquivo do script (sobrevive ao Ctrl+R)
+unsigned g_escStamp = 0;
+
+// O script mexido por ultimo entre os que tem menu do kit na tela? (os outros nao recebem o Esc)
+bool EscWinner(const Script& me) {
+    DWORD now = GetTickCount();
+    auto beats = [&](const Script& other) {
+        return &other != &me && other.escLiveSeen && now - other.escLiveSeen <= 500 && other.escStamp > me.escStamp;
+    };
+    for (const auto& e : g_scripts) {
+        if (beats(e.second)) {
+            return false;
+        }
+    }
+    for (const auto& e : g_moonScripts) {
+        if (beats(e.second)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 // Mod da casa, pelo que tem dentro (o nome do arquivo pode mudar a vontade): usa a pasta da casa
 // (moonloader\resource\trok, a fonte e os icones do kit) ou abre janela com id ##trok. Le o arquivo do script; no
@@ -619,11 +687,12 @@ void KeepScript(Look& want, const Look& cur, const State& st, bool spacingOnly) 
 // Antes de cada janela: o script pode ter mudado cores ou cantos depois do inicio do quadro (ou empurrado
 // para esta janela). Janela padronizada volta ao tema; janela mantida (manter= ou da casa, ##trok...) volta
 // ao visual do script. HUD (fundo transparente) fica intocado.
-void ApplyWindow(const char* name, ImGuiWindowFlags flags) {
+// Devolve true quando a janela ficou no tema da casa (para o kit redesenhar a janela e os controles dela).
+bool ApplyWindow(const char* name, ImGuiWindowFlags flags) {
     ImGuiContext* ctx = p_igGetCurrentContext();
     auto found = g_states.find(ctx);
     if (!ctx || found == g_states.end()) {
-        return; // script intocado (nem tem estado) ou sem quadro ainda
+        return false; // script intocado (nem tem estado) ou sem quadro ainda
     }
     Script& script = ScriptOf(ctx);
     State& st = found->second;
@@ -638,14 +707,15 @@ void ApplyWindow(const char* name, ImGuiWindowFlags flags) {
             KeepScript(want, cur, st, true);
             Write(*style, want);
         }
-        return;
+        return false;
     }
     bool kept = Kept(name);
     NoteWindow(script, name, kept ? "mantida (##trok ou manter=)" : g_theme ? "padronizada" : "tema desligado");
     Look cur;
     Read(*style, cur);
     Look want = cur;
-    if (!g_theme || kept) {
+    bool themed = g_theme && !kept;
+    if (!themed) {
         KeepScript(want, cur, st, false);
     } else {
         float u = Scale(p_igGetIO()->DisplaySize.y);
@@ -661,16 +731,637 @@ void ApplyWindow(const char* name, ImGuiWindowFlags flags) {
         }
     }
     Write(*style, want);
+    return themed;
+}
+
+// ---------------------------------------------------------------- kit (layout=1): o padrao Trok UI nos controles
+
+bool KeyboardBusy(); // menu de pausa, chat ou dialogo do SA-MP (secao do SA-MP)
+
+// Com layout=1, as janelas padronizadas ganham o cabecalho do kit (titulo centralizado na fonte de titulo, X e
+// divisor) e os controles mais comuns sao desenhados como no kit: caixa de marcar vira interruptor e o slider
+// vira trilha fina com bolinha e o valor ao lado. Cada controle mantem o id, o tamanho de linha e o que devolve
+// ao script; o resto (botao, campo, lista) ja fica no padrao pelo tema.
+struct KitApi {
+    bool(__cdecl* InvisibleButton)(const char*, const ImVec2);
+    bool(__cdecl* IsItemHovered)(ImGuiHoveredFlags);
+    bool(__cdecl* IsItemActive)();
+    bool(__cdecl* IsWindowHovered)(ImGuiHoveredFlags);
+    bool(__cdecl* IsWindowFocused)(ImGuiFocusedFlags);
+    bool(__cdecl* IsAnyItemActive)();
+    bool(__cdecl* IsPopupOpen)(const char*);
+    bool(__cdecl* IsWindowAppearing)();
+    bool(__cdecl* IsMouseClicked)(int, bool);
+    bool(__cdecl* IsMouseHoveringRect)(const ImVec2, const ImVec2, bool);
+    ImDrawList*(__cdecl* GetWindowDrawList)();
+    ImFont*(__cdecl* GetFont)();
+    float(__cdecl* GetFontSize)();
+    ImU32(__cdecl* GetColorU32)(ImGuiCol, float);
+    float(__cdecl* CalcItemWidth)();
+    void(__cdecl* SetCursorPos)(const ImVec2);
+    float(__cdecl* GetFrameHeight)();
+    void(__cdecl* GetWindowPos)(ImVec2*);
+    void(__cdecl* GetWindowSize)(ImVec2*);
+    void(__cdecl* GetCursorScreenPos)(ImVec2*);
+    void(__cdecl* CalcTextSize)(ImVec2*, const char*, const char*, bool, float);
+    void(__cdecl* AddLine)(ImDrawList*, const ImVec2, const ImVec2, ImU32, float);
+    void(__cdecl* AddRect)(ImDrawList*, const ImVec2, const ImVec2, ImU32, float, ImDrawCornerFlags, float);
+    void(__cdecl* AddRectFilled)(ImDrawList*, const ImVec2, const ImVec2, ImU32, float, ImDrawCornerFlags);
+    void(__cdecl* AddCircle)(ImDrawList*, const ImVec2, float, ImU32, int, float);
+    void(__cdecl* AddCircleFilled)(ImDrawList*, const ImVec2, float, ImU32, int);
+    void(__cdecl* AddText)(ImDrawList*, const ImVec2, ImU32, const char*, const char*);
+    void(__cdecl* GetItemRectMin)(ImVec2*);
+    void(__cdecl* GetItemRectMax)(ImVec2*);
+    void(__cdecl* PushClipRect)(const ImVec2, const ImVec2, bool);
+    void(__cdecl* PopClipRect)();
+    void(__cdecl* Dummy)(const ImVec2);
+    void(__cdecl* DrawListPushClipRect)(ImDrawList*, const ImVec2, const ImVec2, bool);
+    void(__cdecl* DrawListPopClipRect)(ImDrawList*);
+};
+KitApi k = {};
+volatile bool g_kit = false;    // layout=1 e as funcoes acima resolvidas
+volatile bool g_kitEsc = false; // Esc fecha a janela do kit em foco (ImGui_ImplWin32_WndProcHandler desviado)
+std::vector<char> g_kitWindows; // pilha de Begin/End do script atual: KIT_* da janela
+constexpr char KIT_WINDOW = 1;  // janela padronizada: os controles dela sao os do kit
+constexpr char KIT_SHELL = 2;   // ganhou cabecalho e rodape do kit (e o recorte do conteudo entre os dois)
+
+ImU32 Rgba(int r, int g, int b, int a) {
+    return static_cast<ImU32>(a) << 24 | static_cast<ImU32>(b) << 16 | static_cast<ImU32>(g) << 8 | static_cast<ImU32>(r);
+}
+
+ImU32 Gray(int v, int a = 255) {
+    return Rgba(v, v, v, a);
+}
+
+bool KitActive() {
+    return g_kit && !g_kitWindows.empty() && (g_kitWindows.back() & KIT_WINDOW);
+}
+
+// Fim do texto visivel de um rotulo do ImGui ("Volume##vol" mostra "Volume").
+const char* VisibleEnd(const char* label) {
+    const char* hidden = strstr(label, "##");
+    return hidden ? hidden : label + strlen(label);
+}
+
+float KitScale() {
+    return Scale(p_igGetIO()->DisplaySize.y);
+}
+
+// Medidas da casca do kit (as do Trok UI): cabecalho de 44 e faixa do rodape de 36, vezes a escala.
+float KitHeaderH() {
+    return 44 * KitScale();
+}
+
+float KitFooterH() {
+    return 36 * KitScale();
+}
+
+// Cabecalho do kit: titulo centralizado na fonte de titulo, X (se a janela tem botao de fechar) e a linha embaixo.
+// O X nao e um item do ImGui (so desenho e clique): nao mexe no tamanho das janelas que se ajustam ao conteudo. O
+// conteudo fica recortado entre o cabecalho e o rodape (KitFooter tira o recorte).
+void KitShell(const char* name, bool* open) {
+    ImGuiStyle* style = p_igGetStyle();
+    float u = KitScale();
+    ImVec2 pos, size;
+    k.GetWindowPos(&pos);
+    k.GetWindowSize(&size);
+    ImDrawList* dl = k.GetWindowDrawList();
+    float headerH = 44 * u, padX = 18 * u;
+    Script& script = ScriptOf(p_igGetCurrentContext());
+    const char* end = VisibleEnd(name);
+    if (end > name) {
+        ImFont* font = script.titleFont ? script.titleFont : k.GetFont();
+        float fontSize = script.titleFont ? script.titleFont->FontSize : k.GetFontSize();
+        ImVec2 ts;
+        o_CalcTextSizeA(&ts, font, fontSize, 100000.0f, 0.0f, name, end, nullptr);
+        ImVec2 at(std::floor(pos.x + (size.x - ts.x) * 0.5f), std::floor(pos.y + (headerH - ts.y) * 0.5f));
+        o_AddTextFontPtr(dl, font, fontSize, at, k.GetColorU32(ImGuiCol_Text, 1.0f), name, end, 0.0f, nullptr);
+    }
+    k.AddLine(dl, ImVec2(pos.x + padX, pos.y + headerH - 0.5f), ImVec2(pos.x + size.x - padX, pos.y + headerH - 0.5f),
+              Rgba(255, 255, 255, 10), 1.0f);
+    if (g_kitEsc) {
+        // Menu do kit na tela; o jogador mexeu nele agora se ele acabou de abrir ou levou um clique.
+        const ImGuiHoveredFlags anywhere = ImGuiHoveredFlags_RootAndChildWindows |
+                                           ImGuiHoveredFlags_AllowWhenBlockedByPopup |
+                                           ImGuiHoveredFlags_AllowWhenBlockedByActiveItem;
+        script.escLiveSeen = GetTickCount();
+        if (k.IsWindowAppearing() || (k.IsMouseClicked(0, false) && k.IsWindowHovered(anywhere))) {
+            script.escStamp = ++g_escStamp;
+        }
+    }
+    if (open) {
+        float side = 28 * u;
+        ImVec2 a(pos.x + size.x - padX - side + 6 * u, pos.y + (headerH - side) * 0.5f);
+        ImVec2 b(a.x + side, a.y + side);
+        bool hovered = k.IsWindowHovered(0) && k.IsMouseHoveringRect(a, b, false);
+        if (hovered && k.IsMouseClicked(0, false)) {
+            *open = false;
+        }
+        ImU32 col = k.GetColorU32(hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled, 1.0f);
+        float c = 5 * u;
+        ImVec2 m((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+        k.AddLine(dl, ImVec2(m.x - c, m.y - c), ImVec2(m.x + c, m.y + c), col, 1.5f * u);
+        k.AddLine(dl, ImVec2(m.x - c, m.y + c), ImVec2(m.x + c, m.y - c), col, 1.5f * u);
+        // Esc: faz o mesmo que o X na janela que estava em foco quando a tecla desceu (EscapeKey).
+        if (!script.escClose.empty() && script.escClose == name) {
+            script.escClose.clear();
+            *open = false;
+            Log("Esc fechou a janela \"%s\" de %s", name, script.name.c_str());
+        }
+        if (g_kitEsc && *open && k.IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+            script.escWindow = name;
+            script.escSeen = GetTickCount();
+        }
+    }
+    // O conteudo comeca embaixo do cabecalho (posicao local: acompanha a rolagem da janela).
+    k.SetCursorPos(ImVec2(style->WindowPadding.x, headerH + style->WindowPadding.y * 0.75f));
+    k.PushClipRect(ImVec2(pos.x, pos.y + headerH), ImVec2(pos.x + size.x, pos.y + size.y - KitFooterH()), true);
+}
+
+// Rodape do kit: so a faixa escura com a linha em cima, de borda a borda (no kit, as unicas linhas da janela sao
+// a de baixo do cabecalho e esta). Reserva a altura dela no fim do conteudo: janela que se ajusta ao conteudo cresce,
+// a de tamanho fixo ganha rolagem em vez de esconder o fim embaixo da faixa.
+void KitFooter() {
+    ImGuiStyle* style = p_igGetStyle();
+    float u = KitScale(), footerH = KitFooterH();
+    k.PopClipRect();
+    k.Dummy(ImVec2(0.0f, std::max(0.0f, footerH + 12 * u - style->ItemSpacing.y - style->WindowPadding.y)));
+    ImVec2 pos, size;
+    k.GetWindowPos(&pos);
+    k.GetWindowSize(&size);
+    ImDrawList* dl = k.GetWindowDrawList();
+    float y = pos.y + size.y - footerH;
+    k.DrawListPushClipRect(dl, pos, ImVec2(pos.x + size.x, pos.y + size.y), false);
+    k.AddRectFilled(dl, ImVec2(pos.x + 1, y), ImVec2(pos.x + size.x - 1, pos.y + size.y - 1), Rgba(0, 0, 0, 46),
+                    style->WindowRounding, ImDrawCornerFlags_Bot);
+    k.AddLine(dl, ImVec2(pos.x + 1, y + 0.5f), ImVec2(pos.x + size.x - 1, y + 0.5f), Rgba(255, 255, 255, 10), 1.0f);
+    k.DrawListPopClipRect(dl);
+}
+
+// Interruptor do kit no lugar da caixa de marcar: mesmo id e mesmo retorno (true quando o valor muda).
+bool __cdecl HookCheckbox(const char* label, bool* v) {
+    if (!KitActive() || !v || !label) {
+        return o_igCheckbox(label, v);
+    }
+    ImGuiStyle* style = p_igGetStyle();
+    float u = KitScale();
+    ImVec2 pos;
+    k.GetCursorScreenPos(&pos);
+    float fh = k.GetFrameHeight();
+    const char* end = VisibleEnd(label);
+    ImVec2 ls(0, 0);
+    if (end > label) {
+        k.CalcTextSize(&ls, label, end, false, -1.0f);
+    }
+    float th = std::min(22 * u, fh), tw = th * 40.0f / 22.0f;
+    float width = tw + (end > label ? style->ItemInnerSpacing.x + ls.x : 0.0f);
+    bool pressed = k.InvisibleButton(label, ImVec2(width, fh));
+    bool hovered = k.IsItemHovered(0);
+    if (pressed) {
+        *v = !*v;
+    }
+    ImDrawList* dl = k.GetWindowDrawList();
+    bool on = *v;
+    float r = th * 0.5f;
+    ImVec2 a(pos.x, std::floor(pos.y + (fh - th) * 0.5f)), b(a.x + tw, a.y + th);
+    k.AddRectFilled(dl, a, b, Gray(on ? (hovered ? 240 : 226) : (hovered ? 40 : 32)), r, ImDrawCornerFlags_All);
+    if (!on) {
+        k.AddRect(dl, ImVec2(a.x - 0.5f, a.y - 0.5f), ImVec2(b.x + 0.5f, b.y + 0.5f), Rgba(255, 255, 255, hovered ? 34 : 22),
+                  r + 0.5f, ImDrawCornerFlags_All, 1.0f);
+    }
+    k.AddCircleFilled(dl, ImVec2(a.x + r + (on ? tw - th : 0.0f), a.y + r), r - 3 * u,
+                      Gray(on ? 18 : (hovered ? 226 : 196)), 24);
+    if (end > label) {
+        k.AddText(dl, ImVec2(pos.x + tw + style->ItemInnerSpacing.x, std::floor(pos.y + (fh - ls.y) * 0.5f)),
+                  k.GetColorU32(ImGuiCol_Text, 1.0f), label, end);
+    }
+    return pressed;
+}
+
+// Formata o valor como o script pediu ("%.0f", "%d%%"...). O especificador decide o tipo passado ao snprintf;
+// formato estranho cai no padrao do ImGui.
+void FormatValue(char* out, size_t n, const char* fmt, double v, bool integer, int* decimals) {
+    const char* spec = nullptr;
+    int precision = -1;
+    for (const char* p = fmt ? fmt : ""; *p; ++p) {
+        if (*p != '%') {
+            continue;
+        }
+        if (p[1] == '%') {
+            ++p;
+            continue;
+        }
+        const char* q = p + 1;
+        while (*q && strchr("-+ #0", *q)) {
+            ++q;
+        }
+        while (*q >= '0' && *q <= '9') {
+            ++q;
+        }
+        if (*q == '.') {
+            precision = 0;
+            for (++q; *q >= '0' && *q <= '9'; ++q) {
+                precision = precision * 10 + (*q - '0');
+            }
+        }
+        spec = q;
+        break;
+    }
+    bool asInt = spec && strchr("diu", *spec);
+    bool asFloat = spec && strchr("fFeEgG", *spec);
+    if (!asInt && !asFloat) {
+        fmt = integer ? "%d" : "%.3f";
+        asInt = integer;
+        precision = integer ? 0 : 3;
+    }
+    if (decimals) {
+        *decimals = asInt ? 0 : (precision < 0 ? 6 : precision);
+    }
+    if (asInt) {
+        snprintf(out, n, fmt, static_cast<int>(std::lround(v)));
+    } else {
+        snprintf(out, n, fmt, v);
+    }
+}
+
+// Slider do kit: trilha fina com a bolinha e o valor ao lado, dentro da largura do slider do script; o rotulo
+// fica depois, como no ImGui. Mesmo id; devolve true quando o valor muda (arrastar ou clicar na trilha).
+bool KitSlider(const char* label, double* value, double vmin, double vmax, const char* fmt, bool integer) {
+    ImGuiStyle* style = p_igGetStyle();
+    float u = KitScale();
+    ImVec2 pos;
+    k.GetCursorScreenPos(&pos);
+    float fh = k.GetFrameHeight(), w = k.CalcItemWidth();
+    const char* end = VisibleEnd(label);
+    ImVec2 ls(0, 0);
+    if (end > label) {
+        k.CalcTextSize(&ls, label, end, false, -1.0f);
+    }
+    char text[64], low[64], high[64];
+    int decimals = 0;
+    FormatValue(text, sizeof(text), fmt, *value, integer, &decimals);
+    FormatValue(low, sizeof(low), fmt, vmin, integer, nullptr);
+    FormatValue(high, sizeof(high), fmt, vmax, integer, nullptr);
+    float valueW = 0;
+    for (const char* t : {text, low, high}) {
+        ImVec2 s;
+        k.CalcTextSize(&s, t, nullptr, false, -1.0f);
+        valueW = std::max(valueW, s.x);
+    }
+    float knobR = 7 * u;
+    float x0 = pos.x + knobR, x1 = pos.x + w - valueW - 10 * u - knobR;
+    if (x1 - x0 < 24 * u) { // estreito demais para o valor ao lado: a trilha usa a largura toda
+        valueW = 0;
+        x1 = pos.x + w - knobR;
+    }
+    float width = w + (end > label ? style->ItemInnerSpacing.x + ls.x : 0.0f);
+    k.InvisibleButton(label, ImVec2(std::max(width, 1.0f), fh));
+    bool hovered = k.IsItemHovered(0), active = k.IsItemActive();
+    bool changed = false;
+    if (active && x1 > x0) {
+        float f = std::min(1.0f, std::max(0.0f, (p_igGetIO()->MousePos.x - x0) / (x1 - x0)));
+        double v = vmin + (vmax - vmin) * f;
+        double step = std::pow(10.0, -decimals);
+        v = integer ? std::round(v) : std::round(v / step) * step;
+        v = std::min(vmax, std::max(vmin, v));
+        if (v != *value) {
+            *value = v;
+            changed = true;
+            FormatValue(text, sizeof(text), fmt, v, integer, nullptr);
+        }
+    }
+    ImDrawList* dl = k.GetWindowDrawList();
+    float cy = std::floor(pos.y + fh * 0.5f) + 0.5f, th = 4 * u;
+    double t = vmax > vmin ? (*value - vmin) / (vmax - vmin) : 0.0;
+    float fx = x0 + (x1 - x0) * static_cast<float>(std::min(1.0, std::max(0.0, t)));
+    k.AddRectFilled(dl, ImVec2(x0, cy - th * 0.5f), ImVec2(x1, cy + th * 0.5f), Rgba(255, 255, 255, 26), th * 0.5f,
+                    ImDrawCornerFlags_All);
+    k.AddRectFilled(dl, ImVec2(x0, cy - th * 0.5f), ImVec2(fx, cy + th * 0.5f), Gray(226), th * 0.5f,
+                    ImDrawCornerFlags_All);
+    float kr = hovered || active ? knobR + 1 * u : knobR;
+    k.AddCircleFilled(dl, ImVec2(fx, cy), kr, Gray(240), 24);
+    k.AddCircle(dl, ImVec2(fx, cy), kr, Rgba(0, 0, 0, 90), 24, 1.0f);
+    if (valueW > 0) {
+        ImVec2 s;
+        k.CalcTextSize(&s, text, nullptr, false, -1.0f);
+        k.AddText(dl, ImVec2(pos.x + w - s.x, std::floor(pos.y + (fh - s.y) * 0.5f)),
+                  active ? k.GetColorU32(ImGuiCol_Text, 1.0f) : Gray(200), text, nullptr);
+    }
+    if (end > label) {
+        k.AddText(dl, ImVec2(pos.x + w + style->ItemInnerSpacing.x, std::floor(pos.y + (fh - ls.y) * 0.5f)),
+                  k.GetColorU32(ImGuiCol_Text, 1.0f), label, end);
+    }
+    return changed;
+}
+
+bool __cdecl HookSliderFloat(const char* label, float* v, float vmin, float vmax, const char* fmt, float power) {
+    if (!KitActive() || !v || !label || !(vmax > vmin)) {
+        return o_igSliderFloat(label, v, vmin, vmax, fmt, power);
+    }
+    double value = *v;
+    bool changed = KitSlider(label, &value, vmin, vmax, fmt, false);
+    if (changed) {
+        *v = static_cast<float>(value);
+    }
+    return changed;
+}
+
+bool __cdecl HookSliderInt(const char* label, int* v, int vmin, int vmax, const char* fmt) {
+    if (!KitActive() || !v || !label || vmax <= vmin) {
+        return o_igSliderInt(label, v, vmin, vmax, fmt);
+    }
+    double value = *v;
+    bool changed = KitSlider(label, &value, vmin, vmax, fmt, true);
+    if (changed) {
+        *v = static_cast<int>(value);
+    }
+    return changed;
+}
+
+// Cor opaca de uma cor do estilo por cima do fundo da janela (para cobrir o que o ImGui desenhou sem deixar marca).
+ImU32 OverWindow(ImGuiCol col) {
+    const ImVec4* c = p_igGetStyle()->Colors;
+    const ImVec4& bg = c[ImGuiCol_WindowBg];
+    const ImVec4& fg = c[col];
+    auto mix = [&](float b, float f) { return static_cast<int>(std::lround((b * (1 - fg.w) + f * fg.w) * 255)); };
+    return Rgba(mix(bg.x, fg.x), mix(bg.y, fg.y), mix(bg.z, fg.z), 255);
+}
+
+// Chevron do kit (o "v" do lucide): para baixo, para cima ou para a direita, centrado em c.
+void Chevron(ImDrawList* dl, ImVec2 c, float size, char dir, ImU32 col, float thickness) {
+    float w = size * 0.5f, h = size * 0.25f;
+    if (dir == 'd' || dir == 'u') {
+        float s = dir == 'd' ? 1.0f : -1.0f;
+        k.AddLine(dl, ImVec2(c.x - w, c.y - h * s), ImVec2(c.x, c.y + h * s), col, thickness);
+        k.AddLine(dl, ImVec2(c.x, c.y + h * s), ImVec2(c.x + w, c.y - h * s), col, thickness);
+    } else {
+        k.AddLine(dl, ImVec2(c.x - h, c.y - w), ImVec2(c.x + h, c.y), col, thickness);
+        k.AddLine(dl, ImVec2(c.x + h, c.y), ImVec2(c.x - h, c.y + w), col, thickness);
+    }
+}
+
+// Popup aberto numa janela do kit neste quadro (lista, menu de contexto): o proximo Esc fecha ele primeiro.
+void NotePopup(bool open) {
+    if (open && g_kitEsc && KitActive()) {
+        Script& script = ScriptOf(p_igGetCurrentContext());
+        script.escPopup = true;
+        script.escSeen = GetTickCount();
+    }
+}
+
+// Lista suspensa do kit: a caixa (fundo, contorno, valor e chevron) e redesenhada por cima da do ImGui depois que
+// ele trata o clique; a lista que abre continua a do ImGui, no tema.
+struct KitFrame {
+    bool on = false;
+    ImVec2 pos;
+    float w = 0, fh = 0;
+};
+
+KitFrame KitBeforeCombo() {
+    KitFrame f;
+    f.on = KitActive();
+    if (f.on) {
+        k.GetCursorScreenPos(&f.pos);
+        f.w = k.CalcItemWidth();
+        f.fh = k.GetFrameHeight();
+    }
+    return f;
+}
+
+void KitAfterCombo(const KitFrame& f, const char* preview) {
+    if (!f.on || f.w <= 0) {
+        return;
+    }
+    float u = KitScale();
+    float rounding = p_igGetStyle()->FrameRounding;
+    ImDrawList* dl = k.GetWindowDrawList();
+    bool hovered = k.IsItemHovered(0);
+    ImVec2 a = f.pos, b(f.pos.x + f.w, f.pos.y + f.fh);
+    k.AddRectFilled(dl, ImVec2(a.x - 1, a.y - 1), ImVec2(b.x + 1, b.y + 1), OverWindow(ImGuiCol_WindowBg), rounding + 1,
+                    ImDrawCornerFlags_All);
+    k.AddRectFilled(dl, a, b, Rgba(255, 255, 255, hovered ? 14 : 8), rounding, ImDrawCornerFlags_All);
+    k.AddRect(dl, a, b, Rgba(255, 255, 255, hovered ? 40 : 22), rounding, ImDrawCornerFlags_All, 1.0f);
+    ImU32 col = hovered ? k.GetColorU32(ImGuiCol_Text, 1.0f) : Gray(200);
+    float chevronX = b.x - 14 * u;
+    if (preview && *preview) {
+        ImVec2 ts;
+        k.CalcTextSize(&ts, preview, nullptr, false, -1.0f);
+        // O valor nao passa por cima do chevron.
+        float clipX = chevronX - 10 * u;
+        const char* end = preview + strlen(preview);
+        while (end > preview && a.x + 10 * u + ts.x > clipX) {
+            --end;
+            k.CalcTextSize(&ts, preview, end, false, -1.0f);
+        }
+        k.AddText(dl, ImVec2(a.x + 10 * u, std::floor(a.y + (f.fh - ts.y) * 0.5f)), col, preview, end);
+    }
+    Chevron(dl, ImVec2(chevronX, a.y + f.fh * 0.5f), 8 * u, 'd', col, 1.5f * u);
+}
+
+bool __cdecl HookCombo(const char* label, int* current, const char* const items[], int count, int maxHeight) {
+    KitFrame f = KitBeforeCombo();
+    bool changed = o_igCombo(label, current, items, count, maxHeight);
+    if (f.on) {
+        KitAfterCombo(f, current && items && *current >= 0 && *current < count ? items[*current] : "");
+        NotePopup(label && k.IsPopupOpen(label));
+    }
+    return changed;
+}
+
+bool __cdecl HookComboStr(const char* label, int* current, const char* items, int maxHeight) {
+    KitFrame f = KitBeforeCombo();
+    bool changed = o_igComboStr(label, current, items, maxHeight);
+    if (f.on) {
+        const char* preview = "";
+        if (current && items && *current >= 0) {
+            const char* p = items;
+            for (int i = 0; *p; ++i, p += strlen(p) + 1) {
+                if (i == *current) {
+                    preview = p;
+                    break;
+                }
+            }
+        }
+        KitAfterCombo(f, preview);
+        NotePopup(label && k.IsPopupOpen(label));
+    }
+    return changed;
+}
+
+bool __cdecl HookComboFnPtr(const char* label, int* current, ComboItemsGetter getter, void* data, int count,
+                            int maxHeight) {
+    KitFrame f = KitBeforeCombo();
+    bool changed = o_igComboFnPtr(label, current, getter, data, count, maxHeight);
+    if (f.on) {
+        const char* preview = "";
+        if (current && getter && *current >= 0 && *current < count && !getter(data, *current, &preview)) {
+            preview = "";
+        }
+        KitAfterCombo(f, preview ? preview : "");
+        NotePopup(label && k.IsPopupOpen(label));
+    }
+    return changed;
+}
+
+// Popups abertos pelo proprio mod (BeginCombo, BeginPopup, menus de contexto): so marcam que estao abertos.
+bool __cdecl HookBeginCombo(const char* label, const char* preview, ImGuiComboFlags flags) {
+    bool open = o_igBeginCombo(label, preview, flags);
+    NotePopup(open);
+    return open;
+}
+
+bool __cdecl HookBeginPopup(const char* id, ImGuiWindowFlags flags) {
+    bool open = o_igBeginPopup(id, flags);
+    NotePopup(open);
+    return open;
+}
+
+bool __cdecl HookBeginPopupContextItem(const char* id, int button) {
+    bool open = o_igBeginPopupContextItem(id, button);
+    NotePopup(open);
+    return open;
+}
+
+bool __cdecl HookBeginPopupContextWindow(const char* id, int button, bool alsoOverItems) {
+    bool open = o_igBeginPopupContextWindow(id, button, alsoOverItems);
+    NotePopup(open);
+    return open;
+}
+
+bool __cdecl HookBeginPopupContextVoid(const char* id, int button) {
+    bool open = o_igBeginPopupContextVoid(id, button);
+    NotePopup(open);
+    return open;
+}
+
+// Cabecalho recolhivel: o triangulo do ImGui vira o chevron do kit (direita fechado, baixo aberto).
+void KitHeaderArrow(bool open) {
+    ImGuiStyle* style = p_igGetStyle();
+    ImVec2 a;
+    k.GetItemRectMin(&a);
+    float fs = k.GetFontSize();
+    ImVec2 p(a.x + style->FramePadding.x, a.y + style->FramePadding.y);
+    bool hovered = k.IsItemHovered(0), held = k.IsItemActive();
+    ImDrawList* dl = k.GetWindowDrawList();
+    ImGuiCol under = held && hovered ? ImGuiCol_HeaderActive : hovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header;
+    k.AddRectFilled(dl, ImVec2(p.x - 1, p.y - 1), ImVec2(p.x + fs + 1, p.y + fs + 1), OverWindow(under), 0.0f,
+                    ImDrawCornerFlags_All);
+    Chevron(dl, ImVec2(p.x + fs * 0.5f, p.y + fs * 0.5f), fs * 0.55f, open ? 'd' : 'r',
+            k.GetColorU32(ImGuiCol_Text, 1.0f), std::max(1.0f, fs * 0.1f));
+}
+
+bool __cdecl HookCollapsingHeader(const char* label, ImGuiTreeNodeFlags flags) {
+    bool kit = KitActive();
+    bool open = o_igCollapsingHeader(label, flags);
+    if (kit) {
+        KitHeaderArrow(open);
+    }
+    return open;
+}
+
+bool __cdecl HookCollapsingHeaderBoolPtr(const char* label, bool* visible, ImGuiTreeNodeFlags flags) {
+    bool kit = KitActive() && (!visible || *visible);
+    bool open = o_igCollapsingHeaderBoolPtr(label, visible, flags);
+    if (kit) {
+        KitHeaderArrow(open);
+    }
+    return open;
 }
 
 void __cdecl HookNewFrame() {
     ApplyFrame();
+    g_kitWindows.clear();
+    if (g_kitEsc) {
+        // A janela em foco e recalculada a cada quadro; o fechamento pedido pelo Esc vale so para o quadro seguinte.
+        if (ImGuiContext* ctx = p_igGetCurrentContext()) {
+            Script& script = ScriptOf(ctx);
+            script.escWindow.clear();
+            script.escPopup = false;
+            if (script.escCloseFrames > 0 && --script.escCloseFrames == 0) {
+                script.escClose.clear();
+            }
+            if (script.escCancel) {
+                // O "cancelar" da navegacao do ImGui fecha o popup de cima (menos modal) e devolve o foco a janela
+                // de baixo. Vale mesmo sem a navegacao por teclado ligada; o ImGui zera no fim do quadro.
+                script.escCancel = false;
+                p_igGetIO()->NavInputs[ImGuiNavInput_Cancel] = 1.0f;
+            }
+        }
+        KeyboardBusy(); // marca a hora em que o chat ou o dialogo do SA-MP estava aberto
+    }
     o_igNewFrame();
 }
 
+// Esc apertado com uma janela do kit em foco: ela fecha no proximo quadro (como no X) e o Esc nao chega ao jogo
+// (senao o menu de pausa abriria junto), nem as repeticoes ate soltar. Com um popup dela aberto, fecha so o popup.
+// Fica com o jogo se nao ha janela do kit com X em foco, se esta digitando num campo ou segurando um controle, com o
+// menu de pausa, o chat ou um dialogo do SA-MP abertos, ou se o jogador mexeu depois no menu de outro script.
+// Devolve true quando a skin ficou com a tecla.
+bool EscapeKey(Script& script, LPARAM lParam) {
+    if (lParam & (1 << 30)) { // repeticao (a tecla ja estava embaixo)
+        return script.escHeld;
+    }
+    script.escHeld = false;
+    if ((!script.escPopup && script.escWindow.empty()) || GetTickCount() - script.escSeen > 500 ||
+        k.IsAnyItemActive() || p_igGetIO()->WantTextInput || KeyboardBusy() || !EscWinner(script)) {
+        return false;
+    }
+    if (script.escPopup) {
+        script.escCancel = true; // primeiro o popup aberto, depois a janela (como nos menus da casa)
+    } else {
+        script.escClose = script.escWindow;
+        script.escCloseFrames = 2;
+    }
+    script.escHeld = true;
+    return true;
+}
+
+// O mimgui passa as mensagens da janela do jogo ao contexto do script por aqui e, logo depois, segura a mensagem
+// (consumeWindowMessage) se io.WantCaptureKeyboard estiver ligado: e assim que o Esc pego pela skin some para o jogo.
+// As teclas soltas sempre passam (o GTA le o teclado pelas mensagens; tecla sem soltar ficaria presa).
+LRESULT __cdecl HookWndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    LRESULT result = o_WndProcHandler(hwnd, msg, wParam, lParam);
+    if (g_kitEsc && wParam == VK_ESCAPE && (msg == WM_KEYDOWN || msg == WM_KEYUP)) {
+        ImGuiContext* ctx = p_igGetCurrentContext();
+        if (ctx && !ScriptOf(ctx).untouched) {
+            Script& script = ScriptOf(ctx);
+            if (msg == WM_KEYUP) {
+                script.escHeld = false;
+            } else if (EscapeKey(script, lParam)) {
+                p_igGetIO()->WantCaptureKeyboard = true;
+            }
+        }
+    }
+    return result;
+}
+
 bool __cdecl HookBegin(const char* name, bool* open, ImGuiWindowFlags flags) {
-    ApplyWindow(name, flags);
-    return o_igBegin(name, open, flags);
+    bool themed = ApplyWindow(name, flags);
+    const ImGuiWindowFlags plain = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_ChildWindow |
+                                   ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup | ImGuiWindowFlags_Modal;
+    bool shell = g_kit && themed && name && !(flags & plain);
+    if (shell) {
+        flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse;
+    }
+    bool visible = o_igBegin(name, open, flags);
+    char kit = g_kit && themed ? KIT_WINDOW : 0;
+    if (shell && visible) {
+        KitShell(name, open);
+        kit |= KIT_SHELL;
+    }
+    g_kitWindows.push_back(kit);
+    return visible;
+}
+
+void __cdecl HookEnd() {
+    char kit = g_kitWindows.empty() ? 0 : g_kitWindows.back();
+    if (!g_kitWindows.empty()) {
+        g_kitWindows.pop_back();
+    }
+    if (kit & KIT_SHELL) {
+        KitFooter();
+    }
+    o_igEnd();
 }
 
 // ---------------------------------------------------------------- fonte da casa
@@ -897,6 +1588,14 @@ ImFont* __cdecl HookAddFontFromFileTTF(ImFontAtlas* atlas, const char* filename,
     fallback.DstFont = nullptr;
     o_AddFontFromFileTTF(atlas, filename, houseSize, &fallback, ranges);
     g_replaced[font] = Replaced{atlas, ratio};
+    if (g_kit && !script.titleFont) {
+        // Fonte de titulo do kit (20 x escala) para o cabecalho das janelas, com a mesma reserva de glifos.
+        float titleSize = 20.0f * Scale(ScreenHeight());
+        script.titleFont = o_AddFontFromFileTTF(atlas, g_housePath, titleSize, &base, ranges);
+        if (script.titleFont) {
+            o_AddFontFromFileTTF(atlas, filename, titleSize, &fallback, ranges);
+        }
+    }
     Log("fonte %s %.1f px de %s -> fonte da casa %.1f px (%s)", filename, size, owner.c_str(), houseSize,
         g_layout ? "tamanho da casa" : "mesma largura de texto");
     return font;
@@ -946,6 +1645,7 @@ void ResetLayoutFactor(ImFontAtlas* atlas) {
     auto found = ctx ? g_scripts.find(ctx) : g_scripts.end();
     if (found != g_scripts.end() && p_igGetIO()->Fonts == atlas) {
         found->second.sizeFactor = 0.0f;
+        found->second.titleFont = nullptr;
     }
 }
 
@@ -1037,7 +1737,6 @@ const char kMoonPatch[] =
 #include "moon_patch.inc" // src/moon_patch.lua, embrulhado pelo build.sh
     ;
 
-std::unordered_map<std::string, Script> g_moonScripts; // por arquivo do script (sobrevive ao Ctrl+R)
 
 const char* Arg(lua_State* L, int index) {
     const char* s = g_lua.tolstring(L, index, nullptr);
@@ -1199,8 +1898,39 @@ int __cdecl LuaSpacing(lua_State* L) {
     return 11;
 }
 
+// skin.titleSize(): tamanho da fonte de titulo do kit (20 x escala da tela), para o cabecalho das janelas.
+int __cdecl LuaTitleSize(lua_State* L) {
+    g_lua.pushnumber(L, 20.0f * Scale(ScreenHeight()));
+    return 1;
+}
+
 int __cdecl LuaHousePath(lua_State* L) {
     g_lua.pushstring(L, g_housePath);
+    return 1;
+}
+
+// skin.keyboardBusy(): o teclado e do jogo ou do SA-MP agora (menu de pausa, chat ou dialogo)? Para o Esc do kit.
+int __cdecl LuaKeyboardBusy(lua_State* L) {
+    g_lua.pushboolean(L, KeyboardBusy());
+    return 1;
+}
+
+// Esc do kit entre scripts (os do mimgui e os do imgui antigo juntos): skin.escTouch(arquivo) quando o jogador abre ou
+// clica num menu do kit do script; skin.escLive(arquivo) a cada quadro com menu do kit na tela; skin.escWinner(arquivo)
+// diz se o script e o mexido por ultimo entre os que tem menu na tela (so ele recebe o Esc).
+int __cdecl LuaEscTouch(lua_State* L) {
+    g_moonScripts[Arg(L, 1)].escStamp = ++g_escStamp;
+    return 0;
+}
+
+int __cdecl LuaEscLive(lua_State* L) {
+    g_moonScripts[Arg(L, 1)].escLiveSeen = GetTickCount();
+    return 0;
+}
+
+int __cdecl LuaEscWinner(lua_State* L) {
+    auto found = g_moonScripts.find(Arg(L, 1));
+    g_lua.pushboolean(L, found == g_moonScripts.end() || EscWinner(found->second));
     return 1;
 }
 
@@ -1211,7 +1941,9 @@ void PushSkinTable(lua_State* L) {
     } functions[] = {{"log", LuaLog},         {"script", LuaScript},     {"theme", LuaTheme},
                      {"kept", LuaKept},       {"note", LuaNote},         {"scalars", LuaScalars},
                      {"spacing", LuaSpacing}, {"palette", LuaPalette},   {"fonts", LuaFonts},
-                     {"font", LuaFont},       {"resetFonts", LuaResetFonts}, {"housePath", LuaHousePath}};
+                     {"font", LuaFont},       {"resetFonts", LuaResetFonts}, {"housePath", LuaHousePath},
+                     {"titleSize", LuaTitleSize}, {"keyboardBusy", LuaKeyboardBusy},
+                     {"escTouch", LuaEscTouch},   {"escLive", LuaEscLive},       {"escWinner", LuaEscWinner}};
     g_lua.createtable(L, 0, static_cast<int>(sizeof(functions) / sizeof(functions[0])));
     for (const auto& f : functions) {
         g_lua.pushcclosure(L, f.fn, 0);
@@ -1271,6 +2003,106 @@ template <typename T> bool Hook(HMODULE dll, const char* name, void* detour, T& 
         return false;
     }
     return true;
+}
+
+// Kit (layout=1): resolve o que os controles do kit usam e desvia Checkbox, SliderFloat, SliderInt e End. Se algo
+// faltar, o kit fica desligado e o resto da skin segue (tema, fonte e espacamentos).
+void InstallKit(HMODULE dll) {
+    bool ok = Resolve(dll, "igInvisibleButton", k.InvisibleButton) && Resolve(dll, "igIsItemHovered", k.IsItemHovered) &&
+              Resolve(dll, "igIsItemActive", k.IsItemActive) && Resolve(dll, "igIsWindowHovered", k.IsWindowHovered) &&
+              Resolve(dll, "igIsWindowFocused", k.IsWindowFocused) &&
+              Resolve(dll, "igIsAnyItemActive", k.IsAnyItemActive) && Resolve(dll, "igIsPopupOpen", k.IsPopupOpen) &&
+              Resolve(dll, "igIsWindowAppearing", k.IsWindowAppearing) &&
+              Resolve(dll, "igIsMouseClicked", k.IsMouseClicked) &&
+              Resolve(dll, "igIsMouseHoveringRect", k.IsMouseHoveringRect) &&
+              Resolve(dll, "igGetWindowDrawList", k.GetWindowDrawList) && Resolve(dll, "igGetFont", k.GetFont) &&
+              Resolve(dll, "igGetFontSize", k.GetFontSize) && Resolve(dll, "igGetColorU32", k.GetColorU32) &&
+              Resolve(dll, "igCalcItemWidth", k.CalcItemWidth) && Resolve(dll, "igSetCursorPos", k.SetCursorPos) &&
+              Resolve(dll, "igGetFrameHeight", k.GetFrameHeight) &&
+              Resolve(dll, "igGetWindowPos_nonUDT", k.GetWindowPos) &&
+              Resolve(dll, "igGetWindowSize_nonUDT", k.GetWindowSize) &&
+              Resolve(dll, "igGetCursorScreenPos_nonUDT", k.GetCursorScreenPos) &&
+              Resolve(dll, "igCalcTextSize_nonUDT", k.CalcTextSize) && Resolve(dll, "ImDrawList_AddLine", k.AddLine) &&
+              Resolve(dll, "ImDrawList_AddRect", k.AddRect) && Resolve(dll, "ImDrawList_AddRectFilled", k.AddRectFilled) &&
+              Resolve(dll, "ImDrawList_AddCircle", k.AddCircle) &&
+              Resolve(dll, "ImDrawList_AddCircleFilled", k.AddCircleFilled) &&
+              Resolve(dll, "ImDrawList_AddText", k.AddText) &&
+              Resolve(dll, "igGetItemRectMin_nonUDT", k.GetItemRectMin) &&
+              Resolve(dll, "igGetItemRectMax_nonUDT", k.GetItemRectMax) &&
+              Resolve(dll, "igPushClipRect", k.PushClipRect) && Resolve(dll, "igPopClipRect", k.PopClipRect) &&
+              Resolve(dll, "igDummy", k.Dummy) && Resolve(dll, "ImDrawList_PushClipRect", k.DrawListPushClipRect) &&
+              Resolve(dll, "ImDrawList_PopClipRect", k.DrawListPopClipRect);
+    std::vector<void*> targets;
+    if (ok) {
+        ok = Hook(dll, "igEnd", reinterpret_cast<void*>(HookEnd), o_igEnd) &&
+             Hook(dll, "igCheckbox", reinterpret_cast<void*>(HookCheckbox), o_igCheckbox) &&
+             Hook(dll, "igSliderFloat", reinterpret_cast<void*>(HookSliderFloat), o_igSliderFloat) &&
+             Hook(dll, "igSliderInt", reinterpret_cast<void*>(HookSliderInt), o_igSliderInt) &&
+             Hook(dll, "igCombo", reinterpret_cast<void*>(HookCombo), o_igCombo) &&
+             Hook(dll, "igComboStr", reinterpret_cast<void*>(HookComboStr), o_igComboStr) &&
+             Hook(dll, "igComboFnPtr", reinterpret_cast<void*>(HookComboFnPtr), o_igComboFnPtr) &&
+             Hook(dll, "igCollapsingHeader", reinterpret_cast<void*>(HookCollapsingHeader), o_igCollapsingHeader) &&
+             Hook(dll, "igCollapsingHeaderBoolPtr", reinterpret_cast<void*>(HookCollapsingHeaderBoolPtr),
+                  o_igCollapsingHeaderBoolPtr);
+        for (const char* name : {"igEnd", "igCheckbox", "igSliderFloat", "igSliderInt", "igCombo", "igComboStr",
+                                 "igComboFnPtr", "igCollapsingHeader", "igCollapsingHeaderBoolPtr"}) {
+            if (void* t = reinterpret_cast<void*>(GetProcAddress(dll, name))) {
+                targets.push_back(t);
+            }
+        }
+    }
+    for (void* t : targets) {
+        ok = ok && MH_EnableHook(t) == MH_OK;
+    }
+    if (!ok) {
+        for (void* t : targets) {
+            MH_RemoveHook(t);
+        }
+        Log("kit do layout desligado no mimgui (faltou alguma funcao); tema, fonte e espacamentos seguem");
+        return;
+    }
+    g_kit = true;
+    Log("kit do layout ligado no mimgui: cabecalho do kit, interruptor, slider, lista e cabecalho recolhivel da casa");
+    // Esc fecha a janela em foco: opcional (sem ele, o kit segue e o Esc fica com o jogo, como antes).
+    // Os popups (lista, menu de contexto) entram junto: com um aberto, o Esc fecha ele primeiro.
+    struct Optional {
+        const char* name;
+        void* detour;
+        void** original;
+    } escHooks[] = {
+        {"ImGui_ImplWin32_WndProcHandler", reinterpret_cast<void*>(HookWndProcHandler),
+         reinterpret_cast<void**>(&o_WndProcHandler)},
+        {"igBeginCombo", reinterpret_cast<void*>(HookBeginCombo), reinterpret_cast<void**>(&o_igBeginCombo)},
+        {"igBeginPopup", reinterpret_cast<void*>(HookBeginPopup), reinterpret_cast<void**>(&o_igBeginPopup)},
+        {"igBeginPopupContextItem", reinterpret_cast<void*>(HookBeginPopupContextItem),
+         reinterpret_cast<void**>(&o_igBeginPopupContextItem)},
+        {"igBeginPopupContextWindow", reinterpret_cast<void*>(HookBeginPopupContextWindow),
+         reinterpret_cast<void**>(&o_igBeginPopupContextWindow)},
+        {"igBeginPopupContextVoid", reinterpret_cast<void*>(HookBeginPopupContextVoid),
+         reinterpret_cast<void**>(&o_igBeginPopupContextVoid)},
+    };
+    std::vector<void*> escTargets;
+    bool escOk = true;
+    for (const auto& h : escHooks) {
+        void* target = reinterpret_cast<void*>(GetProcAddress(dll, h.name));
+        if (!target || MH_CreateHook(target, h.detour, h.original) != MH_OK) {
+            escOk = false;
+            break;
+        }
+        escTargets.push_back(target);
+    }
+    for (void* t : escTargets) {
+        escOk = escOk && MH_EnableHook(t) == MH_OK;
+    }
+    if (escOk) {
+        g_kitEsc = true;
+        Log("Esc do kit ligado no mimgui: fecha o popup aberto e depois a janela em foco, como o X");
+    } else {
+        for (void* t : escTargets) {
+            MH_RemoveHook(t);
+        }
+        Log("Esc do kit desligado no mimgui (faltou alguma funcao): o Esc segue so com o jogo");
+    }
 }
 
 void Install(HMODULE dll) {
@@ -1337,6 +2169,9 @@ void Install(HMODULE dll) {
                 ok = false;
             }
         }
+    }
+    if (ok && g_layout) {
+        InstallKit(dll);
     }
     if (!ok) {
         for (void* t : targets) {
@@ -1466,12 +2301,50 @@ constexpr DWORD SAMP_R1_ENTRY = 0x31DF13;
 constexpr DWORD SAMP_INFO = 0x21A0F8;
 constexpr DWORD SAMP_CHAT = 0x21A0E4;
 constexpr DWORD SAMP_INPUT = 0x21A0E8;
+constexpr DWORD SAMP_DIALOG = 0x21A0B8;
+constexpr DWORD SAMP_INPUT_ENABLED = 0x14E0; // CInput: chat aberto (o mesmo campo que os mods da casa leem)
+constexpr DWORD SAMP_DIALOG_ACTIVE = 0x28;   // CDialog: dialogo do servidor na tela
 constexpr DWORD SAMP_CHAT_ADD_ENTRY = 0x64010;
 constexpr DWORD SAMP_ADD_COMMAND = 0x65AD0;
+constexpr DWORD GTA_MENU_ACTIVE = 0xBA67A4; // gta_sa.exe 1.0 US: menu de pausa aberto
 typedef void(__cdecl* CmdProc)(const char*);
 typedef void(__thiscall* AddCommandFn)(void*, const char*, CmdProc);
 typedef void(__thiscall* AddEntryFn)(void*, int, const char*, const char*, DWORD, DWORD);
 DWORD g_samp = 0;
+volatile DWORD g_sampR1 = 0; // samp.dll ja conferido como 0.3.7 R1 (os enderecos acima valem)
+DWORD g_sampKeyboardTick = 0;
+
+// O processo e o gta_sa.exe 1.0 US? (a imagem cobre os enderecos do jogo; nos testes, o host e outro exe)
+bool InGta() {
+    static int gta = -1;
+    if (gta < 0) {
+        auto base = reinterpret_cast<BYTE*>(GetModuleHandleA(nullptr));
+        auto nt = reinterpret_cast<IMAGE_NT_HEADERS*>(base + reinterpret_cast<IMAGE_DOS_HEADER*>(base)->e_lfanew);
+        MEMORY_BASIC_INFORMATION mbi = {};
+        gta = reinterpret_cast<DWORD>(base) == 0x400000 &&
+              nt->OptionalHeader.SizeOfImage > GTA_MENU_ACTIVE - 0x400000 &&
+              VirtualQuery(reinterpret_cast<void*>(GTA_MENU_ACTIVE), &mbi, sizeof(mbi)) && mbi.State == MEM_COMMIT;
+    }
+    return gta == 1;
+}
+
+// O teclado e do jogo ou do SA-MP agora? Menu de pausa aberto, chat ou dialogo do servidor na tela (SA-MP 0.3.7
+// R1). O SA-MP vale tambem por 150 ms depois de fechar: o Esc que fecha o chat nao pode fechar o menu junto.
+bool KeyboardBusy() {
+    if (InGta() && *reinterpret_cast<volatile BYTE*>(GTA_MENU_ACTIVE)) {
+        return true;
+    }
+    if (DWORD samp = g_sampR1) {
+        BYTE* input = *reinterpret_cast<BYTE**>(samp + SAMP_INPUT);
+        BYTE* dialog = *reinterpret_cast<BYTE**>(samp + SAMP_DIALOG);
+        if ((input && *reinterpret_cast<int*>(input + SAMP_INPUT_ENABLED)) ||
+            (dialog && *reinterpret_cast<int*>(dialog + SAMP_DIALOG_ACTIVE))) {
+            g_sampKeyboardTick = GetTickCount();
+            return true;
+        }
+    }
+    return g_sampKeyboardTick && GetTickCount() - g_sampKeyboardTick < 150;
+}
 
 void Chat(const char* text) {
     void* chat = g_samp ? *reinterpret_cast<void**>(g_samp + SAMP_CHAT) : nullptr;
@@ -1531,10 +2404,12 @@ void RegisterCommand() {
     auto dos = reinterpret_cast<IMAGE_DOS_HEADER*>(g_samp);
     auto nt = reinterpret_cast<IMAGE_NT_HEADERS*>(g_samp + dos->e_lfanew);
     if (nt->OptionalHeader.AddressOfEntryPoint != SAMP_R1_ENTRY) {
-        Log("samp.dll nao e o 0.3.7 R1 -- sem /trokskin (o tema segue pelo Trok Skin.ini)");
+        Log("samp.dll nao e o 0.3.7 R1 -- sem /trokskin (o tema segue pelo Trok Skin.ini)%s",
+            g_layout ? "; o Esc do kit nao ve o chat nem os dialogos dessa versao" : "");
         g_samp = 0;
         return;
     }
+    g_sampR1 = g_samp;
     for (int i = 0; i < 1200; ++i) {
         void* input = *reinterpret_cast<void**>(g_samp + SAMP_INPUT);
         void* info = *reinterpret_cast<void**>(g_samp + SAMP_INFO);
@@ -1571,6 +2446,11 @@ DWORD WINAPI Boot(LPVOID) {
 void Start() {
     HouseColors(g_house);
     LoadConfig();
+    if (g_layout) {
+        // No kit, as unicas linhas da janela sao a de baixo do cabecalho e a de cima do rodape: os separadores dos
+        // mods ficam so como espaco.
+        g_house[ImGuiCol_Separator] = ImVec4(1, 1, 1, 0);
+    }
 
     wchar_t dir[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, dir, MAX_PATH); // gta_sa.exe
@@ -1619,7 +2499,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         char file[MAX_PATH] = {};
         GetModuleFileNameA(module, file, MAX_PATH);
         const char* base = strrchr(file, '\\') ? strrchr(file, '\\') + 1 : file;
-        Log("Trok Skin .asi v1.3.0 (%s)", base);
+        Log("Trok Skin .asi v1.4.0 (%s)", base);
         // Uma copia so por jogo: com o Trok Skin.asi e o Trok Skin Layout.asi juntos na pasta, a que carregar
         // depois fica desligada (as duas desviariam as mesmas funcoes).
         CreateMutexA(nullptr, FALSE, "TrokSkin.UmaCopia");
