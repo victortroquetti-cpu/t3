@@ -9,3 +9,8 @@ trok-ui/skin/test/out/
 # Trok Shadows
 trok-shadows/build/
 trok-shadows/test/out/
+
+# Trok Shadows Menu (test/original: os arquivos do Shadows Extender 2.0, do DK22Pac, ficam fora do git)
+trok-shadows-menu/build/
+trok-shadows-menu/test/out/
+trok-shadows-menu/test/original/

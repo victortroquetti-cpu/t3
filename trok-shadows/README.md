@@ -2,6 +2,8 @@
 
 O **Shadows Extender 2.0** (DK22Pac, 2014) refeito com código aberto. Faz tudo o que ele fazia, com as mesmas chaves no INI, e corrige o que estava errado nele.
 
+> **Use o [Trok Shadows Menu](../trok-shadows-menu/) no lugar desta versão.** Ele deixa o `shadows.asi` original como está, corrige os erros dele (o escurecimento dobrado no veículo e o `DisplayShadowsAtLowSettings` do stencil) e põe um menu na tela. Este código fica aqui como referência.
+
 > **Estado:** versão 1.2, compilada e testada no Wine, sem o jogo: as 128 conferências do `test/run.sh` passam. A 1.0 já rodou no GTA; a 1.1 e a 1.2 trazem as correções para os problemas achados nela (ver [Versões](#versões)) e ainda não foram testadas dentro do jogo.
 
 ## O que muda em relação ao Shadows Extender
