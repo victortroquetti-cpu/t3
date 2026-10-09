@@ -192,8 +192,9 @@ bool CapturingKey() {
 
 // ---------------------------------------------------------------- tokens
 
+// 15% menor que a conta do Kill List (altura/1080*0.85, minimo 0.55): tudo vezes 0.85.
 float Scale(float screenHeight) {
-    return std::max(0.55f, (screenHeight / 1080.0f) * 0.85f);
+    return std::max(0.4675f, (screenHeight / 1080.0f) * 0.7225f);
 }
 
 void BuildFonts(float screenHeight, const char* gameDir) {

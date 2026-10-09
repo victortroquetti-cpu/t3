@@ -24,7 +24,7 @@ local VERSION_TAG = 'v1.0.0'
 -- TROK UI -- kit de componentes da casa para mods Lua (mimgui).
 -- Copie este bloco inteiro para um mod novo. Tudo e desenhado a mao no draw list, sem os
 -- widgets cinza padrao do ImGui. As medidas saem dos mods publicados (Trok Kill List,
--- Trok Dialogs e Trok Radar) e escalam com u = altura/1080*0.85, como no Kill List.
+-- Trok Dialogs e Trok Radar) e escalam com u = altura/1080*0.7225: 15% menor que a conta do Kill List.
 -- Fontes da casa: resource\trok\font.ttf (Gotham Medium) e resource\trok\lucide.ttf (icones).
 -- =====================================================================================
 
@@ -94,8 +94,9 @@ local function vec(x, y)
     return imgui.ImVec2(x, y)
 end
 
+-- 15% menor que a conta do Kill List (altura/1080*0.85, minimo 0.55): tudo vezes 0.85.
 function ui.scale(screenY)
-    return math.max(0.55, (screenY / 1080) * 0.85)
+    return math.max(0.4675, (screenY / 1080) * 0.7225)
 end
 
 -- Chamar dentro do imgui.OnInitialize.

@@ -22,7 +22,7 @@ Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diál
 
 - **Texto:** `font.ttf` em 3 tamanhos: corpo **16u**, título **20u** e descrição **13.5u** (números, valores, dicas, versão).
 - **Ícones:** `lucide.ttf` em **18u** (e **13u** para os pequenos: check, lupa, setinha da lista suspensa). A 13u o traço do Lucide fica abaixo de 1 px, então a fonte pequena é carregada com `RasterizerMultiply = 1.6` para ter o mesmo peso da de 18u.
-- **Escala:** `u = max(0.55, altura_da_tela / 1080 * 0.85)`. Toda medida deste guia está em `u`.
+- **Escala:** `u = max(0.4675, altura_da_tela / 1080 * 0.7225)`, 15% menor que a conta do Kill List (`altura / 1080 * 0.85`, mínimo 0.55). Toda medida deste guia está em `u`.
 
 O `lucide.ttf` de `moonloader\resource\trok` é o Lucide completo: 1.796 ícones, nos códigos `U+E038` a `U+E74E` (área de uso particular). O `lucide-static` 1.53.0 traz 77 a mais, e os códigos antigos não mudam. O Dialogs e o Radar embutem um recorte com só 6 deles. O kit usa os códigos oficiais e desenha o glifo quando ele existe. Se o arquivo faltar, ou se for o recorte, desenha um substituto no mesmo traço:
 
@@ -160,7 +160,7 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 - `Trok Skin.log` diz o que aconteceu: cada script pelo nome (padronizado ou intocado), cada janela com a decisão (padronizada, mantida, HUD transparente) e cada fonte trocada. A cada `/trokskin` sai um resumo por script. Se nenhum menu de outro mod apareceu ainda, o chat avisa.
 
 **Versão de teste sem a barreira do layout: `skin/dist/Trok Skin Layout.asi`.** É o mesmo mod, já com `layout=1`, que também padroniza o que mexe no layout:
-- **Tamanho das fontes:** a primeira fonte de cada mod (a Trebuchet 14 do mimgui e do imgui antigo) vai para o tamanho de texto da casa, 16 × a escala da tela (13,6 px em 1080p, a mesma conta do Kill List). As outras fontes do mod, inclusive as embutidas, como ícones, acompanham na mesma proporção, então o título do mod continua maior que o texto.
+- **Tamanho das fontes:** a primeira fonte de cada mod (a Trebuchet 14 do mimgui e do imgui antigo) vai para o tamanho de texto da casa, 16 × a escala da tela (11,6 px em 1080p, com a escala da casa). As outras fontes do mod, inclusive as embutidas, como ícones, acompanham na mesma proporção, então o título do mod continua maior que o texto.
 - **Espaçamentos do kit:** margem da janela 18 × 16, campos com 24 de altura, 6 entre um campo e outro (as linhas de 28 do kit), 8 entre o controle e o rótulo, recuo 12, barra de rolagem 6 e pegador do slider 10, tudo vezes a escala.
 - **Cara do kit:** cada janela padronizada troca a barra de título do ImGui pelo cabeçalho do kit: título centralizado na fonte de título, X à direita e a linha embaixo. As linhas separadoras do mod somem, e a do cabeçalho fica sendo a única linha da janela. Não há rodapé: nos menus da casa ele é a faixa das dicas de tecla, e menu de outro mod não tem dicas. Os controles mais comuns são desenhados como no kit:
   - o botão fica com as medidas do kit: texto na fonte pequena (13,5), 24 de altura e 14 de folga de cada lado, fundo claro com contorno. Largura que o mod deu e cor que ele pôs no botão continuam;

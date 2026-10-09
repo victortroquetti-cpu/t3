@@ -528,8 +528,8 @@ void Clicks(Script* scripts, int count, HMODULE samp, const char* out) {
     Key(scripts, count, WM_KEYUP, VK_ESCAPE, KEY_UP);
     Frame(scripts, count);
     // X do Painel B (janela em 480,40 de 400x520): cabecalho de 44, X de 28 a 18 da borda, vezes a escala da tela.
-    float u = H / 1080.0f * 0.85f;
-    u = u < 0.55f ? 0.55f : u;
+    float u = H / 1080.0f * 0.7225f; // escala da casa
+    u = u < 0.4675f ? 0.4675f : u;
     Script& b = scripts[1];
     Click(scripts, count, 480 + 400 - 26 * u, 40 + 22 * u);
     Frame(scripts, count);

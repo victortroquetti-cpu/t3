@@ -341,8 +341,8 @@ void Clicks(lua_State** states, HMODULE samp, const char* out) {
     Message(states, WM_KEYUP, VK_ESCAPE, KEY_UP);
     Frame(states);
     // X do Painel B (janela em 480,40 de 400x520): cabecalho de 44, X de 28 a 18 da borda, vezes a escala da tela.
-    float u = H / 1080.0f * 0.85f;
-    u = u < 0.55f ? 0.55f : u;
+    float u = H / 1080.0f * 0.7225f; // escala da casa
+    u = u < 0.4675f ? 0.4675f : u;
     Click(states, static_cast<int>(480 + 400 - 26 * u + 0.5f), static_cast<int>(40 + 22 * u + 0.5f));
     Frame(states);
     Values(f, states[1], "x_painel_b");

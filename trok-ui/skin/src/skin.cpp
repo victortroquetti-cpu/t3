@@ -360,9 +360,11 @@ bool IsSemantic(int i) {
            i == ImGuiCol_PlotLinesHovered || i == ImGuiCol_PlotHistogram || i == ImGuiCol_PlotHistogramHovered;
 }
 
+// Escala da casa, a mesma dos mods da casa feitos com o kit: 15% menor que a conta do Kill List (altura/1080*0.85,
+// minimo 0.55), tudo vezes 0.85.
 float Scale(float screenHeight) {
-    float u = screenHeight / 1080.0f * 0.85f;
-    return u < 0.55f ? 0.55f : u;
+    float u = screenHeight / 1080.0f * 0.7225f;
+    return u < 0.4675f ? 0.4675f : u;
 }
 
 void HouseScalars(Look& l, float u) {
@@ -2552,7 +2554,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         char file[MAX_PATH] = {};
         GetModuleFileNameA(module, file, MAX_PATH);
         const char* base = strrchr(file, '\\') ? strrchr(file, '\\') + 1 : file;
-        Log("Trok Skin .asi v1.4.1 (%s)", base);
+        Log("Trok Skin .asi v1.5.0 (%s)", base);
         // Uma copia so por jogo: com o Trok Skin.asi e o Trok Skin Layout.asi juntos na pasta, a que carregar
         // depois fica desligada (as duas desviariam as mesmas funcoes).
         CreateMutexA(nullptr, FALSE, "TrokSkin.UmaCopia");

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Confere as saidas do test/run.sh (Trok Skin no Wine). Uso: compare.py <pasta de saida>."""
+import math
 import os
 import sys
 
@@ -160,13 +161,16 @@ check(same_image(image('acentua\u00e7\u00e3o'), img['completo']), 'acento: tela 
 
 # Versao de teste (Trok Skin Layout.asi, layout=1): fonte e espacamentos da casa, os mesmos numeros do kit.
 lay = rects('layout')
-u = 800 / 1080 * 0.85  # escala da casa na tela do teste
+u = max(0.4675, 800 / 1080 * 0.7225)  # escala da casa na tela do teste (15% menor que a do Kill List)
 text, field, save = lay[(0, 'Painel A|texto')], lay[(0, 'Painel A|campo')], lay[(0, 'Painel A|salvar')]
 check('layout LIGADO' in log('layout'), 'layout: a versao Layout ja vem com layout=1 (log)')
 check('-- skin desligada' not in log('layout') and 'nao deu para desviar' not in log('layout'), 'layout: nenhum erro no log')
 check(abs((text[3] - text[1]) - 16 * u) < 0.1, f'layout: texto com o tamanho da casa ({text[3] - text[1]:.2f} px = 16 x escala)')
 check(abs((field[3] - field[1]) - 24 * u) < 0.1, f'layout: campo com a altura da casa ({field[3] - field[1]:.2f} px = 24 x escala)')
-check(abs((save[1] - text[3]) - 6 * u) < 0.5, f'layout: espaco entre linhas da casa ({save[1] - text[3]:.2f} px ~ 6 x escala)')
+# O ImGui arredonda para baixo a posicao de cada linha nova: o botao cai em floor(fim do texto + espaco entre linhas).
+check(save[1] == math.floor(text[3] + 6 * u),
+      f'layout: espaco entre linhas da casa (6 x escala: botao em {save[1]:.0f}; com o espaco padrao do ImGui seria '
+      f'{math.floor(text[3] + 4):.0f})')
 check(abs(text[0] - (40 + 18 * u)) < 0.5, 'layout: margem da janela da casa (18 x escala)')
 check(lay[(0, 'HUD|texto')][:2] == base[(0, 'HUD|texto')][:2], 'layout: HUD no mesmo lugar (espacamentos do autor)')
 check(image('layout').getpixel((1230, 150)) == (20, 90, 40), 'layout: HUD continua transparente')
@@ -219,7 +223,9 @@ def bright(img, r, w):
 
 track = bright(kit, lay[(0, 'Painel A|checkbox')], 26)
 box = bright(img['completo'], completo[(0, 'Painel A|checkbox')], 26)
-check(track > 150 and box < 120, f'kit: caixa de marcar virou o interruptor do kit, ligado ({track} px claros; a caixa do ImGui tem {box})')
+area = 40 * u * 22 * u  # trilha do interruptor do kit
+check(track > 0.45 * area and box < 0.3 * area,
+      f'kit: caixa de marcar virou o interruptor do kit, ligado ({track} px claros de {area:.0f}; a caixa do ImGui tem {box})')
 sx0, sy0, sx1, sy1 = lay[(0, 'Painel A|slider')]
 nx0, ny0, nx1, ny1 = completo[(0, 'Painel A|slider')]
 check(min(kit.getpixel((int(sx0) + 6, int((sy0 + sy1) / 2)))) > 200 and

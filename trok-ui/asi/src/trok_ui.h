@@ -2,7 +2,8 @@
 
 // Trok UI -- kit de componentes da casa (Victor_Trok) para mods .asi com Dear ImGui 1.89.9.
 // Tudo e desenhado a mao no draw list, sem os widgets cinza padrao do ImGui. As medidas saem
-// dos mods publicados (Trok Kill List, Trok Dialogs e Trok Radar) e escalam com u = altura/1080*0.85.
+// dos mods publicados (Trok Kill List, Trok Dialogs e Trok Radar) e escalam com u = altura/1080*0.7225, 15% menor que
+// a conta do Kill List.
 // Fontes da casa: moonloader\resource\trok\font.ttf (Gotham Medium) e lucide.ttf (icones).
 
 #include "imgui.h"
