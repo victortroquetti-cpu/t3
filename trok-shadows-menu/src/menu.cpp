@@ -23,7 +23,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v1.0";
+constexpr const char* VERSION_TAG = "v1.1";
 
 struct State {
     bool open = false;
@@ -230,6 +230,17 @@ void TabGeneral(Rows& r, Settings& s, const Settings& d) {
     if (r.Toggle("Sombra desfocada (blur)", &blur)) {
         s.combine = !blur;
     }
+    if (blur) {
+        // No modo junto com o stencil o cruzamento ja escurece uma vez so; no desfocado, so com as camadas.
+        r.Toggle("Cruzamento escurece uma vez s\xC3\xB3", &s.layered);
+        if (!backend::LayersInstalled()) {
+            r.Info("O cruzamento n\xC3\xA3o p\xC3\xB4" "de ser ligado",
+                   "Outro mod mexeu no desenho da sombra do Shadows Extender. Veja o Trok Shadows Menu.log.");
+        } else if (s.layered && !s.shader) {
+            r.Info("O cruzamento precisa do shader",
+                   "Ligue o shader do Shadows Extender na aba Avan\xC3\xA7" "ado.");
+        }
+    }
     SliderF(r, "Dist\xC3\xA2ncia (pessoas e ve\xC3\xAD" "culos)", &s.realtimeDistance, 10, 120, 5, "%d m",
             d.realtimeDistance);
     SliderF(r, "Dist\xC3\xA2ncia (pr\xC3\xA9" "dios e objetos)", &s.stencilDistance, 20, 250, 10, "%d m",
@@ -275,14 +286,6 @@ void TabShadow(Rows& r, Settings& s, const Settings& d) {
 }
 
 void TabVehicles(Rows& r, Settings& s) {
-    r.Toggle("Quem est\xC3\xA1 no ve\xC3\xAD" "culo entra na sombra dele", &s.fixOccupants);
-    if (!backend::FixInstalled()) {
-        r.Info("A corre\xC3\xA7\xC3\xA3o n\xC3\xA3o p\xC3\xB4" "de ser ligada",
-               "Outro mod mexeu nos mesmos lugares do jogo que o Shadows Extender. Veja o Trok Shadows Menu.log.");
-    }
-    r.Info("Por que isso existe",
-           "Sem isso, piloto e moto t\xC3\xAAm duas sombras e onde elas se cruzam fica mais escuro. Com isso, a "
-           "sombra do ve\xC3\xAD" "culo j\xC3\xA1 inclui quem est\xC3\xA1 dentro.");
     r.Toggle("Sombra simples junto com a em tempo real", &s.vehicleDefaultWithRealtime);
     r.Toggle("Sem sombra simples nos ve\xC3\xAD" "culos", &s.disableVehicleDefault);
     r.Toggle("Todos os jogadores (SA-MP)", &s.morePlayers);
@@ -404,9 +407,9 @@ void DrawConfirm() {
     const bool no = !keep || clicked == 1 || (keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false));
     if (yes) {
         Settings& s = backend::Current();
-        const bool fix = s.fixOccupants;
+        const bool layered = s.layered;
         s = backend::Defaults();
-        s.fixOccupants = fix;
+        s.layered = layered;
         S.confirm = false;
         Toast("Padr\xC3\xB5" "es restaurados", "Os valores do Shadows Extender voltaram.");
     } else if (no) {

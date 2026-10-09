@@ -197,7 +197,7 @@ bool IniWrite(const char* path, const Settings& s, const Settings& b) {
     i(RT, "EnableShadowsShader", s.shader, b.shader);
     i(RT, "CombineRealTimeShadowsWithStencil", s.combine, b.combine);
     i(RT, "MoreThanOnePlayer", s.morePlayers, b.morePlayers);
-    i("TROK_MENU", "CorrigirVeiculo", s.fixOccupants, b.fixOccupants);
+    i("TROK_MENU", "EscurecerUmaVez", s.layered, b.layered);
     if (!changed) {
         return true;
     }

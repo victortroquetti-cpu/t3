@@ -403,6 +403,7 @@ HRESULT __stdcall HookPresent(IDirect3DDevice9* device, const RECT* src, const R
         }
         g_lastPresent = GetTickCount();
         RenderOverlay(device);
+        SePresent();
         g_inPresent = false;
     }
     return g_present(device, src, dst, wnd, dirty);

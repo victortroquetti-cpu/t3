@@ -79,7 +79,7 @@ run() {
     mkdir -p "$dir"
     cp "$OUT/launcher.exe" "$OUT/host.dll" "build/Trok Shadows Menu.asi" "$dir/"
     case $mode in
-        completo | renomeado) cp test/shadows.ini "$dir/" ;; # o shadows.ini do Victor_Trok
+        completo | renomeado | sem_evento) cp test/shadows.ini "$dir/" ;; # o shadows.ini do Victor_Trok
         liga_desliga) printf '%s\n' "$TOGGLES_INI" | sed 's/$/\r/' > "$dir/shadows.ini" ;;
     esac
     if [ "$mode" != sem_original ]; then
@@ -92,5 +92,6 @@ run() {
 run completo
 run liga_desliga
 run renomeado
+run sem_evento
 run sem_original
 exit $status

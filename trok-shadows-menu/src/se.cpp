@@ -1,7 +1,7 @@
 // Trok Shadows Menu (.asi) -- Victor_Trok
 // O Shadows Extender 2.0 por dentro. Acha o shadows.asi e confere que e o 2.0 do DK22Pac; le e muda as variaveis dele
-// e os bytes que ele troca no jogo; liga a correcao do veiculo; recria as sombras quando a resolucao muda; grava o
-// shadows.ini.
+// e os bytes que ele troca no jogo; desenha a sombra desfocada em camadas (o cruzamento de duas sombras escurece uma
+// vez so); recria as sombras quando a resolucao muda; grava o shadows.ini.
 //
 // Os enderecos do Shadows Extender sao relativos ao comeco do modulo ja descompactado: o ASPack desempacota no DllMain
 // dele, e o Windows pode carregar o modulo em qualquer endereco.
@@ -11,25 +11,24 @@
 
 #include <d3d9.h>
 #include <tlhelp32.h>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 
 using namespace game;
 
-extern "C" {
-extern uintptr_t g_tsmSeExtras;
-void TsmExtrasStub();
-}
-
 namespace {
 
 typedef uint32_t u32;
 typedef void(__thiscall* ThisFn)(void* self);
 typedef void(__thiscall* ReturnShadowFn)(void* manager, void* shadow);
-typedef void*(__cdecl* ForAllAtomicsFn)(void* clump, void* callback, void* data);
-typedef void*(__cdecl* AtomicCallbackFn)(void* atomic, void* data);
 typedef int(__cdecl* RenderStateSetFn)(int state, uintptr_t value);
+typedef int(__cdecl* RenderStateGetFn)(int state, uintptr_t* value);
+typedef void(__cdecl* VoidFn)();
+typedef void(__cdecl* RectFn)(const void* rect, const void* color);
+typedef void(__cdecl* CastFn)(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32,
+                              u32);
 
 template <class F>
 F Fn(uintptr_t addr) {
@@ -38,9 +37,13 @@ F Fn(uintptr_t addr) {
 
 // ------------------------------------------------------------------------------------------------ Shadows Extender
 namespace se {
-// Funcoes dele que o mod chama.
-constexpr u32 PED_HOOK = 0x12F0; // em CPed::PreRenderAfterTest: UpdateRpHAnim e o pedido de sombra em tempo real
-constexpr u32 EXTRAS = 0x3120;   // em CRealTimeShadow::Update: arma, paraquedas e mochila; depois fecha a camera
+// Funcoes dele.
+constexpr u32 PED_HOOK = 0x12F0;     // em CPed::PreRenderAfterTest: UpdateRpHAnim e o pedido de sombra em tempo real
+constexpr u32 EXTRAS = 0x3120;       // em CRealTimeShadow::Update: arma, paraquedas e mochila; depois fecha a camera
+constexpr u32 STENCIL_RECT = 0x1350; // o retangulo do stencil (0x71167F) com a cor e a forca do INI
+constexpr u32 FLUSH = 0x3510;        // RenderStuffInBuffer com o shader dele (0x7082A4, 0x7082BD e o fim do CAST)
+constexpr u32 CAST = 0x36E0;         // CastRealTimeShadowSectorList (0x70AD0D) e depois FLUSH
+constexpr u32 CAST_FLUSH_JMP = 0x3766; // o "jmp FLUSH" no fim do CAST
 // Variaveis: os valores do shadows.ini depois de lidos.
 constexpr u32 MAX_SHADOWS = 0x1F3E4;
 constexpr u32 STENCIL_COLOR[4] = {0x1F3D8, 0x1F404, 0x1F31C, 0x1F304};
@@ -67,20 +70,37 @@ const uint8_t PED_HOOK_CODE[] = {0x56, 0xB8, 0x20, 0x2B, 0x53, 0x00, 0x8B, 0xF1,
 constexpr uintptr_t CRealTimeShadowManager_Init = 0x7067C0;
 constexpr uintptr_t CRealTimeShadowManager_Exit = 0x706A60;
 constexpr uintptr_t CRealTimeShadowManager_ReturnRealTimeShadow = 0x705B30;
-constexpr int RS_TEXTURERASTER = 1;
+constexpr uintptr_t CShadows_CastRealTimeShadowSectorList = 0x70A7E0;
+constexpr uintptr_t RenderBuffer_RenderStuffInBuffer = 0x707800;
+constexpr uintptr_t CSprite2d_DrawRect = 0x727B60;
+// Onde o Shadows Extender desviou o desenho da sombra em tempo real (conferido antes de mexer).
+constexpr uintptr_t SITE_CAST = 0x70AD0D;    // CShadows::RenderStoredShadows chamando CastRealTimeShadowSectorList
+constexpr uintptr_t SITE_FULL_1 = 0x7082A4;  // RenderBuffer::StartStoring com o buffer cheio
+constexpr uintptr_t SITE_FULL_2 = 0x7082BD;
+constexpr uintptr_t SITE_RECT = 0x71167F;    // CStencilShadows::RenderStencilShadows chamando CSprite2d::DrawRect
+// RwRenderState e os valores do RenderWare.
+constexpr int RS_TEXTURERASTER = 1, RS_ZTESTENABLE = 6, RS_SHADEMODE = 7, RS_SRCBLEND = 10, RS_DESTBLEND = 11;
+constexpr int RS_VERTEXALPHAENABLE = 12, RS_STENCILENABLE = 21, RS_STENCILFAIL = 22, RS_STENCILZFAIL = 23;
+constexpr int RS_STENCILPASS = 24, RS_STENCILFUNCTION = 25, RS_STENCILFUNCTIONREF = 26, RS_STENCILFUNCTIONMASK = 27;
+constexpr int RS_STENCILFUNCTIONWRITEMASK = 28, RS_ALPHATESTFUNCTION = 29, RS_ALPHATESTFUNCTIONREF = 30;
+constexpr int STENCIL_KEEP = 1, STENCIL_ZERO = 2, STENCIL_REPLACE = 3;
+constexpr int FUNC_LESSEQUAL = 4, FUNC_GREATER = 5, FUNC_ALWAYS = 8;
+constexpr int BLEND_ZERO = 1, BLEND_ONE = 2, BLEND_SRCALPHA = 5, BLEND_INVSRCALPHA = 6;
+constexpr int SHADE_FLAT = 1;
 // CRealTimeShadow e CRealTimeShadowManager (gta-reversed).
 constexpr u32 RTSHADOW_BLURRED = 0x10, RTSHADOW_BLUR_CAMERA = 0x14, RTSHADOW_BLUR_PASSES = 0x1C;
 constexpr u32 RTSHADOW_MORE_BLUR = 0x20;
 constexpr u32 MANAGER_BLUR_CAMERA = 0x44, MANAGER_GRADIENT_CAMERA = 0x4C;
 
 // ------------------------------------------------------------------------------------------------ estado
-uintptr_t g_se = 0;          // comeco do shadows.asi na memoria
-bool g_attached = false;     // valores lidos: o menu pode mexer
-bool g_fixInstalled = false; // correcao do veiculo ligada (os ganchos do Shadows Extender estavam la)
+uintptr_t g_se = 0;             // comeco do shadows.asi na memoria
+bool g_attached = false;        // valores lidos: o menu pode mexer
+bool g_layersInstalled = false; // sombra desfocada em camadas ligada (os desvios do Shadows Extender estavam la)
 int g_waitFrames = 0;
+int g_frameEvents = 0;     // vezes que o evento de quadro (0x53E981) chegou
+int g_framesAtPresent = 0; // g_frameEvents no Present anterior
 const char* g_problem = "Procurando o Shadows Extender (shadows.asi)...";
 char g_iniPath[MAX_PATH] = "";
-uintptr_t g_sePed = 0;       // gancho do pedestre do Shadows Extender
 
 Settings g_cur;      // valores em uso
 Settings g_saved;    // valores no shadows.ini (o que foi lido ou gravado)
@@ -111,6 +131,16 @@ uintptr_t FindShadowsExtender() {
     const uintptr_t named = reinterpret_cast<uintptr_t>(GetModuleHandleA("shadows.asi"));
     if (named && IsShadowsExtender(named)) {
         return named;
+    }
+    static bool explained = false;
+    if (named && !explained) {
+        explained = true;
+        Log("o shadows.asi esta carregado em 0x%08X, mas nao e o Shadows Extender 2.0 que o menu conhece (versao %s, "
+            "nome %s, INI %s, gancho do pedestre %s)",
+            static_cast<unsigned>(named), Same(named + 0x1714C, "2.0", 4) ? "ok" : "diferente",
+            Same(named + 0x17164, "Shadows Extender", 17) ? "ok" : "diferente",
+            Same(named + 0x1727C, "shadows.ini", 12) ? "ok" : "diferente",
+            Same(named + se::PED_HOOK, se::PED_HOOK_CODE, sizeof(se::PED_HOOK_CODE)) ? "ok" : "diferente");
     }
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
     if (snap == INVALID_HANDLE_VALUE) {
@@ -291,61 +321,289 @@ bool Set(Toggle& t, bool enable) {
     return true;
 }
 
-// ------------------------------------------------------------------------------------------------ correcao do veiculo
-// Silhueta de um clump na camera da sombra, como CShadowCamera::Update(RpClump*) faz com o dono: sem textura, luz
-// nem cor na geometria durante o desenho.
-void* __cdecl SilhouetteAtomic(void* atomic, void* data) {
-    if (!(Field<uint8_t>(atomic, ATOMIC_FLAGS) & 4)) {
-        return atomic;
-    }
-    void* geometry = Field<void*>(atomic, ATOMIC_GEOMETRY);
-    const u32 flags = geometry ? Field<u32>(geometry, GEOMETRY_FLAGS) : 0;
-    if (geometry) {
-        Field<u32>(geometry, GEOMETRY_FLAGS) = flags & ~SHADOW_GEOMETRY_FLAGS;
-    }
-    Fn<AtomicCallbackFn>(atomicQuickRender)(atomic, data);
-    if (geometry) {
-        Field<u32>(geometry, GEOMETRY_FLAGS) = flags;
-    }
-    return atomic;
+// ------------------------------------------------------------------------------------------------ sombra em camadas
+// Com a sombra desfocada (CombineRealTimeShadowsWithStencil=0), cada sombra em tempo real escurece o que ja esta na tela
+// (destino x (1 - sombra)): onde duas se cruzavam (o piloto e a moto, dois jogadores) escurecia dobrado. Aqui cada
+// sombra e desenhada em LAYERS faixas de escurecimento, cada faixa com o shader abaixo. O stencil (bits 4 a 6) guarda
+// ate que faixa cada pixel ja foi escurecido, e uma faixa so escurece o pixel que ainda nao chegou nela. Sozinha, a
+// sombra sai igual a do Shadows Extender (as faixas se multiplicam no mesmo valor); no cruzamento, o pixel fica com o
+// escurecimento da sombra mais forte ali (no maximo uma faixa mais claro), em vez da soma das duas. As marcas saem do
+// stencil antes do retangulo do stencil do jogo (SITE_RECT), que escurece todo pixel com stencil diferente de zero.
+constexpr int LAYERS = 4;
+constexpr uintptr_t LAYER_MASK = 0x70;
+constexpr int LAYER_SHIFT = 4;
+
+// ps_2_0. c0 = cor (rgb) e forca (a), o mesmo c0 do Shadows Extender; c1.x = comeco da faixa, c1.y = 1 / largura;
+// c2.rgb = (1 - cor) * largura / (1 - (1 - cor) * comeco). Saida: o escurecimento desta faixa (para destino x (1 - cor))
+// e, no alfa, o escurecimento da sombra ali (o teste de alfa descarta o que nao chega na faixa).
+//   texld r0, t0, s0
+//   mul r0.w, r0.x, c0.w          ; s = forca * sombra
+//   add r1.x, r0.w, -c1.x
+//   mul_sat r1.x, r1.x, c1.y      ; quanto da faixa o pixel preenche
+//   mul r1.xyz, r1.x, c2
+//   mov r1.w, r0.w
+//   mov oC0, r1
+const DWORD kLayerShader[] = {
+    0xFFFF0200,
+    0x0200001F, 0x80000000, 0xB0030000,
+    0x0200001F, 0x90000000, 0xA00F0800,
+    0x03000042, 0x800F0000, 0xB0E40000, 0xA0E40800,
+    0x03000005, 0x80080000, 0x80000000, 0xA0FF0000,
+    0x03000002, 0x80010001, 0x80FF0000, 0xA1000001,
+    0x03000005, 0x80110001, 0x80000001, 0xA0550001,
+    0x03000005, 0x80070001, 0x80000001, 0xA0E40002,
+    0x02000001, 0x80080001, 0x80FF0000,
+    0x02000001, 0x800F0800, 0x80E40001,
+    0x0000FFFF,
+};
+
+IDirect3DPixelShader9* g_layerShader = nullptr;
+IDirect3DDevice9* g_layerDevice = nullptr;
+bool g_layerShaderFailed = false;
+uintptr_t g_seCast = 0, g_seFlush = 0, g_seRect = 0;
+bool g_inCast = false; // desenhando uma sombra em tempo real (entre SITE_CAST e o fim do CAST)
+bool g_marked = false; // ha marcas das camadas no stencil
+
+void SetState(int state, uintptr_t value) {
+    Fn<RenderStateSetFn>(RwRenderStateSet)(state, value);
 }
 
-// Pedestre dentro de um veiculo que ja tem sombra em tempo real: ele entra na sombra do veiculo (TsmVehicleExtras) em
-// vez de ter a dele. Com duas sombras, onde elas se cruzavam escurecia dobrado (moto e piloto). Se o veiculo ficou sem
-// sombra (as 16 em uso), o pedestre continua com a dele.
-bool InShadowedVehicle(void* ped) {
-    if (!g_cur.fixOccupants || !HasRwObject(ped)) {
-        return false;
+// Guarda os estados que vao mudar e devolve no fim. Sem valor guardado (o RenderWare recusou), volta para o padrao.
+struct SavedStates {
+    struct Item {
+        int state;
+        uintptr_t value;
+    } items[16];
+    int count = 0;
+
+    void Save(int state, uintptr_t fallback) {
+        uintptr_t value = fallback;
+        if (!Fn<RenderStateGetFn>(RwRenderStateGet)(state, &value)) {
+            value = fallback;
+        }
+        items[count++] = {state, value};
     }
-    void* vehicle = VehicleOf(ped);
-    return vehicle && HasRwObject(vehicle) && Field<void*>(vehicle, PHYSICAL_SHADOW_DATA);
+
+    void Restore() const {
+        for (int i = count - 1; i >= 0; i--) {
+            SetState(items[i].state, items[i].value);
+        }
+    }
+};
+
+IDirect3DPixelShader9* LayerShader() {
+    IDirect3DDevice9* device = At<IDirect3DDevice9*>(RW_D3D_DEVICE);
+    if (!device) {
+        return nullptr;
+    }
+    if (device != g_layerDevice) {
+        // Outro device (o do SA-MP na frente do real, ou um novo): cria o shader nele. O antigo nao e liberado, o
+        // device dele pode nao existir mais.
+        g_layerDevice = device;
+        g_layerShader = nullptr;
+        g_layerShaderFailed = false;
+    }
+    if (!g_layerShader && !g_layerShaderFailed) {
+        const HRESULT hr = device->CreatePixelShader(kLayerShader, &g_layerShader);
+        if (FAILED(hr) || !g_layerShader) {
+            g_layerShader = nullptr;
+            g_layerShaderFailed = true;
+            Log("aviso: a placa nao aceitou o shader das camadas (0x%08X) -- a sombra desfocada fica como no original",
+                static_cast<unsigned>(hr));
+        }
+    }
+    return g_layerShader;
 }
 
-// CPed::PreRenderAfterTest (0x5E6664): o Shadows Extender atualiza os ossos e pede sombra em tempo real para todo
-// pedestre. (O pedido do proprio jogo, para quem anda de moto, ele apaga em 0x5E68A2.)
-void __thiscall PedHook(void* ped) {
-    if (InShadowedVehicle(ped)) {
-        Fn<ThisFn>(CEntity_UpdateRpHAnim)(ped);
+// So no modo desfocado com o shader do Shadows Extender: e ele que desenha cada faixa. No modo combinado o stencil ja
+// junta as sombras.
+bool UseLayers() {
+    return g_cur.layered && !SE<int>(se::COMBINE) && SE<uint8_t>(se::SHADER_READY) &&
+           SE<IDirect3DPixelShader9*>(se::SHADER_REALTIME);
+}
+
+void SeFlush() {
+    Fn<VoidFn>(g_seFlush)();
+}
+
+// O que esta no buffer de desenho (uma sombra em tempo real ja projetada no chao), em LAYERS passadas: o FLUSH do
+// Shadows Extender desenha cada uma com o shader das camadas no lugar do dele.
+void LayeredFlush() {
+    const u32 vertices = At<u32>(TEMP_VERTICES_STORED), indices = At<u32>(TEMP_INDICES_STORED);
+    IDirect3DDevice9* device = At<IDirect3DDevice9*>(RW_D3D_DEVICE);
+    IDirect3DPixelShader9* shader = LayerShader();
+    if (!vertices || !indices || !device || !shader) {
+        SeFlush();
         return;
     }
-    Fn<ThisFn>(g_sePed)(ped);
-}
-
-void InstallFix() {
-    const uintptr_t ped = g_se + se::PED_HOOK, extras = g_se + se::EXTRAS;
-    const bool pedOk = At<uint8_t>(0x5E6664) == 0xE8 && patch::CallTarget(0x5E6664) == ped;
-    const bool extrasOk = At<uint8_t>(0x706676) == 0xE9 && patch::CallTarget(0x706676) == extras;
-    if (!pedOk || !extrasOk) {
-        Log("aviso: os ganchos do Shadows Extender em 0x5E6664/0x706676 nao estao la (outro mod?) -- a correcao do "
-            "veiculo ficou desligada");
+    // A forca que o Shadows Extender poe em c0.a (a mesma conta dele) vezes o maximo da textura da sombra (o degrade
+    // multiplica a sombra ate o maior dos dois valores dele). As faixas cobrem de 0 ate ai, com uma folga.
+    float color[3];
+    for (int i = 0; i < 3; i++) {
+        color[i] = SE<int>(se::REALTIME_COLOR[i]) / 255.0f;
+    }
+    const float clouds = std::max(SE<float>(se::CLOUDS), 1.0f - At<float>(CLOUD_COVERAGE));
+    const float night = std::max(SE<float>(se::NIGHT), 1.0f - At<float>(DN_BALANCE));
+    const float strength = SE<int>(se::REALTIME_COLOR[3]) / 255.0f * clouds * night;
+    const float texMax = g_cur.blur2 ? std::max(At<int>(GRADIENT_MAX), At<int>(GRADIENT_MIN)) / 255.0f : 1.0f;
+    const float core = std::min(1.0f, strength * std::min(1.0f, texMax) * 1.02f);
+    if (core < 1.0f / 255.0f) {
+        SeFlush(); // fraca demais para aparecer
         return;
     }
-    g_sePed = ped;
-    g_tsmSeExtras = extras;
-    patch::SetCall(0x5E6664, reinterpret_cast<const void*>(&PedHook));
-    patch::SetJump(0x706676, reinterpret_cast<const void*>(&TsmExtrasStub));
-    g_fixInstalled = true;
-    Log("aplicado: quem esta no veiculo entra na sombra dele (nada de escurecer dobrado)");
+    const float width = core / LAYERS;
+
+    SavedStates saved;
+    saved.Save(RS_STENCILENABLE, FALSE);
+    saved.Save(RS_STENCILFUNCTION, FUNC_ALWAYS);
+    saved.Save(RS_STENCILFUNCTIONREF, 0);
+    saved.Save(RS_STENCILFUNCTIONMASK, 0xFFFFFFFF);
+    saved.Save(RS_STENCILFUNCTIONWRITEMASK, 0xFFFFFFFF);
+    saved.Save(RS_STENCILFAIL, STENCIL_KEEP);
+    saved.Save(RS_STENCILZFAIL, STENCIL_KEEP);
+    saved.Save(RS_STENCILPASS, STENCIL_KEEP);
+    saved.Save(RS_ALPHATESTFUNCTION, FUNC_GREATER);
+    saved.Save(RS_ALPHATESTFUNCTIONREF, 0);
+    // A faixa j escurece o pixel cuja marca ainda e menor que j e marca j nele.
+    SetState(RS_STENCILENABLE, TRUE);
+    SetState(RS_STENCILFUNCTION, FUNC_GREATER);
+    SetState(RS_STENCILFUNCTIONMASK, LAYER_MASK);
+    SetState(RS_STENCILFUNCTIONWRITEMASK, LAYER_MASK);
+    SetState(RS_STENCILFAIL, STENCIL_KEEP);
+    SetState(RS_STENCILZFAIL, STENCIL_KEEP);
+    SetState(RS_STENCILPASS, STENCIL_REPLACE);
+    SetState(RS_ALPHATESTFUNCTION, FUNC_GREATER);
+
+    // O teste de alfa descarta o pixel que nao chega na faixa: sem ele, a faixa marcaria o stencil em todo o quadrado
+    // da sombra. O RenderWare liga com a mistura; aqui fica ligado na placa de qualquer jeito e volta no fim.
+    DWORD alphaTest = FALSE, alphaFunc = D3DCMP_GREATER;
+    const bool alphaKnown = SUCCEEDED(device->GetRenderState(D3DRS_ALPHATESTENABLE, &alphaTest)) &&
+                            SUCCEEDED(device->GetRenderState(D3DRS_ALPHAFUNC, &alphaFunc));
+    if (alphaKnown) {
+        device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+        device->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
+    }
+
+    IDirect3DPixelShader9*& seShader = SE<IDirect3DPixelShader9*>(se::SHADER_REALTIME);
+    IDirect3DPixelShader9* const original = seShader;
+    seShader = shader;
+    for (int j = 1; j <= LAYERS; j++) {
+        const float low = (j - 1) * width;
+        const float band[4] = {low, 1.0f / width, 0.0f, 0.0f};
+        float scale[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        for (int i = 0; i < 3; i++) {
+            const float darken = 1.0f - color[i];
+            scale[i] = darken * width / (1.0f - darken * low);
+        }
+        device->SetPixelShaderConstantF(1, band, 1);
+        device->SetPixelShaderConstantF(2, scale, 1);
+        SetState(RS_STENCILFUNCTIONREF, static_cast<uintptr_t>(j) << LAYER_SHIFT);
+        SetState(RS_ALPHATESTFUNCTIONREF, j == 1 ? 0 : static_cast<uintptr_t>(std::ceil(low * 255.0f)));
+        At<u32>(TEMP_VERTICES_STORED) = vertices; // o desenho zera o buffer
+        At<u32>(TEMP_INDICES_STORED) = indices;
+        SeFlush();
+    }
+    seShader = original;
+    if (alphaKnown) {
+        device->SetRenderState(D3DRS_ALPHATESTENABLE, alphaTest);
+        device->SetRenderState(D3DRS_ALPHAFUNC, alphaFunc);
+    }
+    saved.Restore();
+    g_marked = true;
+}
+
+// SITE_CAST: projeta uma sombra em tempo real no chao de um setor (o CAST do Shadows Extender, que termina no FLUSH).
+void __cdecl CastHook(u32 a0, u32 a1, u32 a2, u32 a3, u32 a4, u32 a5, u32 a6, u32 a7, u32 a8, u32 a9, u32 a10, u32 a11,
+                      u32 a12, u32 a13, u32 a14, u32 a15, u32 a16, u32 a17, u32 a18) {
+    g_inCast = true;
+    Fn<CastFn>(g_seCast)(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18);
+    g_inCast = false;
+}
+
+// O FLUSH do Shadows Extender: no fim do CAST e com o buffer cheio (SITE_FULL_*). Fora de uma sombra em tempo real
+// (outros efeitos tambem enchem o buffer), segue igual ao original.
+void __cdecl FlushHook() {
+    if (g_inCast && UseLayers()) {
+        LayeredFlush();
+    } else {
+        SeFlush();
+    }
+}
+
+// SITE_RECT: antes do retangulo do stencil, apaga as marcas das camadas (so os bits delas, em toda a tela). Os
+// estados do retangulo voltam como o jogo deixou.
+void __cdecl StencilRectHook(const void* rect, const void* color) {
+    if (g_marked) {
+        g_marked = false;
+        // Sem valor guardado, volta o que CStencilShadows::RenderStencilShadows deixa para o retangulo dele.
+        SavedStates saved;
+        saved.Save(RS_STENCILENABLE, TRUE);
+        saved.Save(RS_STENCILFUNCTION, FUNC_LESSEQUAL);
+        saved.Save(RS_STENCILFUNCTIONWRITEMASK, 0xFFFFFFFF);
+        saved.Save(RS_STENCILFAIL, STENCIL_KEEP);
+        saved.Save(RS_STENCILZFAIL, STENCIL_KEEP);
+        saved.Save(RS_STENCILPASS, STENCIL_KEEP);
+        saved.Save(RS_SRCBLEND, BLEND_SRCALPHA);
+        saved.Save(RS_DESTBLEND, BLEND_INVSRCALPHA);
+        saved.Save(RS_ZTESTENABLE, FALSE);
+        saved.Save(RS_ALPHATESTFUNCTIONREF, 0);
+        saved.Save(RS_VERTEXALPHAENABLE, TRUE);
+        saved.Save(RS_TEXTURERASTER, 0);
+        saved.Save(RS_SHADEMODE, SHADE_FLAT);
+        SetState(RS_STENCILENABLE, TRUE);
+        SetState(RS_STENCILFUNCTION, FUNC_ALWAYS);
+        SetState(RS_STENCILFUNCTIONWRITEMASK, LAYER_MASK);
+        SetState(RS_STENCILFAIL, STENCIL_KEEP);
+        SetState(RS_STENCILZFAIL, STENCIL_KEEP);
+        SetState(RS_STENCILPASS, STENCIL_ZERO);
+        SetState(RS_SRCBLEND, BLEND_ZERO); // a cor da tela fica como esta
+        SetState(RS_DESTBLEND, BLEND_ONE);
+        SetState(RS_ZTESTENABLE, FALSE);
+        SetState(RS_ALPHATESTFUNCTIONREF, 0);
+        const uint8_t clear[4] = {0, 0, 0, 1}; // alfa 1: com mistura e passando no teste de alfa
+        Fn<RectFn>(CSprite2d_DrawRect)(rect, clear);
+        saved.Restore();
+    }
+    Fn<RectFn>(g_seRect)(rect, color);
+}
+
+bool CallsInto(uintptr_t site, uint8_t opcode, uintptr_t target) {
+    return patch::Readable(site, 5) && At<uint8_t>(site) == opcode && patch::CallTarget(site) == target;
+}
+
+void PatchLayerSites() {
+    patch::SetCall(SITE_CAST, reinterpret_cast<const void*>(&CastHook));
+    patch::SetCall(SITE_FULL_1, reinterpret_cast<const void*>(&FlushHook));
+    patch::SetCall(SITE_FULL_2, reinterpret_cast<const void*>(&FlushHook));
+    patch::SetCall(SITE_RECT, reinterpret_cast<const void*>(&StencilRectHook));
+}
+
+void InstallLayers() {
+    const uintptr_t cast = g_se + se::CAST, flush = g_se + se::FLUSH, rect = g_se + se::STENCIL_RECT;
+    const bool ok = CallsInto(SITE_CAST, 0xE8, cast) && CallsInto(g_se + se::CAST_FLUSH_JMP, 0xE9, flush) &&
+                    CallsInto(SITE_FULL_1, 0xE8, flush) && CallsInto(SITE_FULL_2, 0xE8, flush) &&
+                    CallsInto(SITE_RECT, 0xE8, rect);
+    if (!ok) {
+        Log("aviso: o desenho da sombra em tempo real nao esta como o Shadows Extender deixa (outro mod?) -- a sombra "
+            "desfocada fica como no original");
+        return;
+    }
+    g_seCast = cast;
+    g_seFlush = flush;
+    g_seRect = rect;
+    patch::SetJump(g_se + se::CAST_FLUSH_JMP, reinterpret_cast<const void*>(&FlushHook));
+    PatchLayerSites();
+    g_layersInstalled = true;
+    Log("aplicado: com a sombra desfocada, onde duas sombras se cruzam escurece uma vez so");
+}
+
+// Se o Shadows Extender iniciar de novo (o evento do RenderWare dele), ele poe os desvios dele de volta nesses lugares.
+void KeepLayers() {
+    if (g_layersInstalled && CallsInto(SITE_CAST, 0xE8, g_seCast) && CallsInto(SITE_FULL_1, 0xE8, g_seFlush) &&
+        CallsInto(SITE_FULL_2, 0xE8, g_seFlush) && CallsInto(SITE_RECT, 0xE8, g_seRect)) {
+        PatchLayerSites();
+        Log("os desvios do Shadows Extender voltaram (ele iniciou de novo) -- camadas ligadas de novo");
+    }
 }
 
 // ------------------------------------------------------------------------------------------------ valores
@@ -530,13 +788,13 @@ void Attach() {
             g_restartPending = true;
         }
     }
-    g_cur.fixOccupants = GetPrivateProfileIntA("TROK_MENU", "CorrigirVeiculo", 1, g_iniPath) != 0;
+    g_cur.layered = GetPrivateProfileIntA("TROK_MENU", "EscurecerUmaVez", 1, g_iniPath) != 0;
     g_saved = g_cur;
     g_good = g_cur;
     g_startMaxShadows = g_cur.maxShadows;
     g_attached = true;
     g_problem = nullptr;
-    InstallFix();
+    InstallLayers();
 
     int known = 0, total = 0;
     for (const Toggle* t : kToggles) {
@@ -552,39 +810,20 @@ void Attach() {
     Log("  liga/desliga ao vivo: %d de %d lugares com o byte original conhecido", known, total);
 }
 
-} // namespace
-
-// Chamado pelo TsmExtrasStub em CRealTimeShadow::Update, com a camera da sombra ainda aberta: quem esta no veiculo
-// entra na sombra dele, em silhueta (motorista e ate 8 passageiros). Depois o trecho do Shadows Extender fecha a camera.
-extern "C" void TsmVehicleExtras(void* shadow) {
-    if (!g_cur.fixOccupants) {
-        return;
-    }
-    void* owner = Field<void*>(shadow, RTSHADOW_OWNER);
-    if (!owner || !HasRwObject(owner) || EntityType(owner) != ENTITY_VEHICLE) {
-        return;
-    }
-    void* camera = Field<void*>(shadow, RTSHADOW_CAMERA);
-    void* globals = At<void*>(RW_ENGINE_INSTANCE);
-    if (!camera || !globals || *static_cast<void**>(globals) != camera) {
-        return; // a camera nao esta aberta (sombra de atomic, ou o RwCameraBeginUpdate recusou)
-    }
-    for (int i = 0; i < 9; i++) {
-        void* ped = Field<void*>(owner, i == 0 ? VEHICLE_DRIVER : VEHICLE_PASSENGERS + (i - 1) * 4);
-        if (!ped || !HasRwObject(ped) || VehicleOf(ped) != owner) {
-            continue;
-        }
-        Fn<ForAllAtomicsFn>(RpClumpForAllAtomics)(Field<void*>(ped, ENTITY_RWOBJECT),
-                                                  reinterpret_cast<void*>(&SilhouetteAtomic), nullptr);
-    }
-}
-
-void SeFrame() {
+// Procura o Shadows Extender, liga o mod nele e recria as sombras quando pedido. Roda no evento de quadro e, se ele
+// nao chega (outro mod tomou a chamada de CGame::Process sem repassar), no Present.
+void Tick(const char* from) {
     if (g_attached) {
+        KeepLayers();
         if (g_recreatePending) {
             Recreate();
         }
         return;
+    }
+    static bool first = true;
+    if (first) {
+        first = false;
+        Log("procurando o Shadows Extender (pelo %s)", from);
     }
     if (!g_se) {
         g_se = FindShadowsExtender();
@@ -604,6 +843,47 @@ void SeFrame() {
             Log("aviso: o Shadows Extender nao ligou o gancho dele em 0x706676 -- os valores sao lidos assim mesmo");
         }
         Attach();
+    }
+}
+
+} // namespace
+
+void SeFrame() {
+    g_frameEvents++;
+    Tick("evento de quadro");
+}
+
+void SePresent() {
+    const bool frameEventAlive = g_frameEvents != g_framesAtPresent;
+    g_framesAtPresent = g_frameEvents;
+    if (frameEventAlive) {
+        return;
+    }
+    static bool logged = false;
+    if (!logged && g_frameEvents == 0) {
+        logged = true;
+        Log("o evento de quadro (0x53E981) ainda nao chegou -- o Present faz o trabalho dele");
+    }
+    // No Present a cena ja acabou e nenhuma sombra esta guardada para desenhar. As sombras criadas de novo desenham
+    // nas cameras delas: o alvo de desenho do jogo volta como estava.
+    IDirect3DDevice9* device = At<IDirect3DDevice9*>(RW_D3D_DEVICE);
+    IDirect3DSurface9* target = nullptr;
+    IDirect3DSurface9* depth = nullptr;
+    const bool recreating = g_attached && g_recreatePending && device;
+    if (recreating) {
+        device->GetRenderTarget(0, &target);
+        device->GetDepthStencilSurface(&depth);
+    }
+    Tick("Present");
+    if (recreating) {
+        if (target) {
+            device->SetRenderTarget(0, target);
+            target->Release();
+        }
+        if (depth) {
+            device->SetDepthStencilSurface(depth);
+            depth->Release();
+        }
     }
 }
 
@@ -710,8 +990,8 @@ bool Save() {
     return true;
 }
 
-bool FixInstalled() {
-    return g_fixInstalled;
+bool LayersInstalled() {
+    return g_layersInstalled;
 }
 
 int ActiveShadows() {
@@ -739,4 +1019,8 @@ extern "C" __declspec(dllexport) void TsmApply(const Settings* before) {
 
 extern "C" __declspec(dllexport) bool TsmSave() {
     return backend::Save();
+}
+
+extern "C" __declspec(dllexport) void TsmPresent() {
+    SePresent();
 }

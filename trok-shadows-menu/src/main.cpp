@@ -1,12 +1,12 @@
 // Trok Shadows Menu (.asi) -- Victor_Trok
 // Complemento do Shadows Extender 2.0 (shadows.asi, DK22Pac). O shadows.asi fica como esta; este .asi:
-//   - corrige o escurecimento dobrado onde a sombra de quem esta num veiculo cruza a do veiculo (moto e piloto);
+//   - com a sombra desfocada, onde duas sombras se cruzam (o piloto e a moto, dois jogadores) escurece uma vez so;
 //   - corrige o DisplayShadowsAtLowSettings do [STENCIL_SHADOWS], que o Shadows Extender nunca lia;
 //   - poe um menu na tela (/sombras no SA-MP, F11 sem ele) para mudar o shadows.ini com o jogo aberto.
 //
 // Ordem: o DllMain liga o evento de quadro (Idle chamando CGame::Process) e o desenho do menu. A cada quadro o mod
 // procura o Shadows Extender; quando ele termina de iniciar (no evento do RenderWare dele), o mod le os valores em
-// uso e liga a correcao (se.cpp).
+// uso e entra no desenho da sombra dele (se.cpp).
 
 #include "tsm.h"
 #include "game.h"
@@ -65,6 +65,17 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         return TRUE;
     }
     g_tsmFrameOriginal = patch::CallTarget(0x53E981);
+    char owner[MAX_PATH] = "o jogo";
+    HMODULE ownerModule = nullptr;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           reinterpret_cast<LPCSTR>(g_tsmFrameOriginal), &ownerModule) &&
+        ownerModule && ownerModule != GetModuleHandleA(nullptr)) {
+        char path[MAX_PATH];
+        GetModuleFileNameA(ownerModule, path, MAX_PATH);
+        const char* slash = strrchr(path, '\\');
+        lstrcpynA(owner, slash ? slash + 1 : path, MAX_PATH);
+    }
+    Log("evento de quadro em 0x53E981 (antes chamava 0x%08X, de %s)", static_cast<unsigned>(g_tsmFrameOriginal), owner);
     patch::SetCall(0x53E981, reinterpret_cast<const void*>(&TsmFrameStub));
     OverlayStart(instance);
     return TRUE;

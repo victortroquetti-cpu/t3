@@ -49,7 +49,7 @@ bool Save() {
 int ActiveShadows() {
     return 5;
 }
-bool FixInstalled() {
+bool LayersInstalled() {
     return true;
 }
 } // namespace backend
@@ -249,6 +249,16 @@ int main(int argc, char** argv) {
     Check(!g_cur.combine, "blur ligado = CombineRealTimeShadowsWithStencil 0");
     Idle(70);
     Check(g_saves >= 1, "gravou um segundo depois da ultima mudanca");
+    Frame("03b_geral_desfocada");
+    // Cruzamento (linha 4, so com o blur).
+    Key(ImGuiKey_DownArrow);
+    Key(ImGuiKey_Enter);
+    Idle(10);
+    Check(!g_cur.layered, "cruzamento desligado na linha 4");
+    Key(ImGuiKey_Enter);
+    Idle(10);
+    Check(g_cur.layered, "e ligado de novo");
+    Key(ImGuiKey_UpArrow);
 
     Key(ImGuiKey_Tab);
     Idle(30);
@@ -292,7 +302,7 @@ int main(int argc, char** argv) {
     Frame("10_confirmar");
     Key(ImGuiKey_Enter);
     Idle(20);
-    Check(g_cur.raster == 7 && g_cur.maxShadows == 64 && g_cur.fixOccupants, "padroes restaurados (a correcao fica)");
+    Check(g_cur.raster == 7 && g_cur.maxShadows == 64 && g_cur.layered, "padroes restaurados (o cruzamento fica)");
     Frame("11_padroes_restaurados");
 
     Key(ImGuiKey_Tab);

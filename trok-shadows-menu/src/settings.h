@@ -31,7 +31,7 @@ struct Settings {
     float night = 0.2f, clouds = 0.4f;
     bool morePlayers = false;
     // [TROK_MENU]
-    bool fixOccupants = true; // quem esta no veiculo entra na sombra dele (nada de escurecer dobrado)
+    bool layered = true; // com a sombra desfocada, o cruzamento de duas sombras escurece uma vez so
 };
 
 // Campo a campo (o memcmp pegaria os bytes de enchimento entre os bool e os int).
@@ -50,7 +50,7 @@ inline bool operator==(const Settings& a, const Settings& b) {
            a.bound == b.bound && a.boundAir == b.boundAir && a.sunZ == b.sunZ && a.zLimit == b.zLimit &&
            a.zLimitAir == b.zLimitAir && a.vehicleDefaultWithRealtime == b.vehicleDefaultWithRealtime &&
            a.disableVehicleDefault == b.disableVehicleDefault && a.shader == b.shader && a.night == b.night &&
-           a.clouds == b.clouds && a.morePlayers == b.morePlayers && a.fixOccupants == b.fixOccupants;
+           a.clouds == b.clouds && a.morePlayers == b.morePlayers && a.layered == b.layered;
 }
 
 inline bool operator!=(const Settings& a, const Settings& b) {
@@ -67,6 +67,6 @@ void Apply(const Settings& before); // aplica o que mudou de before para Current
 bool RestartPending();              // alguma mudanca so vale quando o jogo abrir de novo
 bool Save();                        // grava no shadows.ini
 int ActiveShadows();                // sombras em tempo real no jogo agora (0 a 16)
-bool FixInstalled();                // a correcao do veiculo conseguiu entrar nos ganchos do Shadows Extender
+bool LayersInstalled();             // a sombra desfocada em camadas conseguiu entrar no desenho do Shadows Extender
 
 } // namespace backend

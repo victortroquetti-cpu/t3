@@ -3,11 +3,12 @@
 // complemento, dispara os eventos e chama os ganchos com dados falsos. As funcoes do jogo viram gravadores.
 //
 // Roda dentro do launcher.exe (test/launcher.c), que ocupa a faixa de enderecos do gta_sa.exe.
-// Uso: launcher.exe completo | liga_desliga | renomeado | sem_original
-//   completo:     o shadows.ini do Victor_Trok (tudo ligado): correcao, valores ao vivo, recriar, gravar
+// Uso: launcher.exe completo | liga_desliga | renomeado | sem_evento | sem_original
+//   completo:     o shadows.ini do Victor_Trok (tudo ligado): sombra em camadas, valores ao vivo, recriar, gravar
 //   liga_desliga: tudo desligado no INI: liga e desliga ao vivo com os bytes originais; DisplayShadowsAtLowSettings
 //                 do [STENCIL_SHADOWS] corrigido
 //   renomeado:    o shadows.asi com outro nome: achado pelo conteudo
+//   sem_evento:   o evento de quadro nunca chega (outro mod tomou a chamada): o Present acha o original
 //   sem_original: sem o Shadows Extender: o complemento so avisa
 
 #include <windows.h>
@@ -145,6 +146,22 @@ float FReal(u32 u) {
 }
 
 // ------------------------------------------------------------------------------------------------ funcoes falsas do jogo
+// Estados do RenderWare: o falso guarda o ultimo valor de cada um e o devolve no Get, como o cache dele.
+enum {
+    RS_TEXTURERASTER = 1, RS_ZTESTENABLE = 6, RS_SRCBLEND = 10, RS_DESTBLEND = 11, RS_VERTEXALPHAENABLE = 12,
+    RS_STENCILENABLE = 21, RS_STENCILFAIL = 22, RS_STENCILZFAIL = 23, RS_STENCILPASS = 24, RS_STENCILFUNCTION = 25,
+    RS_STENCILFUNCTIONREF = 26, RS_STENCILFUNCTIONMASK = 27, RS_STENCILFUNCTIONWRITEMASK = 28,
+    RS_ALPHATESTFUNCTION = 29, RS_ALPHATESTFUNCTIONREF = 30,
+};
+u32 g_rs[64];
+void ResetStates() {
+    memset(g_rs, 0, sizeof(g_rs));
+    g_rs[RS_STENCILFUNCTION] = 8; // sempre
+    g_rs[RS_STENCILFUNCTIONMASK] = g_rs[RS_STENCILFUNCTIONWRITEMASK] = 0xFFFFFFFF;
+    g_rs[RS_STENCILFAIL] = g_rs[RS_STENCILZFAIL] = g_rs[RS_STENCILPASS] = 1; // manter
+    g_rs[RS_ALPHATESTFUNCTION] = 5;                                         // maior
+    g_rs[RS_ZTESTENABLE] = 1;
+}
 bool g_rectCallsNopDuringDraw = false;
 
 void __cdecl FakeInitRw() {
@@ -166,9 +183,22 @@ const uintptr_t kTempVerticesStored = 0xC4B950, kTempIndicesStored = 0xC4B954, k
 float g_castTriangle[3][3] = {{-1, 10, -10}, {1, 10, -10}, {0, 12, -10}}; // chao 10 m abaixo da camera (origem)
 bool g_castAddsTriangle = true;
 
+extern IDirect3DDevice9* g_real;
+extern uintptr_t g_se;
+// a[0] vertices; a[1..3] o primeiro; a[4] o shader de sombra do Shadows Extender (0x1F320) na hora do desenho;
+// a[5..10] stencil: ligado, funcao, ref, mascara, mascara de escrita, passou; a[11..12] teste de alfa: ref, funcao;
+// a[13..14] c1.xy; a[15..17] c2.rgb; a[18] c0.a.
 void __cdecl RecRender() {
     const float* p = reinterpret_cast<float*>(kTempVertices);
-    Record("RenderStuffInBuffer", 4, (u32)At<uint16_t>(kTempVerticesStored), FBits(p[0]), FBits(p[1]), FBits(p[2]));
+    float c[12] = {};
+    if (g_real) {
+        g_real->GetPixelShaderConstantF(0, c, 3);
+    }
+    Record("RenderStuffInBuffer", 19, (u32)At<uint16_t>(kTempVerticesStored), FBits(p[0]), FBits(p[1]), FBits(p[2]),
+           g_se ? At<u32>(g_se + 0x1F320) : 0u, g_rs[RS_STENCILENABLE], g_rs[RS_STENCILFUNCTION],
+           g_rs[RS_STENCILFUNCTIONREF], g_rs[RS_STENCILFUNCTIONMASK], g_rs[RS_STENCILFUNCTIONWRITEMASK],
+           g_rs[RS_STENCILPASS], g_rs[RS_ALPHATESTFUNCTIONREF], g_rs[RS_ALPHATESTFUNCTION], FBits(c[4]), FBits(c[5]),
+           FBits(c[8]), FBits(c[9]), FBits(c[10]), FBits(c[3]));
     At<uint16_t>(kTempVerticesStored) = 0;
     At<uint16_t>(kTempIndicesStored) = 0;
 }
@@ -188,19 +218,27 @@ void StoreTriangle() {
 }
 int __cdecl RecRenderStateSet(int state, u32 value) {
     Record("RwRenderStateSet", 2, (u32)state, value);
+    if (state >= 0 && state < 64) {
+        g_rs[state] = value;
+    }
     return 1;
 }
 int __cdecl RecRenderStateGet(int state, u32* out) {
     Record("RwRenderStateGet", 1, (u32)state);
-    *out = 0x55;
+    *out = state >= 0 && state < 64 ? g_rs[state] : 0;
     return 1;
 }
+bool g_castFillsBuffer = false; // o buffer enche no meio: RenderBuffer::StartStoring desenha (0x7082A4) e continua
 void __cdecl RecCast(u32 a0, u32 a1, u32 a2, u32 a3, u32 a4, u32 a5, u32 a6, u32 a7, u32 a8, u32 a9, u32 a10, u32 a11,
                      u32 a12, u32 a13, u32 a14, u32 a15, u32 a16, u32 a17, u32 a18) {
     Record("CastRealTimeShadowSectorList", 19, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15,
            a16, a17, a18);
     if (g_castAddsTriangle) {
         StoreTriangle();
+        if (g_castFillsBuffer) {
+            reinterpret_cast<void(__cdecl*)()>(0x7082A4 + 5 + *reinterpret_cast<int32_t*>(0x7082A5))();
+            StoreTriangle();
+        }
     }
 }
 bool __thiscall RecSphereVisible(void* camera, const float* center, u32 radius) {
@@ -224,10 +262,12 @@ void __cdecl RecSetVS(void* shader) {
 void __cdecl RecSetPS(void* shader) {
     Record("_rwD3D9SetPixelShader", 1, (u32)(uintptr_t)shader);
 }
+// a[6..12]: stencil (ligado, funcao, passou, mascara de escrita), mistura (origem, destino), teste de profundidade.
 void __cdecl RecDrawRect(void* rect, uint8_t* color) {
     g_rectCallsNopDuringDraw = AllNop(0x7FB81D, 5) && AllNop(0x7FB824, 5);
-    Record("DrawRect", 6, (u32)(uintptr_t)rect, (u32)color[0], (u32)color[1], (u32)color[2], (u32)color[3],
-           (u32)g_rectCallsNopDuringDraw);
+    Record("DrawRect", 13, (u32)(uintptr_t)rect, (u32)color[0], (u32)color[1], (u32)color[2], (u32)color[3],
+           (u32)g_rectCallsNopDuringDraw, g_rs[RS_STENCILENABLE], g_rs[RS_STENCILFUNCTION], g_rs[RS_STENCILPASS],
+           g_rs[RS_STENCILFUNCTIONWRITEMASK], g_rs[RS_SRCBLEND], g_rs[RS_DESTBLEND], g_rs[RS_ZTESTENABLE]);
 }
 void __thiscall RecDoShadow(void* manager, void* physical) {
     Record("DoShadowThisFrame", 2, (u32)(uintptr_t)manager, (u32)(uintptr_t)physical);
@@ -282,6 +322,7 @@ bool __cdecl RecStencilInit() {
 // O mod so usa 3 metodos do device: CreatePixelShader, SetPixelShader e SetPixelShaderConstantF. O proxy grava
 // e repassa para o device de verdade do Wine (que valida o bytecode dos shaders).
 IDirect3DDevice9* g_real = nullptr;
+uintptr_t g_se = 0;
 void* g_proxyVtbl[119];
 struct Proxy {
     void** vtbl;
@@ -362,15 +403,6 @@ extern "C" __attribute__((naked)) void HostBackSun() {
             "mov [_g_outEsi], esi\n mov [_g_outEdi], edi\n"
             "mov esp, [_g_saveEsp]\n"
             "pop edi\n pop esi\n pop ebx\n pop ebp\n ret\n"
-            ".att_syntax prefix\n");
-}
-extern "C" __attribute__((naked)) void HostEnterExtras() {
-    __asm__(".intel_syntax noprefix\n"
-            "push ebp\n push ebx\n push esi\n push edi\n"
-            "mov [_g_saveEsp], esp\n"
-            "mov eax, [_g_inEax]\n mov edx, [_g_inEdx]\n mov edi, [_g_inEdi]\n mov esi, [_g_inEsi]\n"
-            "mov ebx, [_g_inEbx]\n mov ebp, 0x0BADF00D\n"
-            "push 0x706676\n ret\n"
             ".att_syntax prefix\n");
 }
 extern "C" __attribute__((naked)) void HostBackExtras() {
@@ -603,37 +635,6 @@ void* NewEntity(int type, bool withModel, uintptr_t clump = 0x1111) {
     return e;
 }
 
-void* NewShadow(void* owner, void* camera) {
-    Fake* s = new Fake();
-    memset(s, 0, sizeof(*s));
-    At<void*>((uintptr_t)s + 0x00) = owner;
-    At<uint8_t>((uintptr_t)s + 0x05) = 100;
-    At<void*>((uintptr_t)s + 0x08) = camera;
-    At<uint8_t>((uintptr_t)s + 0x10) = 0xA5; // m_bBlurred (o jogo le "mov cl, [esi+10h]" depois)
-    return s;
-}
-
-void PutInVehicle(void* ped, void* vehicle) {
-    At<uint8_t>((uintptr_t)ped + 0x46D) = 1;
-    At<void*>((uintptr_t)ped + 0x58C) = vehicle;
-}
-
-void EnterExtras(uint8_t* shadow) {
-    g_inEsi = (u32)(uintptr_t)shadow;
-    g_inEdi = (u32)(uintptr_t)(shadow + 8);
-    g_inEax = 0x1;
-    g_inEdx = 0x22222222;
-    g_inEbx = 0x33333333;
-    HostEnterExtras();
-}
-
-// Como o original deixa: ele repete "mov eax, [edi]" e "mov cl, [esi+10h]" e volta com "mov edi, 0x70667B; jmp edi".
-bool RegsIntact(uint8_t* shadow) {
-    return g_outEax == (u32)(uintptr_t)At<void*>((uintptr_t)shadow + 8) && (g_outEcx & 0xFF) == 0xA5 &&
-           g_outEdx == 0x22222222 && g_outEbx == 0x33333333 && g_outEsi == (u32)(uintptr_t)shadow &&
-           g_outEdi == 0x70667B && g_outEbp == 0x0BADF00D;
-}
-
 // ------------------------------------------------------------------------------------------------ o complemento
 typedef Settings*(__cdecl* CurrentFn)();
 typedef void(__cdecl* ApplyFn)(const Settings*);
@@ -641,7 +642,8 @@ typedef bool(__cdecl* SaveFn)();
 CurrentFn TsmCurrent;
 ApplyFn TsmApply;
 SaveFn TsmSave;
-uintptr_t g_se = 0;
+typedef void(__cdecl* PresentFn)();
+PresentFn TsmPresent;
 
 template <class T>
 T& SE(u32 offset) {
@@ -666,11 +668,12 @@ HMODULE ModuleOf(uintptr_t addr) {
 
 // Carrega o original (com o nome dado) e o complemento, e liga o jogo ate o primeiro quadro.
 HMODULE g_menu = nullptr;
-bool Boot(const char* originalName) {
+bool Boot(const char* originalName, bool frameEvent = true) {
     if (!CreateRealDevice()) {
         printf("aviso: sem device D3D9 no Wine\n");
     }
     SetupGame();
+    ResetStates();
     PutJump(0x7067C0, reinterpret_cast<void*>(&RecManagerInit));
     PutJump(0x706A60, reinterpret_cast<void*>(&RecManagerExit));
     PutJump(0x705B30, reinterpret_cast<void*>(&RecReturnShadow));
@@ -690,13 +693,16 @@ bool Boot(const char* originalName) {
     TsmCurrent = reinterpret_cast<CurrentFn>(GetProcAddress(g_menu, "TsmCurrent"));
     TsmApply = reinterpret_cast<ApplyFn>(GetProcAddress(g_menu, "TsmApply"));
     TsmSave = reinterpret_cast<SaveFn>(GetProcAddress(g_menu, "TsmSave"));
+    TsmPresent = reinterpret_cast<PresentFn>(GetProcAddress(g_menu, "TsmPresent"));
     Check(Mem(0x53E981)[0] == 0xE8 && ModuleOf(Target(0x53E981)) == g_menu,
           "evento de quadro ligado (0x53E981) pelo complemento");
     FireEvent(0x5BD779);                 // o original le o shadows.ini e remenda o jogo
     RecManagerInit(reinterpret_cast<void*>(kManager)); // CGame::Init3 cria as 16 sombras
     FireEvent(0x748CFB);
     ClearRec();
-    FireEvent(0x53E981); // primeiro quadro: o complemento acha o original
+    if (frameEvent) {
+        FireEvent(0x53E981); // primeiro quadro: o complemento acha o original
+    }
     return true;
 }
 
@@ -705,12 +711,17 @@ typedef void(__thiscall* PedFn)(void*);
 
 void TestAttach() {
     printf("\n-- o complemento acha o original\n");
-    Check(LogHas("Shadows Extender 2.0 em 0x"), "log: Shadows Extender 2.0 achado");
-    Check(Mem(0x5E6664)[0] == 0xE8 && Target(0x5E6664) != g_se + 0x12F0 && !InExe(Target(0x5E6664)),
-          "pedido de sombra do pedestre passa pelo complemento");
-    Check(Mem(0x706676)[0] == 0xE9 && Target(0x706676) != g_se + 0x3120 && !InExe(Target(0x706676)),
-          "trecho da camera da sombra passa pelo complemento");
-    Check(LogHas("aplicado: quem esta no veiculo entra na sombra dele"), "log: correcao do veiculo ligada");
+    Check(LogHas("Shadows Extender 2.0 em 0x") && LogHas("procurando o Shadows Extender (pelo evento de quadro)"),
+          "log: Shadows Extender 2.0 achado no evento de quadro");
+    Check(ModuleOf(Target(0x70AD0D)) == g_menu && ModuleOf(Target(0x7082A4)) == g_menu &&
+              ModuleOf(Target(0x7082BD)) == g_menu && ModuleOf(Target(0x71167F)) == g_menu,
+          "projecao, buffer cheio e retangulo do stencil passam pelo complemento");
+    Check(Mem(g_se + 0x3766)[0] == 0xE9 && ModuleOf(Target(g_se + 0x3766)) == g_menu,
+          "o fim do CAST do original desenha pelo complemento");
+    Check(Target(0x5E6664) == g_se + 0x12F0 && Target(0x706676) == g_se + 0x3120,
+          "os ganchos do pedestre e da camera ficam os do original (cada um com a sua sombra)");
+    Check(LogHas("aplicado: com a sombra desfocada, onde duas sombras se cruzam escurece uma vez so"),
+          "log: sombra em camadas ligada");
 }
 
 void TestValuesRead() {
@@ -730,98 +741,206 @@ void TestValuesRead() {
     Check(Near(s->bound, 10.0f) && Near(s->boundAir, 20.0f) && Near(s->sunZ, 0.6f) && Near(s->zLimit, 8.0f) &&
               Near(s->zLimitAir, 10.0f) && Near(s->night, 0.2f) && Near(s->clouds, 0.4f),
           "projecao 10/20, sol 0.6, alcance 8/10, noite 0.2, nuvens 0.4");
-    Check(s->vehicleDefaultWithRealtime && !s->disableVehicleDefault && s->shader && s->morePlayers && s->fixOccupants,
-          "sombra simples junto, shader, MoreThanOnePlayer e a correcao ligados");
+    Check(s->vehicleDefaultWithRealtime && !s->disableVehicleDefault && s->shader && s->morePlayers && s->layered,
+          "sombra simples junto, shader, MoreThanOnePlayer e as camadas ligados");
 }
 
-void TestPedFix() {
-    printf("\n-- quem esta no veiculo nao pede sombra propria\n");
-    Check(AllNop(0x5E68A2, 11), "o pedido do proprio jogo para quem anda de moto o original ja apaga (0x5E68A2)");
-    void* bike = NewEntity(2, true, 0xB001);
-    void* rider = NewEntity(3, true, 0xA001);
-    void* walker = NewEntity(3, true, 0xA002);
-    PutInVehicle(rider, bike);
-    PedFn ped = reinterpret_cast<PedFn>(Target(0x5E6664));
-    ClearRec();
-    ped(rider);
-    Check(CountRec("UpdateRpHAnim") == 1 && CountRec("DoShadowThisFrame") == 1,
-          "moto ainda sem sombra (as 16 em uso): o piloto fica com a dele");
-    At<void*>((uintptr_t)bike + 0x134) = reinterpret_cast<void*>(0x5150); // a moto ganhou a sombra dela
-    ClearRec();
-    ped(rider);
-    Check(CountRec("UpdateRpHAnim") == 1 && FindRec("UpdateRpHAnim")->a[0] == (u32)(uintptr_t)rider &&
-              CountRec("DoShadowThisFrame") == 0,
-          "moto com sombra: o piloto so atualiza os ossos");
-    ClearRec();
-    ped(walker);
-    const Rec* ds = FindRec("DoShadowThisFrame");
-    Check(CountRec("UpdateRpHAnim") == 1 && ds && ds->a[0] == 0xC40350 && ds->a[1] == (u32)(uintptr_t)walker,
-          "a pe: o original atualiza os ossos e pede a sombra");
-    Change([](Settings& s) { s.fixOccupants = false; });
-    ClearRec();
-    ped(rider);
-    Check(CountRec("DoShadowThisFrame") == 1, "correcao desligada: o piloto pede a sombra dele, como no original");
-    Change([](Settings& s) { s.fixOccupants = true; });
+// ------------------------------------------------------------------------------------------------ sombra em camadas
+typedef void(__cdecl* CastFn)(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32,
+                              u32);
+typedef void(__cdecl* RectFn)(const void*, const void*);
+
+// O jogo projeta uma sombra em tempo real (CShadows::RenderStoredShadows chamando o CAST do original em 0x70AD0D).
+void CastShadow() {
+    static uint8_t owner[0x800];
+    static uint8_t shadow[0x4C];
+    *reinterpret_cast<void**>(shadow) = owner; // o CAST do original guarda o dono da sombra
+    u32 a[19] = {};
+    a[17] = (u32)(uintptr_t)shadow;
+    reinterpret_cast<CastFn>(Target(0x70AD0D))(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11],
+                                               a[12], a[13], a[14], a[15], a[16], a[17], a[18]);
 }
 
-void TestExtras() {
-    printf("\n-- a sombra do veiculo desenha quem esta dentro\n");
-    void* bike = NewEntity(2, true, 0xB002);
-    void* rider = NewEntity(3, true, 0xA011);
-    void* passenger = NewEntity(3, true, 0xA013);
-    void* stranger = NewEntity(3, true, 0xA014); // no banco, mas ja saiu (bInVehicle desligado)
-    PutInVehicle(rider, bike);
-    PutInVehicle(passenger, bike);
-    At<void*>((uintptr_t)bike + 0x460) = rider;
-    At<void*>((uintptr_t)bike + 0x464 + 4 * 2) = passenger;
-    At<void*>((uintptr_t)bike + 0x464 + 4 * 3) = stranger;
-    void* camera = reinterpret_cast<void*>(0x4242);
-    uint8_t* shadow = static_cast<uint8_t*>(NewShadow(bike, camera));
-    g_globals.curCamera = camera;
-    ClearRec();
-    EnterExtras(shadow);
-    int first = -1, second = -1, invert = -1;
-    for (int i = 0; i < g_recCount; i++) {
-        if (!strcmp(g_rec[i].name, "RpClumpForAllAtomics")) (first < 0 ? first : second) = i;
-        if (!strcmp(g_rec[i].name, "InvertRaster")) invert = i;
-    }
-    Check(CountRec("RpClumpForAllAtomics") == 2 && first >= 0 && g_rec[first].a[0] == 0xA011 && second >= 0 &&
-              g_rec[second].a[0] == 0xA013,
-          "desenha o piloto e a garupa (quem ja saiu nao)");
-    const Rec* end = FindRec("RwCameraEndUpdate");
-    Check(invert > second && g_rec[invert].a[0] == (u32)(uintptr_t)(shadow + 8) && end && end->a[0] == 0x4242,
-          "depois o original inverte e fecha a camera");
-    Check(RegsIntact(shadow), "registradores do jogo intactos (o original repete as instrucoes e volta)");
+struct Pass {
+    u32 shader, stencilOn, stencilFunc, stencilRef, stencilMask, writeMask, passOp, alphaRef, alphaFunc;
+    float low, invWidth, k[3], strength;
+};
 
-    // O desenho em silhueta: tira textura, luz e cor (0xEC) so durante o desenho.
-    if (first >= 0) {
-        Fake* atomic = new Fake();
-        Fake* geometry = new Fake();
-        memset(atomic, 0, sizeof(*atomic));
-        memset(geometry, 0, sizeof(*geometry));
-        At<uint8_t>((uintptr_t)atomic + 2) = 4;
-        At<void*>((uintptr_t)atomic + 0x18) = geometry;
-        At<u32>((uintptr_t)geometry + 8) = 0xFF;
-        const u32 callback = g_rec[first].a[1];
-        ClearRec();
-        reinterpret_cast<void*(__cdecl*)(void*, void*)>(callback)(atomic, nullptr);
-        const Rec* qr = FindRec("atomicQuickRender");
-        Check(qr && qr->a[2] == 0x13 && At<u32>((uintptr_t)geometry + 8) == 0xFF,
-              "silhueta: flags 0xFF viram 0x13 no desenho e voltam (%02X)", qr ? qr->a[2] : 0);
-    }
+Pass PassOf(const Rec& r) {
+    Pass p;
+    p.shader = r.a[4];
+    p.stencilOn = r.a[5];
+    p.stencilFunc = r.a[6];
+    p.stencilRef = r.a[7];
+    p.stencilMask = r.a[8];
+    p.writeMask = r.a[9];
+    p.passOp = r.a[10];
+    p.alphaRef = r.a[11];
+    p.alphaFunc = r.a[12];
+    p.low = FReal(r.a[13]);
+    p.invWidth = FReal(r.a[14]);
+    for (int i = 0; i < 3; i++) p.k[i] = FReal(r.a[15 + i]);
+    p.strength = FReal(r.a[18]);
+    return p;
+}
 
-    g_globals.curCamera = nullptr;
+// Um pixel de tela pelas passadas gravadas: shader das camadas, teste de alfa (maior que a ref) e stencil (a ref maior
+// que a marca), como a placa faria. s = forca x textura da sombra ali.
+void DrawPixel(const Pass* passes, int n, float s, float rgb[3], u32* stencil) {
+    for (int i = 0; i < n; i++) {
+        const Pass& p = passes[i];
+        const int alpha = static_cast<int>(s * 255.0f + 0.5f);
+        if (alpha <= static_cast<int>(p.alphaRef)) continue;
+        if ((p.stencilRef & p.stencilMask) <= (*stencil & p.stencilMask)) continue;
+        float t = (s - p.low) * p.invWidth;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        for (int c = 0; c < 3; c++) rgb[c] *= 1.0f - t * p.k[c];
+        *stencil = (*stencil & ~p.writeMask) | (p.stencilRef & p.writeMask);
+    }
+}
+
+void TestLayers() {
+    printf("\n-- sombra desfocada em camadas: o cruzamento escurece uma vez so\n");
+    Change([](Settings& s) { s.combine = false; });
+    const u32 seShader = At<u32>(g_se + 0x1F320);
     ClearRec();
-    EnterExtras(shadow);
-    Check(CountRec("RpClumpForAllAtomics") == 0 && FindRec("InvertRaster") && RegsIntact(shadow),
-          "camera fechada: nada desenhado, o original segue igual");
-    g_globals.curCamera = camera;
-    Change([](Settings& s) { s.fixOccupants = false; });
+    CastShadow();
+    Pass passes[8];
+    int n = 0;
+    for (int i = 0; i < g_recCount && n < 8; i++) {
+        if (!strcmp(g_rec[i].name, "RenderStuffInBuffer")) passes[n++] = PassOf(g_rec[i]);
+    }
+    Check(CountRec("CastRealTimeShadowSectorList") == 1 && n == 4, "uma sombra projetada vira 4 desenhos (%d)", n);
+    bool same = n == 4;
+    for (int i = 0; i < n; i++) {
+        const Rec* r = FindRec("RenderStuffInBuffer", i);
+        same = same && r->a[0] == 3 && passes[i].shader && passes[i].shader != seShader && passes[i].stencilOn == 1 &&
+               passes[i].stencilFunc == 5 && passes[i].stencilRef == (u32)(i + 1) << 4 && passes[i].stencilMask == 0x70 &&
+               passes[i].writeMask == 0x70 && passes[i].passOp == 3 && passes[i].alphaFunc == 5;
+    }
+    Check(same, "cada desenho: os 3 vertices, o shader das camadas, stencil faixa 1 a 4 nos bits 4-6");
+    Check(At<u32>(g_se + 0x1F320) == seShader && g_rs[RS_STENCILENABLE] == 0 && g_rs[RS_ALPHATESTFUNCTIONREF] == 0 &&
+              g_rs[RS_STENCILFUNCTION] == 8,
+          "depois: o shader do original e os estados voltam");
+    // A forca do original: A/255 x max(nuvens, 1 - cobertura) x max(noite, 1 - noite agora) = 120/255 x 0.75 x 1.
+    const float strength = 120.0f / 255.0f * 0.75f;
+    const float width = strength * 1.02f / 4; // degrade desligado no TestLive: a textura vai ate 1
+    bool bands = n == 4;
+    for (int i = 0; i < n; i++) {
+        const float low = i * width;
+        const float expectRef = i == 0 ? 0 : ceilf(low * 255.0f);
+        bands = bands && fabsf(passes[i].strength - strength) < 1e-4f && fabsf(passes[i].low - low) < 1e-4f &&
+                fabsf(passes[i].invWidth * width - 1.0f) < 1e-3f && passes[i].alphaRef == (u32)expectRef;
+        const float color[3] = {40 / 255.0f, 12 / 255.0f, 20 / 255.0f};
+        for (int c = 0; c < 3; c++) {
+            const float d = 1 - color[c];
+            bands = bands && fabsf(passes[i].k[c] - d * width / (1 - d * low)) < 1e-4f;
+        }
+    }
+    Check(bands, "faixas de %.3f: comeco, largura, ref de alfa e a cor de cada uma", width);
+
+    // O que a placa faria com essas passadas, pixel a pixel.
+    const float d[3] = {1 - 40 / 255.0f, 1 - 12 / 255.0f, 1 - 20 / 255.0f};
+    float worstSingle = 0, worstDark = 0, worstLight = 0, worstOriginal = 0;
+    for (int a = 0; a <= 40; a++) {
+        const float sa = strength * a / 40;
+        float rgb[3] = {1, 1, 1};
+        u32 st = 0;
+        DrawPixel(passes, n, sa, rgb, &st);
+        for (int c = 0; c < 3; c++) worstSingle = fmaxf(worstSingle, fabsf(rgb[c] - (1 - d[c] * sa)));
+        for (int b = 0; b <= 40; b++) {
+            const float sb = strength * b / 40;
+            float two[3] = {1, 1, 1};
+            u32 st2 = 0;
+            DrawPixel(passes, n, sa, two, &st2);
+            DrawPixel(passes, n, sb, two, &st2);
+            const float strongest = fmaxf(sa, sb);
+            for (int c = 0; c < 3; c++) {
+                const float ideal = 1 - d[c] * strongest;
+                worstDark = fmaxf(worstDark, ideal - two[c]);
+                worstLight = fmaxf(worstLight, two[c] - ideal);
+                worstOriginal = fmaxf(worstOriginal, ideal - (1 - d[c] * sa) * (1 - d[c] * sb));
+            }
+        }
+    }
+    Check(worstSingle < 0.006f, "sozinha, a sombra sai igual a do original (diferenca %.4f)", worstSingle);
+    Check(worstDark < 0.006f && worstLight <= d[0] * width + 0.006f,
+          "duas cruzadas: escurece como a mais forte (mais escuro %.4f, mais claro %.4f; no original: %.4f mais escuro)",
+          worstDark, worstLight, worstOriginal);
+
+    // Buffer cheio no meio da sombra: as duas metades em camadas.
+    g_castFillsBuffer = true;
     ClearRec();
-    EnterExtras(shadow);
-    Check(CountRec("RpClumpForAllAtomics") == 0 && FindRec("InvertRaster"), "correcao desligada: so o original");
-    Change([](Settings& s) { s.fixOccupants = true; });
-    g_globals.curCamera = nullptr;
+    CastShadow();
+    g_castFillsBuffer = false;
+    Check(CountRec("RenderStuffInBuffer") == 8, "buffer cheio no meio da sombra: as duas partes em camadas (%d)",
+          CountRec("RenderStuffInBuffer"));
+    // Outro efeito enchendo o buffer, fora de uma sombra em tempo real: segue igual ao original.
+    StoreTriangle();
+    ClearRec();
+    reinterpret_cast<void(__cdecl*)()>(Target(0x7082A4))();
+    const Rec* other = FindRec("RenderStuffInBuffer");
+    Check(CountRec("RenderStuffInBuffer") == 1 && other && other->a[4] == seShader && other->a[5] == 0,
+          "outro efeito com o buffer cheio: um desenho, como no original");
+
+    // Retangulo do stencil: antes dele, as marcas das camadas saem (so os bits 4-6), e os estados voltam.
+    g_rs[RS_STENCILFUNCTION] = 4; // como CStencilShadows::RenderStencilShadows deixa
+    g_rs[RS_STENCILPASS] = 1;
+    g_rs[RS_STENCILFUNCTIONWRITEMASK] = 0xFFFFFFFF;
+    g_rs[RS_SRCBLEND] = 5;
+    g_rs[RS_DESTBLEND] = 6;
+    g_rs[RS_ZTESTENABLE] = 0;
+    g_rs[RS_STENCILENABLE] = 1;
+    const float rect[4] = {0, 0, 640, 480};
+    const uint8_t color[4] = {0, 0, 0, 50};
+    ClearRec();
+    reinterpret_cast<RectFn>(Target(0x71167F))(rect, color);
+    const Rec* clear = FindRec("DrawRect", 0);
+    const Rec* game = FindRec("DrawRect", 1);
+    Check(CountRec("DrawRect") == 2 && clear && clear->a[0] == (u32)(uintptr_t)rect && clear->a[4] == 1 &&
+              clear->a[6] == 1 && clear->a[7] == 8 && clear->a[8] == 2 && clear->a[9] == 0x70 && clear->a[10] == 1 &&
+              clear->a[11] == 2,
+          "antes do retangulo do stencil: um retangulo que zera so os bits 4-6, sem mudar a cor");
+    Check(game && game->a[7] == 4 && game->a[8] == 1 && game->a[9] == 0xFFFFFFFF && game->a[10] == 5 &&
+              game->a[11] == 6,
+          "depois o retangulo do original, com os estados do jogo");
+    ClearRec();
+    reinterpret_cast<RectFn>(Target(0x71167F))(rect, color);
+    Check(CountRec("DrawRect") == 1, "sem camadas no quadro: so o retangulo do original");
+    ResetStates();
+
+    // Quando nao entra: modo combinado (o stencil ja junta), camadas desligadas no menu, shader desligado.
+    Change([](Settings& s) { s.combine = true; });
+    ClearRec();
+    CastShadow();
+    Check(CountRec("RenderStuffInBuffer") == 1, "modo combinado: um desenho, o do original");
+    Change([](Settings& s) {
+        s.combine = false;
+        s.layered = false;
+    });
+    ClearRec();
+    CastShadow();
+    Check(CountRec("RenderStuffInBuffer") == 1 && FindRec("RenderStuffInBuffer")->a[5] == 0,
+          "desligado no menu: um desenho, sem stencil");
+    Change([](Settings& s) {
+        s.layered = true;
+        s.shader = false;
+    });
+    ClearRec();
+    CastShadow();
+    Check(CountRec("RenderStuffInBuffer") == 1, "sem o shader do original: um desenho, como ele");
+    Change([](Settings& s) { s.shader = true; });
+
+    // O original iniciou de novo e pos os desvios dele de volta: no quadro seguinte as camadas voltam.
+    PutCall(0x70AD0D, g_se + 0x36E0);
+    PutCall(0x7082A4, g_se + 0x3510);
+    PutCall(0x7082BD, g_se + 0x3510);
+    PutCall(0x71167F, g_se + 0x1350);
+    FireEvent(0x53E981);
+    Check(ModuleOf(Target(0x70AD0D)) == g_menu && ModuleOf(Target(0x7082A4)) == g_menu &&
+              ModuleOf(Target(0x7082BD)) == g_menu && ModuleOf(Target(0x71167F)) == g_menu &&
+              LogHas("os desvios do Shadows Extender voltaram"),
+          "o original pos os desvios dele de novo: as camadas voltam no quadro seguinte");
 }
 
 void TestLive() {
@@ -928,11 +1047,11 @@ void TestSave() {
     Check(FileHas(ini, "MaxShadows=500             ; default 64") && FileHas(ini, "ShadowSunZLimit=0.5"),
           "o que nao mudou fica igual; o que mudou com o formato do original");
     Check(FileHas(ini, "FlagIgnoreSomeShadows=0   ; default 1"), "liga/desliga gravado para quando o jogo abrir");
-    Check(!FileHas(ini, "TROK_MENU"), "sem secao nova se a correcao nao mudou");
-    Change([](Settings& s) { s.fixOccupants = false; });
+    Check(!FileHas(ini, "TROK_MENU"), "sem secao nova se as camadas nao mudaram");
+    Change([](Settings& s) { s.layered = false; });
     TsmSave();
-    Check(FileHas(ini, "MoreThanOnePlayer=1 ; Use for SA:MP\r\n\r\n[TROK_MENU]\r\nCorrigirVeiculo=0\r\n"),
-          "correcao desligada: secao [TROK_MENU] no fim");
+    Check(FileHas(ini, "MoreThanOnePlayer=1 ; Use for SA:MP\r\n\r\n[TROK_MENU]\r\nEscurecerUmaVez=0\r\n"),
+          "camadas desligadas: secao [TROK_MENU] no fim");
 }
 
 int RunFull() {
@@ -941,9 +1060,8 @@ int RunFull() {
     }
     TestAttach();
     TestValuesRead();
-    TestPedFix();
-    TestExtras();
     TestLive();
+    TestLayers();
     TestRecreate();
     TestSave();
     return 0;
@@ -993,7 +1111,37 @@ int RunRenamed() {
     }
     printf("\n-- shadows.asi com outro nome\n");
     Check(LogHas("Shadows Extender 2.0 em 0x"), "achado pelo conteudo do modulo");
-    Check(!InExe(Target(0x5E6664)) && Target(0x5E6664) != g_se + 0x12F0, "correcao ligada");
+    Check(ModuleOf(Target(0x70AD0D)) == g_menu && LogHas("aplicado: com a sombra desfocada"), "camadas ligadas");
+    return 0;
+}
+
+// Outro mod tomou a chamada de CGame::Process e o evento de quadro nunca chega: o Present acha o original.
+int RunNoFrameEvent() {
+    if (!Boot("shadows.asi", false)) {
+        return 1;
+    }
+    printf("\n-- sem o evento de quadro\n");
+    Check(!LogHas("Shadows Extender 2.0 em 0x"), "sem quadro, ainda nao achou");
+    TsmPresent();
+    Check(LogHas("o evento de quadro (0x53E981) ainda nao chegou") && LogHas("procurando o Shadows Extender (pelo Present)") &&
+              LogHas("Shadows Extender 2.0 em 0x"),
+          "o Present acha o original");
+    Check(ModuleOf(Target(0x70AD0D)) == g_menu, "e liga as camadas");
+    // Resolucao nova: sem evento de quadro, o Present recria.
+    ClearRec();
+    Change([](Settings& s) {
+        s.raster = 8;
+        s.blurRaster = s.raster2 = s.blurRaster2 = 7;
+    });
+    TsmPresent();
+    const Rec* init = FindRec("Manager::Init");
+    Check(CountRec("Manager::Exit") == 1 && init && init->a[0] == 8, "o Present recria as sombras com a resolucao nova");
+    // Com o evento de quadro chegando, o Present nao faz nada.
+    FireEvent(0x53E981);
+    ClearRec();
+    Change([](Settings& s) { s.raster = 9; });
+    TsmPresent();
+    Check(CountRec("Manager::Init") == 0, "com o evento de quadro chegando, o Present deixa para ele");
     return 0;
 }
 
@@ -1007,6 +1155,7 @@ int RunMissing() {
     }
     Check(LogHas("o Shadows Extender 2.0 (shadows.asi do DK22Pac) nao foi achado"), "log: avisa");
     Check(Target(0x5E6664) == 0x532B20 && Bytes(0x706676, {0x8B, 0x07, 0x8A, 0x4E, 0x10}) &&
+              Target(0x70AD0D) == 0x70A7E0 && Target(0x7082A4) == 0x707800 && Target(0x71167F) == 0x727B60 &&
               Mem(0x7064C2)[0] == 7,
           "nada do jogo alterado");
     return 0;
@@ -1019,6 +1168,8 @@ extern "C" __declspec(dllexport) int HostMain(const char* mode, uintptr_t gameBe
         RunToggles();
     } else if (!strcmp(mode, "renomeado")) {
         RunRenamed();
+    } else if (!strcmp(mode, "sem_evento")) {
+        RunNoFrameEvent();
     } else if (!strcmp(mode, "sem_original")) {
         RunMissing();
     } else {

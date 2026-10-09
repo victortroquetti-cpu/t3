@@ -8,7 +8,7 @@
 
 #include "settings.h"
 
-#define TSM_VERSION "1.0"
+#define TSM_VERSION "1.1"
 
 // ---------------------------------------------------------------- log (log.cpp)
 void LogOpen(const char* path);
@@ -28,7 +28,8 @@ void SetJump(uintptr_t site, const void* fn);
 bool IniWrite(const char* path, const Settings& s, const Settings& before);
 
 // ---------------------------------------------------------------- Shadows Extender (se.cpp)
-void SeFrame(); // todo quadro: procura o Shadows Extender, liga a correcao e aplica o que estiver pendente
+void SeFrame();   // evento de quadro: procura o Shadows Extender, entra no desenho dele e aplica o que estiver pendente
+void SePresent(); // a cada Present: faz o mesmo se o evento de quadro nao chegar (outro mod tomou a chamada)
 
 // ---------------------------------------------------------------- menu na tela (overlay.cpp)
 void OverlayStart(HMODULE module);

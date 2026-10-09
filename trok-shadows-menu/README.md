@@ -2,15 +2,16 @@
 
 Um `.asi` que vai **junto** do Shadows Extender 2.0 (DK22Pac). O `shadows.asi` original continua como está; este complemento:
 
-- **corrige o escurecimento dobrado no veículo:** com a sombra desfocada (blur), onde a sombra do piloto cruzava a da moto (ou a do passageiro, a do carro) ficava mais escuro;
+- **corrige o escurecimento dobrado:** com a sombra desfocada (blur), onde duas sombras se cruzavam (a sua e a da moto, dois jogadores lado a lado) ficava mais escuro. Agora cada um continua com a sua sombra, e o cruzamento escurece uma vez só;
 - **corrige o `DisplayShadowsAtLowSettings` do `[STENCIL_SHADOWS]`:** o Shadows Extender lia a chave do `[REALTIME_SHADOWS]` duas vezes, e a do stencil nunca valia;
 - **põe um menu na tela** para mexer em tudo do `shadows.ini` com o jogo aberto, com limites que não derrubam o FPS e predefinições prontas. Cada mudança vale na hora e fica gravada no `shadows.ini`.
 
-> **Estado:** versão 1.0, compilada e testada sem o jogo. No Wine, com o `shadows.asi` original de verdade, passam as 64 conferências do `test/run.sh`; o menu, desenhado em imagens pelo `test/render.sh`, passa as 8 dele. Ainda não foi testada dentro do jogo.
+> **Estado:** versão 1.1, compilada e testada sem o jogo. No Wine, com o `shadows.asi` original de verdade, passam as 77 conferências do `test/run.sh`; o menu, desenhado em imagens pelo `test/render.sh`, passa as 10 dele. A 1.0 rodou no jogo (ver [Versões](#versões)); a 1.1 ainda não.
 
 ![Geral](docs/01-geral.png) ![Predefinições](docs/02-predefinicao.png)
 ![Sombra](docs/03-sombra.png) ![Veículos](docs/04-veiculos.png)
 ![Stencil](docs/05-stencil.png) ![Avançado](docs/06-avancado.png)
+![Geral com a sombra desfocada](docs/07-desfocada.png)
 
 ## Instalar
 
@@ -29,6 +30,7 @@ A fonte é a da casa (`moonloader\resource\trok\font.ttf`) se ela estiver na pas
 | **Geral** | Predefinição (Leve, Equilibrado, Bonito) | resolução, desfoque e as duas distâncias de uma vez |
 | | Peso estimado: quanto a placa de vídeo trabalha com a sombra em tempo real | — |
 | | Sombra desfocada (blur) | `CombineRealTimeShadowsWithStencil` ao contrário |
+| | Cruzamento escurece uma vez só (aparece com o blur ligado) | `[TROK_MENU] EscurecerUmaVez` |
 | | Distância (pessoas e veículos) | `[REALTIME_SHADOWS] MaxDistance` |
 | | Distância (prédios e objetos) | `[STENCIL_SHADOWS] MaxDistance` |
 | | Sombras em tempo real em uso (das 16 vagas do jogo) | — |
@@ -36,13 +38,12 @@ A fonte é a da casa (`moonloader\resource\trok\font.ttf`) se ela estiver na pas
 | | Cor e Força (as do stencil no modo combinado, as da sombra em tempo real no desfocado) | `R` `G` `B` `A` |
 | | Força à noite, Força com nuvens | `ShadowIntensityNightFactor`, `ShadowIntensityCloudsFactor` |
 | | Altura mínima do sol | `ShadowSunZLimit` (em graus) |
-| **Veículos** | Quem está no veículo entra na sombra dele (a correção) | `[TROK_MENU] CorrigirVeiculo` |
-| | Sombra simples junto com a em tempo real, Sem sombra simples nos veículos | `DrawVehicleDefaultShadowWithRealTime`, `DisableVehicleDefaultShadow` |
+| **Veículos** | Sombra simples junto com a em tempo real, Sem sombra simples nos veículos | `DrawVehicleDefaultShadowWithRealTime`, `DisableVehicleDefaultShadow` |
 | | Todos os jogadores (SA-MP), Com gráficos no baixo | `MoreThanOnePlayer`, `[REALTIME_SHADOWS] DisplayShadowsAtLowSettings` |
 | **Stencil** | Quantidade, Distância, Todos os objetos a cada quadro, Sem sombra de prédios e objetos, Com gráficos no baixo, Cor e Força | `MaxShadows`, `MaxDistance`, `FlagIgnoreSomeShadows`, `DisableBuildingShadows`, `DisplayShadowsAtLowSettings`, `R` `G` `B` `A` |
 | **Avançado** | Raio da projeção (e no ar), Alcance até o chão (e no ar), Shader, Padrões do Shadows Extender | `ShadowBoundSphere(InAir)`, `ShadowZDistanceLimit(InAir)`, `EnableShadowsShader` |
 
-Barras, setas, cores e a resolução fora do padrão do Shadows Extender ganham um "Restaurar" (na predefinição, ele volta para o Equilibrado, o recomendado). "Padrões do Shadows Extender" volta tudo de uma vez (menos a correção do veículo) e grava. Com o shader desligado e o blur desligado, a aba Avançado avisa: o modo junto com o stencil precisa do shader.
+Barras, setas, cores e a resolução fora do padrão do Shadows Extender ganham um "Restaurar" (na predefinição, ele volta para o Equilibrado, o recomendado). "Padrões do Shadows Extender" volta tudo de uma vez (menos o cruzamento) e grava. Com o shader desligado e o blur desligado, a aba Avançado avisa: o modo junto com o stencil precisa do shader.
 
 ### Limites
 
@@ -67,23 +68,27 @@ Um valor do `shadows.ini` fora da faixa fica como está até você mexer nele no
 
 ### O que vale na hora
 
-- **Na hora:** cores e forças, sombra desfocada, distâncias, noite e nuvens, sol, raios e alcances, sombra simples dos veículos, a correção do veículo, desfoque e degradê nas bordas (nas 16 sombras que já existem).
+- **Na hora:** cores e forças, sombra desfocada, o cruzamento, distâncias, noite e nuvens, sol, raios e alcances, sombra simples dos veículos, desfoque e degradê nas bordas (nas 16 sombras que já existem).
 - **No quadro seguinte:** resolução e os valores do degradê. As 16 sombras em tempo real são criadas de novo. Se a placa recusar uma resolução, o menu volta para a última que funcionou e escreve no log.
 - **Shader:** desliga e liga na hora, se o Shadows Extender compilou os shaders ao abrir o jogo.
 - **Os liga/desliga** (todos os objetos a cada quadro, sem sombra de prédios, gráficos no baixo, sombra simples junto, todos os jogadores): na hora quando o byte original do jogo é conhecido. Ele vem da memória (se o Shadows Extender não mexeu ali) ou do `gta_sa.exe` no disco (se o arquivo tem o mesmo código da memória). Se não der, vale quando o jogo abrir de novo, e o menu avisa.
 - **Quantidade do stencil:** quando o jogo abrir de novo (o jogo cria essas sombras uma vez só).
 
-O `shadows.ini` é gravado um segundo depois da última mudança, ou quando o menu fecha. Só as chaves que mudaram são trocadas: os comentários, o alinhamento e a ordem ficam como estavam. A correção do veículo vai numa seção nova, `[TROK_MENU]`, só se você desligar.
+O `shadows.ini` é gravado um segundo depois da última mudança, ou quando o menu fecha. Só as chaves que mudaram são trocadas: os comentários, o alinhamento e a ordem ficam como estavam. O cruzamento vai numa seção nova, `[TROK_MENU]`, só se você desligar.
 
 ## Como funciona
 
 Todos os endereços são do `gta_sa.exe` 1.0 US. Os do Shadows Extender são relativos ao começo do `shadows.asi` já descompactado (ele vem com ASPack).
 
 - **Acha o Shadows Extender** pelo nome `shadows.asi` ou, se foi renomeado, pelo conteúdo de cada módulo carregado: os textos `2.0`, `Shadows Extender` e `shadows.ini` e o código do gancho do pedestre. Espera ele terminar de iniciar (o gancho dele em `0x706676`) e lê os valores em uso: das variáveis dele, dos `push` que ele escreveu no jogo e dos bytes que ele trocou.
-- **Evento de quadro:** a chamada de `CGame::Process` em `Idle` (`0x53E981`), encadeada com quem já estiver lá.
-- **Correção do veículo:**
-  - `CPed::PreRenderAfterTest` (`0x5E6664`): o Shadows Extender troca a atualização dos ossos por uma função dele que também pede sombra em tempo real para todo pedestre. O complemento fica na frente: um pedestre dentro de um veículo que já tem sombra em tempo real só atualiza os ossos. Se o veículo ficou sem sombra (as 16 vagas em uso), o pedestre continua com a dele. O pedido do próprio jogo para quem anda de moto o Shadows Extender já apaga (`0x5E68A2`).
-  - `CRealTimeShadow::Update` (`0x706676`): o Shadows Extender desvia para o trecho dele que desenha a arma e fecha a câmera da sombra. O complemento entra antes, com a câmera ainda aberta: se o dono da sombra é um veículo, desenha o motorista e até 8 passageiros em silhueta (sem textura, luz e cor, como o jogo desenha o dono). Depois segue para o trecho do Shadows Extender com todos os registradores como estavam.
+- **Evento de quadro:** a chamada de `CGame::Process` em `Idle` (`0x53E981`), encadeada com quem já estiver lá. Se ele não chega (outro mod tomou a chamada sem repassar), o `Present` faz o mesmo trabalho; o log diz quem estava em `0x53E981` antes.
+- **Cruzamento (sombra desfocada em camadas):** com a sombra desfocada, cada sombra em tempo real multiplica o que já está na tela por (1 − sombra), então duas sombras no mesmo pixel escurecem duas vezes. O complemento desenha cada sombra em 4 faixas de escurecimento, com um pixel shader dele no lugar do do Shadows Extender (só durante o desenho). O stencil (bits 4 a 6) guarda até que faixa cada pixel já foi escurecido, e cada faixa só escurece o pixel que ainda não chegou nela.
+  - **Resultado:** sozinha, a sombra sai igual à do original, porque as faixas se multiplicam no mesmo valor. No cruzamento, o pixel fica com o escurecimento da sombra mais forte ali (no máximo uma faixa mais claro), em vez da soma das duas.
+  - **Onde entra:**
+    - o `CAST` do Shadows Extender em `CShadows::RenderStoredShadows` (`0x70AD0D`) e o desenho no fim dele;
+    - o buffer cheio no meio da sombra (`0x7082A4`, `0x7082BD`); com outros efeitos, segue igual ao original;
+    - antes do retângulo do stencil (`0x71167F`): um retângulo que não muda a cor zera só os bits das faixas, para o jogo não escurecer esses pixels de novo.
+  - **Quando fica desligado:** no modo combinado (o stencil já junta as sombras), sem o shader do Shadows Extender e quando você desliga no menu.
 - **Valores na hora:** o complemento escreve nas variáveis do Shadows Extender que ele relê a cada quadro (cores, modo combinado, fatores, raios, alcances, sol, sombra simples, shader) e nos lugares do jogo que ele escreveu uma vez (`MAX_DISTANCE_PED_SHADOWS` em `0x8D5240` e o quadrado em `0xC4B6B0`; a distância do stencil, que o jogo lê por ponteiro na variável dele).
 - **Sombras criadas de novo:** com a resolução nova, no evento de quadro (entre `CGame::Process` e a atualização das sombras, quando nenhuma está guardada para desenhar): devolve as sombras em uso (`ReturnRealTimeShadow`, `0x705B30`), `CRealTimeShadowManager::Exit` (`0x706A60`), escreve os `push` de `CRealTimeShadow::Create` e `CRealTimeShadowManager::Init` (`0x7064C2`, `0x7064F9`, `0x706810`–`0x706832`) e o degradê (`0x8D5218`, `0x8D521C`), e `Init` (`0x7067C0`). Confere as câmeras de cada sombra; sem elas, volta para a última resolução que funcionou.
 - **Liga/desliga:** os mesmos bytes que o Shadows Extender troca ao abrir o jogo: `0x711E3D`, `0x711E41`, `0x711D9D` e `0x7113C0` (stencil), `0x706BCC` e `0x5E6766` (tempo real no gráfico baixo), `0x70BDAB` (sombra simples junto) e `0x7069F5` (todos os jogadores).
@@ -110,12 +115,30 @@ O `test/run.sh` precisa de `wine` (com `wine32`), `xvfb-run`, MinGW i686 e dos a
 
 O `test/launcher.exe` ocupa a faixa de endereços do `gta_sa.exe` (`0x400000`–`0xD00000`); o `test/host.cpp` monta ali os pontos do 1.0 US, carrega o `shadows.asi` original e o complemento, dispara os eventos e chama os ganchos com dados falsos. As funções do jogo viram gravadores. Os modos:
 
-- **completo** (o `test/shadows.ini`, tudo ligado): o complemento acha o original e liga a correção; os valores lidos batem com o INI; o piloto não pede sombra própria quando a moto tem a dela, e pede quando ela ficou sem; a sombra da moto desenha o piloto e a garupa em silhueta antes de o original fechar a câmera, com os registradores como o original deixa; os valores mudados chegam ao original e ao jogo; a resolução nova recria as sombras no quadro seguinte (e volta se a placa recusar); o `shadows.ini` é gravado sem perder os comentários.
+- **completo** (o `test/shadows.ini`, tudo ligado):
+  - o complemento acha o original e entra no desenho dele;
+  - os valores lidos batem com o INI, e os mudados chegam ao original e ao jogo;
+  - **camadas:**
+    - uma sombra projetada vira 4 desenhos, com o shader das camadas, as faixas certas e os estados devolvidos no fim;
+    - os pixels, refeitos com as passadas gravadas: sozinha, a sombra sai igual à do original; cruzada, nunca fica mais escura que a mais forte;
+    - o buffer cheio no meio da sombra também entra em camadas, e outros efeitos ficam como no original;
+    - o retângulo do stencil apaga só as marcas das faixas;
+    - nada muda no modo combinado, sem o shader ou com a opção desligada;
+  - a resolução nova recria as sombras no quadro seguinte (e volta se a placa recusar);
+  - o `shadows.ini` é gravado sem perder os comentários.
 - **liga_desliga** (tudo desligado no INI): o `DisplayShadowsAtLowSettings` do stencil corrigido; cada liga/desliga liga e volta ao byte original.
 - **renomeado:** o `shadows.asi` com outro nome é achado pelo conteúdo.
+- **sem_evento:** o evento de quadro nunca chega; o `Present` acha o original, liga as camadas e recria as sombras; com o evento chegando, o `Present` não faz nada.
 - **sem_original:** sem o Shadows Extender, o complemento só avisa e não mexe no jogo.
 
-O `test/render.sh` roda o menu com um Shadows Extender falso (os valores do `test/shadows.ini`), confere predefinições, blur, gravação, quantidade do stencil e padrões, e grava as imagens das abas em `test/out/menu/`.
+O `test/render.sh` roda o menu com um Shadows Extender falso (os valores do `test/shadows.ini`), confere predefinições, blur, cruzamento, gravação, quantidade do stencil e padrões, e grava as imagens das abas em `test/out/menu/`.
+
+## Versões
+
+- **1.1**
+  - O cruzamento de duas sombras desfocadas escurece uma vez só, e cada um continua com a sua sombra. A 1.0 tirava a sombra de quem estava no veículo e tentava desenhar a pessoa dentro da sombra do veículo; no jogo, a pessoa não aparecia nela (na moto, a sombra ficava sem o piloto).
+  - O Shadows Extender é procurado também pelo `Present`. Na 1.0, se outro mod tomasse a chamada do evento de quadro, o menu ficava em "Procurando o Shadows Extender".
+- **1.0** — primeira versão.
 
 ## Créditos
 
