@@ -963,7 +963,7 @@ Rows.__index = Rows
 -- keys = { up, down, left, right, enter, space, digit } vindos do laco principal.
 -- selected = linha selecionada (1..n). Depois de desenhar, leia rows.selected.
 -- Valor padrao: barras mostram uma linha vertical no padrao; setas, giro e segmentado mostram um
--- ponto; todos ganham "Restaurar" quando saem do padrao (a dica mostra qual e o padrao).
+-- tracinho; todos ganham "Restaurar" quando saem do padrao (a dica mostra qual e o padrao).
 function ui.rows(id, x, width, selected, keys, showNumbers)
     local u = ui.u
     local self = setmetatable({}, Rows)
@@ -1066,9 +1066,17 @@ function Rows:restoreButton(differs, controlLeft, defaultText)
     return clicked
 end
 
--- Ponto discreto que marca "este e o valor padrao" (setas, giro e segmentado).
-function Rows:defaultDot(x, y)
-    self.dl:AddCircleFilled(vec(x, y), 1.6 * ui.u, pal('marker'), 12)
+-- Tracinho discreto que marca "este e o valor padrao": 8u de largura, 1.5u de espessura (pelo menos 1 px) e pontas
+-- arredondadas, centrado em (x, y).
+function ui.defaultMark(dl, x, y, color)
+    local u = ui.u
+    local h = math.max(1, 1.5 * u) * 0.5
+    dl:AddRectFilled(vec(x - 4 * u, y - h), vec(x + 4 * u, y + h), color, h)
+end
+
+-- Marca do valor padrao nas setas, no giro e no segmentado.
+function Rows:defaultMark(x, y)
+    ui.defaultMark(self.dl, x, y, pal('marker'))
 end
 
 function Rows:finish(height)
@@ -1146,7 +1154,7 @@ local function drawArrows(self, a, text, leftOff, rightOff, isDefault)
     drawText(self.dl, ui.fonts.desc, a.cx + a.aw + (a.vw - ts.x) * 0.5, centerY - ts.y * 0.5,
         a.hv and pal('text') or pal('column'), text)
     if isDefault then
-        self:defaultDot(a.cx + a.aw + a.vw * 0.5, centerY + 9 * ui.u)
+        self:defaultMark(a.cx + a.aw + a.vw * 0.5, centerY + 9 * ui.u)
     end
 end
 
@@ -1283,7 +1291,7 @@ function Rows:segmented(label, index, options, default)
         local segX = sx + segW * (i - 1)
         drawText(self.dl, ui.fonts.desc, segX + (segW - ts.x) * 0.5, sy + (sh - ts.y) * 0.5 - 1 * u, color, option)
         if i == default then
-            self:defaultDot(segX + segW * 0.5, sy + sh - 4 * u)
+            self:defaultMark(segX + segW * 0.5, sy + sh - 4 * u)
         end
     end
     self:finish(self.rowH)
@@ -1504,7 +1512,7 @@ function Rows:color(label, color, default)
         local hexNow = hexColor(color)
         drawText(pdl, ui.fonts.desc, hx + barW - textSize(ui.fonts.desc, hexNow).x, bottom, pal('text'), hexNow)
 
-        -- Primeira amostra = a cor padrao (com o ponto da casa); depois, cores rapidas.
+        -- Primeira amostra = a cor padrao (com o tracinho da casa); depois, cores rapidas.
         local slots = { default }
         for _, preset in ipairs(PRESETS) do
             slots[#slots + 1] = preset
@@ -1531,8 +1539,7 @@ function Rows:color(label, color, default)
                 4 * u)
             if i == 1 then
                 local lum = (swatch[1] * 3 + swatch[2] * 6 + swatch[3]) / 10
-                pdl:AddCircleFilled(vec(x + presetW * 0.5, presetY + 8 * u), 2 * u,
-                    lum > 140 and rgba(0, 0, 0, 150) or white(200), 12)
+                ui.defaultMark(pdl, x + presetW * 0.5, presetY + 8 * u, lum > 140 and rgba(0, 0, 0, 150) or white(200))
             end
             if pHovered or sameColor(swatch, color) then
                 pdl:AddRect(vec(x - 1.5, presetY - 1.5), vec(x + presetW + 1.5, presetY + 16 * u + 1.5), white(200),

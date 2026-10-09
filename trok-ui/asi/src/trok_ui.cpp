@@ -257,6 +257,12 @@ ImVec2 TextSize(ImFont* font, const char* text) {
     return font->CalcTextSizeA(font->FontSize, 10000.0f, 0.0f, text);
 }
 
+// Tracinho do valor padrao: 8u de largura, 1.5u de espessura (pelo menos 1 px) e pontas arredondadas.
+void DefaultMark(ImDrawList* dl, float x, float y, ImU32 color) {
+    float h = std::max(1.0f, 1.5f * u) * 0.5f;
+    dl->AddRectFilled(ImVec2(x - 4 * u, y - h), ImVec2(x + 4 * u, y + h), color, h);
+}
+
 void Text(ImDrawList* dl, ImFont* font, float x, float y, ImU32 color, const char* text) {
     dl->AddText(font, font->FontSize, ImVec2(std::floor(x), std::floor(y)), color, text);
 }
@@ -741,9 +747,9 @@ bool Rows::Restore(bool differs, float controlLeft, const char* defaultText) {
     return clicked;
 }
 
-// Ponto discreto que marca "este e o valor padrao" (setas, giro e segmentado).
-void Rows::DefaultDot(float x, float y) {
-    dl_->AddCircleFilled(ImVec2(x, y), 1.6f * u, col::marker, 12);
+// Marca do valor padrao nas setas, no giro e no segmentado.
+void Rows::DefaultMark(float x, float y) {
+    tui::DefaultMark(dl_, x, y, col::marker);
 }
 
 void Rows::Finish(float height) {
@@ -856,7 +862,7 @@ bool Rows::Stepper(const char* label, int* value, int min, int max, int step, co
     snprintf(text, sizeof(text), fmt, *value);
     DrawArrows(dl_, a, cy, text, *value <= min, *value >= max);
     if (*value == def) {
-        DefaultDot(a.cx + a.aw + a.vw * 0.5f, cy + 9 * u);
+        DefaultMark(a.cx + a.aw + a.vw * 0.5f, cy + 9 * u);
     }
     Finish(rowH_);
     return changed;
@@ -890,7 +896,7 @@ bool Rows::Cycle(const char* label, int* index, const char* const* options, int 
     Label(label, hovered);
     DrawArrows(dl_, a, cy, options[*index], false, false);
     if (*index == def) {
-        DefaultDot(a.cx + a.aw + a.vw * 0.5f, cy + 9 * u);
+        DefaultMark(a.cx + a.aw + a.vw * 0.5f, cy + 9 * u);
     }
     Finish(rowH_);
     return changed;
@@ -987,7 +993,7 @@ bool Rows::Segmented(const char* label, int* index, const char* const* options, 
         float segX = sx + segW * i;
         Text(dl_, fonts.desc, segX + (segW - ts.x) * 0.5f, sy + (sh - ts.y) * 0.5f - 1 * u, c, options[i]);
         if (i == def) {
-            DefaultDot(segX + segW * 0.5f, sy + sh - 4 * u);
+            DefaultMark(segX + segW * 0.5f, sy + sh - 4 * u);
         }
     }
     Finish(rowH_);
@@ -1263,7 +1269,7 @@ bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
         ImVec2 hx = TextSize(fonts.desc, hex);
         Text(pdl, fonts.desc, hp.x + barW - hx.x, bottom, col::text, hex);
 
-        // Primeira amostra = a cor padrao (com o ponto da casa); depois, cores rapidas.
+        // Primeira amostra = a cor padrao (com o tracinho da casa); depois, cores rapidas.
         static const ImU32 presets[] = {
             IM_COL32(240, 240, 240, 255), IM_COL32(150, 150, 150, 255), IM_COL32(255, 107, 107, 255),
             IM_COL32(255, 196, 87, 255),  IM_COL32(120, 224, 143, 255), IM_COL32(87, 191, 255, 255),
@@ -1296,8 +1302,7 @@ bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
             if (i == 0) {
                 int lum = (((swatch >> IM_COL32_R_SHIFT) & 0xFF) * 3 + ((swatch >> IM_COL32_G_SHIFT) & 0xFF) * 6 +
                            ((swatch >> IM_COL32_B_SHIFT) & 0xFF)) / 10;
-                pdl->AddCircleFilled(ImVec2(px + pw * 0.5f, py + 8 * u), 2 * u,
-                                     lum > 140 ? IM_COL32(0, 0, 0, 150) : col::White(200), 12);
+                tui::DefaultMark(pdl, px + pw * 0.5f, py + 8 * u, lum > 140 ? IM_COL32(0, 0, 0, 150) : col::White(200));
             }
             if (ph || swatch == (*color | IM_COL32_A_MASK)) {
                 pdl->AddRect(ImVec2(px - 1.5f, py - 1.5f), ImVec2(px + pw + 1.5f, py + 16 * u + 1.5f),

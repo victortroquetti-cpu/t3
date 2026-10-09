@@ -60,7 +60,7 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 | `number` / hover / selecionado | branco 78 / 110 / 150 | número à esquerda da linha |
 | `strong` | `226` | "ligado": trilho do toggle, barra, marcas |
 | `ink` | `18` | texto e marca sobre o `strong` |
-| `marker` | branco 70 | ponto do valor padrão |
+| `marker` | branco 70 | tracinho do valor padrão |
 
 ### Medidas
 
@@ -76,10 +76,10 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 1. **Teclado em tudo:** ↑/↓ escolhem a linha, ←/→ ajustam, Enter ativa, Espaço marca, 1–9 escolhem itens de lista, Esc fecha (primeiro o popup aberto, depois a janela). A linha escolhida pelo teclado rola para ficar visível. O Tab não é do menu: no SA-MP ele abre o placar, então passa direto, e as abas trocam com o mouse. O mesmo vale para o T e o F6, que abrem o chat.
 2. **Valor padrão sempre marcado:**
    - **Barras:** linha vertical no ponto padrão (por baixo da bolinha), como no Trok Radar.
-   - **Setas e giro:** ponto sob o valor quando ele é o padrão.
-   - **Segmentado:** ponto sob a opção padrão.
+   - **Setas e giro:** tracinho discreto sob o valor quando ele é o padrão (8u × 1.5u, pontas arredondadas).
+   - **Segmentado:** tracinho sob a opção padrão.
    - **Lista suspensa:** etiqueta "padrão" na opção.
-   - **Cor:** a primeira amostra do seletor é a cor padrão, com o ponto.
+   - **Cor:** a primeira amostra do seletor é a cor padrão, com o tracinho.
    - **Todos:** **Restaurar** aparece à esquerda do controle quando o valor sai do padrão, e a dica mostra qual é o padrão.
 3. **Botões e cliques:** primeiro os botões invisíveis do controle (eles ganham o hover), depois o fundo da linha, e o desenho por último. Nada usa os widgets cinza do ImGui.
 4. **Primeiro quadro sem teclado:** o Enter que mandou o comando (ou abriu a tela) não aciona nada dentro dela.

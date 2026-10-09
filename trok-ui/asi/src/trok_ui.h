@@ -50,6 +50,8 @@ void BuildFonts(float screenHeight, const char* gameDir);
 
 ImVec2 TextSize(ImFont* font, const char* text);
 void Text(ImDrawList* dl, ImFont* font, float x, float y, ImU32 color, const char* text);
+// Tracinho discreto que marca "este e o valor padrao", centrado em (x, y).
+void DefaultMark(ImDrawList* dl, float x, float y, ImU32 color);
 float Anim(ImGuiID id, float target, float speed = 14.0f);
 
 // ---------------------------------------------------------------- icones (lucide)
@@ -122,7 +124,7 @@ struct Keys {
 
 // Lista de linhas numeradas. Use dentro da janela (ou de um child com rolagem).
 // Valor padrao: barras mostram uma linha vertical no padrao; setas, giro e segmentado mostram um
-// ponto; todos ganham "Restaurar" quando saem do padrao (a dica mostra qual e o padrao).
+// tracinho; todos ganham "Restaurar" quando saem do padrao (a dica mostra qual e o padrao).
 class Rows {
 public:
     void Begin(const char* id, float x, float width, int* selected, const Keys& keys, bool showNumbers = true);
@@ -162,7 +164,7 @@ private:
     void Label(const char* label, bool hovered);
     void Number(bool hovered, float centerY);
     bool Restore(bool differs, float controlLeft, const char* defaultText);
-    void DefaultDot(float x, float y);
+    void DefaultMark(float x, float y);
     void Finish(float height);
     bool Selected() const { return *selected_ == index_; }
     ImGuiID Id(const char* suffix) const;
