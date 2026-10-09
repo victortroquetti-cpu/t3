@@ -92,6 +92,14 @@ local function near(a, b)
     return math.abs(a - b) < 1e-5
 end
 
+-- O 1.52 decide se a lista suspensa abre para cima comparando, em float, o espaco embaixo dela com a altura dela.
+-- Com medidas quebradas a subtracao erra no ultimo bit e a lista abre para cima mesmo com espaco embaixo (com as
+-- medidas inteiras de fabrica isso nao acontece). Fontes e espacamentos em multiplos de 1/64 de pixel deixam essas
+-- contas exatas, e a diferenca de tamanho nao aparece.
+local function exact(v)
+    return math.floor(v * 64 + 0.5) / 64
+end
+
 local function samePair(a, b, i)
     return near(a[i * 2 - 1], b[i * 2 - 1]) and near(a[i * 2], b[i * 2])
 end
@@ -231,8 +239,9 @@ local function loadHouse(height)
     local indent, scroll, grab, wpx, wpy, fpx, fpy, isx, isy, iix, iiy = skin.spacing(height)
     layoutOn = indent ~= nil
     if layoutOn then
-        s[6], s[7], s[8] = indent, scroll, grab
-        p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10] = wpx, wpy, fpx, fpy, isx, isy, iix, iiy
+        s[6], s[7], s[8] = exact(indent), exact(scroll), exact(grab)
+        p[3], p[4], p[5], p[6] = exact(wpx), exact(wpy), exact(fpx), exact(fpy)
+        p[7], p[8], p[9], p[10] = exact(isx), exact(isy), exact(iix), exact(iiy)
     end
 end
 
@@ -406,6 +415,7 @@ local function patchFonts()
         local merge = cfg ~= nil and cfg.MergeMode == true
         local houseSize, face = skin.font(file, fontPath, size, ranges ~= nil, merge)
         if not houseSize then return nil end
+        houseSize = exact(houseSize)
         if not face then
             return add(self, fontPath, houseSize, ...) -- layout=1: so o tamanho
         end
@@ -442,8 +452,8 @@ local function patchFonts()
                 return kf
             end
             local titleSize = skin.titleSize()
-            titleFont = kitFont(titleSize)
-            descFont = kitFont(titleSize * 14.5 / 18)
+            titleFont = kitFont(exact(titleSize))
+            descFont = kitFont(exact(titleSize * 14.5 / 18))
         end
         if cfg ~= nil then cfg.MergeMode = false end
         skin.log(string.format('fonte %s %.1f px de %s -> fonte da casa %.1f px (%s)', fontPath, size, file, houseSize,
@@ -470,7 +480,7 @@ local function patchFonts()
                     return skin.font(file, nil, args[sizeArg], false, type(cfg) == 'userdata' and cfg.MergeMode == true)
                 end)
                 if ok and newSize then
-                    args[sizeArg] = newSize
+                    args[sizeArg] = exact(newSize)
                     return original(self, unpack(args, 1, n))
                 end
             end
@@ -605,7 +615,7 @@ local function kitShell(name, open)
     end
     local style = styleRef()
     -- O conteudo comeca embaixo do cabecalho (posicao local: acompanha a rolagem da janela).
-    imgui.SetCursorPos(V(style.WindowPadding.x, headerH + style.WindowPadding.y * 0.75))
+    imgui.SetCursorPos(V(style.WindowPadding.x, exact(headerH + style.WindowPadding.y * 0.75)))
     imgui.PushClipRect(V(pos.x, pos.y + headerH), V(pos.x + size.x, pos.y + size.y), true)
 end
 
