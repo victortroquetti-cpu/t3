@@ -16,8 +16,8 @@ namespace tui {
 
 struct Fonts {
     ImFont* body = nullptr;      // 16u -- rotulos e textos
-    ImFont* title = nullptr;     // 20u -- titulo do cabecalho
-    ImFont* desc = nullptr;      // 13.5u -- numeros, valores, dicas, versao
+    ImFont* title = nullptr;     // 18u -- titulo do cabecalho
+    ImFont* desc = nullptr;      // 14.5u -- abas, botoes, numeros, valores, dicas, versao
     ImFont* icon = nullptr;      // 18u -- lucide.ttf
     ImFont* iconSmall = nullptr; // 13u -- lucide.ttf (check, lupa)
 };

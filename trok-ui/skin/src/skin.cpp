@@ -379,11 +379,11 @@ void HouseScalars(Look& l, float u) {
     l.windowTitleAlign = ImVec2(0.5f, 0.5f);
 }
 
-// Espacamentos da casa (layout=1), os do kit: margem da janela 18x16; campo de 24 com texto de 16 (folga de 4 em
-// cima e embaixo); linhas de 28 com 2 de intervalo (6 entre um campo e outro); recuo 12. Mexem no layout.
+// Espacamentos da casa (layout=1), os do kit: margem da janela 18x16; campo de 26 com texto de 16 (folga de 5 em
+// cima e embaixo); linhas de 30 com 2 de intervalo (6 entre um campo e outro); recuo 12. Mexem no layout.
 void HouseSpacing(Look& l, float u) {
     l.windowPadding = ImVec2(18 * u, 16 * u);
-    l.framePadding = ImVec2(10 * u, 4 * u);
+    l.framePadding = ImVec2(10 * u, 5 * u);
     l.itemSpacing = ImVec2(10 * u, 6 * u);
     l.itemInnerSpacing = ImVec2(8 * u, 6 * u);
     l.indentSpacing = 12 * u;
@@ -896,7 +896,7 @@ bool __cdecl HookCheckbox(const char* label, bool* v) {
     if (end > label) {
         k.CalcTextSize(&ls, label, end, false, -1.0f);
     }
-    float th = std::min(22 * u, fh), tw = th * 40.0f / 22.0f;
+    float th = std::min(24 * u, fh), tw = th * 44.0f / 24.0f;
     float width = tw + (end > label ? style->ItemInnerSpacing.x + ls.x : 0.0f);
     bool pressed = k.InvisibleButton(label, ImVec2(width, fh));
     bool hovered = k.IsItemHovered(0);
@@ -921,7 +921,7 @@ bool __cdecl HookCheckbox(const char* label, bool* v) {
     return pressed;
 }
 
-// Botao do kit: texto na fonte pequena da casa (13,5 x escala), 24 de altura e 14 de folga de cada lado; fundo
+// Botao do kit: texto na fonte pequena da casa (14,5 x escala), 26 de altura e 15 de folga de cada lado; fundo
 // branco a 8% com contorno a 22% (16% e 40% com o mouse em cima) e texto 200 (240 com o mouse em cima). E o botao do
 // proprio ImGui, com essas medidas e cores empurradas so durante a chamada: mesmo id, mesmo retorno, repeticao
 // (PushButtonRepeat) e alinhamento da linha como antes. Tamanho que o mod deu fica (a folga encolhe para o texto
@@ -941,7 +941,7 @@ bool __cdecl HookButton(const char* label, const ImVec2 size) {
     if (end > label) {
         o_CalcTextSizeA(&ts, font ? font : k.GetFont(), fontSize, FLT_MAX, 0.0f, label, end, nullptr);
     }
-    float padX = 14 * u, padY = std::max(0.0f, (24 * u - fontSize) * 0.5f);
+    float padX = 15 * u, padY = std::max(0.0f, (26 * u - fontSize) * 0.5f);
     if (size.x > 0) {
         padX = std::min(padX, std::max(0.0f, (size.x - ts.x) * 0.5f));
     }
@@ -1053,7 +1053,7 @@ bool KitSlider(const char* label, double* value, double vmin, double vmax, const
         k.CalcTextSize(&s, t, nullptr, false, -1.0f);
         valueW = std::max(valueW, s.x);
     }
-    float knobR = 7 * u;
+    float knobR = 8 * u;
     float x0 = pos.x + knobR, x1 = pos.x + w - valueW - 10 * u - knobR;
     if (x1 - x0 < 24 * u) { // estreito demais para o valor ao lado: a trilha usa a largura toda
         valueW = 0;
@@ -1634,16 +1634,16 @@ ImFont* __cdecl HookAddFontFromFileTTF(ImFontAtlas* atlas, const char* filename,
     o_AddFontFromFileTTF(atlas, filename, houseSize, &fallback, ranges);
     g_replaced[font] = Replaced{atlas, ratio};
     if (g_kit && !script.titleFont) {
-        // Fontes do kit, com a mesma reserva de glifos: a de titulo (20 x escala) para o cabecalho das janelas e a
-        // pequena (13,5 x escala) para o texto dos botoes.
+        // Fontes do kit, com a mesma reserva de glifos: a de titulo (18 x escala) para o cabecalho das janelas e a
+        // pequena (14,5 x escala) para o texto dos botoes.
         float scale = Scale(ScreenHeight());
-        script.titleFont = o_AddFontFromFileTTF(atlas, g_housePath, 20.0f * scale, &base, ranges);
+        script.titleFont = o_AddFontFromFileTTF(atlas, g_housePath, 18.0f * scale, &base, ranges);
         if (script.titleFont) {
-            o_AddFontFromFileTTF(atlas, filename, 20.0f * scale, &fallback, ranges);
+            o_AddFontFromFileTTF(atlas, filename, 18.0f * scale, &fallback, ranges);
         }
-        script.descFont = o_AddFontFromFileTTF(atlas, g_housePath, 13.5f * scale, &base, ranges);
+        script.descFont = o_AddFontFromFileTTF(atlas, g_housePath, 14.5f * scale, &base, ranges);
         if (script.descFont) {
-            o_AddFontFromFileTTF(atlas, filename, 13.5f * scale, &fallback, ranges);
+            o_AddFontFromFileTTF(atlas, filename, 14.5f * scale, &fallback, ranges);
         }
     }
     Log("fonte %s %.1f px de %s -> fonte da casa %.1f px (%s)", filename, size, owner.c_str(), houseSize,
@@ -1949,9 +1949,9 @@ int __cdecl LuaSpacing(lua_State* L) {
     return 11;
 }
 
-// skin.titleSize(): tamanho da fonte de titulo do kit (20 x escala da tela), para o cabecalho das janelas.
+// skin.titleSize(): tamanho da fonte de titulo do kit (18 x escala da tela), para o cabecalho das janelas.
 int __cdecl LuaTitleSize(lua_State* L) {
-    g_lua.pushnumber(L, 20.0f * Scale(ScreenHeight()));
+    g_lua.pushnumber(L, 18.0f * Scale(ScreenHeight()));
     return 1;
 }
 
@@ -2554,7 +2554,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         char file[MAX_PATH] = {};
         GetModuleFileNameA(module, file, MAX_PATH);
         const char* base = strrchr(file, '\\') ? strrchr(file, '\\') + 1 : file;
-        Log("Trok Skin .asi v1.5.0 (%s)", base);
+        Log("Trok Skin .asi v1.5.1 (%s)", base);
         // Uma copia so por jogo: com o Trok Skin.asi e o Trok Skin Layout.asi juntos na pasta, a que carregar
         // depois fica desligada (as duas desviariam as mesmas funcoes).
         CreateMutexA(nullptr, FALSE, "TrokSkin.UmaCopia");

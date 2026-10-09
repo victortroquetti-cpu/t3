@@ -180,7 +180,7 @@ text, field, save = lay[(0, 'Painel A|texto')], lay[(0, 'Painel A|campo')], lay[
 check('layout LIGADO' in log('layout'), 'layout: a versao Layout ja vem com layout=1 (log)')
 check('erro' not in log('layout') and 'nao conferiu' not in log('layout'), 'layout: nenhum erro no log (e a leitura rapida conferiu)')
 check(abs((text[3] - text[1]) - 16 * u) < 0.1, f'layout: texto com o tamanho da casa ({text[3] - text[1]:.2f} px = 16 x escala)')
-check(abs((field[3] - field[1]) - 24 * u) < 0.1, f'layout: campo com a altura da casa ({field[3] - field[1]:.2f} px = 24 x escala)')
+check(abs((field[3] - field[1]) - 26 * u) < 0.1, f'layout: campo com a altura da casa ({field[3] - field[1]:.2f} px = 26 x escala)')
 # O ImGui arredonda para baixo a posicao de cada linha nova: o botao cai em floor(fim do texto + espaco entre linhas).
 check(save[1] == math.floor(text[3] + 6 * u),
       f'layout: espaco entre linhas da casa (6 x escala: botao em {save[1]:.0f}; com o espaco padrao do ImGui seria '
@@ -234,7 +234,7 @@ def bright(img, r, w):
 
 track = bright(kit, lay[(0, 'Painel A|checkbox')], 26)
 box = bright(img['completo'], completo[(0, 'Painel A|checkbox')], 26)
-area = 40 * u * 22 * u  # trilha do interruptor do kit
+area = 44 * u * 24 * u  # trilha do interruptor do kit
 check(track > 0.45 * area and box < 0.3 * area,
       f'kit: caixa de marcar virou o interruptor do kit, ligado ({track} px claros de {area:.0f}; a caixa do ImGui tem {box})')
 sx0, sy0, sx1, sy1 = lay[(0, 'Painel A|slider')]
@@ -253,7 +253,7 @@ def text_height(img, r):
 
 
 sv = lay[(0, 'Painel A|salvar')]
-check(abs((sv[3] - sv[1]) - 24 * u) < 0.1, f'kit: botao com a altura do kit ({sv[3] - sv[1]:.2f} px = 24 x escala)')
+check(abs((sv[3] - sv[1]) - 26 * u) < 0.1, f'kit: botao com a altura do kit ({sv[3] - sv[1]:.2f} px = 26 x escala)')
 kit_text, normal_text = text_height(kit, sv), text_height(img['completo'], completo[(0, 'Painel A|salvar')])
 check(0 < kit_text < 0.85 * normal_text,
       f'kit: texto do botao na fonte pequena do kit ({kit_text} px de altura; no botao do ImGui, {normal_text})')

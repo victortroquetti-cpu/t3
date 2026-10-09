@@ -426,8 +426,8 @@ local function patchFonts()
         end
         if not ok then skin.log('fonte de reserva nao entrou: ' .. tostring(err)) end
         if kitOn and titleFont == nil then
-            -- Fontes do kit, com a mesma reserva de glifos: a de titulo (20 x escala) para o cabecalho das janelas e
-            -- a pequena (13,5 x escala) para o texto dos botoes.
+            -- Fontes do kit, com a mesma reserva de glifos: a de titulo (18 x escala) para o cabecalho das janelas e
+            -- a pequena (14,5 x escala) para o texto dos botoes.
             local function kitFont(kitSize)
                 fallback.MergeMode = false
                 local kf
@@ -443,7 +443,7 @@ local function patchFonts()
             end
             local titleSize = skin.titleSize()
             titleFont = kitFont(titleSize)
-            descFont = kitFont(titleSize * 13.5 / 20)
+            descFont = kitFont(titleSize * 14.5 / 18)
         end
         if cfg ~= nil then cfg.MergeMode = false end
         skin.log(string.format('fonte %s %.1f px de %s -> fonte da casa %.1f px (%s)', fontPath, size, file, houseSize,
@@ -621,8 +621,8 @@ local function kitToggle(label, value)
     local fh = frameHeight(style)
     local shown = visibleLabel(label)
     local ls = shown ~= '' and imgui.CalcTextSize(shown) or nil
-    local th = math.min(22 * u, fh)
-    local tw = th * 40 / 22
+    local th = math.min(24 * u, fh)
+    local tw = th * 44 / 24
     local inner = style.ItemInnerSpacing.x
     local pressed = imgui.InvisibleButton(label, V(tw + (ls and inner + ls.x or 0), fh))
     local hovered = imgui.IsItemHovered()
@@ -666,7 +666,7 @@ local function kitSlider(label, value, vmin, vmax, fmt, integer)
     for _, t in ipairs({text, (formatValue(fmt, vmin, integer)), (formatValue(fmt, vmax, integer))}) do
         valueW = math.max(valueW, imgui.CalcTextSize(t).x)
     end
-    local knobR = 7 * u
+    local knobR = 8 * u
     local x0, x1 = pos.x + knobR, pos.x + w - valueW - 10 * u - knobR
     if x1 - x0 < 24 * u then -- estreito demais para o valor ao lado: a trilha usa a largura toda
         valueW, x1 = 0, pos.x + w - knobR
@@ -826,7 +826,7 @@ end
 
 local checkbox, sliderFloat, sliderInt = imgui.Checkbox, imgui.SliderFloat, imgui.SliderInt
 
--- Botao do kit: texto na fonte pequena da casa (13,5 x escala), 24 de altura e 14 de folga de cada lado; fundo branco
+-- Botao do kit: texto na fonte pequena da casa (14,5 x escala), 26 de altura e 15 de folga de cada lado; fundo branco
 -- a 8% com contorno a 22% (16% e 40% com o mouse em cima) e texto 200 (240 com o mouse em cima). E o botao do proprio
 -- ImGui, com essas medidas e cores empurradas so durante a chamada: mesmo id, mesmo retorno e alinhamento da linha.
 -- Tamanho que o mod deu fica (a folga encolhe para o texto caber); cor que o mod pos no botao ou no texto fica, e no
@@ -855,7 +855,7 @@ local function kitButtonPush(state, label, size)
     local fs = imgui.GetFontSize()
     local shown = visibleLabel(label)
     local tw = shown ~= '' and imgui.CalcTextSize(shown).x or 0
-    local padX, padY = 14 * u, math.max(0, (24 * u - fs) * 0.5)
+    local padX, padY = 15 * u, math.max(0, (26 * u - fs) * 0.5)
     if type(size) == 'userdata' then
         if size.x > 0 then padX = math.min(padX, math.max(0, (size.x - tw) * 0.5)) end
         if size.y > 0 then padY = math.min(padY, math.max(0, (size.y - fs) * 0.5)) end

@@ -263,7 +263,7 @@ void DrawMenu() {
     bool escape = keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
 
     float width = 640 * u;
-    float height = std::min(io.DisplaySize.y * 0.72f, 540 * u);
+    float height = std::min(io.DisplaySize.y * 0.72f, 560 * u);
     PushStyle();
     bool keep = BeginShell("##trokUiShowcase", "Trok UI", VERSION_TAG, width, height, S.shell);
 
@@ -400,10 +400,10 @@ void DrawDialog() {
     bool isList = S.dialog == Dialog::List || S.dialog == Dialog::Table;
     if (S.dialog == Dialog::List) {
         width = std::max(width, 420 * u);
-        content += 5 * 30 * u;
+        content += 5 * 32 * u;
     } else if (S.dialog == Dialog::Table) {
         width = std::max(width, 480 * u);
-        content += 26 * u + 4 * 30 * u;
+        content += 28 * u + 4 * 32 * u;
     }
     float height = HeaderHeight() + 18 * u + content + 18 * u + FooterHeight();
     height = std::min(height, io.DisplaySize.y * 0.8f);

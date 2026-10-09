@@ -233,8 +233,8 @@ void BuildFonts(float screenHeight, const char* gameDir) {
     cfg.OversampleV = 2;
     if (GetFileAttributesA(body) != INVALID_FILE_ATTRIBUTES) {
         fonts.body = io.Fonts->AddFontFromFileTTF(body, 16 * u, &cfg, textRanges);
-        fonts.title = io.Fonts->AddFontFromFileTTF(body, 20 * u, &cfg, textRanges);
-        fonts.desc = io.Fonts->AddFontFromFileTTF(body, 13.5f * u, &cfg, textRanges);
+        fonts.title = io.Fonts->AddFontFromFileTTF(body, 18 * u, &cfg, textRanges);
+        fonts.desc = io.Fonts->AddFontFromFileTTF(body, 14.5f * u, &cfg, textRanges);
     } else {
         fonts.body = fonts.title = fonts.desc = io.Fonts->AddFontDefault();
     }
@@ -522,7 +522,7 @@ bool BeginShell(const char* id, const char* title, const char* version, float wi
     float titleX = pos.x + (size.x - titleSize.x - gap - versionSize.x) * 0.5f;
     Text(dl, fonts.title, titleX, pos.y + (headerH - titleSize.y) * 0.5f, col::text, title);
     if (version) {
-        Text(dl, fonts.desc, titleX + titleSize.x + gap, pos.y + (headerH - versionSize.y) * 0.5f + 2 * u,
+        Text(dl, fonts.desc, titleX + titleSize.x + gap, pos.y + (headerH - versionSize.y) * 0.5f + 1 * u,
              col::version, version);
     }
 
@@ -663,7 +663,7 @@ void Rows::Begin(const char* id, float x, float width, int* selected, const Keys
     keys_ = keys;
     numbers_ = showNumbers;
     index_ = 0;
-    rowH_ = 28 * u;
+    rowH_ = 30 * u;
     gap_ = 2 * u;
     recuo_ = 12 * u;
     numberW_ = TextSize(fonts.desc, "99").x;
@@ -765,7 +765,7 @@ void Rows::Finish(float height) {
 
 bool Rows::Action(const char* label, const char* button) {
     Start();
-    float bw = std::max(136 * u, TextSize(fonts.desc, button).x + 28 * u), bh = 24 * u;
+    float bw = std::max(144 * u, TextSize(fonts.desc, button).x + 30 * u), bh = 26 * u;
     float bx = x_ + w_ - recuo_ * 0.5f - bw, by = y_ + (rowH_ - bh) * 0.5f;
     ImGui::SetCursorScreenPos(ImVec2(bx, by));
     bool clicked = ImGui::InvisibleButton("##acao", ImVec2(bw, bh));
@@ -862,7 +862,7 @@ bool Rows::Stepper(const char* label, int* value, int min, int max, int step, co
     snprintf(text, sizeof(text), fmt, *value);
     DrawArrows(dl_, a, cy, text, *value <= min, *value >= max);
     if (*value == def) {
-        DefaultMark(a.cx + a.aw + a.vw * 0.5f, cy + 9 * u);
+        DefaultMark(a.cx + a.aw + a.vw * 0.5f, cy + 9.5f * u);
     }
     Finish(rowH_);
     return changed;
@@ -896,7 +896,7 @@ bool Rows::Cycle(const char* label, int* index, const char* const* options, int 
     Label(label, hovered);
     DrawArrows(dl_, a, cy, options[*index], false, false);
     if (*index == def) {
-        DefaultMark(a.cx + a.aw + a.vw * 0.5f, cy + 9 * u);
+        DefaultMark(a.cx + a.aw + a.vw * 0.5f, cy + 9.5f * u);
     }
     Finish(rowH_);
     return changed;
@@ -904,7 +904,7 @@ bool Rows::Cycle(const char* label, int* index, const char* const* options, int 
 
 bool Rows::Toggle(const char* label, bool* value) {
     Start();
-    float tw = 40 * u, th = 22 * u;
+    float tw = 44 * u, th = 24 * u;
     float tx = x_ + w_ - recuo_ * 0.5f - tw, ty = y_ + (rowH_ - th) * 0.5f;
     ImGui::SetCursorScreenPos(ImVec2(tx, ty));
     bool clicked = ImGui::InvisibleButton("##b", ImVec2(tw, th));
@@ -948,9 +948,9 @@ bool Rows::Segmented(const char* label, int* index, const char* const* options, 
     Start();
     float segW = 0;
     for (int i = 0; i < count; ++i) {
-        segW = std::max(segW, TextSize(fonts.desc, options[i]).x + 26 * u);
+        segW = std::max(segW, TextSize(fonts.desc, options[i]).x + 30 * u);
     }
-    float sh = 24 * u, sw = segW * count;
+    float sh = 26 * u, sw = segW * count;
     float sx = x_ + w_ - recuo_ * 0.5f - sw, sy = y_ + (rowH_ - sh) * 0.5f;
     bool changed = false;
     int hoveredSeg = -1;
@@ -1002,7 +1002,7 @@ bool Rows::Segmented(const char* label, int* index, const char* const* options, 
 
 bool Rows::Slider(const char* label, int* value, int min, int max, int step, const char* fmt, int def) {
     Start();
-    float valueW = 56 * u, trackW = 180 * u, knobR = 7 * u;
+    float valueW = 56 * u, trackW = 180 * u, knobR = 8 * u;
     float right = x_ + w_ - recuo_ * 0.5f;
     float tx = right - valueW - 10 * u - trackW, cy = y_ + rowH_ * 0.5f;
     bool changed = false;
@@ -1049,7 +1049,7 @@ bool Rows::Slider(const char* label, int* value, int min, int max, int step, con
     dl_->AddRectFilled(ImVec2(tx, cy - th * 0.5f), ImVec2(fx, cy + th * 0.5f), col::strong, th * 0.5f);
     // Linha vertical no valor padrao (Trok Radar), por baixo da bolinha.
     float dx = std::floor(tx + trackW * static_cast<float>(def - min) / static_cast<float>(max - min)) + 0.5f;
-    dl_->AddLine(ImVec2(dx, cy - 7 * u), ImVec2(dx, cy + 7 * u), (shov || active) ? col::White(130) : col::White(90),
+    dl_->AddLine(ImVec2(dx, cy - 8 * u), ImVec2(dx, cy + 8 * u), (shov || active) ? col::White(130) : col::White(90),
                  1.5f * u);
     float kr = (shov || active) ? knobR + 1 * u : knobR;
     dl_->AddCircleFilled(ImVec2(fx, cy), kr, col::text, 24);
@@ -1070,7 +1070,7 @@ bool Rows::Keybind(const char* label, ImGuiKey* key, ImGuiKey def) {
 
     const char* name = *key == ImGuiKey_None ? "Nenhuma" : ImGui::GetKeyName(*key);
     const char* shown = isCapturing ? "Pressione uma tecla" : name;
-    float cw = std::max(64 * u, TextSize(fonts.desc, shown).x + 22 * u), ch = 24 * u;
+    float cw = std::max(68 * u, TextSize(fonts.desc, shown).x + 24 * u), ch = 26 * u;
     float cx = x_ + w_ - recuo_ * 0.5f - cw, cy = y_ + (rowH_ - ch) * 0.5f;
     bool changed = false;
 
@@ -1147,7 +1147,7 @@ void HexText(ImU32 c, char* out, size_t size) {
 bool PopupItem(const char* label, bool checked, bool isDefault, float width) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 p = ImGui::GetCursorScreenPos();
-    float h = 26 * u;
+    float h = 28 * u;
     bool clicked = ImGui::InvisibleButton(label, ImVec2(width, h));
     bool hovered = ImGui::IsItemHovered();
     if (hovered) {
@@ -1173,7 +1173,7 @@ bool PopupItem(const char* label, bool checked, bool isDefault, float width) {
 
 bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
     Start();
-    float sw = 34 * u, sh = 20 * u;
+    float sw = 36 * u, sh = 22 * u;
     float sx = x_ + w_ - recuo_ * 0.5f - sw, sy = y_ + (rowH_ - sh) * 0.5f;
     char hex[16], defHex[16];
     HexText(*color, hex, sizeof(hex));
@@ -1216,7 +1216,7 @@ bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
             U32ToHsv(*color, &h, &s, &v);
             editing = pid;
         }
-        float side = 168 * u, barW = 14 * u, pad = 8 * u;
+        float side = 168 * u, barW = 16 * u, pad = 8 * u;
         ImGui::Dummy(ImVec2(0, pad * 0.5f));
         ImVec2 p = ImGui::GetCursorScreenPos();
         p.x += pad * 0.5f;
@@ -1284,7 +1284,7 @@ bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
             ImGui::SetCursorScreenPos(ImVec2(px, py));
             char bid[16];
             snprintf(bid, sizeof(bid), "##pre%d", i);
-            if (ImGui::InvisibleButton(bid, ImVec2(pw, 16 * u))) {
+            if (ImGui::InvisibleButton(bid, ImVec2(pw, 18 * u))) {
                 *color = swatch;
                 U32ToHsv(*color, &h, &s, &v);
                 changed = true;
@@ -1298,18 +1298,18 @@ bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
                     Tooltip(tip);
                 }
             }
-            pdl->AddRectFilled(ImVec2(px, py), ImVec2(px + pw, py + 16 * u), swatch, 4 * u);
+            pdl->AddRectFilled(ImVec2(px, py), ImVec2(px + pw, py + 18 * u), swatch, 4 * u);
             if (i == 0) {
                 int lum = (((swatch >> IM_COL32_R_SHIFT) & 0xFF) * 3 + ((swatch >> IM_COL32_G_SHIFT) & 0xFF) * 6 +
                            ((swatch >> IM_COL32_B_SHIFT) & 0xFF)) / 10;
-                tui::DefaultMark(pdl, px + pw * 0.5f, py + 8 * u, lum > 140 ? IM_COL32(0, 0, 0, 150) : col::White(200));
+                tui::DefaultMark(pdl, px + pw * 0.5f, py + 9 * u, lum > 140 ? IM_COL32(0, 0, 0, 150) : col::White(200));
             }
             if (ph || swatch == (*color | IM_COL32_A_MASK)) {
-                pdl->AddRect(ImVec2(px - 1.5f, py - 1.5f), ImVec2(px + pw + 1.5f, py + 16 * u + 1.5f),
+                pdl->AddRect(ImVec2(px - 1.5f, py - 1.5f), ImVec2(px + pw + 1.5f, py + 18 * u + 1.5f),
                              col::White(200), 5 * u, 0, 1.0f);
             }
         }
-        ImGui::SetCursorScreenPos(ImVec2(p.x, py + 16 * u));
+        ImGui::SetCursorScreenPos(ImVec2(p.x, py + 18 * u));
         ImGui::Dummy(ImVec2(side + pad + barW + pad * 0.5f, pad));
         // Enter que abriu o seletor nao pode fecha-lo no mesmo quadro.
         if (!ImGui::IsWindowAppearing() &&
@@ -1325,7 +1325,7 @@ bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
 
 bool Rows::Dropdown(const char* label, int* index, const char* const* options, int count, int def) {
     Start();
-    float dw = 170 * u, dh = 24 * u;
+    float dw = 180 * u, dh = 26 * u;
     float dx = x_ + w_ - recuo_ * 0.5f - dw, dy = y_ + (rowH_ - dh) * 0.5f;
     bool changed = false;
 
@@ -1530,7 +1530,7 @@ bool TextField(const char* id, char* buffer, size_t size, const char* placeholde
 
 bool Rows::Input(const char* label, char* buffer, size_t size, const char* placeholder, bool password) {
     Start();
-    float fw = 240 * u, fh = 24 * u;
+    float fw = 240 * u, fh = 26 * u;
     float fx = x_ + w_ - recuo_ * 0.5f - fw, fy = y_ + (rowH_ - fh) * 0.5f;
     dl_->ChannelsSplit(3);
     dl_->ChannelsSetCurrent(2);
@@ -1550,7 +1550,7 @@ bool Rows::Input(const char* label, char* buffer, size_t size, const char* place
 
 bool Rows::Search(const char* label, char* buffer, size_t size, const char* placeholder) {
     Start();
-    float fw = 240 * u, fh = 24 * u;
+    float fw = 240 * u, fh = 26 * u;
     float fx = x_ + w_ - recuo_ * 0.5f - fw, fy = y_ + (rowH_ - fh) * 0.5f;
     dl_->ChannelsSplit(3);
     dl_->ChannelsSetCurrent(2);
@@ -1583,7 +1583,7 @@ bool Rows::Multiline(const char* label, char* buffer, size_t size, const char* p
     }
     dl_->ChannelsSetCurrent(0);
     bool hovered = Row(rowH, false);
-    Label(label, hovered); // rowH_ (28u) alinha o rotulo com a primeira linha do campo
+    Label(label, hovered); // rowH_ (30u) alinha o rotulo com a primeira linha do campo
     dl_->ChannelsMerge();
     Finish(rowH);
     return changed;
@@ -1635,13 +1635,13 @@ void Rows::Loading(const char* label, const char* status) {
 
 void Rows::Badges(const char* label, const char* const* badges, const int* kinds, int count) {
     Start();
-    float right = x_ + w_ - recuo_ * 0.5f, cy = y_ + rowH_ * 0.5f, bh = 20 * u;
+    float right = x_ + w_ - recuo_ * 0.5f, cy = y_ + rowH_ * 0.5f, bh = 22 * u;
     bool hovered = Row(rowH_, false);
     Label(label, hovered);
     float x = right;
     for (int i = count - 1; i >= 0; --i) {
         ImVec2 ts = TextSize(fonts.desc, badges[i]);
-        float bw = ts.x + 16 * u;
+        float bw = ts.x + 18 * u;
         x -= bw;
         ImVec2 a(x, cy - bh * 0.5f), b(x + bw, cy + bh * 0.5f);
         ImU32 tc = col::column;
@@ -1653,7 +1653,7 @@ void Rows::Badges(const char* label, const char* const* badges, const int* kinds
         } else {
             dl_->AddRectFilled(a, b, col::White(16), bh * 0.5f);
         }
-        Text(dl_, fonts.desc, x + 8 * u, cy - ts.y * 0.5f, tc, badges[i]);
+        Text(dl_, fonts.desc, x + 9 * u, cy - ts.y * 0.5f, tc, badges[i]);
         x -= 6 * u;
     }
     Finish(rowH_);
@@ -1703,7 +1703,7 @@ bool Rows::Item(const char* text) {
 
 void Rows::TableHeader(const char* const* columns, const float* widths, int count) {
     y_ = ImGui::GetCursorScreenPos().y;
-    float h = 24 * u, x = labelX_;
+    float h = 26 * u, x = labelX_;
     for (int i = 0; i < count; ++i) {
         ImVec2 ts = TextSize(fonts.desc, columns[i]);
         Text(dl_, fonts.desc, x, y_ + (h - ts.y) * 0.5f, col::hint, columns[i]);

@@ -103,7 +103,7 @@ static void MouseIn(float x, float y) {
 // levava 2): quem chama espera 3 a menos depois, para as animacoes chegarem iguais as telas.
 static void ClickTab(int i, float backX, float backY) {
     float u = tui::u;
-    float width = 640 * u, height = std::min(H * 0.72f, 540 * u);
+    float width = 640 * u, height = std::min(H * 0.72f, 560 * u);
     float x = W * 0.5f - std::ceil(width) * 0.5f + 18 * u, y = H * 0.5f - std::ceil(height) * 0.5f + tui::HeaderHeight();
     float tabW = (width - 36 * u) / 5;
     Click(x + tabW * (i + 0.5f), y + tui::TabsHeight() * 0.5f);

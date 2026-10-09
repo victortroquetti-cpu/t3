@@ -117,8 +117,8 @@ function ui.buildFonts()
         cfg.OversampleH = 2
         cfg.OversampleV = 2
         ui.fonts.body = io.Fonts:AddFontFromFileTTF(body, 16 * u, cfg, ranges)
-        ui.fonts.title = io.Fonts:AddFontFromFileTTF(body, 20 * u, cfg, ranges)
-        ui.fonts.desc = io.Fonts:AddFontFromFileTTF(body, 13.5 * u, cfg, ranges)
+        ui.fonts.title = io.Fonts:AddFontFromFileTTF(body, 18 * u, cfg, ranges)
+        ui.fonts.desc = io.Fonts:AddFontFromFileTTF(body, 14.5 * u, cfg, ranges)
     else
         local default = io.Fonts:AddFontDefault()
         ui.fonts.body, ui.fonts.title, ui.fonts.desc = default, default, default
@@ -652,7 +652,7 @@ function ui.beginShell(id, title, version, width, height, shell, extraFlags)
     local titleX = pos.x + (size.x - titleSize.x - gap - versionSize.x) * 0.5
     drawText(dl, ui.fonts.title, titleX, pos.y + (headerH - titleSize.y) * 0.5, pal('text'), title)
     if version then
-        drawText(dl, ui.fonts.desc, titleX + titleSize.x + gap, pos.y + (headerH - versionSize.y) * 0.5 + 2 * u,
+        drawText(dl, ui.fonts.desc, titleX + titleSize.x + gap, pos.y + (headerH - versionSize.y) * 0.5 + 1 * u,
             pal('version'), version)
     end
 
@@ -784,7 +784,7 @@ local function popupItem(id, label, checked, isDefault, width)
     local u = ui.u
     local dl = imgui.GetWindowDrawList()
     local p = imgui.GetCursorScreenPos()
-    local h = 26 * u
+    local h = 28 * u
     local clicked = imgui.InvisibleButton(id, vec(width, h))
     local hovered = imgui.IsItemHovered()
     if hovered then
@@ -974,7 +974,7 @@ function ui.rows(id, x, width, selected, keys, showNumbers)
     self.keys = keys or {}
     self.numbers = showNumbers ~= false
     self.index = 0
-    self.rowH, self.gap, self.recuo = 28 * u, 2 * u, 12 * u
+    self.rowH, self.gap, self.recuo = 30 * u, 2 * u, 12 * u
     self.numberW = textSize(ui.fonts.desc, '99').x
     self.labelX = self.numbers and x + self.recuo + self.numberW + 9 * u or x + self.recuo
     self.y = imgui.GetCursorScreenPos().y
@@ -1100,8 +1100,8 @@ end
 function Rows:action(label, button)
     self:start()
     local u = ui.u
-    local bw = math.max(136 * u, textSize(ui.fonts.desc, button).x + 28 * u)
-    local bh = 24 * u
+    local bw = math.max(144 * u, textSize(ui.fonts.desc, button).x + 30 * u)
+    local bh = 26 * u
     local bx, by = self:right() - bw, self.y + (self.rowH - bh) * 0.5
     imgui.SetCursorScreenPos(vec(bx, by))
     local clicked = imgui.InvisibleButton(self:uid('##acao'), vec(bw, bh))
@@ -1154,7 +1154,7 @@ local function drawArrows(self, a, text, leftOff, rightOff, isDefault)
     drawText(self.dl, ui.fonts.desc, a.cx + a.aw + (a.vw - ts.x) * 0.5, centerY - ts.y * 0.5,
         a.hv and pal('text') or pal('column'), text)
     if isDefault then
-        self:defaultMark(a.cx + a.aw + a.vw * 0.5, centerY + 9 * ui.u)
+        self:defaultMark(a.cx + a.aw + a.vw * 0.5, centerY + 9.5 * ui.u)
     end
 end
 
@@ -1218,7 +1218,7 @@ end
 function Rows:toggle(label, value)
     self:start()
     local u = ui.u
-    local tw, th = 40 * u, 22 * u
+    local tw, th = 44 * u, 24 * u
     local tx, ty = self:right() - tw, self.y + (self.rowH - th) * 0.5
     imgui.SetCursorScreenPos(vec(tx, ty))
     local clicked = imgui.InvisibleButton(self:uid('##b'), vec(tw, th))
@@ -1255,9 +1255,9 @@ function Rows:segmented(label, index, options, default)
     local u = ui.u
     local segW = 0
     for _, option in ipairs(options) do
-        segW = math.max(segW, textSize(ui.fonts.desc, option).x + 26 * u)
+        segW = math.max(segW, textSize(ui.fonts.desc, option).x + 30 * u)
     end
-    local sh, sw = 24 * u, segW * #options
+    local sh, sw = 26 * u, segW * #options
     local sx, sy = self:right() - sw, self.y + (self.rowH - sh) * 0.5
     local changed, hoveredSeg = false, nil
     for i = 1, #options do
@@ -1303,7 +1303,7 @@ end
 function Rows:slider(label, value, min, max, step, fmt, default)
     self:start()
     local u = ui.u
-    local valueW, trackW, knobR = 56 * u, 180 * u, 7 * u
+    local valueW, trackW, knobR = 56 * u, 180 * u, 8 * u
     local right = self:right()
     local tx, centerY = right - valueW - 10 * u - trackW, self.y + self.rowH * 0.5
     local changed = false
@@ -1342,7 +1342,7 @@ function Rows:slider(label, value, min, max, step, fmt, default)
     self.dl:AddRectFilled(vec(tx, centerY - th * 0.5), vec(fx, centerY + th * 0.5), pal('strong'), th * 0.5)
     -- Linha vertical no valor padrao, por baixo da bolinha.
     local dx = math.floor(tx + trackW * (default - min) / (max - min)) + 0.5
-    self.dl:AddLine(vec(dx, centerY - 7 * u), vec(dx, centerY + 7 * u), white((sHovered or active) and 130 or 90),
+    self.dl:AddLine(vec(dx, centerY - 8 * u), vec(dx, centerY + 8 * u), white((sHovered or active) and 130 or 90),
         1.5 * u)
     local kr = (sHovered or active) and knobR + 1 * u or knobR
     self.dl:AddCircleFilled(vec(fx, centerY), kr, pal('text'), 24)
@@ -1379,7 +1379,7 @@ function Rows:keybind(label, vk, default)
     end
 
     local shown = capturing and 'Pressione uma tecla' or keyName(vk)
-    local cw, ch = math.max(64 * u, textSize(ui.fonts.desc, shown).x + 22 * u), 24 * u
+    local cw, ch = math.max(68 * u, textSize(ui.fonts.desc, shown).x + 24 * u), 26 * u
     local cx, cy = self:right() - cw, self.y + (self.rowH - ch) * 0.5
     imgui.SetCursorScreenPos(vec(cx, cy))
     local clicked = imgui.InvisibleButton(myId, vec(cw, ch))
@@ -1419,7 +1419,7 @@ local PRESETS = {
 function Rows:color(label, color, default)
     self:start()
     local u = ui.u
-    local sw, sh = 34 * u, 20 * u
+    local sw, sh = 36 * u, 22 * u
     local sx, sy = self:right() - sw, self.y + (self.rowH - sh) * 0.5
     local hex = hexColor(color)
     local hs = textSize(ui.fonts.desc, hex)
@@ -1466,7 +1466,7 @@ function Rows:color(label, color, default)
             color[1], color[2], color[3] = math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5)
             changed = true
         end
-        local side, barW, pad = 168 * u, 14 * u, 8 * u
+        local side, barW, pad = 168 * u, 16 * u, 8 * u
         imgui.Dummy(vec(0, pad * 0.5))
         local p = imgui.GetCursorScreenPos()
         local px, py = p.x + pad * 0.5, p.y
@@ -1522,7 +1522,7 @@ function Rows:color(label, color, default)
         for i, swatch in ipairs(slots) do
             local x = px + (i - 1) * (presetW + 4 * u)
             imgui.SetCursorScreenPos(vec(x, presetY))
-            if imgui.InvisibleButton('##pre' .. i, vec(presetW, 16 * u)) then
+            if imgui.InvisibleButton('##pre' .. i, vec(presetW, 18 * u)) then
                 color[1], color[2], color[3] = swatch[1], swatch[2], swatch[3]
                 local h, s, v = rgbToHsv(swatch[1] / 255, swatch[2] / 255, swatch[3] / 255)
                 hsv.h, hsv.s, hsv.v = h, s, v
@@ -1535,18 +1535,18 @@ function Rows:color(label, color, default)
                     ui.tooltip(popupId .. '##padrao', 'Cor padr\195\163o (' .. hexColor(default) .. ')')
                 end
             end
-            pdl:AddRectFilled(vec(x, presetY), vec(x + presetW, presetY + 16 * u), rgba(swatch[1], swatch[2], swatch[3]),
+            pdl:AddRectFilled(vec(x, presetY), vec(x + presetW, presetY + 18 * u), rgba(swatch[1], swatch[2], swatch[3]),
                 4 * u)
             if i == 1 then
                 local lum = (swatch[1] * 3 + swatch[2] * 6 + swatch[3]) / 10
-                ui.defaultMark(pdl, x + presetW * 0.5, presetY + 8 * u, lum > 140 and rgba(0, 0, 0, 150) or white(200))
+                ui.defaultMark(pdl, x + presetW * 0.5, presetY + 9 * u, lum > 140 and rgba(0, 0, 0, 150) or white(200))
             end
             if pHovered or sameColor(swatch, color) then
-                pdl:AddRect(vec(x - 1.5, presetY - 1.5), vec(x + presetW + 1.5, presetY + 16 * u + 1.5), white(200),
+                pdl:AddRect(vec(x - 1.5, presetY - 1.5), vec(x + presetW + 1.5, presetY + 18 * u + 1.5), white(200),
                     5 * u, nil, 1)
             end
         end
-        imgui.SetCursorScreenPos(vec(px, presetY + 16 * u))
+        imgui.SetCursorScreenPos(vec(px, presetY + 18 * u))
         imgui.Dummy(vec(side + pad + barW + pad * 0.5, pad))
         if ui.closePopup then
             imgui.CloseCurrentPopup()
@@ -1562,7 +1562,7 @@ end
 function Rows:dropdown(label, index, options, default)
     self:start()
     local u = ui.u
-    local dw, dh = 170 * u, 24 * u
+    local dw, dh = 180 * u, 26 * u
     local dx, dy = self:right() - dw, self.y + (self.rowH - dh) * 0.5
     local changed = false
     local popupId = self:uid('##lista')
@@ -1624,7 +1624,7 @@ local function fieldRow(self, label, kind, id, buffer, placeholder, multilineLin
     self:start()
     local u = ui.u
     local fw = 240 * u
-    local fh = multilineLines and ui.fonts.desc.FontSize * multilineLines + 14 * u or 24 * u
+    local fh = multilineLines and ui.fonts.desc.FontSize * multilineLines + 14 * u or 26 * u
     local rowH = multilineLines and fh + 8 * u or self.rowH
     local fx = self:right() - fw
     local fy = multilineLines and self.y + 4 * u or self.y + (self.rowH - fh) * 0.5
@@ -1709,14 +1709,14 @@ end
 function Rows:badges(label, badges)
     self:start()
     local u = ui.u
-    local right, centerY, bh = self:right(), self.y + self.rowH * 0.5, 20 * u
+    local right, centerY, bh = self:right(), self.y + self.rowH * 0.5, 22 * u
     local hovered = self:row(self.rowH, false)
     self:label(label, hovered)
     local x = right
     for i = #badges, 1, -1 do
         local text, kind = badges[i][1], badges[i][2]
         local ts = textSize(ui.fonts.desc, text)
-        local bw = ts.x + 16 * u
+        local bw = ts.x + 18 * u
         x = x - bw
         local color = pal('column')
         if kind == 'forte' then
@@ -1727,7 +1727,7 @@ function Rows:badges(label, badges)
         else
             self.dl:AddRectFilled(vec(x, centerY - bh * 0.5), vec(x + bw, centerY + bh * 0.5), white(16), bh * 0.5)
         end
-        drawText(self.dl, ui.fonts.desc, x + 8 * u, centerY - ts.y * 0.5, color, text)
+        drawText(self.dl, ui.fonts.desc, x + 9 * u, centerY - ts.y * 0.5, color, text)
         x = x - 6 * u
     end
     self:finish(self.rowH)
@@ -1786,7 +1786,7 @@ end
 function Rows:tableHeader(columns, widths)
     local u = ui.u
     self.y = imgui.GetCursorScreenPos().y
-    local h, x = 24 * u, self.labelX
+    local h, x = 26 * u, self.labelX
     for i, column in ipairs(columns) do
         local ts = textSize(ui.fonts.desc, column)
         drawText(self.dl, ui.fonts.desc, x, self.y + (h - ts.y) * 0.5, pal('hint'), column)
@@ -2133,7 +2133,7 @@ local function drawMenu()
 
     local _, screenY = getScreenResolution()
     local width = 640 * u
-    local height = math.min(screenY * 0.72, 540 * u)
+    local height = math.min(screenY * 0.72, 560 * u)
     ui.pushStyle()
     -- Com a confirmacao na frente, o menu nao recebe cliques (fica escurecido por baixo).
     local flags = S.confirm and imgui.WindowFlags.NoInputs or 0
@@ -2262,10 +2262,10 @@ local function drawDialog()
     end
     if d.items then
         width = math.max(width, 420 * u)
-        content = content + #d.items * 30 * u
+        content = content + #d.items * 32 * u
     elseif d.rows then
         width = math.max(width, 480 * u)
-        content = content + 26 * u + #d.rows * 30 * u
+        content = content + 28 * u + #d.rows * 32 * u
     end
     local height = math.min(ui.headerHeight() + 18 * u + content + 18 * u + ui.footerHeight(), screenY * 0.8)
 
