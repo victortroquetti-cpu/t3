@@ -379,11 +379,11 @@ void HouseScalars(Look& l, float u) {
     l.windowTitleAlign = ImVec2(0.5f, 0.5f);
 }
 
-// Espacamentos da casa (layout=1), os do kit: margem da janela 18x16; campo de 26 com texto de 16 (folga de 5 em
+// Espacamentos da casa (layout=1), os do kit: margem da janela 18x16; campo de 26 com texto de 17 (folga de 4,5 em
 // cima e embaixo); linhas de 30 com 2 de intervalo (6 entre um campo e outro); recuo 12. Mexem no layout.
 void HouseSpacing(Look& l, float u) {
     l.windowPadding = ImVec2(18 * u, 16 * u);
-    l.framePadding = ImVec2(10 * u, 5 * u);
+    l.framePadding = ImVec2(10 * u, 4.5f * u);
     l.itemSpacing = ImVec2(10 * u, 6 * u);
     l.itemInnerSpacing = ImVec2(8 * u, 6 * u);
     l.indentSpacing = 12 * u;
@@ -1551,11 +1551,11 @@ float ScreenHeight() {
 }
 
 // layout=1: a primeira fonte do atlas do script (a padrao do mimgui ou do imgui antigo, Trebuchet 14) vai para o
-// tamanho de texto da casa (16 x escala da tela, como no kit); as outras fontes acompanham na mesma proporcao,
+// tamanho de texto da casa (17 x escala da tela, como no kit); as outras fontes acompanham na mesma proporcao,
 // para o titulo do mod continuar maior que o texto.
 float LayoutFactor(Script& script, float size) {
     if (script.sizeFactor <= 0.0f) {
-        script.sizeFactor = 16.0f * Scale(ScreenHeight()) / size;
+        script.sizeFactor = 17.0f * Scale(ScreenHeight()) / size;
         Log("layout: %s: primeira fonte %.1f px -> %.1f px (tamanho de texto da casa); as outras na mesma proporcao",
             script.name.c_str(), size, size * script.sizeFactor);
     }
@@ -2554,7 +2554,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         char file[MAX_PATH] = {};
         GetModuleFileNameA(module, file, MAX_PATH);
         const char* base = strrchr(file, '\\') ? strrchr(file, '\\') + 1 : file;
-        Log("Trok Skin .asi v1.5.1 (%s)", base);
+        Log("Trok Skin .asi v1.5.2 (%s)", base);
         // Uma copia so por jogo: com o Trok Skin.asi e o Trok Skin Layout.asi juntos na pasta, a que carregar
         // depois fica desligada (as duas desviariam as mesmas funcoes).
         CreateMutexA(nullptr, FALSE, "TrokSkin.UmaCopia");

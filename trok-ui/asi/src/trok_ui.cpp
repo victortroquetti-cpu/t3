@@ -232,7 +232,7 @@ void BuildFonts(float screenHeight, const char* gameDir) {
     cfg.OversampleH = 2;
     cfg.OversampleV = 2;
     if (GetFileAttributesA(body) != INVALID_FILE_ATTRIBUTES) {
-        fonts.body = io.Fonts->AddFontFromFileTTF(body, 16 * u, &cfg, textRanges);
+        fonts.body = io.Fonts->AddFontFromFileTTF(body, 17 * u, &cfg, textRanges);
         fonts.title = io.Fonts->AddFontFromFileTTF(body, 18 * u, &cfg, textRanges);
         fonts.desc = io.Fonts->AddFontFromFileTTF(body, 14.5f * u, &cfg, textRanges);
     } else {

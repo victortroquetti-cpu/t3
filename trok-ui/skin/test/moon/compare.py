@@ -179,7 +179,7 @@ u = max(0.4675, 800 / 1080 * 0.7225)  # escala da casa na tela do teste (15% men
 text, field, save = lay[(0, 'Painel A|texto')], lay[(0, 'Painel A|campo')], lay[(0, 'Painel A|salvar')]
 check('layout LIGADO' in log('layout'), 'layout: a versao Layout ja vem com layout=1 (log)')
 check('erro' not in log('layout') and 'nao conferiu' not in log('layout'), 'layout: nenhum erro no log (e a leitura rapida conferiu)')
-check(abs((text[3] - text[1]) - 16 * u) < 0.1, f'layout: texto com o tamanho da casa ({text[3] - text[1]:.2f} px = 16 x escala)')
+check(abs((text[3] - text[1]) - 17 * u) < 0.1, f'layout: texto com o tamanho da casa ({text[3] - text[1]:.2f} px = 17 x escala)')
 check(abs((field[3] - field[1]) - 26 * u) < 0.1, f'layout: campo com a altura da casa ({field[3] - field[1]:.2f} px = 26 x escala)')
 # O ImGui arredonda para baixo a posicao de cada linha nova: o botao cai em floor(fim do texto + espaco entre linhas).
 check(save[1] == math.floor(text[3] + 6 * u),

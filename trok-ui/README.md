@@ -20,7 +20,7 @@ Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diál
 
 ## Fonte e ícones
 
-- **Texto:** `font.ttf` em 3 tamanhos: corpo **16u**, título **18u** e pequeno **14.5u** (abas, botões, números, valores, dicas, versão).
+- **Texto:** `font.ttf` em 3 tamanhos: corpo **17u**, título **18u** e pequeno **14.5u** (abas, botões, números, valores, dicas, versão).
 - **Ícones:** `lucide.ttf` em **18u** (e **13u** para os pequenos: check, lupa, setinha da lista suspensa). A 13u o traço do Lucide fica abaixo de 1 px, então a fonte pequena é carregada com `RasterizerMultiply = 1.6` para ter o mesmo peso da de 18u.
 - **Escala:** `u = max(0.4675, altura_da_tela / 1080 * 0.7225)`, 15% menor que a conta do Kill List (`altura / 1080 * 0.85`, mínimo 0.55). Toda medida deste guia está em `u`.
 
@@ -67,7 +67,7 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 - **Janela:** cantos de 10u e padding de 18u × 16u. Configuração com abas: 640u × 560u (no máximo 72% da altura da tela). Configuração simples: 420u.
 - **Cabeçalho (44u):** título e versão centralizados, divisor, X do lucide à direita. Arrastar pelo cabeçalho move a janela.
 - **Abas (34u):** largura igual para todas, texto em 14.5u e indicador de 2u que desliza sob a aba ativa (texto + 7u de cada lado).
-- **Linha (30u, intervalo de 2u):** recuo de 12u, número à esquerda, rótulo em 16u, controle à direita. Fundo da seleção e do hover com cantos de 6u.
+- **Linha (30u, intervalo de 2u):** recuo de 12u, número à esquerda, rótulo em 17u, controle à direita. Fundo da seleção e do hover com cantos de 6u.
 - **Controles:** botão, segmentado, tecla, lista suspensa e campos com 26u de altura (texto em 14.5u); interruptor de 44u × 24u; amostra de cor de 36u × 22u; etiquetas de 22u; bolinha da barra com raio de 8u; itens dos menus flutuantes com 28u.
 - **Rodapé (36u):** faixa preta a 18% e dicas `Tecla Ação`, com 6u entre tecla e ação e 22u entre dicas. Na configuração ficam à esquerda; nos diálogos, à direita (`Enter Ok`, `Esc Cancelar`). Dicas clicáveis acendem no hover.
 - **Rolagem:** barra fina de 4u.
@@ -161,7 +161,7 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 - `Trok Skin.log` diz o que aconteceu: cada script pelo nome (padronizado ou intocado), cada janela com a decisão (padronizada, mantida, HUD transparente) e cada fonte trocada. A cada `/trokskin` sai um resumo por script. Se nenhum menu de outro mod apareceu ainda, o chat avisa.
 
 **Versão de teste sem a barreira do layout: `skin/dist/Trok Skin Layout.asi`.** É o mesmo mod, já com `layout=1`, que também padroniza o que mexe no layout:
-- **Tamanho das fontes:** a primeira fonte de cada mod (a Trebuchet 14 do mimgui e do imgui antigo) vai para o tamanho de texto da casa, 16 × a escala da tela (11,6 px em 1080p, com a escala da casa). As outras fontes do mod, inclusive as embutidas, como ícones, acompanham na mesma proporção, então o título do mod continua maior que o texto.
+- **Tamanho das fontes:** a primeira fonte de cada mod (a Trebuchet 14 do mimgui e do imgui antigo) vai para o tamanho de texto da casa, 17 × a escala da tela (12,3 px em 1080p, com a escala da casa). As outras fontes do mod, inclusive as embutidas, como ícones, acompanham na mesma proporção, então o título do mod continua maior que o texto.
 - **Espaçamentos do kit:** margem da janela 18 × 16, campos com 26 de altura, 6 entre um campo e outro (as linhas de 30 do kit), 8 entre o controle e o rótulo, recuo 12, barra de rolagem 6 e pegador do slider 10, tudo vezes a escala.
 - **Cara do kit:** cada janela padronizada troca a barra de título do ImGui pelo cabeçalho do kit: título centralizado na fonte de título, X à direita e a linha embaixo. As linhas separadoras do mod somem, e a do cabeçalho fica sendo a única linha da janela. Não há rodapé: nos menus da casa ele é a faixa das dicas de tecla, e menu de outro mod não tem dicas. Os controles mais comuns são desenhados como no kit:
   - o botão fica com as medidas do kit: texto na fonte pequena (14,5), 26 de altura e 15 de folga de cada lado, fundo claro com contorno. Largura que o mod deu e cor que ele pôs no botão continuam;

@@ -116,7 +116,7 @@ function ui.buildFonts()
         local cfg = imgui.ImFontConfig()
         cfg.OversampleH = 2
         cfg.OversampleV = 2
-        ui.fonts.body = io.Fonts:AddFontFromFileTTF(body, 16 * u, cfg, ranges)
+        ui.fonts.body = io.Fonts:AddFontFromFileTTF(body, 17 * u, cfg, ranges)
         ui.fonts.title = io.Fonts:AddFontFromFileTTF(body, 18 * u, cfg, ranges)
         ui.fonts.desc = io.Fonts:AddFontFromFileTTF(body, 14.5 * u, cfg, ranges)
     else

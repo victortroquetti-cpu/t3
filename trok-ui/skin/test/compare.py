@@ -165,7 +165,7 @@ u = max(0.4675, 800 / 1080 * 0.7225)  # escala da casa na tela do teste (15% men
 text, field, save = lay[(0, 'Painel A|texto')], lay[(0, 'Painel A|campo')], lay[(0, 'Painel A|salvar')]
 check('layout LIGADO' in log('layout'), 'layout: a versao Layout ja vem com layout=1 (log)')
 check('-- skin desligada' not in log('layout') and 'nao deu para desviar' not in log('layout'), 'layout: nenhum erro no log')
-check(abs((text[3] - text[1]) - 16 * u) < 0.1, f'layout: texto com o tamanho da casa ({text[3] - text[1]:.2f} px = 16 x escala)')
+check(abs((text[3] - text[1]) - 17 * u) < 0.1, f'layout: texto com o tamanho da casa ({text[3] - text[1]:.2f} px = 17 x escala)')
 check(abs((field[3] - field[1]) - 26 * u) < 0.1, f'layout: campo com a altura da casa ({field[3] - field[1]:.2f} px = 26 x escala)')
 # O ImGui arredonda para baixo a posicao de cada linha nova: o botao cai em floor(fim do texto + espaco entre linhas).
 check(save[1] == math.floor(text[3] + 6 * u),
@@ -177,7 +177,7 @@ check(image('layout').getpixel((1230, 150)) == (20, 90, 40), 'layout: HUD contin
 check(all(lay[k] == base[k] for k in base if k[1].startswith('Casa|')), 'layout: mod da casa intocado (retangulos)')
 check(same_image(image('layout').crop(casa), img['base'].crop(casa)), 'layout: mod da casa intocado, pixel a pixel')
 ratio = lay[(0, 'HUD|largura_explicita')][0] / completo[(0, 'HUD|largura_explicita')][0]
-check(abs(ratio - 16 * u / (14 * 1.007)) < 0.03, f'layout: texto com tamanho explicito acompanha ({ratio:.3f})')
+check(abs(ratio - 17 * u / (14 * 1.007)) < 0.03, f'layout: texto com tamanho explicito acompanha ({ratio:.3f})')
 again = {k[1]: v for k, v in lay.items() if k[0] == 1}
 check(again == {k[1]: v for k, v in lay.items() if k[0] == 0}, 'layout: depois de recarregar os retangulos sao os mesmos')
 
