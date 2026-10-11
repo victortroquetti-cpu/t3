@@ -4,6 +4,7 @@
 // do jogo, como o SA-MP. Aberto (T ou F6), ganha o fundo, a rolagem e a barra de digitacao.
 
 #include "chat.h"
+#include "options.h"
 
 #include "imgui.h"
 #include "trok_ui.h"
@@ -71,6 +72,8 @@ struct State {
     int session = 0; // uma barra nova (outro id no ImGui) a cada vez que abre
     bool active = false;          // a barra estava com o teclado no quadro anterior
     std::vector<ImWchar> pending; // digitado antes de a barra pegar o teclado
+    bool replace = false;         // SetInput: trocar o texto da barra (o ImGui guarda o dele enquanto ela esta ativa)
+    bool tags = true;             // opt::Options::tags com que as mensagens foram quebradas
 } S;
 
 unsigned g_added = 0; // mensagens que ja chegaram (com g_lock)
@@ -160,7 +163,7 @@ bool Tag(const std::string& s, size_t i, ImU32 color, size_t* end, std::string* 
     return true;
 }
 
-void ParseText(const std::string& s, ImU32 color, bool spaceFirst, std::vector<Token>& out) {
+void ParseText(const std::string& s, ImU32 color, bool spaceFirst, bool tags, std::vector<Token>& out) {
     ImU32 current = color;
     std::string word;
     bool space = spaceFirst;
@@ -186,7 +189,7 @@ void ParseText(const std::string& s, ImU32 color, bool spaceFirst, std::vector<T
             i++;
             continue;
         }
-        if (c == '[') {
+        if (c == '[' && tags) {
             size_t end;
             std::string text;
             ImU32 tagColor, after;
@@ -205,7 +208,7 @@ void ParseText(const std::string& s, ImU32 color, bool spaceFirst, std::vector<T
     flush();
 }
 
-std::vector<Token> Tokenize(const Message& m) {
+std::vector<Token> Tokenize(const Message& m, bool tags = true) {
     std::vector<Token> tokens;
     if (m.type == TYPE_CHAT && !m.prefix.empty()) {
         std::string nick = m.prefix;
@@ -214,7 +217,7 @@ std::vector<Token> Tokenize(const Message& m) {
         }
         tokens.push_back({WORD, false, nick, FromArgb(m.prefixColor)});
     }
-    ParseText(m.text, FromArgb(m.textColor), !tokens.empty(), tokens);
+    ParseText(m.text, FromArgb(m.textColor), !tokens.empty(), tags, tokens);
     return tokens;
 }
 
@@ -388,6 +391,11 @@ int InputCallback(ImGuiInputTextCallbackData* data) {
             data->InsertChars(0, text.c_str());
         }
     } else if (data->EventFlag == ImGuiInputTextFlags_CallbackAlways) {
+        if (S.replace) {
+            S.replace = false;
+            data->DeleteChars(0, data->BufTextLen);
+            data->InsertChars(0, S.input);
+        }
         // Ao pegar o teclado de volta, o ImGui pode selecionar o texto todo (depende da versao, e a proxima tecla
         // apagaria a mensagem): o cursor vai para o fim, sem selecao.
         if (S.caretToEnd) {
@@ -427,7 +435,7 @@ std::string Submit() {
 void Add(const Message& m) {
     Entry e;
     e.msg = m;
-    e.tokens = Tokenize(m);
+    e.tokens = Tokenize(m, opt::Get().tags);
     std::lock_guard<std::mutex> lock(g_lock);
     g_entries.push_back(std::move(e));
     g_added++;
@@ -445,6 +453,7 @@ void Open() {
     S.session++;
     S.active = false;
     S.pending.clear();
+    S.replace = false;
     S.input[0] = 0;
     S.historyPos = -1;
     S.scroll = 0;
@@ -465,13 +474,51 @@ bool IsOpen() {
     return S.open;
 }
 
+void SetInput(const char* utf8) {
+    if (!S.open || !utf8) {
+        return;
+    }
+    // No maximo MAX_INPUT caracteres, sem partir um caractere ao meio.
+    size_t bytes = 0;
+    int count = 0;
+    while (utf8[bytes] && bytes < sizeof(S.input) - 1) {
+        size_t next = bytes + 1;
+        while (utf8[next] && (static_cast<unsigned char>(utf8[next]) & 0xC0) == 0x80) {
+            next++;
+        }
+        if (next > sizeof(S.input) - 1 || ++count > MAX_INPUT) {
+            break;
+        }
+        bytes = next;
+    }
+    std::memcpy(S.input, utf8, bytes);
+    S.input[bytes] = 0;
+    S.replace = true; // ja ativa, a barra so ve o texto novo pelo callback
+    S.caretToEnd = true;
+}
+
+bool InputEmpty() {
+    return S.input[0] == 0;
+}
+
 void Frame() {
     const host::ChatSettings cfg = host::Settings();
     if (S.open && host::DialogOpen()) {
         Close(); // um dialogo do servidor apareceu: o teclado e dele
     }
-    const bool showLog = cfg.mode != 0;
-    if (!S.open && !showLog) {
+    const bool tags = opt::Get().tags;
+    if (tags != S.tags) {
+        // [conteudo] virando (ou deixando de virar) tag: as mensagens sao quebradas de novo.
+        S.tags = tags;
+        std::lock_guard<std::mutex> relayout(g_lock);
+        for (Entry& e : g_entries) {
+            e.tokens = Tokenize(e.msg, tags);
+            e.layoutWidth = -1;
+        }
+    }
+    // Escondido (o F7 do SA-MP) vale para o chat fechado: aberto, as mensagens aparecem.
+    const bool showLog = S.open || cfg.mode != 0;
+    if (!showLog) {
         return;
     }
     ImGuiIO& io = ImGui::GetIO();
@@ -598,9 +645,10 @@ void Frame() {
     }
 
     if (S.open) {
+        // A moldura do campo de texto da casa (tui::TextField) com o teclado nele.
         const ImVec2 a(x0, y0 + logH + barGap), b(x0 + width, a.y + barH);
-        dl->AddRectFilled(a, b, col::White(12), 8 * u);
-        dl->AddRect(a, b, col::White(46), 8 * u);
+        dl->AddRectFilled(a, b, col::White(10), 6 * u);
+        dl->AddRect(a, b, col::White(70), 6 * u);
         char counter[16];
         const int used = Codepoints(S.input);
         std::snprintf(counter, sizeof(counter), "%d/%d", used, MAX_INPUT);
@@ -637,8 +685,8 @@ void Frame() {
         // Um id por abertura: o ImGui guarda a rolagem do texto e o desfazer da barra pelo id, e o texto anterior
         // (um longo, rolado para o lado) esconderia a dica e o cursor da barra vazia.
         ImGui::PushID(S.session);
-        const bool enter = ImGui::InputTextWithHint("##mensagem", "Mensagem ou /comando", S.input, sizeof(S.input),
-                                                    inputFlags, InputCallback);
+        const bool enter = ImGui::InputTextWithHint("##mensagem", "Digite sua mensagem\xE2\x80\xA6", S.input,
+                                                    sizeof(S.input), inputFlags, InputCallback);
         const bool active = ImGui::IsItemActive();
         ImGui::PopID();
         S.active = active;

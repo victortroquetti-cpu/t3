@@ -17,7 +17,8 @@ if [ -n "$ICONS" ]; then ICON_FLAG="-DTROK_UI_TEST_ICONS=\"$ICONS\""; fi
 mkdir -p "$OUT"
 find "$OUT" -maxdepth 1 -name '*.png' -delete
 g++ -std=c++17 -O2 -Wall -DTROK_UI_TEST_FONT="\"$FONT\"" $ICON_FLAG -I$KIT/test/stub -I$I -I$KIT/src -Isrc \
-    test/render_test.cpp $KIT/src/trok_ui.cpp $I/imgui.cpp $I/imgui_draw.cpp $I/imgui_tables.cpp \
+    test/render_test.cpp src/menu.cpp src/options.cpp $KIT/src/trok_ui.cpp $I/imgui.cpp $I/imgui_draw.cpp \
+    $I/imgui_tables.cpp \
     $I/imgui_widgets.cpp -o "$OUT/render_test"
 "$OUT/render_test" "$OUT"
 python3 -c "

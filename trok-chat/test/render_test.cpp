@@ -5,6 +5,8 @@
 // Uso: ./render_test <pasta de saida>
 #include "chat.cpp"
 #include "imgui_internal.h"
+#include "menu.h"
+#include "options.h"
 
 #include <algorithm>
 #include <cmath>
@@ -25,6 +27,9 @@ int g_wheel = 0;
 namespace host {
 ChatSettings Settings() {
     return g_cfg;
+}
+void Apply(const ChatSettings& s) {
+    g_cfg = s;
 }
 void Send(const char* utf8) {
     g_sent.push_back(utf8);
@@ -154,6 +159,9 @@ static void Frame(const char* shot = nullptr) {
     io.DeltaTime = 1.0f / 60.0f;
     ImGui::NewFrame();
     chat::Frame();
+    if (menu::WantsFrame()) {
+        menu::Frame();
+    }
     ImGui::Render();
     if (shot) {
         Clear();
@@ -247,6 +255,10 @@ static void Parsing() {
     p.prefixColor = 0xFF33CCFF;
     Check(Pieces(p) == "Victor_Trok: _bora _pro _evento?" && Tokenize(p)[0].color == IM_COL32(0x33, 0xCC, 0xFF, 255),
           "mensagem de jogador: nick com ':' na cor dele");
+    Check(Pieces(Msg("{FF6347}[ADMIN]{FFFFFF} oi")).find("[ADMIN]") == 0 &&
+              chat::Tokenize(Msg("{FF6347}[ADMIN]{FFFFFF} oi"), false)[0].kind == chat::WORD &&
+              chat::Tokenize(Msg("{FF6347}[ADMIN]{FFFFFF} oi"), false)[0].text == "[ADMIN]",
+          "com as etiquetas desligadas, [ADMIN] continua texto");
 }
 
 static void Fill() {
@@ -269,7 +281,7 @@ static void Fill() {
     Say(chat::TYPE_DEBUG, "Discord: https://discord.gg/brasil-trok-roleplay-servidor-oficial-samp037-comunidade",
         0xFFC8C8C8);
     Player("Diego_Ramos", 0xFFFF8040, "[ooc] alguém sabe onde fica a autoescola?");
-    Say(chat::TYPE_DEBUG, "{9A9A9A}[Trok Chat]{FFFFFF} ligado. {9A9A9A}/trokchat volta o chat do SA-MP.");
+    Say(chat::TYPE_DEBUG, "{9A9A9A}[Trok Chat]{FFFFFF} ligado. {9A9A9A}/trokchat abre as configurações.");
 }
 
 int main(int argc, char** argv) {
@@ -292,6 +304,7 @@ int main(int argc, char** argv) {
     chat::Open();
     Idle(3);
     Check(chat::IsOpen() && g_inputOpened == 1 && g_inputFlag, "T abre a barra e liga o 'chat aberto' do SA-MP");
+    Frame("02a_aberto_vazio");
     const char* hello = "Olá pessoal, alguém vai no [evento] hoje? Às 21h!";
     Type(hello);
     Idle(20);
@@ -345,6 +358,28 @@ int main(int argc, char** argv) {
     Idle(2);
     Check(std::string(chat::S.input) == "rascunho", "para baixo ate o fim: o rascunho volta");
     Frame("03_historico");
+
+    // Texto pronto de um script (sampSetChatInputText): entra na barra aberta, com o cursor no fim.
+    Key(ImGuiKey_Escape);
+    chat::Open();
+    chat::SetInput("/r ");
+    Idle(3);
+    Type("na escuta");
+    Idle(2);
+    Check(std::string(chat::S.input) == "/r na escuta", "texto de script na barra, e o que se digita vem depois");
+    Key(ImGuiKey_Escape);
+    chat::Open();
+    Idle(3);
+    chat::SetInput("/me ");
+    Idle(2);
+    Type("acena");
+    Idle(2);
+    Check(std::string(chat::S.input) == "/me acena", "tambem com a barra ja ativa");
+    Key(ImGuiKey_Escape);
+    chat::Open();
+    Idle(2);
+    Type("rascunho");
+    Idle(2);
 
     // A barra perde o teclado (um clique fora, por exemplo): volta sozinha, sem selecionar o texto.
     ImGui::ClearActiveID();
@@ -449,6 +484,85 @@ int main(int argc, char** argv) {
     Frame("10_pagesize_15");
     Key(ImGuiKey_Escape);
     Idle(2);
+    g_cfg.pageSize = 10;
+    g_saveH = 470;
+
+    // Escondido com o chat fechado: aberto, as mensagens aparecem.
+    g_cfg.mode = 0;
+    chat::Open();
+    Idle(2);
+    Frame("09b_escondido_aberto");
+    Key(ImGuiKey_Escape);
+    g_cfg.mode = 2;
+    Idle(2);
+
+    // ---------------------------------------------------------------- menu do /trokchat
+    g_saveW = W;
+    g_saveH = H;
+    menu::Toggle();
+    Idle(30);
+    Check(menu::IsOpen(), "/trokchat abre o menu");
+    Frame("11_menu");
+    // Linha 2 (tecla alternativa): Enter e a proxima tecla apertada fica no lugar.
+    Key(ImGuiKey_DownArrow);
+    Key(ImGuiKey_Enter);
+    Idle(10);
+    Check(tui::CapturingKey(), "Enter na linha da tecla: esperando a tecla");
+    Frame("12_menu_esperando_tecla");
+    Key(ImGuiKey_Enter);
+    Idle(20);
+    Check(!tui::CapturingKey() && opt::Get().keys[1] == ImGuiKey_Enter && opt::Get().keys[0] == ImGuiKey_T,
+          "F6 trocado por Enter (o T continua)");
+    Frame("13_menu_f6_por_enter");
+    // Linhas na tela (linha 3): seta para a direita.
+    Key(ImGuiKey_DownArrow);
+    Key(ImGuiKey_RightArrow);
+    Idle(5);
+    Check(g_cfg.pageSize == 11, "linhas na tela: 10 -> 11 (o /pagesize do SA-MP muda junto)");
+    // Hora (linha 4) e o chat fechado (linha 5: escondido).
+    Key(ImGuiKey_DownArrow);
+    Key(ImGuiKey_Enter);
+    Idle(5);
+    Check(g_cfg.timestamps, "hora ligada (o /timestamp do SA-MP)");
+    Key(ImGuiKey_DownArrow);
+    Key(ImGuiKey_RightArrow);
+    Key(ImGuiKey_RightArrow);
+    Idle(5);
+    Check(g_cfg.mode == 0, "com o chat fechado: escondido (o F7 do SA-MP)");
+    Key(ImGuiKey_LeftArrow);
+    Key(ImGuiKey_LeftArrow);
+    Idle(5);
+    Check(g_cfg.mode == 2, "e de volta para com contorno");
+    // Etiquetas (linha 6) desligadas: as mensagens sao quebradas de novo.
+    Key(ImGuiKey_DownArrow);
+    Key(ImGuiKey_Enter);
+    Idle(30);
+    Check(!opt::Get().tags, "etiquetas desligadas");
+    Frame("14_menu_opcoes");
+    Key(ImGuiKey_Escape);
+    Idle(20);
+    Check(!menu::IsOpen(), "Esc fecha o menu");
+    g_saveW = 1000;
+    g_saveH = 470;
+    Frame("15_sem_etiquetas_com_hora");
+    // Padroes (linha 8): confirma e volta T e F6.
+    menu::Toggle();
+    Idle(10);
+    for (int i = 0; i < 7; i++) {
+        Key(ImGuiKey_DownArrow);
+    }
+    Key(ImGuiKey_Enter);
+    Idle(10);
+    g_saveW = W;
+    g_saveH = H;
+    Frame("16_menu_restaurar");
+    Key(ImGuiKey_Enter);
+    Idle(10);
+    Check(opt::Get().keys[0] == ImGuiKey_T && opt::Get().keys[1] == ImGuiKey_F6 && opt::Get().tags &&
+              g_cfg.pageSize == 10 && !g_cfg.timestamps && g_cfg.mode == 2,
+          "padroes: T e F6, etiquetas, 10 linhas, sem hora, com contorno");
+    Key(ImGuiKey_Escape);
+    Idle(60);
 
     ImGui::DestroyContext();
     printf("render: %d falhas\n", g_fail);

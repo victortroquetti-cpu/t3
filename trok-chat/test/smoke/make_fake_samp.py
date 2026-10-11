@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Gera um samp.dll de mentira para o smoke test do Trok Chat (test/smoke/run.sh).
 
-Tem o ponto de entrada do SA-MP 0.3.7 R1 (o .asi reconhece a versao por ele), os ponteiros do CChat, CInput, CDialog e
-do info nos enderecos do R1 e stubs nas funcoes que o .asi usa ou desvia:
-  CChat::AddEntry  guarda o tipo e conta       CChat::Draw / CChat::Render  contam
-  CInput::Send     copia o texto e conta       CInput::AddCommand           guarda o nome e o callback
-  CInput::Open / CInput::Close ligam e desligam o m_bEnabled (+0x14E0) e contam
-O CChat ja vem com tres mensagens (o .asi copia as que ja estavam no chat). O fake_gta.exe le e escreve esses campos.
+Tem o ponto de entrada do SA-MP 0.3.7 R1 (o .asi reconhece a versao por ele), os ponteiros do CChat, CInput, CDialog,
+CGame e do info nos enderecos do R1 e stubs nas funcoes que o .asi usa ou desvia:
+  CChat::AddEntry   guarda o tipo e conta         CChat::Draw / CChat::Render   contam
+  CInput::Send      copia o texto e conta         CInput::AddCommand            guarda o nome e o callback
+  CInput::Open      liga o m_bEnabled e conta     CInput::Close                 desliga e conta
+  KeyPressHandler   chamam o que o fake_gta.exe   CGame::SetCursorMode          guarda o modo
+  CharInputHandler  pos nos ponteiros (o SA-MP)
+O CChat ja vem com tres mensagens (o .asi copia as que ja estavam no chat), e o CInput aponta para uma caixa de texto
+no formato do DXUT (tipo 7, o texto num buffer de 129 caracteres). O fake_gta.exe le e escreve esses campos.
 
 Uso: make_fake_samp.py <saida/samp.dll> [--outra-versao]
 """
@@ -18,18 +21,22 @@ SIZE = 0x320000
 
 # Campos lidos pelo fake_gta.exe (RVA): DATA + 4 * indice.
 DATA = 0x300000
-(CMD_NAME, CMD_PROC, ADD_COUNT, DRAW_COUNT, RENDER_COUNT, SEND_COUNT, LAST_TYPE, OPEN_COUNT,
- CLOSE_COUNT) = (DATA + 4 * i for i in range(9))
+(CMD_NAME, CMD_PROC, ADD_COUNT, DRAW_COUNT, RENDER_COUNT, SEND_COUNT, LAST_TYPE, OPEN_COUNT, CLOSE_COUNT,
+ CURSOR_MODE) = (DATA + 4 * i for i in range(10))
+KEY_PRESS_SLOT, CHAR_INPUT_SLOT = DATA + 0x40, DATA + 0x44  # o fake_gta.exe poe aqui o SA-MP dele
 SEND_BUF = DATA + 0x100
 
-CHAT, INPUT, DIALOG, INFO = 0x301000, 0x308000, 0x30A000, 0x30B000
+CHAT, INPUT, DIALOG, INFO, EDITBOX, GAME = 0x301000, 0x308000, 0x30A000, 0x30B000, 0x30C000, 0x30D000
+EDIT_TEXT = EDITBOX + 0x100
 
 # Enderecos do SA-MP 0.3.7 R1 (os mesmos de src/samp.cpp).
 ENTRY_R1 = 0x31DF13
 ENTRY_OTHER = 0xCC5F0  # outra versao: o .asi tem que ficar de fora
-P_CHAT, P_INPUT, P_DIALOG, P_INFO = 0x21A0E4, 0x21A0E8, 0x21A0B8, 0x21A0F8
+P_CHAT, P_INPUT, P_DIALOG, P_INFO, P_GAME = 0x21A0E4, 0x21A0E8, 0x21A0B8, 0x21A0F8, 0x21A10C
 ADD_ENTRY, DRAW, RENDER, SEND, ADD_COMMAND = 0x64010, 0x64230, 0x63D70, 0x65C60, 0x65AD0
 INPUT_OPEN, INPUT_CLOSE, INPUT_ENABLED = 0x657E0, 0x658E0, 0x14E0
+KEY_PRESS, CHAR_INPUT = 0x5D850, 0x5DA80
+SET_CURSOR, UNLOCK_CAM = 0x9BD30, 0x9BC10
 
 # CChat (R1)
 CHAT_ENTRIES, ENTRY_SIZE = 0x132, 0xFC
@@ -59,12 +66,17 @@ def main():
     # AddCommand(this, name, proc): mov eax,[esp+4]; mov [nome],eax; mov eax,[esp+8]; mov [proc],eax; ret 8
     put(ADD_COMMAND, b'\x8B\x44\x24\x04\xA3' + d(BASE + CMD_NAME) + b'\x8B\x44\x24\x08\xA3' + d(BASE + CMD_PROC) +
         b'\xC2\x08\x00')
-
     # Open(this) / Close(this): mov dword [ecx+14E0h], 1 (ou 0); inc [conta]; ret
     put(INPUT_OPEN, b'\xC7\x81' + d(INPUT_ENABLED) + d(1) + b'\xFF\x05' + d(BASE + OPEN_COUNT) + b'\xC3')
     put(INPUT_CLOSE, b'\xC7\x81' + d(INPUT_ENABLED) + d(0) + b'\xFF\x05' + d(BASE + CLOSE_COUNT) + b'\xC3')
+    # KeyPressHandler(key) / CharInputHandler(ch), cdecl: mov eax,[esp+4]; push eax; call [ponteiro]; add esp,4; ret
+    for rva, slot in ((KEY_PRESS, KEY_PRESS_SLOT), (CHAR_INPUT, CHAR_INPUT_SLOT)):
+        put(rva, b'\x8B\x44\x24\x04\x50\xFF\x15' + d(BASE + slot) + b'\x83\xC4\x04\xC3')
+    # SetCursorMode(this, mode, hide): mov eax,[esp+4]; mov [modo],eax; ret 8. UnlockActorCam(this): ret
+    put(SET_CURSOR, b'\x8B\x44\x24\x04\xA3' + d(BASE + CURSOR_MODE) + b'\xC2\x08\x00')
+    put(UNLOCK_CAM, b'\xC3')
 
-    for pointer, obj in ((P_CHAT, CHAT), (P_INPUT, INPUT), (P_DIALOG, DIALOG), (P_INFO, INFO)):
+    for pointer, obj in ((P_CHAT, CHAT), (P_INPUT, INPUT), (P_DIALOG, DIALOG), (P_INFO, INFO), (P_GAME, GAME)):
         put(pointer, d(BASE + obj))
     # CChat: /pagesize 10, modo normal (F7), sem hora; as tres ultimas das 100 mensagens dele.
     put(CHAT + 0x0, d(10))
@@ -79,6 +91,10 @@ def main():
         put(e + 0x4, prefix.encode('cp1252'))
         put(e + 0x20, text.encode('cp1252'))
         put(e + 0xF0, d(kind) + d(color) + d(prefix_color))
+    # CInput::m_pEditbox (+8): CDXUTIMEEditBox (m_Type 7 em +30h), texto em +50h, tamanho do buffer em +54h.
+    put(INPUT + 0x8, d(BASE + EDITBOX))
+    put(EDITBOX + 0x30, d(7))
+    put(EDITBOX + 0x50, d(BASE + EDIT_TEXT) + d(129))
 
     headers = bytearray(0x400)
     headers[0:2] = b'MZ'

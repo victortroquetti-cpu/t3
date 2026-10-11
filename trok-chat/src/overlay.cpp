@@ -4,14 +4,17 @@
 // do arquivo em disco, sao desviados com o MinHook, e o desenho acontece no fim de qualquer corrente (proxy do SA-MP,
 // Trok Dialogs, Trok Radar, moonloader). Se o Present desviado nao for chamado, cai para o slot da vtable.
 //
-// Teclado: o T e o F6 seguem o caminho de sempre ate o SA-MP (um mod com um campo de texto na frente fica com eles), e
-// quando o SA-MP abre a caixa dele por causa deles, a barra do Trok Chat abre no lugar (samp.cpp). Com a barra aberta,
-// as teclas apertadas e os caracteres ficam com ela (nem o GTA nem o SA-MP os veem, como na caixa do SA-MP), menos as
-// teclas F (F7, F8...). Teclas soltas sempre passam: o GTA le o teclado pelas mensagens da janela e uma tecla sem
-// "soltar" ficaria presa.
+// Teclado, em tres estados:
+//   - menu do /trokchat aberto: teclado e mouse sao dele (com o cursor do SA-MP), como nos menus da casa;
+//   - barra aberta: as teclas apertadas e os caracteres ficam com ela (nem o GTA nem o SA-MP os veem, como na caixa do
+//     SA-MP), menos as teclas F que nao abrem o chat (F7, F8...). A tecla que abriu a barra, segurada, nao repete nela;
+//   - fechada: tudo segue o caminho de sempre ate o SA-MP, e e la que as teclas do chat abrem a barra (samp.cpp).
+// Teclas soltas sempre passam: o GTA le o teclado pelas mensagens da janela e uma tecla sem "soltar" ficaria presa.
 
 #include "tc.h"
 #include "chat.h"
+#include "menu.h"
+#include "options.h"
 #include "samp.h"
 
 #include <d3d9.h>
@@ -57,6 +60,25 @@ const char* g_hookMode = "nenhum";
 volatile LONG g_presentCalls = 0;
 volatile DWORD g_lastPresent = 0;
 float g_fontScreenH = 0.0f;
+WPARAM g_heldKey = 0;   // a tecla que abriu a barra, enquanto segurada
+bool g_eatChar = false; // o caractere que ela ainda vai gerar (o "\r" do Enter, por exemplo)
+bool g_cursorOn = false;
+
+// O que o Trok Chat.ini guarda: as opcoes e a copia das do SA-MP. Gravado um segundo depois da ultima mudanca.
+struct Snapshot {
+    opt::Options options;
+    host::ChatSettings chat;
+};
+
+bool operator!=(const Snapshot& a, const Snapshot& b) {
+    return a.options.keys[0] != b.options.keys[0] || a.options.keys[1] != b.options.keys[1] ||
+           a.options.tags != b.options.tags || a.options.enabled != b.options.enabled ||
+           a.chat.pageSize != b.chat.pageSize || a.chat.mode != b.chat.mode || a.chat.timestamps != b.chat.timestamps;
+}
+
+Snapshot g_saved, g_pending;
+bool g_haveSaved = false;
+DWORD g_changedAt = 0;
 
 HMODULE OwnerOf(const void* address) {
     HMODULE module = nullptr;
@@ -114,43 +136,101 @@ bool MouseButton(UINT msg) {
     return (msg >= WM_LBUTTONDOWN && msg <= WM_MBUTTONDBLCLK) || (msg >= WM_XBUTTONDOWN && msg <= WM_XBUTTONDBLCLK);
 }
 
+// O WindowsMouse da casa le esta propriedade: 1 = maozinha, 2 = I de texto, ausente = seta.
+void PublishCursor(int request) {
+    static int published = -1;
+    if (!g_window || request == published) {
+        return;
+    }
+    published = request;
+    if (request > 0) {
+        SetPropA(g_window, "TrokCursor.Pedido", reinterpret_cast<HANDLE>(static_cast<INT_PTR>(request)));
+    } else {
+        RemovePropA(g_window, "TrokCursor.Pedido");
+    }
+}
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (!g_ready) {
         return CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
     }
-    // O ImGui ve o teclado e a roda sempre (o estado das teclas fica em dia), mas nao os cliques (sem cursor na tela,
-    // um clique, o tiro do jogo, tiraria o foco da barra) nem os caracteres com a barra fechada (o "t" que abre o chat
-    // nao pode cair nela).
-    const bool open = chat::IsOpen();
-    if (!MouseButton(msg) && (open || (msg != WM_CHAR && msg != WM_DEADCHAR))) {
+
+    if (menu::IsOpen() && !host::DialogOpen()) {
+        // Menu do /trokchat: o jogo nao recebe teclas nem cliques (as teclas soltas passam).
+        ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        switch (msg) {
+        case WM_KEYDOWN:
+        case WM_CHAR:
+        case WM_DEADCHAR:
+        case WM_MOUSEWHEEL:
+            return 0;
+        case WM_SETCURSOR:
+            return TRUE;
+        default:
+            if (MouseButton(msg)) {
+                return 0;
+            }
+            break;
+        }
+        return CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
+    }
+
+    if (chat::IsOpen()) {
+        // A tecla que abriu a barra, segurada: nao digita e nao chega a barra (o Enter nao manda a mensagem vazia).
+        if (msg == WM_KEYDOWN && g_heldKey && wParam == g_heldKey) {
+            g_eatChar = true;
+            return 0;
+        }
+        if (msg == WM_KEYUP && wParam == g_heldKey) {
+            g_heldKey = 0;
+        }
+        if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) {
+            g_eatChar = false;
+        }
+        if (msg == WM_CHAR && g_eatChar) {
+            g_eatChar = false;
+            return 0;
+        }
+        // O ImGui ve o teclado e a roda, mas nao os cliques: sem cursor na tela, um clique (o tiro do jogo) tiraria o
+        // foco da barra.
+        if (!MouseButton(msg)) {
+            ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        }
+        switch (msg) {
+        case WM_KEYDOWN:
+            if (wParam >= VK_F1 && wParam <= VK_F24 && !samp::IsChatKey(wParam, lParam)) {
+                break; // F7 (modo do chat), F8 (foto) e afins continuam com o SA-MP
+            }
+            return 0;
+        case WM_CHAR:
+        case WM_DEADCHAR:
+        case WM_MOUSEWHEEL:
+            return 0;
+        default:
+            break;
+        }
+        return CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
+    }
+
+    // Fechada: o ImGui so ve as teclas soltas e o resto (foco, mouse); as apertadas e os caracteres nao, para a tecla
+    // que abre o chat nao chegar nele apertada (o Enter mandaria a barra vazia).
+    if (!MouseButton(msg) && msg != WM_KEYDOWN && msg != WM_SYSKEYDOWN && msg != WM_CHAR && msg != WM_DEADCHAR &&
+        msg != WM_MOUSEWHEEL) {
         ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
     }
-    if (!open) {
-        // T e F6 (e o caractere que o T gera, em qualquer teclado) vao adiante marcados: se o SA-MP abrir a caixa dele
-        // agora, e por causa deles.
-        const bool chatKey = msg == WM_CHAR || (msg == WM_KEYDOWN && (wParam == 'T' || wParam == VK_F6));
-        if (!chatKey) {
-            return CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
-        }
-        samp::ChatKey(true);
-        LRESULT result = CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
-        samp::ChatKey(false);
-        return result;
+    if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) {
+        samp::KeyDown(wParam, lParam);
     }
-    switch (msg) {
-    case WM_KEYDOWN:
-        if (wParam >= VK_F1 && wParam <= VK_F24 && wParam != VK_F6) {
-            break; // F7 (modo do chat), F8 (foto) e afins continuam com o SA-MP
-        }
-        return 0;
-    case WM_CHAR:
-    case WM_DEADCHAR:
-    case WM_MOUSEWHEEL:
-        return 0;
-    default:
-        break;
+    const LRESULT result = CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
+    if (msg == WM_CHAR) {
+        samp::CharDone();
     }
-    return CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
+    if (chat::IsOpen()) {
+        // Abriu agora, por esta mensagem (uma das teclas do chat la no SA-MP, ou um script).
+        g_heldKey = samp::OpenedBy();
+        g_eatChar = msg == WM_KEYDOWN && g_heldKey != 0;
+    }
+    return result;
 }
 
 // O device que chega no Present e o do jogo? (o Present desviado atende qualquer device do processo)
@@ -227,6 +307,17 @@ void InitImGui(IDirect3DDevice9* device) {
     g_fontScreenH = ScreenHeight();
     BuildFonts(g_fontScreenH);
 
+    // As opcoes (as teclas tem nome do ImGui, por isso so agora) e a copia das do SA-MP, que valem de novo.
+    char path[MAX_PATH];
+    GetModuleFileNameA(g_module, path, MAX_PATH);
+    char* slash = strrchr(path, '\\');
+    lstrcpynA(slash ? slash + 1 : path, "Trok Chat.ini", static_cast<int>(MAX_PATH - (slash ? slash + 1 - path : 0)));
+    ini::SetPath(path);
+    host::ChatSettings saved = host::Settings();
+    if (ini::Load(&saved)) {
+        host::Apply(saved);
+    }
+
     g_wndProc = reinterpret_cast<WNDPROC>(
         SetWindowLongPtrA(g_window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(WndProc)));
     if (!g_wndProc) {
@@ -240,9 +331,31 @@ void InitImGui(IDirect3DDevice9* device) {
         reinterpret_cast<DWORD>(g_window), g_fontScreenH);
 }
 
+// Grava o Trok Chat.ini um segundo depois da ultima mudanca (do menu ou do /pagesize, /timestamp e F7 do SA-MP).
+void Persist() {
+    const Snapshot now = {opt::Get(), host::Settings()};
+    if (!g_haveSaved) {
+        g_saved = g_pending = now; // o que veio do INI (ou os padroes): nada a gravar
+        g_haveSaved = true;
+        return;
+    }
+    if (now != g_pending) {
+        g_pending = now;
+        g_changedAt = GetTickCount();
+    }
+    if (g_pending != g_saved && GetTickCount() - g_changedAt > 1000) {
+        if (ini::Save(g_pending.chat)) {
+            g_saved = g_pending;
+        } else {
+            g_saved = g_pending; // nao tenta de novo a cada quadro; o aviso fica no menu
+            tui::Toast("Trok Chat", "N\xC3\xA3o deu para gravar o Trok Chat.ini (pasta s\xC3\xB3 para leitura?).");
+        }
+    }
+}
+
 void RenderOverlay(IDirect3DDevice9* device) {
-    // Na primeira vez com o SA-MP pronto: desvia o chat dele (na thread do jogo).
-    samp::FrameStart();
+    // Na primeira vez com o SA-MP pronto, desvia o chat dele (na thread do jogo); depois, o texto de scripts.
+    samp::Frame();
     if (!samp::Ready()) {
         return;
     }
@@ -273,22 +386,47 @@ void RenderOverlay(IDirect3DDevice9* device) {
         ImGui_ImplDX9_CreateDeviceObjects();
     }
 
-    // O ImGui roda todo quadro (mesmo sem nada na tela) para a fila de entrada nao acumular e o estado das teclas
-    // ficar em dia; so desenha com o Trok Chat no lugar e fora do menu de pausa (o SA-MP tambem esconde o chat nele).
-    const bool active = samp::Active();
     const bool paused = PauseMenuOpen();
-    if (chat::IsOpen() && (!active || paused)) {
+    if (samp::TakeMenuRequest()) {
+        if (paused) {
+            Log("menu: ignorado (menu de pausa aberto)");
+        } else {
+            menu::Toggle();
+            Log("menu %s", menu::IsOpen() ? "aberto" : "fechado");
+        }
+    }
+    const bool active = samp::Active();
+    if (chat::IsOpen() && (!active || paused || menu::IsOpen())) {
         chat::Close();
     }
-    const bool draw = active && !paused;
+
+    // Cursor do SA-MP com o menu aberto (todo quadro: outros mods tentam devolver o cursor).
+    const bool wantCursor = menu::IsOpen() && !paused;
+    if (wantCursor) {
+        samp::Cursor(true);
+    } else if (g_cursorOn) {
+        samp::Cursor(false);
+    }
+    g_cursorOn = wantCursor;
+
+    // O ImGui roda todo quadro (mesmo sem nada na tela) para a fila de entrada nao acumular e o estado das teclas
+    // ficar em dia; o chat so aparece com o Trok Chat no lugar e fora do menu de pausa (o SA-MP tambem o esconde nele).
+    const bool drawChat = active && !paused;
+    const bool drawMenu = menu::WantsFrame() && !paused;
     ImGui_ImplDX9_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-    if (draw) {
+    if (drawChat) {
         chat::Frame();
     }
+    if (drawMenu) {
+        menu::Frame();
+    }
+    const ImGuiMouseCursor cursor = ImGui::GetMouseCursor();
     ImGui::EndFrame();
-    if (!draw) {
+    PublishCursor(!wantCursor ? 0 : cursor == ImGuiMouseCursor_Hand ? 1 : cursor == ImGuiMouseCursor_TextInput ? 2 : 0);
+    Persist();
+    if (!drawChat && !drawMenu) {
         return;
     }
     ImGui::Render();

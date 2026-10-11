@@ -28,17 +28,24 @@ run() {
     cp "$OUT/fake_gta.exe" "$dir/"
     cp "$ASI" "$dir/Trok Chat.asi"
     case $mode in
-        r1) python3 test/smoke/make_fake_samp.py "$dir/samp.dll" ;;
+        r1 | teclas | desligado) python3 test/smoke/make_fake_samp.py "$dir/samp.dll" ;;
         outra-versao) python3 test/smoke/make_fake_samp.py "$dir/samp.dll" --outra-versao ;;
+    esac
+    case $mode in
+        teclas) printf '%s\r\n' "[TROK_CHAT]" "Tecla1=Y" "Tecla2=Enter" "Linhas=15" "Hora=1" "ModoF7=1" \
+            > "$dir/Trok Chat.ini" ;;
+        desligado) printf '%s\r\n' "[TROK_CHAT]" "Ligado=0" > "$dir/Trok Chat.ini" ;;
     esac
     if [ -n "${TROK_FONT:-}" ]; then cp "$TROK_FONT" "$dir/moonloader/resource/trok/font.ttf"; fi
     if [ -n "${TROK_ICONS:-}" ]; then cp "$TROK_ICONS" "$dir/moonloader/resource/trok/lucide.ttf"; fi
     echo "== $mode"
-    (cd "$dir" && timeout 120 xvfb-run -a -s "-screen 0 1600x900x24" wine fake_gta.exe "Trok Chat.asi" "$mode") \
+    (cd "$dir" && timeout 180 xvfb-run -a -s "-screen 0 1600x900x24" wine fake_gta.exe "Trok Chat.asi" "$mode") \
         2>/dev/null | tr -d '\r' || status=1
     sed 's/^/   log| /' "$dir/Trok Chat.log" 2>/dev/null | tr -d '\r' || echo "   (sem log do .asi)"
 }
 run r1
+run teclas
+run desligado
 run outra-versao
 run sem-samp
 exit $status

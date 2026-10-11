@@ -22,9 +22,11 @@ struct Message {
 };
 
 void Add(const Message& m); // de qualquer thread
-void Open();                // T ou F6
+void Open();                // a barra de digitacao (as teclas do chat, um script)
 void Close();
 bool IsOpen();
+void SetInput(const char* utf8); // texto pronto na barra aberta (o de um script), com o cursor no fim
+bool InputEmpty();
 void Frame();               // dentro do quadro do ImGui
 
 } // namespace chat
@@ -33,12 +35,13 @@ void Frame();               // dentro do quadro do ImGui
 namespace host {
 
 struct ChatSettings {
-    int pageSize = 10;       // /pagesize
-    int mode = 2;            // F7: 0 desligado, 1 sem sombra, 2 normal
+    int pageSize = 10;       // /pagesize: linhas na tela
+    int mode = 2;            // F7: 0 escondido com o chat fechado, 1 sem contorno, 2 com contorno
     bool timestamps = false; // /timestamp
 };
 
 ChatSettings Settings();
+void Apply(const ChatSettings& s); // o menu do /trokchat muda as do SA-MP por aqui
 void Send(const char* utf8);  // como a caixa de digitacao do SA-MP: comando ou mensagem
 void InputOpened(bool open);  // "chat aberto" do SA-MP (o que os scripts consultam)
 bool DialogOpen();            // dialogo do servidor na tela: a barra fecha
