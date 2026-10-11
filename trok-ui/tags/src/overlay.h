@@ -27,6 +27,8 @@ struct Nametag {
 struct FixedText {
     std::string text;
     ImU32 color = IM_COL32_WHITE;
+    std::string before; // sigla do nome, antes do texto (so na linha que fica no lugar da nametag escondida)
+    std::string after;  // ID do jogador, depois do texto (idem)
 };
 
 // Balao de fala (SetPlayerChatBubble).
@@ -57,5 +59,13 @@ void DrawStacks(ImDrawList* dl, std::vector<Stack>& stacks, float time);
 
 // "digitando...", "typing...", "..." e parecidos (sem as cores).
 bool IsTypingText(const char* text);
+
+// Sigla do nome do jogador: mode 1 = as duas primeiras letras (VI), 2 = as iniciais de cada parte (VT, de
+// Victor_Trok). A etiqueta do comeco ([PM]Nome) fica de fora.
+std::string NameInitials(const std::string& name, int mode);
+
+// Previa da aba Fixos do menu: dois textos fixos de exemplo com as escolhas atuais, numa caixa de largura w
+// a partir de (x, y). Devolve a altura usada.
+float DrawFixedPreview(ImDrawList* dl, float x, float y, float w);
 
 } // namespace tags

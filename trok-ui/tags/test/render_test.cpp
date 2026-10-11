@@ -231,6 +231,41 @@ static void Overlay(std::vector<tags::Stack> stacks, const std::string& out) {
     Save(out);
 }
 
+// A linha do RG sem a nametag do servidor, uma coluna por escolha da aba Fixos: o padrao, sigla de 2 letras e
+// ID, iniciais e ID com o "RG:" escondido (o exemplo do Horizonte) e tudo branco com o "RG:" como texto.
+static void FixedVariants(const std::string& out) {
+    struct Variant {
+        int word, initials;
+        bool id;
+        int color;
+    } variants[] = {{0, 0, false, 0}, {0, 1, true, 0}, {2, 1, true, 0}, {1, 2, true, 1}};
+    ImGuiIO& io = ImGui::GetIO();
+    io.DeltaTime = 1.0f / 60.0f;
+    ImGui::NewFrame();
+    for (int i = 0; i < 4; ++i) {
+        const Variant& v = variants[i];
+        tags::cfg.fixedWord = v.word;
+        tags::cfg.fixedInitials = v.initials;
+        tags::cfg.fixedId = v.id;
+        tags::cfg.fixedIdColor = v.color;
+        tags::Stack st;
+        st.at = ImVec2(250.0f + i * 470.0f, 540.0f);
+        st.distance = 10;
+        tags::FixedText f;
+        f.text = "RG: 48213";
+        f.before = tags::NameInitials("Victor_Trok", v.initials);
+        f.after = v.id ? "12" : "";
+        st.fixed.push_back(f);
+        std::vector<tags::Stack> one = {st};
+        tags::DrawStacks(ImGui::GetBackgroundDrawList(), one, 0.35f);
+    }
+    ImGui::Render();
+    Clear();
+    Render(ImGui::GetDrawData());
+    Save(out);
+    tags::cfg = tags::Config();
+}
+
 static void Menu(int tab, const samp::ServerInfo& server, const std::string& out) {
     ImGuiIO& io = ImGui::GetIO();
     // Clica na aba (as 5 dividem a largura do menu, que fica no meio da tela) e espera as animacoes.
@@ -291,6 +326,12 @@ int main(int argc, char** argv) {
     tags::cfg.fixedChip = 1;
     Overlay(States(), dir + "/04_nome_colorido_etiqueta_azul.ppm");
     tags::cfg = tags::Config();
+    FixedVariants(dir + "/10_fixos_sigla_id.ppm");
+    Check(DrawnPixels() > 300, "linha do RG com sigla e ID desenhada");
+    Check(tags::NameInitials("Victor_Trok", 1) == "VI" && tags::NameInitials("Victor_Trok", 2) == "VT" &&
+              tags::NameInitials("[PM]Victor_Trok", 2) == "VT" && tags::NameInitials("maria_souza_lima", 2) == "MSL" &&
+              tags::NameInitials("Victor_Trok", 0).empty() && tags::NameInitials("[PM]", 1).empty(),
+          "sigla do nome (2 letras e iniciais, sem a etiqueta do comeco)");
 
     // Etiquetas e texto: o que vira etiqueta e o que e digitando.
     Check(tags::IsTypingText("digitando...") && tags::IsTypingText("{AAAAAA}* digitando *") &&
@@ -311,6 +352,12 @@ int main(int argc, char** argv) {
         Menu(t, server, dir + "/" + names[t] + ".ppm");
     }
     Check(menu::CapturesInput(), "menu aberto");
+    // Aba Fixos com o exemplo do Horizonte ligado: sigla de 2 letras, ID e o "RG:" escondido.
+    tags::cfg.fixedInitials = 1;
+    tags::cfg.fixedId = true;
+    tags::cfg.fixedWord = 2;
+    Menu(2, server, dir + "/11_menu_fixos_sigla_id.ppm");
+    tags::cfg = tags::Config();
 
     ImGui::DestroyContext();
     printf("%s\n", failures ? "FALHOU" : "PASSOU");

@@ -17,6 +17,7 @@
 //   desligado         Trok Tags.ini com ligado=0: tudo fica com o SA-MP
 //   outra-versao      samp.dll com o ponto de entrada do R3: o .asi nao instala nada
 //   baloes-estranhos  a estrutura dos baloes nao confere: os baloes ficam com o SA-MP, o resto segue
+//   sigla-id          Trok Tags.ini com a sigla e o ID ligados: entram so na linha do RG de quem esta sem nametag
 
 #include <windows.h>
 #include <d3d9.h>
@@ -157,7 +158,7 @@ const Player PLAYERS[] = {
     {1, "Joao_Silva", 0xFF2ECC71, 0.0f, 10.0f, true, true, 100.0f, 60.0f, 0, 80},
     {2, "Maria_Souza_Lima", 0xFFF39C12, -6.0f, 16.0f, true, true, 22.0f, 0.0f, 2, 320}, // nome de 16: fora do SSO
     {3, "Pedro_Lima", 0xFF3498DB, 0.0f, 0.0f, false, false, 100.0f, 0.0f, 0, 60},     // fora de alcance
-    {4, "Ana_Costa", 0xFFE74C3C, 8.0f, 16.0f, true, false, 100.0f, 0.0f, 0, 50},      // servidor esconde a nametag
+    {4, "Ana_Costa", 0xFFE74C3C, 8.0f, 16.0f, true, false, 100.0f, 0.0f, 0, 50},      // servidor esconde a nametag (tem RG)
 };
 constexpr int PLAYER_COUNT = 4;
 
@@ -269,10 +270,12 @@ void BuildSamp(bool strangeBubbles) {
     // 1: texto 3D do mundo (fica com o SA-MP)
     // 2: preso ao Pedro, que esta fora de alcance (fica com o SA-MP)
     // 3: segunda linha presa ao Joao, mais alta
+    // 4: o RG da Ana, que esta sem nametag (o servidor esconde): a linha que fica no lugar da nametag
     AddLabel(0, "{5AA2FF}RG: {FFFFFF}48213", 0xFFFFFFFF, Vec3{0.0f, 0.0f, 0.45f}, 20.0f, true, 1);
     AddLabel(1, "Prefeitura", 0xFFFFFFFF, Vec3{0.0f, 12.0f, 1.0f}, 30.0f, false, 0xFFFF);
     AddLabel(2, "[VIP]", 0xFFFFD27A, Vec3{0.0f, 0.0f, 0.5f}, 20.0f, false, 3);
     AddLabel(3, "[ADMIN] Moderador", 0xFFFF6B6B, Vec3{0.0f, 0.0f, 0.6f}, 20.0f, false, 1);
+    AddLabel(4, "RG: 77777", 0xFFFFFFFF, Vec3{0.0f, 0.0f, 0.3f}, 20.0f, false, 4);
     Field(F_NO_OBSTACLES) = 1;
 
     if (strangeBubbles) {
@@ -415,6 +418,28 @@ double AboveHead(const Player& p, int halfWidth, int height) {
     return Covered(a.x - halfWidth, a.y - height, a.x + halfWidth, a.y - 1);
 }
 
+// Altura (px) do que foi desenhado em cima da cabeca e quantos pixels azuis tem ali (a sigla e o ID saem azuis).
+void Drawn(const Player& p, int halfWidth, int height, int* rows, int* blue) {
+    POINT a = Anchor(p);
+    int top = -1, bottom = -1;
+    *blue = 0;
+    for (int y = a.y - height; y < a.y; ++y) {
+        for (int x = a.x - halfWidth; x < a.x + halfWidth; ++x) {
+            DWORD px = g_shot[y * W + x] & 0xFFFFFF;
+            if (px == (CLEAR & 0xFFFFFF)) {
+                continue;
+            }
+            if (top < 0) {
+                top = y;
+            }
+            bottom = y;
+            int r = (px >> 16) & 0xFF, g = (px >> 8) & 0xFF, b = px & 0xFF;
+            *blue += b > 150 && b > r + 60 && b > g + 20;
+        }
+    }
+    *rows = top < 0 ? 0 : bottom - top + 1;
+}
+
 bool LogHas(const char* text) {
     FILE* f = fopen("Trok Tags.log", "rb");
     if (!f) {
@@ -445,6 +470,7 @@ int main(int argc, char** argv) {
     bool off = strcmp(scenario, "desligado") == 0;
     bool otherVersion = strcmp(scenario, "outra-versao") == 0;
     bool strangeBubbles = strcmp(scenario, "baloes-estranhos") == 0;
+    bool initials = strcmp(scenario, "sigla-id") == 0;
     bool takesOver = !off && !otherVersion;        // o Trok Tags assume nametags e textos fixos
     bool takesBubbles = takesOver && !strangeBubbles; // e os baloes
 
@@ -575,7 +601,7 @@ int main(int argc, char** argv) {
         if (present) {
             exposed->Present(nullptr, nullptr, nullptr, nullptr);
         }
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 5; ++i) {
             if (!LabelUsed(i)) {
                 Check(false, "texto 3D ficou marcado como vazio depois do desenho do SA-MP");
                 Put<BOOL>(g_labelPool, 0xE800 + i * 4, TRUE);
@@ -617,7 +643,18 @@ int main(int argc, char** argv) {
             } else {
                 CheckPct(j < 0.002 && m < 0.002, "nada desenhado em cima das cabecas", j + m);
             }
-            CheckPct(a < 0.002, "Ana: nada (o servidor esconde a nametag dela)", a);
+            int anaRows, anaBlue;
+            Drawn(ana, 100, 160, &anaRows, &anaBlue);
+            if (takesOver) {
+                char text[160];
+                snprintf(text, sizeof(text), "Ana: so o RG, sem a nametag que o servidor esconde (%d px de altura)", anaRows);
+                Check(a > 0.01 && anaRows > 8 && anaRows < 26, text);
+                snprintf(text, sizeof(text), "Ana: sigla e ID %s na linha do RG (%d pixels azuis)", initials ? "entram" : "ficam fora",
+                         anaBlue);
+                Check(initials ? anaBlue > 20 : anaBlue == 0, text);
+            } else {
+                CheckPct(a < 0.002, "Ana: nada (o RG dela fica com o SA-MP)", a);
+            }
             double below = Covered(300, H / 2 + 30, W - 300, H / 2 + 150);
             CheckPct(below < 0.002, "nada abaixo das cabecas", below);
             ++step;

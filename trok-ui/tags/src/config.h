@@ -28,9 +28,14 @@ struct Config {
 
     // Textos fixos (texto 3D preso ao jogador)
     bool fixed = true;
-    bool fixedTags = true; // [conteudo] e "PALAVRA:" no comeco viram etiqueta
+    bool fixedTags = true; // [conteudo] vira etiqueta
+    int fixedWord = 0;     // "PALAVRA:" no comeco (o "RG:"): 0 etiqueta, 1 texto, 2 escondida
     int fixedChip = 0;     // 0 cor do texto, 1 azul, 2 branco
     int fixedText = 0;     // 0 cor do servidor, 1 branco
+    // Na linha que fica no lugar da nametag, quando o servidor nao mostra a nametag daquele jogador.
+    int fixedInitials = 0; // sigla do nome: 0 nao, 1 duas primeiras letras, 2 iniciais (Nome_Sobrenome)
+    bool fixedId = false;  // ID do jogador no fim da linha
+    int fixedIdColor = 0;  // sigla e ID: 0 azul, 1 branco, 2 a cor do texto
 
     // Indicadores
     bool afk = true;

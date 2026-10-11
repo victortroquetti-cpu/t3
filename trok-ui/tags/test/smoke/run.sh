@@ -26,6 +26,9 @@ run() {
     rm -f "$OUT/Trok Tags.log" "$OUT/Trok Tags.ini" "$OUT"/*.bmp
     python3 test/smoke/make_fake_samp.py "$OUT/samp.dll" $([ "$name" = outra-versao ] && echo r3)
     if [ "$name" = desligado ]; then printf '[padrao]\r\nligado=0\r\n' >"$OUT/Trok Tags.ini"; fi
+    if [ "$name" = sigla-id ]; then
+        printf '[padrao]\r\nsigla_fixo=1\r\nid_fixo=1\r\npalavra_fixo=2\r\n' >"$OUT/Trok Tags.ini"
+    fi
     (cd "$OUT" && timeout 120 xvfb-run -a -s "-screen 0 1600x900x24" wine fake_gta.exe "Trok Tags.asi" "$name") 2>/dev/null ||
         status=1
     mkdir -p "$OUT/$name"
@@ -33,7 +36,7 @@ run() {
     cp "$OUT/Trok Tags.log" "$OUT/$name/" 2>/dev/null || true
     sed 's/^/   log| /' "$OUT/$name/Trok Tags.log" 2>/dev/null || echo "   (sem log do .asi)"
 }
-for scenario in ${SCENARIOS:-direto samp-mods desligado outra-versao baloes-estranhos}; do
+for scenario in ${SCENARIOS:-direto samp-mods desligado outra-versao baloes-estranhos sigla-id}; do
     run "$scenario"
 done
 exit $status

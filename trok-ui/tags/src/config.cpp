@@ -30,7 +30,9 @@ const Key KEYS[] = {
     {"largura_balao", nullptr, &cfg.bubbleWidth}, {"etiqueta_balao", &cfg.bubbleTags, nullptr},
     {"ooc", &cfg.ooc, nullptr},              {"opacidade_balao", nullptr, &cfg.bubbleOpacity},
     {"fixos", &cfg.fixed, nullptr},          {"etiqueta_fixo", &cfg.fixedTags, nullptr},
-    {"cor_etiqueta_fixo", nullptr, &cfg.fixedChip}, {"cor_texto_fixo", nullptr, &cfg.fixedText},
+    {"palavra_fixo", nullptr, &cfg.fixedWord}, {"cor_etiqueta_fixo", nullptr, &cfg.fixedChip},
+    {"cor_texto_fixo", nullptr, &cfg.fixedText}, {"sigla_fixo", nullptr, &cfg.fixedInitials},
+    {"id_fixo", &cfg.fixedId, nullptr},      {"cor_sigla_fixo", nullptr, &cfg.fixedIdColor},
     {"afk", &cfg.afk, nullptr},              {"afk_tempo", &cfg.afkTime, nullptr},
     {"digitando", &cfg.typing, nullptr},     {"ping", &cfg.ping, nullptr},
     {"ping_limite", nullptr, &cfg.pingLimit}, {"vida_baixa", &cfg.lowHealth, nullptr},
@@ -79,8 +81,11 @@ void LoadConfig(const char* path, const char* server) {
     cfg.distance = Clamp(cfg.distance, 0, 1000);
     cfg.bubbleWidth = Clamp(cfg.bubbleWidth, 60, 160);
     cfg.bubbleOpacity = Clamp(cfg.bubbleOpacity, 40, 100);
+    cfg.fixedWord = Clamp(cfg.fixedWord, 0, 2);
     cfg.fixedChip = Clamp(cfg.fixedChip, 0, 2);
     cfg.fixedText = Clamp(cfg.fixedText, 0, 1);
+    cfg.fixedInitials = Clamp(cfg.fixedInitials, 0, 2);
+    cfg.fixedIdColor = Clamp(cfg.fixedIdColor, 0, 2);
     cfg.pingLimit = Clamp(cfg.pingLimit, 80, 1000);
 }
 

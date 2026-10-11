@@ -148,7 +148,7 @@ struct Run {
     ImU32 color = 0;
 };
 
-enum ParseFlags { CHIPS = 1, WORD_CHIP = 2, OOC = 4 };
+enum ParseFlags { CHIPS = 1, WORD_CHIP = 2, OOC = 4, WORD_HIDE = 8 };
 
 bool HexColor(const char* p, ImU32* out) {
     unsigned v = 0;
@@ -195,8 +195,8 @@ std::string Trim(const std::string& s) {
 }
 
 // Quebra o texto do servidor em pedacos de texto (com a cor de cada um) e etiquetas:
-// {RRGGBB} troca a cor; [conteudo] vira etiqueta; "PALAVRA:" no comeco vira etiqueta (textos fixos, como o
-// "RG:"); (( ... )) vira a etiqueta OOC.
+// {RRGGBB} troca a cor; [conteudo] vira etiqueta; "PALAVRA:" no comeco vira etiqueta ou some (textos fixos,
+// como o "RG:"); (( ... )) vira a etiqueta OOC.
 std::vector<Run> Parse(const char* text, ImU32 base, int flags) {
     std::vector<Run> runs;
     ImU32 color = base;
@@ -257,14 +257,16 @@ std::vector<Run> Parse(const char* text, ImU32 base, int flags) {
                 }
             }
         }
-        if ((flags & WORD_CHIP) && atStart) {
+        if ((flags & (WORD_CHIP | WORD_HIDE)) && atStart) {
             int n = 0;
             while (n < 8 && ((p[n] >= 'A' && p[n] <= 'Z') || (p[n] >= 'a' && p[n] <= 'z') || (p[n] >= '0' && p[n] <= '9'))) {
                 ++n;
             }
             if (n >= 1 && p[n] == ':' && (p[n + 1] == ' ' || p[n + 1] == 0 || p[n + 1] == '{')) {
                 flush();
-                runs.push_back({true, Upper(std::string(p, n)), color});
+                if (flags & WORD_CHIP) {
+                    runs.push_back({true, Upper(std::string(p, n)), color});
+                }
                 p += n + 1;
                 while (*p == ' ') {
                     ++p;
@@ -549,10 +551,11 @@ float DrawNametag(ImDrawList* dl, const Nametag& tag, const Metrics& m, float cx
     return y0;
 }
 
-// Texto fixo do servidor (o RG do Horizonte, o "[ADMIN] Em servico"...). Devolve o topo.
-float DrawFixed(ImDrawList* dl, const FixedText& fixed, const Metrics& m, float cx, float bottom, float alpha) {
+// Texto fixo pronto para desenhar: etiquetas, cores e a sigla e o ID nas pontas.
+Laid LayFixed(const FixedText& fixed, const Metrics& m) {
     ImU32 base = cfg.fixedText == 1 ? col::text : Readable(fixed.color);
-    std::vector<Run> runs = Parse(fixed.text.c_str(), base, cfg.fixedTags ? (CHIPS | WORD_CHIP) : 0);
+    int flags = (cfg.fixedTags ? CHIPS : 0) | (cfg.fixedWord == 0 ? WORD_CHIP : cfg.fixedWord == 2 ? WORD_HIDE : 0);
+    std::vector<Run> runs = Parse(fixed.text.c_str(), base, flags);
     for (Run& r : runs) {
         if (r.chip) {
             if (cfg.fixedChip == 1) {
@@ -566,12 +569,28 @@ float DrawFixed(ImDrawList* dl, const FixedText& fixed, const Metrics& m, float 
             r.color = Readable(r.color);
         }
     }
-    Laid laid = Layout(runs, m, fonts.body, m.nameSize, 0);
+    ImU32 extra = cfg.fixedIdColor == 0 ? CHIP_BLUE : cfg.fixedIdColor == 1 ? col::text : base;
+    if (!fixed.before.empty()) {
+        runs.insert(runs.begin(), Run{false, fixed.before + " ", extra});
+    }
+    if (!fixed.after.empty()) {
+        runs.push_back(Run{false, " " + fixed.after, extra});
+    }
+    return Layout(runs, m, fonts.body, m.nameSize, 0);
+}
+
+float FixedHeight(const Laid& laid, const Metrics& m) {
+    return std::max(m.pillH, laid.h + 8 * m.s);
+}
+
+// Texto fixo do servidor (o RG do Horizonte, o "[ADMIN] Em servico"...). Devolve o topo.
+float DrawFixed(ImDrawList* dl, const FixedText& fixed, const Metrics& m, float cx, float bottom, float alpha) {
+    Laid laid = LayFixed(fixed, m);
     if (laid.items.empty()) {
         return bottom + m.stackGap; // texto vazio: nao ocupa lugar
     }
     float padX = 10 * m.s;
-    float h = std::max(m.pillH, laid.h + 8 * m.s);
+    float h = FixedHeight(laid, m);
     float w = laid.w + 2 * padX;
     float x0 = std::floor(cx - w * 0.5f), y0 = std::floor(bottom - h);
     bool clean = cfg.style == 1;
@@ -676,6 +695,55 @@ void DrawStacks(ImDrawList* dl, std::vector<Stack>& stacks, float time) {
     for (const Stack& st : stacks) {
         DrawStack(dl, st, m, time);
     }
+}
+
+std::string NameInitials(const std::string& name, int mode) {
+    size_t start = 0;
+    if (!name.empty() && name[0] == '[') {
+        size_t close = name.find(']');
+        start = close == std::string::npos ? 0 : close + 1;
+    }
+    std::string out;
+    bool wordStart = true;
+    for (size_t i = start; i < name.size(); ++i) {
+        char c = name[i];
+        bool alnum = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+        if (!alnum) {
+            wordStart = true; // Nome_Sobrenome, Nome.Sobrenome
+            continue;
+        }
+        if (mode == 1 || wordStart) {
+            out += static_cast<char>(c >= 'a' && c <= 'z' ? c - 32 : c);
+        }
+        wordStart = false;
+        if ((mode == 1 && out.size() == 2) || out.size() == 3) {
+            break;
+        }
+    }
+    return mode == 1 || mode == 2 ? out : std::string();
+}
+
+float DrawFixedPreview(ImDrawList* dl, float x, float y, float w) {
+    if (!fonts.body || !fonts.desc) {
+        return 0.0f;
+    }
+    Metrics m = Measure();
+    FixedText admin;
+    admin.text = "{FF6B6B}[ADMIN] {FFFFFF}Em servi\xC3\xA7o";
+    FixedText rg;
+    rg.text = "RG: 48213";
+    rg.before = NameInitials("Victor_Trok", cfg.fixedInitials);
+    rg.after = cfg.fixedId ? "12" : "";
+    float top = 6 * u + fonts.desc->FontSize + 4 * u;
+    float h = top + FixedHeight(LayFixed(admin, m), m) + m.stackGap + FixedHeight(LayFixed(rg, m), m) + 8 * u;
+    dl->AddRectFilled(ImVec2(x, y), ImVec2(x + w, y + h), col::White(7), 8 * u);
+    dl->AddText(fonts.desc, fonts.desc->FontSize, ImVec2(std::floor(x + 12 * u), std::floor(y + 6 * u)), col::hint,
+                "Pr\xC3\xA9via (sem a nametag do servidor)");
+    float alpha = cfg.fixed ? 1.0f : 0.35f;
+    float cx = std::floor(x + w * 0.5f);
+    float next = DrawFixed(dl, rg, m, cx, y + h - 8 * u, alpha) - m.stackGap;
+    DrawFixed(dl, admin, m, cx, next, alpha);
+    return h;
 }
 
 bool IsTypingText(const char* text) {

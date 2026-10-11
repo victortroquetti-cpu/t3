@@ -222,7 +222,7 @@ Também acrescenta indicadores que o SA-MP não tem: tempo de AFK, digitando, pi
 - **Distância:** a do menu vai de 5 m até a do servidor, nunca além; dá só para diminuir.
 - **Textos fixos:** cada um respeita a distância e o "atrás de parede" que o servidor deu a ele, com o próprio teste de parede do SA-MP.
 - **Balões:** a distância de cada balão. Se o servidor esconde nametag atrás de parede, os balões somem atrás de parede também.
-- **Nome e ID:** quando o servidor esconde a nametag (o Horizonte esconde e mostra o "RG"), o mod deixa o RG no estilo da casa, mas não acrescenta nome nem ID. Montar uma linha nova com as letras do nome e o ID mostraria o que o servidor escondeu, então fica de fora.
+- **Sigla e ID:** quando o servidor esconde a nametag (o Horizonte esconde e mostra o "RG"), o mod deixa o RG no estilo da casa e, só se você ligar na aba Fixos, põe a sigla do nome e o ID nas pontas dessa linha (`VI 48213 12`). O nome e o ID já estão no placar (Tab), então isso não dá vantagem. Vida, colete e AFK continuam só com a nametag do servidor.
 - **Diálogo do servidor ou placar (Tab) na tela:** o desenho some até eles fecharem. O Trok Tags desenha por cima de tudo e ficaria em cima deles (as nametags do SA-MP ficam atrás).
 - **Indicadores** vêm do que o SA-MP já tem:
   - **AFK:** o status do jogador, o mesmo do ícone de pausa;
@@ -231,20 +231,22 @@ Também acrescenta indicadores que o SA-MP não tem: tempo de AFK, digitando, pi
 
 **Etiquetas:**
 - `[conteúdo]` vira etiqueta no nome, nos balões e nos textos fixos.
-- `PALAVRA:` no começo de um texto fixo vira etiqueta: `RG: 48213` mostra a etiqueta RG e o número.
+- `PALAVRA:` no começo de um texto fixo (o `RG:`) vira etiqueta, fica como texto ou some, como você escolher: `RG: 48213` mostra a etiqueta RG e o número.
 - `(( ... ))` no começo do balão vira a etiqueta OOC.
 - As cores `{RRGGBB}` do servidor continuam. Cor escura demais para ler sobre o fundo escuro é clareada.
 
 **Menu (`/troktags`):** abas Nametag, Balões, Fixos, Indicadores e Servidor. Setas escolhem e ajustam, Esc fecha.
 - **Nametag:** liga e desliga o mod, estilo (pílula ou limpo), cor do jogador (na faixa ou no nome), ID, vida e colete, etiquetas no nome, tamanho (80 a 130%), distância e desbotar com a distância.
 - **Balões:** estilo da casa, largura máxima, etiquetas, OOC e fundo.
-- **Fixos:** estilo da casa, etiquetas, cor da etiqueta (do texto, azul ou branca) e cor do texto (do servidor ou branco).
+- **Fixos:** estilo da casa, etiquetas, a palavra do começo (etiqueta, texto ou escondida), cor da etiqueta (do texto, azul ou branca) e cor do texto (do servidor ou branco). Embaixo, para quem está sem a nametag do servidor: sigla do nome (não, 2 letras ou iniciais), ID do jogador e a cor dos dois (azul, branco ou a do texto). Elas entram na linha do texto fixo mais perto da cabeça, a que fica no lugar da nametag. Uma prévia mostra o resultado na hora.
 - **Indicadores:** AFK, tempo de AFK, digitando, ping alto (com o limite, padrão 250 ms) e vida baixa pulsando.
 - **Servidor:** só leitura. Mostra o que o servidor definiu (distância da nametag, parede, nametags ligadas) e as regras acima.
 
-![Menu: abas Nametag e Servidor](docs/15-tags-menu.png)
+![Menu: abas Fixos (com o exemplo do Horizonte ligado) e Servidor](docs/15-tags-menu.png)
 
-**Escolhas por servidor:** ficam no `Trok Tags.ini`, ao lado do .asi, numa seção `[padrao]` e numa seção por servidor (`[ip:porta]`). Ao entrar num servidor vale o `[padrao]` com a seção dele por cima. Cada mudança é gravada nas duas, então um servidor novo começa com as últimas escolhas. As chaves são as do menu: `ligado`, `estilo`, `cor`, `id`, `barras`, `etiqueta_nome`, `tamanho`, `distancia` (0 = a do servidor), `desbotar`, `baloes`, `largura_balao`, `etiqueta_balao`, `ooc`, `opacidade_balao`, `fixos`, `etiqueta_fixo`, `cor_etiqueta_fixo`, `cor_texto_fixo`, `afk`, `afk_tempo`, `digitando`, `ping`, `ping_limite` e `vida_baixa`.
+![A linha do RG com as escolhas da aba Fixos](docs/16-tags-sigla-id.png)
+
+**Escolhas por servidor:** ficam no `Trok Tags.ini`, ao lado do .asi, numa seção `[padrao]` e numa seção por servidor (`[ip:porta]`). Ao entrar num servidor vale o `[padrao]` com a seção dele por cima. Cada mudança é gravada nas duas, então um servidor novo começa com as últimas escolhas. As chaves são as do menu: `ligado`, `estilo`, `cor`, `id`, `barras`, `etiqueta_nome`, `tamanho`, `distancia` (0 = a do servidor), `desbotar`, `baloes`, `largura_balao`, `etiqueta_balao`, `ooc`, `opacidade_balao`, `fixos`, `etiqueta_fixo`, `palavra_fixo` (0 etiqueta, 1 texto, 2 escondida), `cor_etiqueta_fixo`, `cor_texto_fixo`, `sigla_fixo` (0 não, 1 duas letras, 2 iniciais), `id_fixo`, `cor_sigla_fixo` (0 azul, 1 branco, 2 a do texto), `afk`, `afk_tempo`, `digitando`, `ping`, `ping_limite` e `vida_baixa`.
 
 **Se algo der errado, o SA-MP volta sozinho:**
 - A troca só vale enquanto o desenho do Trok Tags está rodando. Se ele parar por 300 ms, o SA-MP volta a desenhar as nametags e os textos 3D. Os balões que o mod já tinha pego voltam para o SA-MP com o tempo que faltava.
@@ -300,20 +302,20 @@ Duas regras que custaram caro na primeira versão:
     - o X do cabeçalho fecha;
     - na versão normal, o Esc continua só do jogo.
 - **Trok Skin no imgui antigo:** `skin/test/moon/run.sh` compila o LuaJIT 2.1 como `lua51.dll` (precisa do gcc com multilib) e baixa o moon_imgui 1.1.5 (`imgui.lua` + `MoonImGui.dll`) de uma cópia pública, conferindo o SHA-256. Com `MOONIMGUI_DIR=…\moonloader\lib`, usa os do jogo. No Wine, cada script roda no seu estado Lua com o `imgui.lua` de verdade, como no moonloader, nos mesmos quatro papéis do teste do mimgui (o mod da casa renomeado usa a pasta `resource\trok`, como os de verdade). São 145 verificações: as mesmas do mimgui (com os mesmos cliques e teclas), mais o host terminar (um assert do 1.52 travaria numa caixa de mensagem), os campos que o 1.52 deixa a 30% irem para o fundo da casa, a borda e o divisor do título, o Ctrl+R com todos os scripts fechando e abrindo de novo, e a versão Layout com as mesmas medidas do kit.
-- **Trok Tags:** `tags/build.sh` gera `tags/dist/Trok Tags.asi` (usa o kit e as dependências da vitrine .asi). `tags/test/run.sh <pasta> [fundo.png]` desenha num rasterizador por software a cena, os estados, os estilos e as cinco abas do menu (as imagens acima saíram dele, com `TROK_FONT`/`TROK_ICONS`).
+- **Trok Tags:** `tags/build.sh` gera `tags/dist/Trok Tags.asi` (usa o kit e as dependências da vitrine .asi). `tags/test/run.sh <pasta> [fundo.png]` desenha num rasterizador por software a cena, os estados, os estilos, a linha do RG com a sigla e o ID e as abas do menu (as imagens acima saíram dele, com `TROK_FONT`/`TROK_ICONS`). Também confere a sigla do nome (2 letras e iniciais, sem a etiqueta do começo).
 - **Trok Tags num GTA de mentira:** `tags/test/smoke/run.sh` roda o .asi no Wine 32 bits com um processo que faz o papel do GTA e do SA-MP:
   - um `samp.dll` falso com os endereços do R1, em que as funções de desenho só contam quantas vezes foram chamadas;
-  - as estruturas que o mod lê: `CNetGame` conectado em `127.0.0.1:7777`, pools, quatro jogadores remotos, textos 3D e balões;
+  - as estruturas que o mod lê: `CNetGame` conectado em `127.0.0.1:7777`, pools, quatro jogadores remotos (um deles sem nametag, só com o RG), textos 3D e balões;
   - o `CalcScreenCoors` e o `GetBonePosition` do GTA.
 
   A cada quadro ele chama o desenho do SA-MP entre `BeginScene` e `EndScene` e depois o Present. O teste confere, entre outras coisas:
   - as nametags e barras do SA-MP somem e os textos 3D presos ao jogador saem só durante o desenho dele (os do mundo e os de jogador fora de alcance ficam);
   - o balão passa para o Trok Tags;
-  - os pixels em cima de cada cabeça, inclusive que nada aparece em quem o servidor esconde;
+  - os pixels em cima de cada cabeça: quem o servidor deixa sem nametag fica só com o RG, e a sigla e o ID só entram nele quando ligados;
   - parar o Present devolve tudo ao SA-MP, balões incluídos, e voltar o Present retoma;
   - o ping é pedido uma vez, o diálogo do servidor esconde o desenho e o `/troktags` abre e fecha o menu com o cursor do SA-MP.
 
-  São 5 cenários: device direto, proxy estilo SA-MP, `ligado=0`, `samp.dll` de outra versão e estrutura de balões que não confere.
+  São 6 cenários: device direto, proxy estilo SA-MP, `ligado=0`, `samp.dll` de outra versão, estrutura de balões que não confere e sigla e ID ligados.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
 > O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.

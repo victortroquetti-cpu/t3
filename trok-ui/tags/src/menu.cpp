@@ -4,6 +4,7 @@
 #include "menu.h"
 
 #include "config.h"
+#include "overlay.h"
 #include "trok_ui.h"
 
 #include "imgui.h"
@@ -20,8 +21,8 @@ namespace {
 using namespace tui;
 using tags::cfg;
 
-constexpr const char* VERSION = "0.1.0";
-constexpr const char* VERSION_TAG = "v0.1";
+constexpr const char* VERSION = "0.2.0";
+constexpr const char* VERSION_TAG = "v0.2";
 
 const char* const TABS[] = {"Nametag", "Bal\xC3\xB5" "es", "Fixos", "Indicadores", "Servidor"};
 constexpr int TAB_COUNT = 5;
@@ -110,16 +111,28 @@ void TabBubbles(Rows& r, const samp::ServerInfo& server) {
     r.Slider("Fundo do bal\xC3\xA3o", &cfg.bubbleOpacity, 40, 100, 5, "%d%%", DEFAULTS.bubbleOpacity);
 }
 
-void TabFixed(Rows& r) {
+void TabFixed(Rows& r, float x, float w) {
     r.Toggle("Textos fixos no estilo da casa", &cfg.fixed);
-    r.Toggle("Etiquetas ([ADMIN], RG:)", &cfg.fixedTags);
+    r.Toggle("[conte\xC3\xBA" "do] vira etiqueta", &cfg.fixedTags);
+    static const char* const word[] = {"Etiqueta", "Texto", "Esconder"};
+    r.Segmented("Palavra do come\xC3\xA7o (RG:)", &cfg.fixedWord, word, 3, DEFAULTS.fixedWord);
     static const char* const chip[] = {"Do texto", "Azul", "Branca"};
     r.Segmented("Cor da etiqueta", &cfg.fixedChip, chip, 3, DEFAULTS.fixedChip);
     static const char* const text[] = {"Do servidor", "Branco"};
     r.Segmented("Cor do texto", &cfg.fixedText, text, 2, DEFAULTS.fixedText);
-    r.Info("Nome e ID",
-           "Nome, ID, vida, colete e AFK s\xC3\xB3 aparecem onde a nametag do servidor aparece: o Trok Tags nunca "
-           "mostra o que o servidor esconde.");
+    // A linha que fica no lugar da nametag quando o servidor a esconde (o RG do Horizonte).
+    r.Section("Sem a nametag do servidor");
+    static const char* const initials[] = {"N\xC3\xA3o", "2 letras", "Iniciais"};
+    r.Segmented("Sigla do nome", &cfg.fixedInitials, initials, 3, DEFAULTS.fixedInitials);
+    r.Toggle("ID do jogador", &cfg.fixedId);
+    static const char* const extra[] = {"Azul", "Branco", "Do texto"};
+    r.Segmented("Cor da sigla e do ID", &cfg.fixedIdColor, extra, 3, DEFAULTS.fixedIdColor);
+    r.Info("Vida, colete e AFK",
+           "Vida, colete e AFK s\xC3\xB3 aparecem com a nametag do servidor. A sigla e o ID entram na linha do texto "
+           "fixo mais perto da cabe\xC3\xA7" "a, s\xC3\xB3 em quem est\xC3\xA1 sem a nametag do servidor.");
+    ImVec2 at = ImGui::GetCursorScreenPos();
+    float h = tags::DrawFixedPreview(ImGui::GetWindowDrawList(), x, at.y + 4 * u, w);
+    ImGui::Dummy(ImVec2(w, h + 4 * u));
 }
 
 void TabIndicators(Rows& r) {
@@ -146,7 +159,8 @@ void TabServer(Rows& r, const samp::ServerInfo& server) {
     r.Value("Bal\xC3\xB5" "es", server.bubbles > 0 ? "do Trok Tags" : server.bubbles < 0 ? "do SA-MP" : "esperando o primeiro");
     r.Section("Como o Trok Tags segue");
     r.Value("Nunca passa do limite", "sempre");
-    r.Value("Esconde o que o servidor esconde", "sempre");
+    r.Value("Vida, colete e AFK", "s\xC3\xB3 com a nametag");
+    r.Value("Sigla e ID sem a nametag", cfg.fixedInitials || cfg.fixedId ? "ligados (aba Fixos)" : "desligados");
     r.Value("Escolhas salvas", "por servidor");
 }
 
@@ -169,7 +183,8 @@ bool Frame(const samp::ServerInfo& server) {
     if (!S.open) {
         return false;
     }
-    tags::Config before = cfg;
+    tags::Config before;
+    memcpy(&before, &cfg, sizeof(cfg)); // copia byte a byte (com o enchimento), para o memcmp do fim
     ImGuiIO& io = ImGui::GetIO();
     bool fresh = S.age++ == 0;
     bool keysOk = !fresh && KeyboardFree();
@@ -199,7 +214,7 @@ bool Frame(const samp::ServerInfo& server) {
     switch (S.tab) {
     case 0: TabNametag(rows, server); break;
     case 1: TabBubbles(rows, server); break;
-    case 2: TabFixed(rows); break;
+    case 2: TabFixed(rows, cp.x + 4 * u, rowW); break;
     case 3: TabIndicators(rows); break;
     default: TabServer(rows, server); break;
     }

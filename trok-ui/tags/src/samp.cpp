@@ -607,6 +607,13 @@ void Collect(std::vector<tags::Stack>& out, float screenW, float screenH, float 
             for (int i = 0; i < count; ++i) {
                 st.fixed.push_back(items[i].text);
             }
+            // Sem a nametag do servidor, a linha mais perto da cabeca fica no lugar dela: a sigla do nome e o
+            // ID, se escolhidos no menu, entram nas pontas dela.
+            if (!st.hasTag && !st.fixed.empty() && (tags::cfg.fixedInitials || tags::cfg.fixedId)) {
+                tags::FixedText& line = st.fixed.back();
+                line.before = tags::NameInitials(NameOf(info), tags::cfg.fixedInitials);
+                line.after = tags::cfg.fixedId ? std::to_string(id) : std::string();
+            }
         }
 
         if (bubble.active && dist <= bubble.dist && (!serverLos || NoObstacles(head))) {
