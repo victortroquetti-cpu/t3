@@ -146,6 +146,7 @@ public:
     void Loading(const char* label, const char* status);
     void Badges(const char* label, const char* const* badges, const int* kinds, int count); // 0 neutro, 1 forte, 2 contorno
     void Info(const char* label, const char* tooltip);
+    void Value(const char* label, const char* value); // so leitura: o valor a direita
     void Section(const char* title);
 
     // Itens de lista (estilo Trok Dialogs). Devolvem true quando o item e ativado (Enter, clique duplo, 1-9).

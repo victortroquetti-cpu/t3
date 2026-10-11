@@ -1674,6 +1674,16 @@ void Rows::Info(const char* label, const char* tooltip) {
     Finish(rowH_);
 }
 
+void Rows::Value(const char* label, const char* value) {
+    Start();
+    float right = x_ + w_ - recuo_ * 0.5f;
+    bool hovered = Row(rowH_, false);
+    Label(label, hovered);
+    ImVec2 ts = TextSize(fonts.desc, value);
+    Text(dl_, fonts.desc, right - ts.x, y_ + (rowH_ - ts.y) * 0.5f, col::column, value);
+    Finish(rowH_);
+}
+
 void Rows::Section(const char* title) {
     y_ = ImGui::GetCursorScreenPos().y;
     float h = 26 * u;

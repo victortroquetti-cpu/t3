@@ -7,6 +7,7 @@ Dois mods de visualização com **todos os controles de menu da casa**, um em **
 | Lua | `lua/Trok UI Showcase.lua` | `/trokuilua` |
 | .asi | `asi/dist/Trok UI Showcase.asi` | `/trokui` (sem SA-MP 0.3.7 R1: **F10**) |
 | Trok Skin (.asi) | `skin/dist/Trok Skin.asi` | sozinho; `/trokskin` liga e desliga (ver [Trok Skin](#trok-skin-o-visual-da-casa-nos-mods-dos-outros)) |
+| Trok Tags (.asi) | `tags/dist/Trok Tags.asi` | sozinho; `/troktags` abre o menu (ver [Trok Tags](#trok-tags-nametags-balões-e-textos-fixos-da-casa)) |
 
 Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diálogos**), diálogos de exemplo, confirmação, notificações e o modo de mover.
 
@@ -199,6 +200,72 @@ Use **um dos dois** `.asi`, nunca os dois juntos: se os dois estiverem na pasta,
   - **Fechar só a lista aberta:** no mimgui, a skin manda o "cancelar" da navegação do ImGui. No 1.52, devolve o foco à janela, e o próprio ImGui fecha o popup que ficou sem foco.
   - **Qual menu recebe o Esc:** cada script tem o seu ImGui, e o clique que um segura o outro nem vê. Então a skin, que é uma só para todos, guarda qual menu foi aberto ou clicado por último, e só esse recebe o Esc.
 
+## Trok Tags: nametags, balões e textos fixos da casa
+
+`tags/dist/Trok Tags.asi` troca tudo o que o SA-MP desenha em cima dos personagens pelo desenho da casa:
+- a nametag (nome, ID, vida, colete e AFK);
+- os balões de fala (`SetPlayerChatBubble`);
+- os textos 3D que o servidor prende no jogador, como o "RG" do Horizonte RP.
+
+Também acrescenta indicadores que o SA-MP não tem: tempo de AFK, digitando, ping alto e vida baixa pulsando. Copie para a pasta do GTA (ou `scripts\`). Funciona só no SA-MP 0.3.7 R1: em qualquer outra versão não encosta em nada e diz o motivo no `Trok Tags.log`, ao lado do .asi.
+
+![Trok Tags numa rua](docs/12-tags-cena.png)
+
+![Estados da nametag](docs/13-tags-nametag.png)
+
+![Balões e textos fixos](docs/14-tags-baloes-fixos.png)
+
+*Capturas do teste de renderização (`tags/test/run.sh`), com a fonte e os ícones da casa, em 1080p.*
+
+**A regra: o Trok Tags nunca mostra mais do que o servidor mostraria.** Senão ele vira mod vantajoso.
+- **Nametag:** aparece só em quem o próprio SA-MP decidiu desenhar naquele quadro. O mod intercepta a chamada de desenho do SA-MP, que já passou por todos os limites do servidor: distância, parede, `ShowNameTags` e `ShowPlayerNameTagForPlayer`. Ninguém escondido aparece.
+- **Distância:** a do menu vai de 5 m até a do servidor, nunca além; dá só para diminuir.
+- **Textos fixos:** cada um respeita a distância e o "atrás de parede" que o servidor deu a ele, com o próprio teste de parede do SA-MP.
+- **Balões:** a distância de cada balão. Se o servidor esconde nametag atrás de parede, os balões somem atrás de parede também.
+- **Nome e ID:** quando o servidor esconde a nametag (o Horizonte esconde e mostra o "RG"), o mod deixa o RG no estilo da casa, mas não acrescenta nome nem ID. Montar uma linha nova com as letras do nome e o ID mostraria o que o servidor escondeu, então fica de fora.
+- **Diálogo do servidor ou placar (Tab) na tela:** o desenho some até eles fecharem. O Trok Tags desenha por cima de tudo e ficaria em cima deles (as nametags do SA-MP ficam atrás).
+- **Indicadores** vêm do que o SA-MP já tem:
+  - **AFK:** o status do jogador, o mesmo do ícone de pausa;
+  - **ping:** o do placar (com o indicador ligado, o mod faz a cada 10 s o mesmo pedido que o Tab faz);
+  - **digitando:** só quando o servidor manda um balão de "digitando...", porque o SA-MP não tem essa informação.
+
+**Etiquetas:**
+- `[conteúdo]` vira etiqueta no nome, nos balões e nos textos fixos.
+- `PALAVRA:` no começo de um texto fixo vira etiqueta: `RG: 48213` mostra a etiqueta RG e o número.
+- `(( ... ))` no começo do balão vira a etiqueta OOC.
+- As cores `{RRGGBB}` do servidor continuam. Cor escura demais para ler sobre o fundo escuro é clareada.
+
+**Menu (`/troktags`):** abas Nametag, Balões, Fixos, Indicadores e Servidor. Setas escolhem e ajustam, Esc fecha.
+- **Nametag:** liga e desliga o mod, estilo (pílula ou limpo), cor do jogador (na faixa ou no nome), ID, vida e colete, etiquetas no nome, tamanho (80 a 130%), distância e desbotar com a distância.
+- **Balões:** estilo da casa, largura máxima, etiquetas, OOC e fundo.
+- **Fixos:** estilo da casa, etiquetas, cor da etiqueta (do texto, azul ou branca) e cor do texto (do servidor ou branco).
+- **Indicadores:** AFK, tempo de AFK, digitando, ping alto (com o limite, padrão 250 ms) e vida baixa pulsando.
+- **Servidor:** só leitura. Mostra o que o servidor definiu (distância da nametag, parede, nametags ligadas) e as regras acima.
+
+![Menu: abas Nametag e Servidor](docs/15-tags-menu.png)
+
+**Escolhas por servidor:** ficam no `Trok Tags.ini`, ao lado do .asi, numa seção `[padrao]` e numa seção por servidor (`[ip:porta]`). Ao entrar num servidor vale o `[padrao]` com a seção dele por cima. Cada mudança é gravada nas duas, então um servidor novo começa com as últimas escolhas. As chaves são as do menu: `ligado`, `estilo`, `cor`, `id`, `barras`, `etiqueta_nome`, `tamanho`, `distancia` (0 = a do servidor), `desbotar`, `baloes`, `largura_balao`, `etiqueta_balao`, `ooc`, `opacidade_balao`, `fixos`, `etiqueta_fixo`, `cor_etiqueta_fixo`, `cor_texto_fixo`, `afk`, `afk_tempo`, `digitando`, `ping`, `ping_limite` e `vida_baixa`.
+
+**Se algo der errado, o SA-MP volta sozinho:**
+- A troca só vale enquanto o desenho do Trok Tags está rodando. Se ele parar por 300 ms, o SA-MP volta a desenhar as nametags e os textos 3D. Os balões que o mod já tinha pego voltam para o SA-MP com o tempo que faltava.
+- Antes de mexer nos balões, o mod confere a estrutura deles: a memória tem que ser gravável e o "existe" de todos os 1004 jogadores tem que valer 0 ou 1. Se não conferir, os balões continuam os do SA-MP e o menu e o log avisam.
+- Desligar o Trok Tags, os balões ou os textos fixos no menu devolve aquela parte ao SA-MP na hora.
+
+**Como funciona:**
+- **Ganchos no `samp.dll` R1 (MinHook):**
+  - `CPlayerTags::DrawLabel` (`+0x686C0`) anota quem o SA-MP desenharia, com a cor e a distância, e não desenha;
+  - `CPlayerTags::DrawHealthBar` (`+0x689C0`) não desenha;
+  - `CLabelPool::Draw` (`+0x1340`) tira da vez do SA-MP só os textos 3D presos a jogadores que estão por perto (com personagem no jogo), e só durante o desenho dele. O `m_bNotEmpty` é zerado e volta logo depois, então os dados continuam lá para o resto do SA-MP.
+- **Balões:** no começo de cada quadro (`BeginScene` do d3d9, antes de o SA-MP desenhar), os balões novos são copiados e o "existe" deles é zerado.
+- **Desenho:** no Present, na mesma base da vitrine .asi. A posição é a do osso da cabeça (`CPed::GetBonePosition`) mais 25 cm, projetada com o `CSprite::CalcScreenCoors` do GTA.
+- **Endereços:** vêm dos cabeçalhos do R1 da [SAMP-API](https://github.com/BlastHackNet/SAMP-API) (compilados para imprimir os deslocamentos). Os balões são a única estrutura que a SAMP-API não mapeia no R1: o ponteiro (`+0x21A0DC`) vem da mesma posição relativa do R3 e é conferido no jogo, como acima.
+
+**Limites:**
+- Só no SA-MP 0.3.7 R1.
+- O "digitando" depende do servidor mandar o balão: o mod reconhece "digitando...", "escrevendo...", "typing...", "..." e parecidos, e troca pelos três pontinhos na nametag.
+- O tempo de AFK conta a partir de quando o mod viu a pausa, então quem já estava AFK quando você chegou começa do zero.
+- **Ainda não foi conferido dentro do GTA de verdade**, só no GTA de mentira e no renderizador por software (veja abaixo). O ponto mais sensível é o ponteiro dos balões. Se o `Trok Tags.log` disser "nao conferiu", os balões ficam os do SA-MP e o log diz o motivo.
+
 ## Reaproveitar nos próximos mods
 
 - **Lua:** copie o bloco "TROK UI" do topo de `Trok UI Showcase.lua` (até "Fim do kit"). Chame `ui.buildFonts()` no `imgui.OnInitialize`, envolva cada quadro com `ui.beginFrame()` / `ui.endFrame()` e monte a janela com `ui.pushStyle()`, `ui.beginShell(...)`, `ui.rows(...)`, `ui.endShell(...)` e `ui.popStyle()`. O teclado vem do `onWindowMessage` (veja o fim do arquivo).
@@ -233,10 +300,24 @@ Duas regras que custaram caro na primeira versão:
     - o X do cabeçalho fecha;
     - na versão normal, o Esc continua só do jogo.
 - **Trok Skin no imgui antigo:** `skin/test/moon/run.sh` compila o LuaJIT 2.1 como `lua51.dll` (precisa do gcc com multilib) e baixa o moon_imgui 1.1.5 (`imgui.lua` + `MoonImGui.dll`) de uma cópia pública, conferindo o SHA-256. Com `MOONIMGUI_DIR=…\moonloader\lib`, usa os do jogo. No Wine, cada script roda no seu estado Lua com o `imgui.lua` de verdade, como no moonloader, nos mesmos quatro papéis do teste do mimgui (o mod da casa renomeado usa a pasta `resource\trok`, como os de verdade). São 145 verificações: as mesmas do mimgui (com os mesmos cliques e teclas), mais o host terminar (um assert do 1.52 travaria numa caixa de mensagem), os campos que o 1.52 deixa a 30% irem para o fundo da casa, a borda e o divisor do título, o Ctrl+R com todos os scripts fechando e abrindo de novo, e a versão Layout com as mesmas medidas do kit.
+- **Trok Tags:** `tags/build.sh` gera `tags/dist/Trok Tags.asi` (usa o kit e as dependências da vitrine .asi). `tags/test/run.sh <pasta> [fundo.png]` desenha num rasterizador por software a cena, os estados, os estilos e as cinco abas do menu (as imagens acima saíram dele, com `TROK_FONT`/`TROK_ICONS`).
+- **Trok Tags num GTA de mentira:** `tags/test/smoke/run.sh` roda o .asi no Wine 32 bits com um processo que faz o papel do GTA e do SA-MP:
+  - um `samp.dll` falso com os endereços do R1, em que as funções de desenho só contam quantas vezes foram chamadas;
+  - as estruturas que o mod lê: `CNetGame` conectado em `127.0.0.1:7777`, pools, quatro jogadores remotos, textos 3D e balões;
+  - o `CalcScreenCoors` e o `GetBonePosition` do GTA.
+
+  A cada quadro ele chama o desenho do SA-MP entre `BeginScene` e `EndScene` e depois o Present. O teste confere, entre outras coisas:
+  - as nametags e barras do SA-MP somem e os textos 3D presos ao jogador saem só durante o desenho dele (os do mundo e os de jogador fora de alcance ficam);
+  - o balão passa para o Trok Tags;
+  - os pixels em cima de cada cabeça, inclusive que nada aparece em quem o servidor esconde;
+  - parar o Present devolve tudo ao SA-MP, balões incluídos, e voltar o Present retoma;
+  - o ping é pedido uma vez, o diálogo do servidor esconde o desenho e o `/troktags` abre e fecha o menu com o cursor do SA-MP.
+
+  São 5 cenários: device direto, proxy estilo SA-MP, `ligado=0`, `samp.dll` de outra versão e estrutura de balões que não confere.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
 > O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.
 
 ## Terceiros
 
-O .asi inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). O teste do imgui antigo baixa o [LuaJIT](https://github.com/LuaJIT/LuaJIT) (MIT, © Mike Pall) e o moon_imgui (© FYP), que não vão no repositório nem no .asi. As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.
+O .asi (e o Trok Tags) inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). Os endereços e estruturas do SA-MP 0.3.7 R1 do Trok Tags foram conferidos com os cabeçalhos da [SAMP-API](https://github.com/BlastHackNet/SAMP-API) (MIT, © LUCHARE e BlastHack), que não vai no .asi. O teste do imgui antigo baixa o [LuaJIT](https://github.com/LuaJIT/LuaJIT) (MIT, © Mike Pall) e o moon_imgui (© FYP), que não vão no repositório nem no .asi. As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.
