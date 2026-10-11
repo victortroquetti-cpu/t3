@@ -74,6 +74,11 @@ struct State {
     std::vector<ImWchar> pending; // digitado antes de a barra pegar o teclado
     bool replace = false;         // SetInput: trocar o texto da barra (o ImGui guarda o dele enquanto ela esta ativa)
     bool tags = true;             // opt::Options::tags com que as mensagens foram quebradas
+    // Modo de mover (como no Trok Radar e na Kill List): o chat aberto, arrastado com o mouse.
+    bool moving = false;
+    bool movingDrag = false;
+    bool moveStart = false; // pegar a posicao atual no proximo quadro
+    ImVec2 movePos;
 } S;
 
 unsigned g_added = 0; // mensagens que ja chegaram (com g_lock)
@@ -430,6 +435,19 @@ std::string Submit() {
     return empty ? std::string() : text;
 }
 
+// Onde o chat fica: o canto de cima a esquerda do painel (o chat aberto, com a barra). O canto de sempre ou o que foi
+// escolhido no menu, sempre dentro da tela (o chat aberto inteiro cabe nela).
+ImVec2 Placement(float panelW, float panelH) {
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    const opt::Options& o = opt::Get();
+    ImVec2 p = o.posX < 0 || o.posY < 0
+                   ? ImVec2(std::floor(34 * u) - std::floor(12 * u), std::floor(26 * u) - std::floor(12 * u))
+                   : ImVec2(std::floor(o.posX * screen.x), std::floor(o.posY * screen.y));
+    p.x = std::max(0.0f, std::min(p.x, screen.x - panelW));
+    p.y = std::max(0.0f, std::min(p.y, screen.y - panelH));
+    return p;
+}
+
 } // namespace
 
 void Add(const Message& m) {
@@ -445,7 +463,7 @@ void Add(const Message& m) {
 }
 
 void Open() {
-    if (S.open) {
+    if (S.open || S.moving) {
         return;
     }
     S.open = true;
@@ -501,6 +519,22 @@ bool InputEmpty() {
     return S.input[0] == 0;
 }
 
+void StartMove() {
+    Close();
+    S.moving = true;
+    S.movingDrag = false;
+    S.moveStart = true;
+}
+
+void CancelMove() {
+    S.moving = false;
+    S.movingDrag = false;
+}
+
+bool IsMoving() {
+    return S.moving;
+}
+
 void Frame() {
     const host::ChatSettings cfg = host::Settings();
     if (S.open && host::DialogOpen()) {
@@ -517,19 +551,24 @@ void Frame() {
         }
     }
     // Escondido (o F7 do SA-MP) vale para o chat fechado: aberto, as mensagens aparecem.
-    const bool showLog = S.open || cfg.mode != 0;
-    if (!showLog) {
+    const bool panel = S.open || S.moving; // o chat com o painel e a barra
+    if (!panel && cfg.mode == 0) {
         return;
     }
     ImGuiIO& io = ImGui::GetIO();
+    const ImVec2 screen = io.DisplaySize;
     const float lineH = std::floor(fonts.body->FontSize + 6 * u);
-    const float x0 = std::floor(34 * u), y0 = std::floor(26 * u);
-    const float width = std::floor(std::min(io.DisplaySize.x - x0 - 40 * u, 760 * u));
+    const float width = std::floor(std::min(screen.x - 74 * u, 760 * u));
     const int view = std::max(2, std::min(cfg.pageSize, 40));
-    const float logH = showLog ? view * lineH : 0;
+    const float logH = view * lineH;
     const float pad = std::floor(12 * u);
     const float barH = std::floor(fonts.body->FontSize + 18 * u);
-    const float barGap = showLog ? std::floor(10 * u) : 0;
+    const float barGap = std::floor(10 * u);
+    const float panelW = width + 2 * pad, openH = logH + barGap + barH + 2 * pad;
+    if (S.moveStart) {
+        S.moveStart = false;
+        S.movePos = Placement(panelW, openH);
+    }
 
     std::string send;
     std::unique_lock<std::mutex> lock(g_lock);
@@ -555,20 +594,38 @@ void Frame() {
         S.seen = g_added;
     }
 
-    ImVec2 panelMin(x0 - pad, y0 - pad);
-    ImVec2 panelMax(x0 + width + pad, y0 + logH + (S.open ? barGap + barH : 0) + pad);
-    ImGui::SetNextWindowPos(panelMin);
-    ImGui::SetNextWindowSize(ImVec2(panelMax.x - panelMin.x, panelMax.y - panelMin.y));
+    // Movendo: uma janela na tela toda (o chat anda por ela); senao, so o tamanho do chat.
+    ImVec2 origin = S.moving ? S.movePos : Placement(panelW, openH);
+    const float shownH = panel ? openH : logH + 2 * pad;
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                              ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-    if (!S.open) {
+    if (!panel) {
         flags |= ImGuiWindowFlags_NoInputs;
     }
+    ImGui::SetNextWindowPos(S.moving ? ImVec2(0, 0) : origin);
+    ImGui::SetNextWindowSize(S.moving ? screen : ImVec2(panelW, shownH));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::Begin("##trokChat", nullptr, flags);
+    ImGui::Begin(S.moving ? "##trokChatMover" : "##trokChat", nullptr, flags);
     ImDrawList* dl = ImGui::GetWindowDrawList();
+    bool moveHovered = false;
+    if (S.moving) {
+        ImGui::SetCursorScreenPos(S.movePos);
+        ImGui::InvisibleButton("##arrastar", ImVec2(panelW, openH));
+        moveHovered = ImGui::IsItemHovered();
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 0.0f)) {
+            S.movingDrag = true;
+            S.movePos.x = std::max(0.0f, std::min(screen.x - panelW, S.movePos.x + io.MouseDelta.x));
+            S.movePos.y = std::max(0.0f, std::min(screen.y - openH, S.movePos.y + io.MouseDelta.y));
+        }
+        if (moveHovered || S.movingDrag) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        }
+        origin = S.movePos;
+    }
+    const float x0 = origin.x + pad, y0 = origin.y + pad;
+    const ImVec2 panelMin = origin, panelMax(origin.x + panelW, origin.y + shownH);
 
     if (S.open) {
         if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) S.scroll += view - 1;
@@ -583,13 +640,15 @@ void Frame() {
         }
         S.scroll += wheel * 3;
         S.scroll = std::max(0, std::min(S.scroll, maxScroll));
+    }
+    if (panel) {
         dl->AddRectFilled(panelMin, panelMax, IM_COL32(10, 10, 12, 205), 10 * u);
         dl->AddRect(panelMin, panelMax, col::White(14), 10 * u);
     }
 
-    if (showLog) {
+    {
         // De baixo para cima: a linha k (0 = a mais recente) fica na fileira view - 1 - (k - scroll).
-        const bool overGame = !S.open, outline = overGame && cfg.mode == 2;
+        const bool overGame = !panel, outline = overGame && cfg.mode == 2;
         dl->PushClipRect(ImVec2(x0 - 2, y0 - 2), ImVec2(x0 + width + 2, y0 + logH + 2), true);
         int k = 0;
         for (auto it = g_entries.rbegin(); it != g_entries.rend() && k < S.scroll + view; ++it) {
@@ -706,6 +765,37 @@ void Frame() {
         } else if (!active) {
             S.focus = true; // a barra nao perde o teclado enquanto estiver aberta
             S.caretToEnd = S.input[0] != 0;
+        }
+    } else if (S.moving) {
+        // A barra parada (so para mostrar onde o chat aberto vai ficar), a borda acesa e a ajuda no rodape da tela.
+        const ImVec2 a(x0, y0 + logH + barGap), b(x0 + width, a.y + barH);
+        dl->AddRectFilled(a, b, col::White(10), 6 * u);
+        dl->AddRect(a, b, col::White(46), 6 * u);
+        Text(dl, fonts.body, a.x + 12 * u, a.y + (barH - fonts.body->FontSize) * 0.5f, col::hint,
+             "Digite sua mensagem\xE2\x80\xA6");
+        const int border = S.movingDrag ? 120 : moveHovered ? 90 : 60;
+        dl->AddRect(panelMin, panelMax, col::White(border), 10 * u, 0, 1.5f * u);
+        const char* help = S.movingDrag ? "Solte para fixar"
+                                        : "Arraste o chat  |  Esc ou bot\xC3\xA3o direito cancela";
+        ImDrawList* fg = ImGui::GetForegroundDrawList();
+        const ImVec2 hs = TextSize(fonts.body, help);
+        const float px = (screen.x - hs.x) * 0.5f - 18 * u, py = screen.y - 28 * u - hs.y - 24 * u;
+        fg->AddRectFilled(ImVec2(px, py), ImVec2(px + hs.x + 36 * u, py + hs.y + 24 * u), IM_COL32(12, 12, 12, 252),
+                          10 * u);
+        fg->AddRect(ImVec2(px, py), ImVec2(px + hs.x + 36 * u, py + hs.y + 24 * u), col::White(14), 10 * u, 0, 1.0f);
+        Text(fg, fonts.body, px + 18 * u, py + 12 * u, col::text, help);
+
+        if (S.movingDrag && !ImGui::IsMouseDown(0)) {
+            // Solto: a posicao fica, em fracao da tela (vale em qualquer resolucao).
+            opt::Options& o = opt::Get();
+            o.posX = S.movePos.x / screen.x;
+            o.posY = S.movePos.y / screen.y;
+            S.moving = false;
+            S.movingDrag = false;
+            Toast("Posi\xC3\xA7\xC3\xA3o salva", "O chat ficou onde voc\xC3\xAA soltou.");
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsMouseClicked(1)) {
+            S.moving = false; // cancelado: fica onde estava
+            S.movingDrag = false;
         }
     }
 

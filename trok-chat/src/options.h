@@ -9,6 +9,8 @@ namespace opt {
 struct Options {
     bool tags = true;    // [conteudo] vira etiqueta
     bool enabled = true; // o Trok Chat no lugar do chat do SA-MP
+    // Canto de cima a esquerda do chat, em fracao da tela (vale em qualquer resolucao); -1 = no canto de sempre.
+    float posX = -1.0f, posY = -1.0f;
 };
 
 Options& Get();

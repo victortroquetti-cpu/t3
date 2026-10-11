@@ -28,11 +28,12 @@ run() {
     cp "$OUT/fake_gta.exe" "$dir/"
     cp "$ASI" "$dir/Trok Chat.asi"
     case $mode in
-        r1 | desligado) python3 test/smoke/make_fake_samp.py "$dir/samp.dll" ;;
+        r1 | desligado | posicao) python3 test/smoke/make_fake_samp.py "$dir/samp.dll" ;;
         outra-versao) python3 test/smoke/make_fake_samp.py "$dir/samp.dll" --outra-versao ;;
     esac
     case $mode in
         desligado) printf '%s\r\n' "[TROK_CHAT]" "Ligado=0" "Linhas=15" "Hora=1" "ModoF7=1" > "$dir/Trok Chat.ini" ;;
+        posicao) printf '%s\r\n' "[TROK_CHAT]" "PosicaoX=0,5" "PosicaoY=0.4" > "$dir/Trok Chat.ini" ;;
     esac
     if [ -n "${TROK_FONT:-}" ]; then cp "$TROK_FONT" "$dir/moonloader/resource/trok/font.ttf"; fi
     if [ -n "${TROK_ICONS:-}" ]; then cp "$TROK_ICONS" "$dir/moonloader/resource/trok/lucide.ttf"; fi
@@ -43,6 +44,7 @@ run() {
 }
 run r1
 run desligado
+run posicao
 run outra-versao
 run sem-samp
 exit $status

@@ -19,7 +19,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v1.2";
+constexpr const char* VERSION_TAG = "v1.3";
 
 struct State {
     bool open = false;
@@ -92,6 +92,18 @@ void DrawRows(Rows& r) {
     host::ChatSettings chat = host::Settings();
     const host::ChatSettings before = chat;
 
+    if (o.enabled) {
+        // Como o "Mover lista" da Kill List: o menu some, o chat aparece aberto e e arrastado com o mouse.
+        r.Section("Na tela");
+        if (r.Action("Posi\xC3\xA7\xC3\xA3o do chat", "Mover chat")) {
+            chat::StartMove();
+        }
+        if (o.posX >= 0 && r.Action("Posi\xC3\xA7\xC3\xA3o padr\xC3\xA3o", "Restaurar")) {
+            o.posX = o.posY = -1.0f;
+            Toast("Posi\xC3\xA7\xC3\xA3o padr\xC3\xA3o", "O chat voltou para o canto de cima.");
+        }
+    }
+
     r.Section("Mensagens");
     r.Stepper("Linhas na tela", &chat.pageSize, 5, 20, 1, "%d", 10);
     r.Toggle("Hora antes de cada mensagem", &chat.timestamps);
@@ -125,9 +137,12 @@ void DrawMenu() {
     Keys keys = ReadKeys(keysOk);
     const bool escape = keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
 
-    // Cabe tudo, mais a linha de aviso do Trok Chat desligado quando aparece.
+    // Cabe tudo: a secao da posicao (com a linha de restaurar, se o chat saiu do canto) com o Trok Chat ligado, ou a
+    // linha de aviso com ele desligado.
+    const opt::Options& o = opt::Get();
+    const float extra = o.enabled ? 62 + (o.posX >= 0 ? 30 : 0) : 34;
     const float width = 560 * u;
-    const float height = std::min(io.DisplaySize.y * 0.85f, (338 + (opt::Get().enabled ? 0 : 34)) * u);
+    const float height = std::min(io.DisplaySize.y * 0.85f, (338 + extra) * u);
     PushStyle();
     const bool keep = BeginShell("##trokChatMenu", "Trok Chat", VERSION_TAG, width, height, S.shell);
 
@@ -214,8 +229,19 @@ bool WantsFrame() {
     return S.open || ToastsVisible();
 }
 
+bool CapturesInput() {
+    return S.open || chat::IsMoving();
+}
+
 void Frame() {
-    if (S.open) {
+    // Movendo o chat, o menu some; quando volta, o primeiro quadro ignora o teclado (o Esc que cancelou).
+    static bool wasMoving = false;
+    const bool moving = chat::IsMoving();
+    if (wasMoving && !moving) {
+        S.menuAge = 0;
+    }
+    wasMoving = moving;
+    if (S.open && !moving) {
         DrawMenu();
         if (S.confirm) {
             DrawConfirm();

@@ -27,6 +27,9 @@ void Close();
 bool IsOpen();
 void SetInput(const char* utf8); // texto pronto na barra aberta (o de um script), com o cursor no fim
 bool InputEmpty();
+void StartMove();           // o menu do /trokchat: o chat aparece aberto para ser arrastado com o mouse
+void CancelMove();
+bool IsMoving();
 void Frame();               // dentro do quadro do ImGui
 
 } // namespace chat

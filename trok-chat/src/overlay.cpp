@@ -75,6 +75,7 @@ struct Snapshot {
 
 bool operator!=(const Snapshot& a, const Snapshot& b) {
     return a.options.tags != b.options.tags || a.options.enabled != b.options.enabled ||
+           a.options.posX != b.options.posX || a.options.posY != b.options.posY ||
            a.chat.pageSize != b.chat.pageSize || a.chat.mode != b.chat.mode || a.chat.timestamps != b.chat.timestamps;
 }
 
@@ -160,8 +161,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         g_enterHeld = false;
     }
 
-    if (menu::IsOpen() && !host::DialogOpen()) {
-        // Menu do /trokchat: o jogo nao recebe teclas nem cliques (as teclas soltas passam).
+    if (menu::CapturesInput() && !host::DialogOpen()) {
+        // Menu do /trokchat (ou o chat sendo movido): o jogo nao recebe teclas nem cliques (as teclas soltas passam).
         ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
         switch (msg) {
         case WM_KEYDOWN:
@@ -411,9 +412,12 @@ void RenderOverlay(IDirect3DDevice9* device) {
     if (chat::IsOpen() && (!active || paused || menu::IsOpen())) {
         chat::Close();
     }
+    if (chat::IsMoving() && (!active || paused)) {
+        chat::CancelMove(); // o chat nao esta sendo desenhado: nada para arrastar
+    }
 
-    // Cursor do SA-MP com o menu aberto (todo quadro: outros mods tentam devolver o cursor).
-    const bool wantCursor = menu::IsOpen() && !paused;
+    // Cursor do SA-MP com o menu aberto ou movendo o chat (todo quadro: outros mods tentam devolver o cursor).
+    const bool wantCursor = menu::CapturesInput() && !paused;
     if (wantCursor) {
         samp::Cursor(true);
     } else if (g_cursorOn) {
@@ -436,7 +440,10 @@ void RenderOverlay(IDirect3DDevice9* device) {
     }
     const ImGuiMouseCursor cursor = ImGui::GetMouseCursor();
     ImGui::EndFrame();
-    PublishCursor(!wantCursor ? 0 : cursor == ImGuiMouseCursor_Hand ? 1 : cursor == ImGuiMouseCursor_TextInput ? 2 : 0);
+    PublishCursor(!wantCursor                                                                ? 0
+                  : cursor == ImGuiMouseCursor_Hand || cursor == ImGuiMouseCursor_ResizeAll ? 1
+                  : cursor == ImGuiMouseCursor_TextInput                                     ? 2
+                                                                                             : 0);
     Persist();
     if (!drawChat && !drawMenu) {
         return;

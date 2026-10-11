@@ -9,15 +9,17 @@ Um `.asi` que troca o chat do SA-MP 0.3.7 R1 por um feito com o Dear ImGui e o k
 - **Aberto** (T ou F6, como no SA-MP), ganha um painel escuro, barra de rolagem e a barra de digitação:
   - **Rolagem:** Page Up e Page Down, ou a roda do mouse, por até 300 mensagens (o SA-MP guarda 100). Mensagem nova não mexe no que você está lendo; um aviso mostra quantas chegaram ("3 mensagens novas").
   - **Barra de digitação:** "Digite sua mensagem…", como os campos dos menus da casa. Histórico nas setas para cima e para baixo (o rascunho volta no fim), limite de 128 caracteres com contador, colar com Ctrl+V. Enter manda, Esc fecha.
+- **Posição:** o chat pode ir para qualquer lugar da tela, arrastado com o mouse (`/trokchat` → Mover chat).
 - **/trokchat** abre o menu de configurações (abaixo).
 
-> **Estado:** versão 1.2, compilada e testada sem o jogo. O chat e o menu desenhados em imagens pelo `test/render.sh` passam as 44 conferências dele; no Wine, com um `samp.dll` de mentira nos endereços do R1, o `test/smoke/run.sh` passa as 72 dele. Ainda não rodou no jogo.
+> **Estado:** versão 1.3, compilada e testada sem o jogo. O chat e o menu desenhados em imagens pelo `test/render.sh` passam as 50 conferências dele; no Wine, com um `samp.dll` de mentira nos endereços do R1, o `test/smoke/run.sh` passa as 83 dele. Ainda não rodou no jogo.
 
 ![Fechado](docs/01-fechado.png)
 ![Aberto](docs/02-aberto.png)
 ![Digitando](docs/03-digitando.png)
 ![Mensagens novas](docs/04-mensagens-novas.png)
 ![Menu](docs/05-menu.png)
+![Movendo o chat](docs/06-mover.png)
 
 ## Instalar
 
@@ -33,12 +35,14 @@ O casco, as linhas e o rodapé dos outros menus da casa, com o cursor do SA-MP (
 
 | Linha | O que faz |
 |---|---|
+| **Posição do chat** | "Mover chat": o menu some e o chat aparece aberto, com a borda acesa. Arraste com o mouse e solte onde quiser ("Posição salva"); Esc ou o botão direito cancelam. O chat aberto inteiro sempre cabe na tela. |
+| **Posição padrão** | Aparece com o chat fora do canto: "Restaurar" volta para o canto de cima. |
 | **Linhas na tela** | 5 a 20 (o `/pagesize` do SA-MP, que também continua valendo). |
 | **Hora antes de cada mensagem** | O `/timestamp` do SA-MP. |
 | **Chat fechado** | Com contorno, Sem contorno ou Escondido (o F7 do SA-MP). Escondido some só com o chat fechado: aberto, as mensagens aparecem. |
 | **[Colchetes] viram etiquetas** | Desligado, `[ADMIN]` fica como texto. |
 | **Usar o Trok Chat** | Desligado, o chat e a caixa do SA-MP voltam; o `/trokchat` continua abrindo este menu. |
-| **Padrões do Trok Chat** | 10 linhas, sem hora, com contorno e etiquetas (pede confirmação). |
+| **Padrões do Trok Chat** | Canto de cima, 10 linhas, sem hora, com contorno e etiquetas (pede confirmação). |
 
 Tudo vale na hora e fica no `Trok Chat.ini`, ao lado do `.asi`, um segundo depois da última mudança (do menu ou do `/pagesize`, `/timestamp` e F7):
 
@@ -46,12 +50,14 @@ Tudo vale na hora e fica no `Trok Chat.ini`, ao lado do `.asi`, um segundo depoi
 [TROK_CHAT]
 Etiquetas=1
 Ligado=1
+PosicaoX=-1
+PosicaoY=-1
 Linhas=10
 Hora=0
 ModoF7=2
 ```
 
-`ModoF7`: 2 com contorno, 1 sem contorno, 0 escondido.
+`PosicaoX` e `PosicaoY`: o canto de cima à esquerda do chat em fração da tela (`0.5` = no meio, com ponto ou vírgula), então vale em qualquer resolução; `-1` = o canto de sempre. `ModoF7`: 2 com contorno, 1 sem contorno, 0 escondido.
 
 ## Teclado
 
@@ -97,6 +103,7 @@ O `test/render.sh` roda o `chat.cpp` e o `menu.cpp` com um SA-MP falso e mensage
 - digita logo depois do T (as letras não podem se perder enquanto a barra pega o teclado);
 - rola com Page Up, Page Down e as duas rodas, e confere que mensagem nova não mexe na leitura;
 - no menu: muda linhas, hora, chat fechado e etiquetas, restaura os padrões;
+- move o chat com o mouse: fica onde foi solto, Esc cancela no meio do arrasto (sem fechar o menu), para na beira da tela com o chat aberto inteiro dentro, "Restaurar" volta para o canto;
 - grava as imagens em `test/out/render/`.
 
 O `test/smoke/run.sh` precisa de `wine` (com `wine32`), `xvfb-run` e do MinGW i686. O `fake_gta.exe` deixa os endereços do 1.0 US na própria memória, carrega o `samp.dll` de mentira (`make_fake_samp.py`: os ponteiros e as funções do R1, com três mensagens no chat e a caixa de texto no formato do DXUT) e o `.asi`, e apresenta quadros num device D3D9 de verdade, atrás de um proxy como o do SA-MP. O WndProc da janela faz o papel do SA-MP (abre a caixa com o "t" e o F6) e do jogo; um "mod" com campo de texto fica na frente. Os modos:
@@ -112,11 +119,13 @@ O `test/smoke/run.sh` precisa de `wine` (com `wine32`), `xvfb-run` e do MinGW i6
   - o menu do `/trokchat` abre com o cursor do SA-MP, fica com o T, e Esc devolve o mouse;
   - sem o `Present` do Trok Chat, o chat do SA-MP volta sozinho, e some de novo quando ele volta.
 - **desligado** (`Trok Chat.ini` com `Ligado=0`, linhas, hora e F7): o chat e a caixa do SA-MP, com os valores do INI, e o `/trokchat` continua abrindo o menu.
+- **posicao** (`Trok Chat.ini` com `PosicaoX=0,5` e `PosicaoY=0.4`): o chat fechado e o aberto no meio da tela, nada no canto de sempre.
 - **outra-versao:** um `samp.dll` de outra versão: nada muda.
 - **sem-samp:** sem o SA-MP: nada muda.
 
 ## Versões
 
+- **1.3** — Mover o chat: `/trokchat` → Mover chat, arrastado com o mouse (como o "Mover lista" da Kill List), guardado no `Trok Chat.ini` em fração da tela.
 - **1.2** — T e F6 de volta como no SA-MP: a troca das teclas do chat saiu (por enquanto). O Enter segurado depois de mandar continua sem chegar ao jogo.
 - **1.1**
   - Só o conteúdo do Trok Chat na tela: script abrindo o chat abre a barra (com o texto pronto dele), não a caixa do SA-MP.

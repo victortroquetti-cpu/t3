@@ -503,11 +503,12 @@ int main(int argc, char** argv) {
     Idle(30);
     Check(menu::IsOpen(), "/trokchat abre o menu");
     Frame("11_menu");
-    // Linhas na tela (linha 1): seta para a direita.
+    // Linhas na tela (linha 2): seta para a direita.
+    Key(ImGuiKey_DownArrow);
     Key(ImGuiKey_RightArrow);
     Idle(5);
     Check(g_cfg.pageSize == 11, "linhas na tela: 10 -> 11 (o /pagesize do SA-MP muda junto)");
-    // Hora (linha 2) e o chat fechado (linha 3: escondido e de volta).
+    // Hora (linha 3) e o chat fechado (linha 4: escondido e de volta).
     Key(ImGuiKey_DownArrow);
     Key(ImGuiKey_Enter);
     Idle(5);
@@ -521,7 +522,7 @@ int main(int argc, char** argv) {
     Key(ImGuiKey_LeftArrow);
     Idle(5);
     Check(g_cfg.mode == 2, "e de volta para com contorno");
-    // Etiquetas (linha 4) desligadas: as mensagens sao quebradas de novo.
+    // Etiquetas (linha 5) desligadas: as mensagens sao quebradas de novo.
     Key(ImGuiKey_DownArrow);
     Key(ImGuiKey_Enter);
     Idle(30);
@@ -533,21 +534,97 @@ int main(int argc, char** argv) {
     g_saveW = 1000;
     g_saveH = 470;
     Frame("13_sem_etiquetas_com_hora");
-    // Padroes (linha 6): confirma e volta tudo.
+
+    // Mover o chat (linha 1): o menu some, o chat aberto vai com o mouse e fica onde for solto.
+    g_saveW = W;
+    g_saveH = H;
     menu::Toggle();
     Idle(10);
-    for (int i = 0; i < 5; i++) {
+    Key(ImGuiKey_Enter);
+    Idle(3);
+    Check(chat::IsMoving() && menu::IsOpen(), "Mover chat: o chat entra no modo de mover (o menu espera)");
+    const ImVec2 start = chat::S.movePos;
+    const float pad = std::floor(12 * tui::u);
+    const float panelW = std::floor(std::min(W - 74 * tui::u, 760 * tui::u)) + 2 * pad;
+    const float openH = g_cfg.pageSize * std::floor(tui::fonts.body->FontSize + 6 * tui::u) + std::floor(10 * tui::u) +
+                        std::floor(tui::fonts.body->FontSize + 18 * tui::u) + 2 * pad;
+    io.AddMousePosEvent(start.x + 100, start.y + 50);
+    Idle(2);
+    io.AddMouseButtonEvent(0, true);
+    Idle(2);
+    for (int i = 1; i <= 10; i++) {
+        io.AddMousePosEvent(start.x + 100 + 60 * i, start.y + 50 + 40 * i);
+        Frame();
+    }
+    Frame("14_movendo");
+    io.AddMouseButtonEvent(0, false);
+    Idle(5);
+    const float expectX = (start.x + 600) / W, expectY = (start.y + 400) / H;
+    Check(!chat::IsMoving() && std::fabs(opt::Get().posX - expectX) < 0.002f &&
+              std::fabs(opt::Get().posY - expectY) < 0.002f,
+          "solto: o chat fica onde foi solto (em fracao da tela)");
+    Check(menu::IsOpen(), "e o menu volta");
+    Idle(20);
+    Frame("15_menu_depois_de_mover");
+    // Esc no meio do arrasto: cancela e fica onde estava (o menu continua aberto).
+    const float keepX = opt::Get().posX, keepY = opt::Get().posY;
+    Key(ImGuiKey_Enter);
+    Idle(3);
+    const ImVec2 again = chat::S.movePos;
+    io.AddMousePosEvent(again.x + 50, again.y + 50);
+    Idle(2);
+    io.AddMouseButtonEvent(0, true);
+    Idle(2);
+    io.AddMousePosEvent(again.x + 250, again.y + 150);
+    Idle(2);
+    Key(ImGuiKey_Escape);
+    io.AddMouseButtonEvent(0, false);
+    Idle(5);
+    Check(!chat::IsMoving() && opt::Get().posX == keepX && opt::Get().posY == keepY && menu::IsOpen(),
+          "Esc cancela: o chat fica onde estava e o menu continua aberto");
+    // Arrastado para fora: para na beira da tela, com o chat aberto inteiro dentro.
+    Key(ImGuiKey_Enter);
+    Idle(3);
+    const ImVec2 edge = chat::S.movePos;
+    io.AddMousePosEvent(edge.x + 50, edge.y + 50);
+    Idle(2);
+    io.AddMouseButtonEvent(0, true);
+    Idle(2);
+    for (int i = 1; i <= 10; i++) {
+        io.AddMousePosEvent(edge.x + 50 + 400 * i, edge.y + 50 + 300 * i);
+        Frame();
+    }
+    io.AddMouseButtonEvent(0, false);
+    Idle(5);
+    Check(std::fabs(opt::Get().posX * W + panelW - W) < 1.5f && std::fabs(opt::Get().posY * H + openH - H) < 1.5f,
+          "arrastado para fora: para no canto de baixo, com o chat aberto inteiro na tela");
+    Key(ImGuiKey_Escape);
+    Idle(20);
+    Frame("16_chat_movido");
+    // Posicao padrao (linha 2, so com o chat fora do canto).
+    menu::Toggle();
+    Idle(10);
+    Key(ImGuiKey_DownArrow);
+    Key(ImGuiKey_Enter);
+    Idle(5);
+    Check(opt::Get().posX < 0 && opt::Get().posY < 0, "Restaurar: o chat volta para o canto");
+    Key(ImGuiKey_Escape);
+    Idle(20);
+
+    // Padroes (linha 7): confirma e volta tudo.
+    menu::Toggle();
+    Idle(10);
+    for (int i = 0; i < 6; i++) {
         Key(ImGuiKey_DownArrow);
     }
     Key(ImGuiKey_Enter);
     Idle(10);
-    g_saveW = W;
-    g_saveH = H;
-    Frame("14_menu_restaurar");
+    Frame("17_menu_restaurar");
     Key(ImGuiKey_Enter);
     Idle(10);
-    Check(opt::Get().tags && opt::Get().enabled && g_cfg.pageSize == 10 && !g_cfg.timestamps && g_cfg.mode == 2,
-          "padroes: etiquetas, 10 linhas, sem hora, com contorno");
+    Check(opt::Get().tags && opt::Get().enabled && opt::Get().posX < 0 && g_cfg.pageSize == 10 && !g_cfg.timestamps &&
+              g_cfg.mode == 2,
+          "padroes: etiquetas, canto de sempre, 10 linhas, sem hora, com contorno");
     Key(ImGuiKey_Escape);
     Idle(60);
 

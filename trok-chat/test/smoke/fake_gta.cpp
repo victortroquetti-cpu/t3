@@ -8,13 +8,14 @@
 //    (CInput::Open, desviado pelo .asi) com o caractere "t" e com o F6, menos com dialogo ou menu de pausa; o que
 //    passa dele e o "jogo". Um "mod" com campo de texto fica na frente.
 //
-// Uso: fake_gta.exe <asi> <r1|desligado|outra-versao|sem-samp>
+// Uso: fake_gta.exe <asi> <r1|desligado|posicao|outra-versao|sem-samp>
 //   r1            o chat do SA-MP some e o do Trok Chat aparece; T e F6 abrem a barra no lugar da caixa do SA-MP; Enter
 //                 manda (segurado depois, nao chega ao jogo); Esc fecha; dialogo, mod com campo de texto, scripts (com
 //                 texto pronto), menu de pausa, o menu do /trokchat; o Trok Chat.ini guarda o /pagesize; sem o Present
 //                 do Trok Chat o chat do SA-MP volta sozinho
 //   desligado     Trok Chat.ini com Ligado=0 (e linhas, hora e F7): o chat e a caixa do SA-MP, com os valores do INI;
 //                 o /trokchat abre o menu
+//   posicao       Trok Chat.ini com o chat no meio da tela (PosicaoX=0,5 com virgula, PosicaoY=0.4)
 //   outra-versao  samp.dll com outro ponto de entrada: o .asi nao pode mexer em nada
 //   sem-samp      sem samp.dll (single player): idem
 
@@ -557,6 +558,24 @@ void RunOff() {
     Frames(5);
 }
 
+void RunPosition() {
+    Check(LogHas("chat em 50% x 40% da tela"), "log: posicao do Trok Chat.ini (com virgula e com ponto)");
+    Frames(10);
+    Check(Capture("chat_no_meio.bmp"), "back buffer salvo (chat_no_meio.bmp)");
+    // O canto do chat em (800, 360): as tres mensagens ficam nas ultimas linhas, na altura do meio da tela.
+    const double middle = Covered(810, 370, 1340, 530);
+    snprintf(g_text, sizeof(g_text), "mensagens do Trok Chat no meio da tela (%.1f%% dos pixels)", middle * 100);
+    Check(middle > 0.01, g_text);
+    Check(Covered(CX0, CY0, CX1, CY1) == 0.0, "e nada no canto de sempre");
+    Press('T', 't');
+    Frames(5);
+    Check(InputOpen() == 1, "T abre a barra");
+    Check(Capture("barra_no_meio.bmp"), "back buffer salvo (barra_no_meio.bmp)");
+    Check(Covered(810, 370, 1340, 560) > 0.95, "aberto, o painel tambem fica no meio da tela");
+    Press(VK_ESCAPE, 0);
+    Frames(3);
+}
+
 void RunWithoutR1(bool withSamp) {
     Frames(300);
     const DWORD draws = withSamp ? F(DRAW_COUNT) : 0;
@@ -577,7 +596,7 @@ void RunWithoutR1(bool withSamp) {
 
 int main(int argc, char** argv) {
     if (argc < 3) {
-        printf("uso: fake_gta.exe <asi> <r1|desligado|outra-versao|sem-samp>\n");
+        printf("uso: fake_gta.exe <asi> <r1|desligado|posicao|outra-versao|sem-samp>\n");
         return 2;
     }
     const std::string mode = argv[2];
@@ -650,6 +669,8 @@ int main(int argc, char** argv) {
         Check(F(CMD_NAME) != 0, "Trok Chat ligado no SA-MP");
         if (mode == "desligado") {
             RunOff();
+        } else if (mode == "posicao") {
+            RunPosition();
         } else {
             RunR1();
         }
