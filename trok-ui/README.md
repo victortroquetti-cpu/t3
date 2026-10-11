@@ -8,6 +8,7 @@ Dois mods de visualização com **todos os controles de menu da casa**, um em **
 | .asi | `asi/dist/Trok UI Showcase.asi` | `/trokui` (sem SA-MP 0.3.7 R1: **F10**) |
 | Trok Skin (.asi) | `skin/dist/Trok Skin.asi` | sozinho; `/trokskin` liga e desliga (ver [Trok Skin](#trok-skin-o-visual-da-casa-nos-mods-dos-outros)) |
 | Trok Tags (.asi) | `tags/dist/Trok Tags.asi` | sozinho; `/troktags` abre o menu (ver [Trok Tags](#trok-tags-nametags-balões-e-textos-fixos-da-casa)) |
+| Trok Veículos (.asi) | `veiculos/dist/Trok Veiculos.asi` | sozinho; `/trokveiculos` abre o menu (ver [Trok Veículos](#trok-veículos-a-placa-dos-veículos)) |
 
 Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diálogos**), diálogos de exemplo, confirmação, notificações e o modo de mover.
 
@@ -268,6 +269,72 @@ Também acrescenta indicadores que o SA-MP não tem: tempo de AFK, digitando, pi
 - O tempo de AFK conta a partir de quando o mod viu a pausa, então quem já estava AFK quando você chegou começa do zero.
 - **Ainda não foi conferido dentro do GTA de verdade**, só no GTA de mentira e no renderizador por software (veja abaixo). O ponto mais sensível é o ponteiro dos balões. Se o `Trok Tags.log` disser "nao conferiu", os balões ficam os do SA-MP e o log diz o motivo.
 
+## Trok Veículos: a placa dos veículos
+
+`veiculos/dist/Trok Veiculos.asi` põe uma placa embaixo de cada veículo do SA-MP, no estilo da casa. A placa mostra nome do modelo, ID, vida, blindagem, pneus furados e se o veículo está trancado. Copie para a pasta do GTA (ou `scripts\`); `/trokveiculos` abre o menu. Funciona só no SA-MP 0.3.7 R1: em qualquer outra versão não faz nada e diz o motivo no `Trok Veiculos.log`, ao lado do .asi.
+
+![Trok Veículos numa rua](docs/17-veiculos-cena.png)
+
+![Estados da placa](docs/18-veiculos-estados.png)
+
+*Capturas do teste de renderização (`veiculos/test/run.sh`), com a fonte e os ícones da casa, em 1080p.*
+
+**A placa:**
+- **Linha de cima:** os pneus, o nome do modelo, o ID, o cadeado (trancado para você) e a vida em número. O número ganha o escudo quando tem blindagem e a chama quando o carro pega fogo. Quando tudo isso não cabe (nome comprido, ID de 4 dígitos, blindagem), a placa fica mais larga em vez de cortar o nome.
+- **Pneus:** só aparecem com pneu furado. É o chassi visto de cima, com a frente para cima e o pneu furado em vermelho; na moto são duas rodas.
+- **Barra azul:** a blindagem, que é a vida acima de 1000. No Horizonte, o carro blindado fica com 5000: 1000 do carro e 4000 de blindagem, que gasta primeiro. O teto da barra é o maior valor visto naquele carro, ou um valor fixo escolhido no menu.
+- **Barra da vida do motor (0 a 1000):** a cor segue a fumaça do GTA.
+  - branca acima de 650;
+  - âmbar com fumaça branca;
+  - laranja com fumaça preta (abaixo de 390);
+  - vermelha pulsando quando pega fogo (abaixo de 250, a marca na barra). O GTA explode o carro alguns segundos depois.
+- **O seu dano:** a parte da barra que saiu fica branca e escorre, e o número (`–120`) sobe e some.
+- **Linha de detalhes (opcional):** como no `/dl`, com número do modelo, distância e lugares.
+- **Vazio e longe:** veículo sem ninguém dentro fica com a placa mais apagada. Perto dos 20 m a placa vira só a barra e vai apagando, sem cortar de uma vez.
+
+**A regra: nunca mais do que o `/dl` mostraria.**
+- **Alcance:** até 20 m de você, o mesmo do `/dl`. O mod mede com a mesma função do SA-MP, e no menu dá só para diminuir.
+- **Informação:** só o que o `/dl` mostra (modelo, ID, vida, distância, lugares) e o que dá para ver no próprio carro (pneu furado, trancado).
+- **Parede:** atrás de parede a placa some, com o mesmo teste de parede que o SA-MP usa nos textos 3D. O `/dl` mostra através da parede; no menu, "Atrás de parede: Como o /dl" deixa igual a ele.
+- **Diálogo do servidor ou placar (Tab) na tela:** as placas somem até eles fecharem.
+
+**Mostrar: sempre ou ao dar dano.**
+- **Sempre:** toda placa dentro do alcance.
+- **Ao dar dano:** só a placa do veículo que você acertou. Ela some alguns segundos depois do último dano (6 s, ajustável de 3 a 15).
+- **Como o mod sabe que o dano foi seu:** a vida dos outros chega pelo sync, um pouco depois do tiro. Então conta como seu o dano que chega até 1,5 s depois de você atirar com a mira em cima do veículo, ou até 0,8 s depois de o seu veículo encostar nele. É uma dedução: se outra pessoa acertar o mesmo carro no mesmo instante, a placa também abre.
+
+**O seu veículo:** com "Esconder o meu" (padrão), o veículo em que você está, dirigindo ou de carona, não ganha placa.
+
+**Menu (`/trokveiculos`):** abas Exibir, Barras, Informações e Servidor. Setas escolhem e ajustam, Esc fecha.
+- **Exibir:** liga e desliga o mod, mostrar (sempre ou ao dar dano), quanto tempo a placa fica depois do dano, esconder o meu, veículos vazios, posição (embaixo ou em cima do veículo), tamanho, distância (5 a 20 m), atrás de parede (esconder ou como o `/dl`) e desbotar no fim do alcance.
+- **Barras:** blindagem, teto da blindagem (maior visto ou fixo), cores da fumaça e do fogo, linha do fogo, dano que você deu e número do dano, com uma prévia.
+- **Informações:** nome do modelo, ID, vida em número, pneus furados, cadeado e a linha de detalhes (número do modelo, distância e lugares), com uma prévia.
+- **Servidor:** só leitura. Mostra o endereço, o alcance do `/dl`, a sua distância e as regras acima.
+
+![Menu: abas Exibir e Informações](docs/19-veiculos-menu.png)
+
+**Escolhas por servidor:** ficam no `Trok Veiculos.ini`, ao lado do .asi, como no Trok Tags: `[padrao]` e uma seção por servidor (`[ip:porta]`). As chaves são as do menu: `ligado`, `mostrar` (0 sempre, 1 ao dar dano), `tempo_dano`, `esconder_meu`, `vazios`, `posicao` (0 embaixo, 1 em cima), `tamanho`, `distancia` (0 = os 20 m do `/dl`), `parede` (0 esconder, 1 como o `/dl`), `desbotar`, `blindagem`, `teto_blindagem` (0 maior visto, 1 fixo), `teto_fixo`, `cores`, `linha_fogo`, `dano_barra`, `dano_numero`, `nome`, `id`, `vida_numero`, `pneus`, `cadeado`, `det_modelo`, `det_distancia` e `det_lugares`.
+
+**Como funciona:**
+- **Só leitura:** o mod não esconde nem troca nada do SA-MP, e o `/dl` continua funcionando por fora. Não há gancho no samp.dll; só o Present e o Reset do d3d9 são desviados, para desenhar, como no Trok Tags.
+- **Veículos:** vêm da `CVehiclePool` do samp.dll R1. Os endereços foram conferidos compilando os cabeçalhos do R1 da SAMP-API: o veículo do SA-MP fica em `+0x1134`, o "existe" em `+0x3074` e o do GTA em `+0x4FB4`.
+- **Funções do próprio SA-MP:**
+  - `CEntity::GetDistanceToLocalPlayer`, a conta do `/dl`;
+  - `CVehicle::IsOccupied`, `IsWrecked` e `GetMaxPassengers`;
+  - `CLabel::HasNoObstacles`, o teste de parede;
+  - `CPed::IsInVehicle` e `GetVehicle`, para achar o seu veículo.
+- **Do GTA, só o que o samp.dll também lê:**
+  - a vida (`+0x4C0`);
+  - os pneus (`+0x5A5` no carro, `+0x65C` na moto);
+  - o tipo do veículo, pela vtable.
+- **Posição da placa:** os oito cantos da caixa do modelo são projetados na tela, e a placa fica embaixo do retângulo que eles formam.
+- **Alcance:** os 20 m saíram do código do `/dl` num samp.dll 0.3.7.
+
+**Limites:**
+- Só no SA-MP 0.3.7 R1.
+- "Ao dar dano" é uma dedução (veja acima). Conta o tiro do personagem e a batida do seu veículo; canhão de veículo (Rhino, Hunter) ainda não.
+- **Ainda não foi conferido dentro do GTA de verdade**, só no GTA de mentira e no renderizador por software (veja abaixo). O alcance de 20 m foi lido num samp.dll 0.3.7 de outra versão; no R1 ele precisa ser confirmado no jogo.
+
 ## Reaproveitar nos próximos mods
 
 - **Lua:** copie o bloco "TROK UI" do topo de `Trok UI Showcase.lua` (até "Fim do kit"). Chame `ui.buildFonts()` no `imgui.OnInitialize`, envolva cada quadro com `ui.beginFrame()` / `ui.endFrame()` e monte a janela com `ui.pushStyle()`, `ui.beginShell(...)`, `ui.rows(...)`, `ui.endShell(...)` e `ui.popStyle()`. O teclado vem do `onWindowMessage` (veja o fim do arquivo).
@@ -316,10 +383,25 @@ Duas regras que custaram caro na primeira versão:
   - o ping é pedido uma vez, o diálogo do servidor esconde o desenho e o `/troktags` abre e fecha o menu com o cursor do SA-MP.
 
   São 6 cenários: device direto, proxy estilo SA-MP, `ligado=0`, `samp.dll` de outra versão, estrutura de balões que não confere e sigla e ID ligados.
+- **Trok Veículos:** `veiculos/build.sh` gera `veiculos/dist/Trok Veiculos.asi`. `veiculos/test/run.sh <pasta> [fundo.png]` desenha a cena, os estados e as quatro abas do menu num rasterizador por software (as imagens acima saíram dele) e confere o pneu furado em vermelho.
+- **Trok Veículos num GTA de mentira:** `veiculos/test/smoke/run.sh` roda o .asi no Wine com um processo que faz o papel do GTA e do SA-MP:
+  - uma `CVehiclePool` com 6 veículos;
+  - o personagem local dentro do próprio carro;
+  - as funções do R1 que o mod chama, caindo em funções do teste.
+
+  O teste confere:
+  - a placa embaixo de cada veículo até 20 m e não além;
+  - o seu carro escondido e o carro atrás da parede escondido (e mostrado com "como o /dl");
+  - pneu furado em vermelho, blindagem em azul e fogo em vermelho;
+  - o diálogo do servidor escondendo as placas;
+  - "ao dar dano" abrindo só a placa do veículo que você acertou, com o `–120`, e fechando depois;
+  - o `/trokveiculos` abrindo e fechando o menu.
+
+  São 4 cenários e 70 verificações.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
 > O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.
 
 ## Terceiros
 
-O .asi (e o Trok Tags) inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). Os endereços e estruturas do SA-MP 0.3.7 R1 do Trok Tags foram conferidos com os cabeçalhos da [SAMP-API](https://github.com/BlastHackNet/SAMP-API) (MIT, © LUCHARE e BlastHack), que não vai no .asi. O teste do imgui antigo baixa o [LuaJIT](https://github.com/LuaJIT/LuaJIT) (MIT, © Mike Pall) e o moon_imgui (© FYP), que não vão no repositório nem no .asi. As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.
+O .asi (e o Trok Tags e o Trok Veículos) inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). Os endereços e estruturas do SA-MP 0.3.7 R1 do Trok Tags e do Trok Veículos foram conferidos com os cabeçalhos da [SAMP-API](https://github.com/BlastHackNet/SAMP-API) (MIT, © LUCHARE e BlastHack), que não vai no .asi. O teste do imgui antigo baixa o [LuaJIT](https://github.com/LuaJIT/LuaJIT) (MIT, © Mike Pall) e o moon_imgui (© FYP), que não vão no repositório nem no .asi. As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.
