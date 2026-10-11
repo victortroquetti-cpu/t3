@@ -14,3 +14,7 @@ trok-shadows/test/out/
 trok-shadows-menu/build/
 trok-shadows-menu/test/out/
 trok-shadows-menu/test/original/
+
+# Trok Chat
+trok-chat/build/
+trok-chat/test/out/
