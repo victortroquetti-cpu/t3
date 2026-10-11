@@ -4,12 +4,10 @@
 //     chatlog.txt, e o Trok Chat guarda uma copia para desenhar (em UTF-8, ate 300);
 //   - CChat::Draw (0x64230) e CChat::Render (0x63D70): o desenho do chat do SA-MP; pulados enquanto o Trok Chat estiver
 //     no lugar e desenhando (se o desenho do Trok Chat parar, o do SA-MP volta sozinho);
-//   - teclado: o SA-MP decide abrir a caixa dele no fim da corrente de janelas, em InputHandler::KeyPressHandler
-//     (0x5D850, o F6) e InputHandler::CharInputHandler (0x5DA80, o caractere "t"). Os dois sao desviados: e la, onde
-//     um mod com campo de texto na frente ja teria ficado com a tecla, que as duas teclas escolhidas no menu abrem a
-//     barra do Trok Chat. O T e o F6 do SA-MP so abrem se forem elas;
-//   - CInput::Open (0x657E0) e CInput::Close (0x658E0): scripts abrindo ou fechando o chat. Abre a barra do Trok Chat
-//     (so o conteudo do Trok Chat aparece), com o texto que o script tiver posto na caixa do SA-MP;
+//   - CInput::Open (0x657E0) e CInput::Close (0x658E0): o SA-MP abre a caixa dele com o T e o F6 (no fim da corrente
+//     de janelas: um mod com campo de texto na frente fica com a tecla, como sempre), e scripts a abrem e fecham.
+//     Qualquer pedido de abrir abre a barra do Trok Chat (so o conteudo do Trok Chat aparece), com o texto que um
+//     script tiver posto na caixa do SA-MP;
 //   - CInput::Send (0x65C60): o que a caixa do SA-MP faz com o texto digitado (comando do cliente, do servidor ou
 //     mensagem); a barra do Trok Chat manda por ele;
 //   - CInput::m_bEnabled (+0x14E0): "chat aberto", que os scripts e os outros mods consultam; fica ligado enquanto a
@@ -18,7 +16,6 @@
 
 #include "tc.h"
 #include "chat.h"
-#include "menu.h"
 #include "options.h"
 #include "samp.h"
 
@@ -35,7 +32,6 @@ constexpr DWORD R1_ENTRY = 0x31DF13; // ponto de entrada do samp.dll 0.3.7 R1
 constexpr DWORD P_CHAT = 0x21A0E4, P_INPUT = 0x21A0E8, P_DIALOG = 0x21A0B8, P_INFO = 0x21A0F8, P_GAME = 0x21A10C;
 constexpr DWORD F_ADD_ENTRY = 0x64010, F_DRAW = 0x64230, F_RENDER = 0x63D70;
 constexpr DWORD F_SEND = 0x65C60, F_ADD_COMMAND = 0x65AD0, F_INPUT_OPEN = 0x657E0, F_INPUT_CLOSE = 0x658E0;
-constexpr DWORD F_KEY_PRESS = 0x5D850, F_CHAR_INPUT = 0x5DA80;
 constexpr DWORD F_SET_CURSOR = 0x9BD30, F_UNLOCK_CAM = 0x9BC10;
 // CChat
 constexpr DWORD CHAT_PAGE_SIZE = 0x0, CHAT_MODE = 0x8, CHAT_TIMESTAMPS = 0xC, CHAT_ENTRIES = 0x132, CHAT_REDRAW = 0x63DA;
@@ -52,7 +48,6 @@ constexpr int MAX_SEND = 128;      // a caixa do SA-MP manda no maximo 128 bytes
 constexpr size_t MAX_TEXT = 1024;  // mensagens de scripts podem passar dos 144 do servidor
 constexpr int PREFILL_FRAMES = 30; // quadros depois de um script abrir o chat em que o texto dele e procurado
 // gta_sa.exe
-constexpr DWORD GTA_MENU_ACTIVE = 0xBA67A4;
 constexpr DWORD GTA_MOUSE_STATE = 0xB73418; // CPad::NewMouseControllerState (+3 roda para cima, +4 para baixo)
 // Chamadas do desenho do SA-MP sem o Present do Trok Chat no meio: passou disso, o desenho dele parou.
 constexpr int MAX_DRAWS_WITHOUT_BEAT = 30;
@@ -62,7 +57,6 @@ typedef void(__thiscall* AddEntryFn)(void* chat, int type, const char* text, con
 typedef void(__thiscall* DrawFn)(void* chat);
 typedef void(__thiscall* SendFn)(void* input, const char* text);
 typedef void(__thiscall* InputFn)(void* input);
-typedef BOOL(__cdecl* KeyFn)(unsigned int key);
 typedef void(__cdecl* CmdProc)(const char* params);
 typedef void(__thiscall* AddCommandFn)(void* input, const char* name, CmdProc proc);
 typedef void(__thiscall* SetCursorFn)(void* game, int mode, BOOL hide);
@@ -79,15 +73,6 @@ DrawFn g_draw = nullptr;
 DrawFn g_render = nullptr;
 InputFn g_inputOpen = nullptr;
 InputFn g_inputClose = nullptr;
-KeyFn g_keyPress = nullptr;
-KeyFn g_charInput = nullptr;
-
-// A ultima tecla apertada que a janela passou adiante (overlay.cpp): so uma apertada nova (nao a repeticao de quem
-// segura a tecla) abre o chat.
-UINT g_lastKey = 0;
-bool g_lastFresh = false;
-bool g_lastExtended = false;
-UINT g_openedBy = 0;     // a tecla que abriu a barra (0 = um script)
 int g_prefillFrames = 0;
 int g_editboxState = -1; // a caixa do SA-MP: -1 nao olhada, 0 nao reconhecida, 1 texto legivel
 
@@ -185,127 +170,16 @@ void __thiscall RenderHook(void* chatObject) {
     }
 }
 
-// ---------------------------------------------------------------- teclas
-
-// A tecla do Windows como o ImGui (e o menu) chama (a mesma tabela do backend Win32 do ImGui).
-ImGuiKey KeyOf(UINT vk, bool extended) {
-    if (vk >= 'A' && vk <= 'Z') {
-        return static_cast<ImGuiKey>(ImGuiKey_A + (vk - 'A'));
-    }
-    if (vk >= '0' && vk <= '9') {
-        return static_cast<ImGuiKey>(ImGuiKey_0 + (vk - '0'));
-    }
-    if (vk >= VK_F1 && vk <= VK_F12) {
-        return static_cast<ImGuiKey>(ImGuiKey_F1 + (vk - VK_F1));
-    }
-    if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) {
-        return static_cast<ImGuiKey>(ImGuiKey_Keypad0 + (vk - VK_NUMPAD0));
-    }
-    switch (vk) {
-    case VK_TAB: return ImGuiKey_Tab;
-    case VK_LEFT: return ImGuiKey_LeftArrow;
-    case VK_RIGHT: return ImGuiKey_RightArrow;
-    case VK_UP: return ImGuiKey_UpArrow;
-    case VK_DOWN: return ImGuiKey_DownArrow;
-    case VK_PRIOR: return ImGuiKey_PageUp;
-    case VK_NEXT: return ImGuiKey_PageDown;
-    case VK_HOME: return ImGuiKey_Home;
-    case VK_END: return ImGuiKey_End;
-    case VK_INSERT: return ImGuiKey_Insert;
-    case VK_DELETE: return ImGuiKey_Delete;
-    case VK_BACK: return ImGuiKey_Backspace;
-    case VK_SPACE: return ImGuiKey_Space;
-    case VK_RETURN: return extended ? ImGuiKey_KeypadEnter : ImGuiKey_Enter;
-    case VK_OEM_7: return ImGuiKey_Apostrophe;
-    case VK_OEM_COMMA: return ImGuiKey_Comma;
-    case VK_OEM_MINUS: return ImGuiKey_Minus;
-    case VK_OEM_PERIOD: return ImGuiKey_Period;
-    case VK_OEM_2: return ImGuiKey_Slash;
-    case VK_OEM_1: return ImGuiKey_Semicolon;
-    case VK_OEM_PLUS: return ImGuiKey_Equal;
-    case VK_OEM_4: return ImGuiKey_LeftBracket;
-    case VK_OEM_5: return ImGuiKey_Backslash;
-    case VK_OEM_6: return ImGuiKey_RightBracket;
-    case VK_OEM_3: return ImGuiKey_GraveAccent;
-    case VK_CAPITAL: return ImGuiKey_CapsLock;
-    case VK_SCROLL: return ImGuiKey_ScrollLock;
-    case VK_NUMLOCK: return ImGuiKey_NumLock;
-    case VK_SNAPSHOT: return ImGuiKey_PrintScreen;
-    case VK_PAUSE: return ImGuiKey_Pause;
-    case VK_DECIMAL: return ImGuiKey_KeypadDecimal;
-    case VK_DIVIDE: return ImGuiKey_KeypadDivide;
-    case VK_MULTIPLY: return ImGuiKey_KeypadMultiply;
-    case VK_SUBTRACT: return ImGuiKey_KeypadSubtract;
-    case VK_ADD: return ImGuiKey_KeypadAdd;
-    case VK_APPS: return ImGuiKey_Menu;
-    default: return ImGuiKey_None;
-    }
-}
-
-// A tecla gera um caractere visivel (letra, numero, espaco, pontuacao)? Essas abrem o chat com o caractere, como o "t"
-// do SA-MP; as outras (Enter, F1-F12...) com a tecla.
-bool Printable(UINT vk) {
-    return (MapVirtualKeyA(vk, MAPVK_VK_TO_CHAR) & 0x7FFFFFFF) >= 0x20;
-}
-
-bool CanOpen() {
-    return Taken() && !chat::IsOpen() && !menu::IsOpen() && !*reinterpret_cast<BYTE*>(GTA_MENU_ACTIVE) &&
-           !host::DialogOpen();
-}
-
-void OpenBy(UINT vk) {
-    g_openedBy = vk;
-    g_lastFresh = false;
-    g_prefillFrames = 0;
-    chat::Open();
-}
-
-BOOL __cdecl KeyPressHook(unsigned int vk) {
-    if (!CanOpen()) {
-        return g_keyPress(vk);
-    }
-    const bool last = vk == g_lastKey;
-    if (opt::IsOpenKey(KeyOf(vk, last && g_lastExtended))) {
-        if (last && g_lastFresh && !Printable(vk)) {
-            OpenBy(vk);
-        }
-        // A com caractere abre com ele (CharInputHook). E segurando a tecla do chat nada acontece, nem no jogo (o Enter
-        // segurado depois de mandar a mensagem nao entra no carro): so a proxima apertada abre de novo.
-        return TRUE;
-    }
-    if (vk == VK_F6) {
-        return TRUE; // o F6 do SA-MP so abre o chat se for uma das teclas escolhidas
-    }
-    return g_keyPress(vk);
-}
-
-BOOL __cdecl CharInputHook(unsigned int ch) {
-    if (!CanOpen()) {
-        return g_charInput(ch);
-    }
-    if (ch >= 0x20 && g_lastFresh && Printable(g_lastKey) && opt::IsOpenKey(KeyOf(g_lastKey, g_lastExtended))) {
-        OpenBy(g_lastKey); // o caractere fica com o SA-MP (nao cai na barra), como o "t" dele
-        return TRUE;
-    }
-    if (ch == 't' || ch == 'T') {
-        return TRUE; // o "t" do SA-MP, idem
-    }
-    return g_charInput(ch);
-}
-
-// ---------------------------------------------------------------- scripts abrindo e fechando o chat
+// ---------------------------------------------------------------- abrir e fechar o chat
 
 void __thiscall InputOpenHook(void* input) {
     if (!Taken()) {
         g_inputOpen(input);
         return;
     }
-    // Tudo que abre o chat do SA-MP abre a barra do Trok Chat. Um script pode por um texto na caixa do SA-MP (antes ou
-    // logo depois de abrir): ele passa para a barra nos proximos quadros.
-    if (!chat::IsOpen()) {
-        g_openedBy = 0;
-        chat::Open();
-    }
+    // Tudo que abre o chat do SA-MP (o T, o F6, um script) abre a barra do Trok Chat. Um script pode por um texto na
+    // caixa do SA-MP (antes ou logo depois de abrir): ele passa para a barra nos proximos quadros.
+    chat::Open();
     g_prefillFrames = PREFILL_FRAMES;
 }
 
@@ -414,8 +288,6 @@ void InstallHooks() {
         {F_RENDER, reinterpret_cast<void*>(RenderHook), reinterpret_cast<void**>(&g_render), "Render"},
         {F_INPUT_OPEN, reinterpret_cast<void*>(InputOpenHook), reinterpret_cast<void**>(&g_inputOpen), "Open"},
         {F_INPUT_CLOSE, reinterpret_cast<void*>(InputCloseHook), reinterpret_cast<void**>(&g_inputClose), "Close"},
-        {F_KEY_PRESS, reinterpret_cast<void*>(KeyPressHook), reinterpret_cast<void**>(&g_keyPress), "KeyPress"},
-        {F_CHAR_INPUT, reinterpret_cast<void*>(CharInputHook), reinterpret_cast<void**>(&g_charInput), "CharInput"},
     };
     bool ok = true;
     for (const auto& h : hooks) {
@@ -516,24 +388,6 @@ void Heartbeat() {
 
 bool Active() {
     return Taken();
-}
-
-void KeyDown(WPARAM vk, LPARAM lParam) {
-    g_lastKey = static_cast<UINT>(vk);
-    g_lastFresh = !(lParam & (1 << 30));
-    g_lastExtended = (HIWORD(lParam) & KF_EXTENDED) != 0;
-}
-
-void CharDone() {
-    g_lastFresh = false; // o caractere da tecla ja passou: so a proxima apertada abre o chat
-}
-
-UINT OpenedBy() {
-    return g_openedBy;
-}
-
-bool IsChatKey(WPARAM vk, LPARAM lParam) {
-    return opt::IsOpenKey(KeyOf(static_cast<UINT>(vk), (HIWORD(lParam) & KF_EXTENDED) != 0));
 }
 
 bool TakeMenuRequest() {

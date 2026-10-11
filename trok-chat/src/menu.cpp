@@ -1,7 +1,6 @@
 // Trok Chat (.asi) -- Victor_Trok
-// O menu do /trokchat, com o kit da casa (o mesmo casco, linhas e rodape dos outros menus). As teclas trocam como nos
-// menus da casa: Enter (ou clique) na linha, e a proxima tecla apertada fica no lugar; Backspace deixa sem tecla, Esc
-// cancela. Linhas, hora e o contorno sao os do proprio SA-MP (/pagesize, /timestamp e o F7), mudados na hora.
+// O menu do /trokchat, com o kit da casa (o mesmo casco, linhas e rodape dos outros menus). Linhas, hora e o contorno
+// sao os do proprio SA-MP (/pagesize, /timestamp e o F7), mudados na hora.
 
 #include "menu.h"
 #include "chat.h"
@@ -20,7 +19,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v1.1";
+constexpr const char* VERSION_TAG = "v1.2";
 
 struct State {
     bool open = false;
@@ -90,16 +89,8 @@ void Backdrop(const char* id) {
 
 void DrawRows(Rows& r) {
     opt::Options& o = opt::Get();
-    const opt::Options& d = opt::Defaults();
     host::ChatSettings chat = host::Settings();
     const host::ChatSettings before = chat;
-
-    r.Section("Abrir o chat");
-    r.Keybind("Tecla principal", &o.keys[0], d.keys[0]);
-    r.Keybind("Tecla alternativa", &o.keys[1], d.keys[1]);
-    if (o.keys[0] == ImGuiKey_None && o.keys[1] == ImGuiKey_None) {
-        r.Info("Nenhuma tecla abre o chat", "Escolha pelo menos uma tecla. Sem elas, o chat s\xC3\xB3 abre por scripts.");
-    }
 
     r.Section("Mensagens");
     r.Stepper("Linhas na tela", &chat.pageSize, 5, 20, 1, "%d", 10);
@@ -134,11 +125,9 @@ void DrawMenu() {
     Keys keys = ReadKeys(keysOk);
     const bool escape = keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
 
-    // Cabe tudo, mais as linhas de aviso (sem tecla, Trok Chat desligado) quando aparecem.
-    const opt::Options& o = opt::Get();
-    const int notes = (o.keys[0] == ImGuiKey_None && o.keys[1] == ImGuiKey_None) + !o.enabled;
+    // Cabe tudo, mais a linha de aviso do Trok Chat desligado quando aparece.
     const float width = 560 * u;
-    const float height = std::min(io.DisplaySize.y * 0.85f, (420 + 34 * notes) * u);
+    const float height = std::min(io.DisplaySize.y * 0.85f, (338 + (opt::Get().enabled ? 0 : 34)) * u);
     PushStyle();
     const bool keep = BeginShell("##trokChatMenu", "Trok Chat", VERSION_TAG, width, height, S.shell);
 
@@ -159,12 +148,11 @@ void DrawMenu() {
     ImGui::Dummy(ImVec2(0, 6 * u));
     ImGui::EndChild();
 
-    static const std::vector<Hint> hints = {
-        {"Setas", "Ajustar", false}, {"Enter", "Trocar a tecla", false}, {"Esc", "Fechar", true}};
+    static const std::vector<Hint> hints = {{"Setas", "Ajustar", false}, {"Esc", "Fechar", true}};
     const int clicked = EndShell(hints);
     PopStyle();
 
-    if (!keep || clicked == 2 || escape) {
+    if (!keep || clicked == 1 || escape) {
         S.open = false;
     }
 }
@@ -180,7 +168,7 @@ void DrawConfirm() {
     const bool keep = BeginShell("##trokChatConfirmar", "Restaurar padr\xC3\xB5" "es?", nullptr, width, height, shell);
     const ImVec2 pos = ImGui::GetWindowPos();
     RichText(ImGui::GetWindowDrawList(), fonts.body, pos.x + 22 * u, pos.y + HeaderHeight() + 20 * u, col::text,
-             "T e F6 voltam a abrir o chat, com 10 linhas e contorno.\n"
+             "10 linhas, sem hora, com contorno e etiquetas.\n"
              "{9A9A9A}O Trok Chat continua ligado.");
     static const std::vector<Hint> hints = {{"Enter", "Confirmar", true}, {"Esc", "Cancelar", true}};
     const int clicked = EndShell(hints, true);
@@ -200,7 +188,7 @@ void DrawConfirm() {
         chat.timestamps = false;
         host::Apply(chat);
         S.confirm = false;
-        Toast("Padr\xC3\xB5" "es restaurados", "T e F6 abrem o chat de novo.");
+        Toast("Padr\xC3\xB5" "es restaurados", "O chat voltou ao jeito que vem.");
     } else if (no) {
         S.confirm = false;
     }

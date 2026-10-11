@@ -503,23 +503,11 @@ int main(int argc, char** argv) {
     Idle(30);
     Check(menu::IsOpen(), "/trokchat abre o menu");
     Frame("11_menu");
-    // Linha 2 (tecla alternativa): Enter e a proxima tecla apertada fica no lugar.
-    Key(ImGuiKey_DownArrow);
-    Key(ImGuiKey_Enter);
-    Idle(10);
-    Check(tui::CapturingKey(), "Enter na linha da tecla: esperando a tecla");
-    Frame("12_menu_esperando_tecla");
-    Key(ImGuiKey_Enter);
-    Idle(20);
-    Check(!tui::CapturingKey() && opt::Get().keys[1] == ImGuiKey_Enter && opt::Get().keys[0] == ImGuiKey_T,
-          "F6 trocado por Enter (o T continua)");
-    Frame("13_menu_f6_por_enter");
-    // Linhas na tela (linha 3): seta para a direita.
-    Key(ImGuiKey_DownArrow);
+    // Linhas na tela (linha 1): seta para a direita.
     Key(ImGuiKey_RightArrow);
     Idle(5);
     Check(g_cfg.pageSize == 11, "linhas na tela: 10 -> 11 (o /pagesize do SA-MP muda junto)");
-    // Hora (linha 4) e o chat fechado (linha 5: escondido).
+    // Hora (linha 2) e o chat fechado (linha 3: escondido e de volta).
     Key(ImGuiKey_DownArrow);
     Key(ImGuiKey_Enter);
     Idle(5);
@@ -528,39 +516,38 @@ int main(int argc, char** argv) {
     Key(ImGuiKey_RightArrow);
     Key(ImGuiKey_RightArrow);
     Idle(5);
-    Check(g_cfg.mode == 0, "com o chat fechado: escondido (o F7 do SA-MP)");
+    Check(g_cfg.mode == 0, "chat fechado: escondido (o F7 do SA-MP)");
     Key(ImGuiKey_LeftArrow);
     Key(ImGuiKey_LeftArrow);
     Idle(5);
     Check(g_cfg.mode == 2, "e de volta para com contorno");
-    // Etiquetas (linha 6) desligadas: as mensagens sao quebradas de novo.
+    // Etiquetas (linha 4) desligadas: as mensagens sao quebradas de novo.
     Key(ImGuiKey_DownArrow);
     Key(ImGuiKey_Enter);
     Idle(30);
     Check(!opt::Get().tags, "etiquetas desligadas");
-    Frame("14_menu_opcoes");
+    Frame("12_menu_opcoes");
     Key(ImGuiKey_Escape);
     Idle(20);
     Check(!menu::IsOpen(), "Esc fecha o menu");
     g_saveW = 1000;
     g_saveH = 470;
-    Frame("15_sem_etiquetas_com_hora");
-    // Padroes (linha 8): confirma e volta T e F6.
+    Frame("13_sem_etiquetas_com_hora");
+    // Padroes (linha 6): confirma e volta tudo.
     menu::Toggle();
     Idle(10);
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 5; i++) {
         Key(ImGuiKey_DownArrow);
     }
     Key(ImGuiKey_Enter);
     Idle(10);
     g_saveW = W;
     g_saveH = H;
-    Frame("16_menu_restaurar");
+    Frame("14_menu_restaurar");
     Key(ImGuiKey_Enter);
     Idle(10);
-    Check(opt::Get().keys[0] == ImGuiKey_T && opt::Get().keys[1] == ImGuiKey_F6 && opt::Get().tags &&
-              g_cfg.pageSize == 10 && !g_cfg.timestamps && g_cfg.mode == 2,
-          "padroes: T e F6, etiquetas, 10 linhas, sem hora, com contorno");
+    Check(opt::Get().tags && opt::Get().enabled && g_cfg.pageSize == 10 && !g_cfg.timestamps && g_cfg.mode == 2,
+          "padroes: etiquetas, 10 linhas, sem hora, com contorno");
     Key(ImGuiKey_Escape);
     Idle(60);
 

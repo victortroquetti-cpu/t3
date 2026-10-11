@@ -4,7 +4,7 @@
 
 #include <windows.h>
 
-#define TC_VERSION "1.1"
+#define TC_VERSION "1.2"
 
 namespace host {
 struct ChatSettings;

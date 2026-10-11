@@ -7,8 +7,9 @@
 // Teclado, em tres estados:
 //   - menu do /trokchat aberto: teclado e mouse sao dele (com o cursor do SA-MP), como nos menus da casa;
 //   - barra aberta: as teclas apertadas e os caracteres ficam com ela (nem o GTA nem o SA-MP os veem, como na caixa do
-//     SA-MP), menos as teclas F que nao abrem o chat (F7, F8...). A tecla que abriu a barra, segurada, nao repete nela;
-//   - fechada: tudo segue o caminho de sempre ate o SA-MP, e e la que as teclas do chat abrem a barra (samp.cpp).
+//     SA-MP), menos as teclas F (F7, F8...; o F6 fica com ela). A tecla que abriu a barra, segurada, nao repete nela;
+//   - fechada: tudo segue o caminho de sempre ate o SA-MP; quando ele abre a caixa dele (T, F6, um script), a barra do
+//     Trok Chat abre no lugar (samp.cpp). O Enter que mandou a mensagem, segurado, nao chega ao jogo.
 // Teclas soltas sempre passam: o GTA le o teclado pelas mensagens da janela e uma tecla sem "soltar" ficaria presa.
 
 #include "tc.h"
@@ -60,8 +61,10 @@ const char* g_hookMode = "nenhum";
 volatile LONG g_presentCalls = 0;
 volatile DWORD g_lastPresent = 0;
 float g_fontScreenH = 0.0f;
+WPARAM g_lastDown = 0;  // a ultima tecla apertada que passou adiante com a barra fechada
 WPARAM g_heldKey = 0;   // a tecla que abriu a barra, enquanto segurada
-bool g_eatChar = false; // o caractere que ela ainda vai gerar (o "\r" do Enter, por exemplo)
+bool g_eatChar = false; // o caractere que ela ainda vai gerar
+bool g_enterHeld = false; // o Enter que mandou a mensagem, ainda apertado
 bool g_cursorOn = false;
 
 // O que o Trok Chat.ini guarda: as opcoes e a copia das do SA-MP. Gravado um segundo depois da ultima mudanca.
@@ -71,8 +74,7 @@ struct Snapshot {
 };
 
 bool operator!=(const Snapshot& a, const Snapshot& b) {
-    return a.options.keys[0] != b.options.keys[0] || a.options.keys[1] != b.options.keys[1] ||
-           a.options.tags != b.options.tags || a.options.enabled != b.options.enabled ||
+    return a.options.tags != b.options.tags || a.options.enabled != b.options.enabled ||
            a.chat.pageSize != b.chat.pageSize || a.chat.mode != b.chat.mode || a.chat.timestamps != b.chat.timestamps;
 }
 
@@ -154,6 +156,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (!g_ready) {
         return CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
     }
+    if (msg == WM_KEYUP && wParam == VK_RETURN) {
+        g_enterHeld = false;
+    }
 
     if (menu::IsOpen() && !host::DialogOpen()) {
         // Menu do /trokchat: o jogo nao recebe teclas nem cliques (as teclas soltas passam).
@@ -176,13 +181,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     }
 
     if (chat::IsOpen()) {
-        // A tecla que abriu a barra, segurada: nao digita e nao chega a barra (o Enter nao manda a mensagem vazia).
+        // A tecla que abriu a barra, segurada: nao fica repetindo nela (o T segurado nao vira "ttt").
         if (msg == WM_KEYDOWN && g_heldKey && wParam == g_heldKey) {
             g_eatChar = true;
             return 0;
         }
         if (msg == WM_KEYUP && wParam == g_heldKey) {
             g_heldKey = 0;
+        }
+        if (msg == WM_KEYDOWN && wParam == VK_RETURN) {
+            g_enterHeld = true;
         }
         if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) {
             g_eatChar = false;
@@ -198,7 +206,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         switch (msg) {
         case WM_KEYDOWN:
-            if (wParam >= VK_F1 && wParam <= VK_F24 && !samp::IsChatKey(wParam, lParam)) {
+            if (wParam >= VK_F1 && wParam <= VK_F24 && wParam != VK_F6) {
                 break; // F7 (modo do chat), F8 (foto) e afins continuam com o SA-MP
             }
             return 0;
@@ -212,23 +220,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         return CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
     }
 
-    // Fechada: o ImGui so ve as teclas soltas e o resto (foco, mouse); as apertadas e os caracteres nao, para a tecla
-    // que abre o chat nao chegar nele apertada (o Enter mandaria a barra vazia).
+    // Fechada: o Enter que mandou a mensagem, segurado (so as repeticoes; ele ja foi solto e apertado de novo se nao for
+    // repeticao), nao chega ao jogo (o boneco nao entra no carro) nem ao SA-MP.
+    if (g_enterHeld && ((msg == WM_KEYDOWN && wParam == VK_RETURN && (lParam & (1 << 30))) ||
+                        (msg == WM_CHAR && wParam == '\r'))) {
+        return 0;
+    }
+    // O ImGui so ve as teclas soltas e o resto (foco, mouse); as apertadas e os caracteres nao: a tecla que abre o chat
+    // nao pode chegar nele apertada.
     if (!MouseButton(msg) && msg != WM_KEYDOWN && msg != WM_SYSKEYDOWN && msg != WM_CHAR && msg != WM_DEADCHAR &&
         msg != WM_MOUSEWHEEL) {
         ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
     }
     if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) {
-        samp::KeyDown(wParam, lParam);
+        g_lastDown = wParam;
     }
     const LRESULT result = CallWindowProcA(g_wndProc, hwnd, msg, wParam, lParam);
-    if (msg == WM_CHAR) {
-        samp::CharDone();
-    }
     if (chat::IsOpen()) {
-        // Abriu agora, por esta mensagem (uma das teclas do chat la no SA-MP, ou um script).
-        g_heldKey = samp::OpenedBy();
-        g_eatChar = msg == WM_KEYDOWN && g_heldKey != 0;
+        // Abriu agora, por esta mensagem: o "t" do T (que fica com o SA-MP) ou o F6 (que nao gera caractere).
+        const bool key = msg == WM_KEYDOWN || msg == WM_CHAR;
+        g_heldKey = key ? g_lastDown : 0;
+        g_eatChar = msg == WM_KEYDOWN;
     }
     return result;
 }

@@ -4,19 +4,17 @@
 //    device, como o ASI Loader;
 //  - cria o device d3d9 e o expoe em 0xC97C28 atras de um proxy estilo SA-MP;
 //  - a cada quadro chama o CChat::Draw e o CChat::Render do samp.dll (como o SA-MP faz) e apresenta;
-//  - o WndProc da janela faz o papel do SA-MP e do GTA, no fim da corrente: chama o KeyPressHandler e o
-//    CharInputHandler do samp.dll (desviados pelo .asi), e o "SA-MP" abre a caixa dele (CInput::Open) com o caractere
-//    "t" e com o F6, menos com dialogo ou menu de pausa; o que passa dele e o "jogo". Um "mod" com campo de texto fica
-//    na frente.
+//  - o WndProc da janela faz o papel do SA-MP e do GTA, no fim da corrente: o "SA-MP" abre a caixa dele
+//    (CInput::Open, desviado pelo .asi) com o caractere "t" e com o F6, menos com dialogo ou menu de pausa; o que
+//    passa dele e o "jogo". Um "mod" com campo de texto fica na frente.
 //
-// Uso: fake_gta.exe <asi> <r1|teclas|desligado|outra-versao|sem-samp>
-//   r1            teclas padrao (T e F6): o chat do SA-MP some e o do Trok Chat aparece; as teclas abrem a barra no
-//                 lugar da caixa do SA-MP; Enter manda; Esc fecha; dialogo, mod com campo de texto, scripts (com texto
-//                 pronto), menu de pausa, o menu do /trokchat; o Trok Chat.ini guarda o /pagesize; sem o Present do
-//                 Trok Chat o chat do SA-MP volta sozinho
-//   teclas        Trok Chat.ini com Y e Enter: Y abre, Enter abre e manda, Enter segurado nao reabre nem chega ao
-//                 jogo, T e F6 nao abrem nada; linhas, hora e F7 do INI voltam
-//   desligado     Trok Chat.ini com Ligado=0: o chat e a caixa do SA-MP; o /trokchat abre o menu
+// Uso: fake_gta.exe <asi> <r1|desligado|outra-versao|sem-samp>
+//   r1            o chat do SA-MP some e o do Trok Chat aparece; T e F6 abrem a barra no lugar da caixa do SA-MP; Enter
+//                 manda (segurado depois, nao chega ao jogo); Esc fecha; dialogo, mod com campo de texto, scripts (com
+//                 texto pronto), menu de pausa, o menu do /trokchat; o Trok Chat.ini guarda o /pagesize; sem o Present
+//                 do Trok Chat o chat do SA-MP volta sozinho
+//   desligado     Trok Chat.ini com Ligado=0 (e linhas, hora e F7): o chat e a caixa do SA-MP, com os valores do INI;
+//                 o /trokchat abre o menu
 //   outra-versao  samp.dll com outro ponto de entrada: o .asi nao pode mexer em nada
 //   sem-samp      sem samp.dll (single player): idem
 
@@ -38,7 +36,6 @@ template <typename T> T& Mem(DWORD address) {
 
 typedef void(__thiscall* DrawFn)(void*);
 typedef void(__thiscall* InputFn)(void*);
-typedef BOOL(__cdecl* KeyFn)(unsigned int);
 typedef void(__cdecl* CmdProc)(const char*);
 
 constexpr int W = 1600;
@@ -49,11 +46,10 @@ constexpr DWORD GTA_MENU_ACTIVE = 0xBA67A4;
 // Campos do samp.dll falso (RVA, ver make_fake_samp.py).
 constexpr DWORD CMD_NAME = 0x300000, CMD_PROC = 0x300004, ADD_COUNT = 0x300008, DRAW_COUNT = 0x30000C;
 constexpr DWORD RENDER_COUNT = 0x300010, SEND_COUNT = 0x300014, LAST_TYPE = 0x300018, OPEN_COUNT = 0x30001C;
-constexpr DWORD CLOSE_COUNT = 0x300020, CURSOR_MODE = 0x300024, KEY_PRESS_SLOT = 0x300040, CHAR_INPUT_SLOT = 0x300044;
+constexpr DWORD CLOSE_COUNT = 0x300020, CURSOR_MODE = 0x300024;
 constexpr DWORD SEND_BUF = 0x300100;
 constexpr DWORD CHAT = 0x301000, CINPUT = 0x308000, CDIALOG = 0x30A000, EDIT_TEXT = 0x30C100;
 constexpr DWORD ADD_ENTRY = 0x64010, DRAW = 0x64230, RENDER = 0x63D70, INPUT_OPEN = 0x657E0, INPUT_CLOSE = 0x658E0;
-constexpr DWORD KEY_PRESS = 0x5D850, CHAR_INPUT = 0x5DA80;
 
 int g_failures = 0;
 IDirect3DDevice9* g_real = nullptr;
@@ -98,7 +94,7 @@ void Check(bool ok, const char* what) {
 
 // ---------------------------------------------------------------- o SA-MP e o jogo, no fim da corrente
 
-// O que o samp.dll faz com as teclas (o original dos desvios do .asi): abre a caixa com o F6 e o "t".
+// O que o samp.dll faz com as teclas: abre a caixa com o F6 e o "t" (pelo CInput::Open, que o .asi desvia).
 bool SampMayOpen() {
     return !InputOpen() && !DialogOpen() && !Mem<BYTE>(GTA_MENU_ACTIVE);
 }
@@ -125,10 +121,10 @@ BOOL __cdecl NativeCharInput(unsigned int ch) {
 
 LRESULT CALLBACK GameWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (g_samp) {
-        if (msg == WM_KEYDOWN && reinterpret_cast<KeyFn>(g_samp + KEY_PRESS)(static_cast<unsigned>(wParam))) {
+        if (msg == WM_KEYDOWN && NativeKeyPress(static_cast<unsigned>(wParam))) {
             return 0;
         }
-        if (msg == WM_CHAR && reinterpret_cast<KeyFn>(g_samp + CHAR_INPUT)(static_cast<unsigned>(wParam))) {
+        if (msg == WM_CHAR && NativeCharInput(static_cast<unsigned>(wParam))) {
             return 0;
         }
     }
@@ -409,7 +405,8 @@ void RunR1() {
     Down('T', true);
     Char('t');
     Up('T');
-    Check(g_downs['T'] == 0 && g_chars == 0 && g_ups['T'] == 1, "nem a tecla nem o 't' chegam ao jogo (so a solta)");
+    Check(g_downs['T'] == 1 && g_chars == 0 && g_ups['T'] == 1,
+          "o T faz o caminho de sempre (o jogo ve a tecla, o SA-MP fica com o 't'); segurado, nao repete");
     Frames(3);
     Down('W');
     Check(g_downs['W'] == 0, "tecla apertada com a barra aberta fica com ela (o boneco nao anda)");
@@ -425,13 +422,23 @@ void RunR1() {
     const double open = Covered(CX0, CY0, CX1, CY1);
     snprintf(g_text, sizeof(g_text), "barra aberta: painel do chat na tela (%.0f%% coberto)", open * 100);
     Check(open > 0.95, g_text);
-    Press(VK_RETURN, '\r');
+    Down(VK_RETURN);
+    Char('\r');
     Frames(5);
     snprintf(g_text, sizeof(g_text), "Enter manda o texto em cp1252 pelo CInput::Send (\"%s\"); o T segurado nao digitou",
              Sent());
     Check(F(SEND_COUNT) == 1 && strcmp(Sent(), "Ol\xE1 [teste]") == 0, g_text);
     Check(InputOpen() == 0, "e fecha a barra (\"chat aberto\" desligado)");
-    Check(g_downs[VK_RETURN] == 0 && g_ups[VK_RETURN] == 1, "o Enter nao chega ao jogo (so a tecla solta)");
+    const int charsBefore = g_chars;
+    Down(VK_RETURN, true); // ainda segurando o Enter que mandou: as repeticoes
+    Char('\r');
+    Down(VK_RETURN, true);
+    Char('\r');
+    Up(VK_RETURN);
+    Check(g_downs[VK_RETURN] == 0 && g_chars == charsBefore && g_ups[VK_RETURN] == 1,
+          "o Enter que mandou, segurado, nao chega ao jogo (o boneco nao entra no carro)");
+    Press(VK_RETURN, '\r');
+    Check(g_downs[VK_RETURN] == 1 && InputOpen() == 0, "solto e apertado de novo, o Enter volta a ser do jogo");
 
     Down(VK_F6);
     Check(InputOpen() == 1 && F(OPEN_COUNT) == 0 && g_downs[VK_F6] == 0, "F6 tambem abre a barra (o jogo nao ve o F6)");
@@ -443,9 +450,10 @@ void RunR1() {
           "Esc fecha sem mandar e o jogo nao ve o Esc (o menu de pausa nao abre)");
 
     DialogOpen() = 1;
+    const int dialogT = g_downs['T'], dialogChars = g_chars;
     Press('T', 't');
     Frames(2);
-    Check(InputOpen() == 0 && F(OPEN_COUNT) == 0 && g_downs['T'] == 1,
+    Check(InputOpen() == 0 && F(OPEN_COUNT) == 0 && g_downs['T'] == dialogT + 1 && g_chars == dialogChars + 1,
           "com dialogo do servidor o T segue o caminho do SA-MP e nao abre nada");
     DialogOpen() = 0;
     g_modTyping = true;
@@ -530,50 +538,10 @@ void RunR1() {
     Check(LogHas("o desenho do Trok Chat parou") && LogHas("o desenho do Trok Chat voltou"), "log: parou e voltou");
 }
 
-void RunKeys() {
-    Check(F(CHAT + 0x0) == 15 && Mem<BYTE>(g_samp + CHAT + 0xC) == 1 && F(CHAT + 0x8) == 1,
-          "o Trok Chat.ini volta linhas (15), hora e o F7 (sem contorno)");
-    Check(LogHas("opcoes: teclas Y e Enter"), "log: teclas Y e Enter");
-    Press('Y', 'y');
-    Check(InputOpen() == 1 && g_downs['Y'] == 0 && g_chars == 0, "Y (tecla principal) abre a barra; o 'y' nao entra");
-    Frames(3);
-    Chars("oi");
-    Frames(2);
-    Down(VK_RETURN);
-    Char('\r');
-    Frames(5);
-    Check(F(SEND_COUNT) == 1 && strcmp(Sent(), "oi") == 0 && InputOpen() == 0,
-          "Enter manda a mensagem, mesmo sendo a tecla alternativa");
-    Down(VK_RETURN, true); // ainda segurando o Enter que mandou: as repeticoes
-    Char('\r');
-    Down(VK_RETURN, true);
-    Char('\r');
-    Frames(3);
-    Check(InputOpen() == 0 && g_downs[VK_RETURN] == 0,
-          "Enter segurado depois de mandar: a barra nao reabre e o jogo nao ve (nao entra no carro)");
-    Up(VK_RETURN);
-    Frames(2);
-    Down(VK_RETURN);
-    Char('\r');
-    Frames(3);
-    Check(InputOpen() == 1 && g_downs[VK_RETURN] == 0, "Enter de novo (outra apertada): abre a barra");
-    Up(VK_RETURN);
-    Frames(3);
-    Press(VK_RETURN, '\r');
-    Frames(5);
-    Check(InputOpen() == 0 && F(SEND_COUNT) == 1, "o Enter que abriu nao entrou na barra: o seguinte so fecha");
-    Press('T', 't');
-    Frames(2);
-    Check(InputOpen() == 0 && F(OPEN_COUNT) == 0 && g_downs['T'] == 1,
-          "T (fora das teclas escolhidas) nao abre o chat e segue para o jogo");
-    Down(VK_F6);
-    Up(VK_F6);
-    Frames(2);
-    Check(InputOpen() == 0 && F(OPEN_COUNT) == 0, "F6 (fora das teclas escolhidas) nao abre nada");
-}
-
 void RunOff() {
     Check(LogHas("DESLIGADO (chat do SA-MP)"), "log: desligado no Trok Chat.ini");
+    Check(F(CHAT + 0x0) == 15 && Mem<BYTE>(g_samp + CHAT + 0xC) == 1 && F(CHAT + 0x8) == 1,
+          "o Trok Chat.ini volta linhas (15), hora e o F7 (sem contorno) no chat do SA-MP");
     const DWORD draws = F(DRAW_COUNT);
     Frames(10);
     Check(F(DRAW_COUNT) > draws, "o chat do SA-MP continua sendo desenhado");
@@ -609,7 +577,7 @@ void RunWithoutR1(bool withSamp) {
 
 int main(int argc, char** argv) {
     if (argc < 3) {
-        printf("uso: fake_gta.exe <asi> <r1|teclas|desligado|outra-versao|sem-samp>\n");
+        printf("uso: fake_gta.exe <asi> <r1|desligado|outra-versao|sem-samp>\n");
         return 2;
     }
     const std::string mode = argv[2];
@@ -642,8 +610,6 @@ int main(int argc, char** argv) {
             return 1;
         }
         g_samp = reinterpret_cast<DWORD>(samp);
-        F(KEY_PRESS_SLOT) = reinterpret_cast<DWORD>(NativeKeyPress);
-        F(CHAR_INPUT_SLOT) = reinterpret_cast<DWORD>(NativeCharInput);
     }
     HMODULE asi = LoadLibraryA(argv[1]);
     Check(asi != nullptr, "asi carregado");
@@ -682,9 +648,7 @@ int main(int argc, char** argv) {
         }
         Frames(30);
         Check(F(CMD_NAME) != 0, "Trok Chat ligado no SA-MP");
-        if (mode == "teclas") {
-            RunKeys();
-        } else if (mode == "desligado") {
+        if (mode == "desligado") {
             RunOff();
         } else {
             RunR1();

@@ -6,8 +6,7 @@ CGame e do info nos enderecos do R1 e stubs nas funcoes que o .asi usa ou desvia
   CChat::AddEntry   guarda o tipo e conta         CChat::Draw / CChat::Render   contam
   CInput::Send      copia o texto e conta         CInput::AddCommand            guarda o nome e o callback
   CInput::Open      liga o m_bEnabled e conta     CInput::Close                 desliga e conta
-  KeyPressHandler   chamam o que o fake_gta.exe   CGame::SetCursorMode          guarda o modo
-  CharInputHandler  pos nos ponteiros (o SA-MP)
+  CGame::SetCursorMode guarda o modo
 O CChat ja vem com tres mensagens (o .asi copia as que ja estavam no chat), e o CInput aponta para uma caixa de texto
 no formato do DXUT (tipo 7, o texto num buffer de 129 caracteres). O fake_gta.exe le e escreve esses campos.
 
@@ -23,7 +22,6 @@ SIZE = 0x320000
 DATA = 0x300000
 (CMD_NAME, CMD_PROC, ADD_COUNT, DRAW_COUNT, RENDER_COUNT, SEND_COUNT, LAST_TYPE, OPEN_COUNT, CLOSE_COUNT,
  CURSOR_MODE) = (DATA + 4 * i for i in range(10))
-KEY_PRESS_SLOT, CHAR_INPUT_SLOT = DATA + 0x40, DATA + 0x44  # o fake_gta.exe poe aqui o SA-MP dele
 SEND_BUF = DATA + 0x100
 
 CHAT, INPUT, DIALOG, INFO, EDITBOX, GAME = 0x301000, 0x308000, 0x30A000, 0x30B000, 0x30C000, 0x30D000
@@ -35,7 +33,6 @@ ENTRY_OTHER = 0xCC5F0  # outra versao: o .asi tem que ficar de fora
 P_CHAT, P_INPUT, P_DIALOG, P_INFO, P_GAME = 0x21A0E4, 0x21A0E8, 0x21A0B8, 0x21A0F8, 0x21A10C
 ADD_ENTRY, DRAW, RENDER, SEND, ADD_COMMAND = 0x64010, 0x64230, 0x63D70, 0x65C60, 0x65AD0
 INPUT_OPEN, INPUT_CLOSE, INPUT_ENABLED = 0x657E0, 0x658E0, 0x14E0
-KEY_PRESS, CHAR_INPUT = 0x5D850, 0x5DA80
 SET_CURSOR, UNLOCK_CAM = 0x9BD30, 0x9BC10
 
 # CChat (R1)
@@ -69,9 +66,6 @@ def main():
     # Open(this) / Close(this): mov dword [ecx+14E0h], 1 (ou 0); inc [conta]; ret
     put(INPUT_OPEN, b'\xC7\x81' + d(INPUT_ENABLED) + d(1) + b'\xFF\x05' + d(BASE + OPEN_COUNT) + b'\xC3')
     put(INPUT_CLOSE, b'\xC7\x81' + d(INPUT_ENABLED) + d(0) + b'\xFF\x05' + d(BASE + CLOSE_COUNT) + b'\xC3')
-    # KeyPressHandler(key) / CharInputHandler(ch), cdecl: mov eax,[esp+4]; push eax; call [ponteiro]; add esp,4; ret
-    for rva, slot in ((KEY_PRESS, KEY_PRESS_SLOT), (CHAR_INPUT, CHAR_INPUT_SLOT)):
-        put(rva, b'\x8B\x44\x24\x04\x50\xFF\x15' + d(BASE + slot) + b'\x83\xC4\x04\xC3')
     # SetCursorMode(this, mode, hide): mov eax,[esp+4]; mov [modo],eax; ret 8. UnlockActorCam(this): ret
     put(SET_CURSOR, b'\x8B\x44\x24\x04\xA3' + d(BASE + CURSOR_MODE) + b'\xC2\x08\x00')
     put(UNLOCK_CAM, b'\xC3')

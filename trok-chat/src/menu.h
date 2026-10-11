@@ -1,5 +1,5 @@
 // Trok Chat (.asi) -- Victor_Trok
-// O menu do /trokchat: as duas teclas que abrem o chat, como as mensagens aparecem e o Trok Chat ligado ou nao.
+// O menu do /trokchat: como as mensagens aparecem e o Trok Chat ligado ou nao.
 // Sem windows.h: o teste de renderizacao compila no Linux.
 #pragma once
 

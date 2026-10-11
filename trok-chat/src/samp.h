@@ -1,6 +1,5 @@
 // Trok Chat (.asi) -- Victor_Trok
-// O SA-MP 0.3.7 R1 por dentro: as mensagens do chat dele, a caixa de digitacao, as teclas que abrem o chat e o
-// /trokchat.
+// O SA-MP 0.3.7 R1 por dentro: as mensagens do chat dele, a caixa de digitacao e o /trokchat.
 #pragma once
 
 #include <windows.h>
@@ -20,12 +19,6 @@ bool Ready(); // ligado no SA-MP
 void Heartbeat();
 
 bool Active(); // o Trok Chat no lugar do chat do SA-MP (ligado no menu e desenhando)
-
-// A janela do jogo passando uma tecla apertada para os outros (o SA-MP, la no fim) e o caractere dela.
-void KeyDown(WPARAM vk, LPARAM lParam);
-void CharDone();
-UINT OpenedBy();                         // a tecla que abriu a barra agora (0 = um script)
-bool IsChatKey(WPARAM vk, LPARAM lParam); // uma das duas teclas do menu
 
 bool TakeMenuRequest(); // o /trokchat foi digitado
 void Cursor(bool on);   // o cursor do SA-MP (o menu precisa do mouse)
