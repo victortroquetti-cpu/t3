@@ -18,11 +18,9 @@ struct Options {
 
     // ---- Mira: o hitmarker
     int marker = 0;          // 0 Classico (X), 1 Discreto, 2 Anel
-    bool onAim = true;       // sinal de acerto na mira
+    bool onAim = true;       // sinal de acerto onde a mira esta (le onde o GTA desenhou a mira neste quadro, entao
+                             // segue mod que centraliza ou sobe a mira; sem opcao de lugar)
     int markerSize = 100;    // %
-    // A mira de verdade: 0 segue a do jogo (le onde o GTA desenhou a mira neste quadro, entao vale com mod que
-    // centraliza ou sobe a mira), 1 centro da tela, 2 lugar escolhido no modo Mover (mira desenhada por outro mod)
-    int aim = 0;
 
     // ---- Numeros de dano
     int numbers = 0;         // 0 sobem do personagem, 1 sobem na tela (ao lado da mira), 2 desligado
@@ -68,7 +66,6 @@ struct Options {
     // ---- Posicoes
     Place given = {0.60f, 0.40f};   // informer: dano dado (o lugar do damage informer antigo)
     Place taken = {0.30f, 0.40f};   // informer: dano levado
-    Place aimAt = {0.50f, 0.50f};   // a mira, quando "lugar escolhido"
 };
 
 Options& Get();

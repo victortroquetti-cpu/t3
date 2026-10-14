@@ -88,8 +88,6 @@ void TabMira(Rows& r, float x, float w) {
     r.Slider("Tamanho", &o.markerSize, 50, 200, 10, "%d%%", d.markerSize);
     r.Section("Na mira");
     r.Toggle("Sinal de acerto na mira", &o.onAim);
-    static const char* const aim[] = {"A do jogo", "Centro", "Escolhida"};
-    r.Segmented("Posi\xC3\xA7\xC3\xA3o da mira", &o.aim, aim, 3, d.aim);
     r.Section("No corpo");
     r.Toggle("Local do acerto", &o.hitLocal);
     r.Slider("Fica no corpo", &o.hitLocalTime, 1, 5, 1, "%d s", d.hitLocalTime);

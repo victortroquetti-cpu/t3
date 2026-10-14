@@ -19,7 +19,7 @@ Indicador de dano para o SA-MP 0.3.7 R1, no estilo da casa: sinal de acerto na m
 
 ## Mira e corpo
 
-- **Sinal na mira:** desenhado onde a mira está naquele quadro. O mod lê onde o próprio GTA desenhou a mira, então mod que centraliza ou sobe a mira não precisa de ajuste (`docs/08-mira-seguida.png`). Se outro mod esconde a mira do GTA e desenha a dele, o menu tem "Centro" ou "Escolhida" (arrastada no modo Mover).
+- **Sinal na mira:** desenhado onde a mira está naquele quadro. O mod lê onde o próprio GTA desenhou a mira, então mod que centraliza ou sobe a mira não precisa de ajuste nem de opção no menu (`docs/08-mira-seguida.png`).
 - **Local do acerto:** a marca fica na parte do corpo que o tiro pegou (cabeça, tronco, braço, perna) por 1 a 5 s, acompanhando o alvo quando ele anda (`docs/06-local-do-acerto.png`).
 
 ## Sons
