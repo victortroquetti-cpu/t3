@@ -45,7 +45,6 @@ struct Line {       // uma pessoa no informer (dado ou levado)
     std::string nick;
     int id = 0;
     ImU32 nickColor = 0xFFFFFFFF; // a cor do jogador no SA-MP
-    std::string weapon;
     bool afk = false;
     int hits = 0, total = 0;      // combo: acertos e dano somado
     float age = 0;                // desde o ultimo acerto
@@ -56,7 +55,7 @@ struct Incoming {   // tiro levado: de onde veio
     float angle = 0; // rad: 0 = na frente, + = para a direita (sentido horario na tela)
     float age = 0;
     int damage = 0;
-    std::string nick, weapon;
+    std::string nick;
     ImU32 nickColor = 0xFFFFFFFF;
 };
 

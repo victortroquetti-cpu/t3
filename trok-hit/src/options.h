@@ -38,7 +38,6 @@ struct Options {
     int informer = 0;        // 0 Classico, 1 Lista, 2 desligado
     int nickGiven = 0;       // 0 cor do jogador, 1 cor fixa
     int nickTaken = 0;
-    bool weapon = true;      // nome da arma ao lado do nick
     bool afk = true;         // "AFK" no lugar do dano de quem esta pausado
     int informerSize = 100;
 

@@ -98,11 +98,6 @@ void InformerClassic(ImDrawList* dl, const Line& l, ImVec2 at, bool given, const
     float nickSize = 17 * s;
     ImVec2 np(at.x, at.y + 0.02f * 1080 * k);
     Outlined(dl, g_text, nickSize, np, Alpha(nickColor, fade), nick, 1.3f * s);
-    if (o.weapon && !l.weapon.empty()) {
-        ImVec2 ns = Size(g_text, nickSize, nick);
-        Outlined(dl, g_text, 14 * s, ImVec2(np.x + ns.x + 8 * s, np.y + 2 * s), Alpha(IM_COL32(205, 205, 205, 255), fade),
-                 l.weapon.c_str(), 1.1f * s);
-    }
     float numSize = 26 * s;
     ImFont* nf = NumberFont(o);
     for (size_t i = 0; i < l.recent.size(); ++i) {
@@ -136,7 +131,7 @@ void InformerList(ImDrawList* dl, const std::vector<Line>& lines, ImVec2 at, boo
                   float k) {
     float s = k * o.informerSize / 100.0f;
     float y = at.y;
-    float h = 32 * s, w = 300 * s;
+    float h = 32 * s, w = 250 * s;
     for (const Line& l : lines) {
         float fade = l.age < 3.0f ? 1.0f : 1.0f - (l.age - 3.0f) / 0.4f;
         if (fade <= 0) {
@@ -155,11 +150,6 @@ void InformerList(ImDrawList* dl, const std::vector<Line>& lines, ImVec2 at, boo
         char id[8];
         snprintf(id, sizeof(id), "%d", l.id);
         dl->AddText(g_text, 12.5f * s, ImVec2(tx, ty + 2 * s), Alpha(IM_COL32(255, 255, 255, 110), fade), id);
-        tx += Size(g_text, 12.5f * s, id).x + 10 * s;
-        if (o.weapon) {
-            dl->AddText(g_text, 12.5f * s, ImVec2(tx, ty + 2 * s), Alpha(IM_COL32(255, 255, 255, 150), fade),
-                        l.weapon.c_str());
-        }
         char total[32];
         if (l.afk) {
             snprintf(total, sizeof(total), "AFK");
@@ -308,8 +298,7 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
                                   ImVec2(c.x + dir.x * (r + 5 * k) - side.x * 9 * k, c.y + dir.y * (r + 5 * k) - side.y * 9 * k),
                                   Alpha(IM_COL32(255, 60, 56, 255), 0.9f * a));
             if (o.directionName && !in.nick.empty()) {
-                char label[64];
-                snprintf(label, sizeof(label), "%s  %s", in.nick.c_str(), in.weapon.c_str());
+                const char* label = in.nick.c_str();
                 ImVec2 ts = Size(g_text, 15 * k, label);
                 ImVec2 lp(c.x + dir.x * (r + 42 * k) - ts.x * 0.5f, c.y + dir.y * (r + 40 * k) - ts.y * 0.5f);
                 Outlined(dl, g_text, 15 * k, lp, Alpha(Opaque(in.nickColor), a), label, 1.3f * k);
@@ -336,7 +325,7 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
         }
     } else if (o.informer == 1) {
         InformerList(dl, st.given, gAt, true, o, k);
-        InformerList(dl, st.taken, ImVec2(tAt.x + 300 * k * o.informerSize / 100.0f, tAt.y), false, o, k);
+        InformerList(dl, st.taken, ImVec2(tAt.x + 250 * k * o.informerSize / 100.0f, tAt.y), false, o, k);
     }
 
     // local do acerto: a marca fica na parte do corpo que o tiro pegou (o samp.cpp atualiza a posicao do osso)

@@ -133,7 +133,6 @@ static hud::Line LucasLine() {
     l.nick = "Lucas_Mendes";
     l.id = 3;
     l.nickColor = LUCAS;
-    l.weapon = "Deagle";
     l.hits = 5;
     l.total = 126;
     l.age = 0.2f;
@@ -146,7 +145,6 @@ static hud::Line EnzoLine() {
     l.nick = "Enzo_Rampani";
     l.id = 7;
     l.nickColor = ENZO;
-    l.weapon = "M4";
     l.hits = 2;
     l.total = 20;
     l.age = 0.3f;
@@ -182,7 +180,6 @@ static hud::State Fight() {
     in.age = 0.3f;
     in.damage = 10;
     in.nick = "Enzo_Rampani";
-    in.weapon = "M4";
     in.nickColor = ENZO;
     s.incoming.push_back(in);
     s.flash = 0.35f;
@@ -374,7 +371,7 @@ int main(int argc, char** argv) {
     o.given = {0.58f, 0.37f}, o.taken = {0.32f, 0.37f};
     hud::State s = Fight();
     hud::Line other;
-    other.nick = "Victor_Trok", other.id = 12, other.nickColor = IM_COL32(79, 140, 255, 255), other.weapon = "M4";
+    other.nick = "Victor_Trok", other.id = 12, other.nickColor = IM_COL32(79, 140, 255, 255);
     other.hits = 1, other.total = 10, other.age = 1.4f;
     s.given.push_back(other);
     Frame(s, true, 1.0f);
@@ -405,9 +402,9 @@ int main(int argc, char** argv) {
     s = hud::State();
     s.crosshair = CROSS;
     hud::Incoming in;
-    in.angle = -0.95f, in.age = 0.2f, in.damage = 46, in.nick = "Enzo_Rampani", in.weapon = "Deagle", in.nickColor = ENZO;
+    in.angle = -0.95f, in.age = 0.2f, in.damage = 46, in.nick = "Enzo_Rampani", in.nickColor = ENZO;
     s.incoming.push_back(in);
-    in.angle = 2.5f, in.age = 0.7f, in.damage = 10, in.nick = "Lucas_Mendes", in.weapon = "M4", in.nickColor = LUCAS;
+    in.angle = 2.5f, in.age = 0.7f, in.damage = 10, in.nick = "Lucas_Mendes", in.nickColor = LUCAS;
     s.incoming.push_back(in);
     s.flash = 0.8f;
     s.taken = {EnzoLine()};

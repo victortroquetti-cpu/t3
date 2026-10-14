@@ -127,7 +127,6 @@ void TabInformer(Rows& r) {
     r.Color("Cor fixa ao dar dano", &o.cGiven, d.cGiven);
     r.Segmented("Cor do nick ao levar dano", &o.nickTaken, nick, 2, d.nickTaken);
     r.Color("Cor fixa ao levar dano", &o.cTaken, d.cTaken);
-    r.Toggle("Nome da arma", &o.weapon);
     r.Toggle("AFK no lugar do dano", &o.afk);
     r.Toggle("Combo (acertos e dano somado)", &o.combo);
     r.Slider("Combo fecha depois de", &o.comboWindow, 1, 10, 1, "%d s", d.comboWindow);
