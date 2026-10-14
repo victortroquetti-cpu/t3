@@ -69,6 +69,11 @@ struct State {
     Kind flashKind = HEALTH;      // HEALTH, ARMOUR ou HEADSHOT: a cor da borda
 };
 
+// Imagens da pasta "Trok Hitmarker\mira" (PNG que o usuario edita). O overlay carrega e passa a textura; sem a
+// imagem, a mira e o efeito caem no desenho do Ponto. Tamanho: o da imagem numa tela de 1080, vezes o "Tamanho".
+enum ImageSlot { IMG_CROSSHAIR, IMG_HIT, IMG_ARMOUR, IMG_HEAD, IMG_KILL, IMG_COUNT };
+void SetImage(int slot, ImTextureID texture, ImVec2 size);
+
 // Fontes extras no atlas (numeros grandes em Arial Black ou na fonte da casa). Chamar antes de construir o atlas.
 void AddFonts(float screenHeight, const char* houseFont, const char* numberFont);
 ImU32 KindColor(Kind k, const opt::Options& o);

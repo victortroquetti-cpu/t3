@@ -16,6 +16,22 @@ namespace {
 ImFont* g_text = nullptr;   // fonte da casa (nicks, rotulos)
 ImFont* g_number = nullptr; // numeros: Arial Black ou a fonte da casa
 ImFont* g_house = nullptr;  // numeros na fonte da casa
+struct Img {
+    ImTextureID texture = nullptr;
+    ImVec2 size;
+} g_images[IMG_COUNT];
+
+// Desenha a imagem centrada em c (tamanho da imagem a 1080 vezes scale); false se a imagem nao existe.
+bool Picture(ImDrawList* dl, int slot, ImVec2 c, float scale, float alpha) {
+    const Img& im = g_images[slot];
+    if (!im.texture) {
+        return false;
+    }
+    ImVec2 h(im.size.x * scale * 0.5f, im.size.y * scale * 0.5f);
+    dl->AddImage(im.texture, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 0), ImVec2(1, 1),
+                 IM_COL32(255, 255, 255, static_cast<int>(255 * (alpha < 0 ? 0 : alpha > 1 ? 1 : alpha))));
+    return true;
+}
 constexpr float PI = 3.14159265f;
 
 float Clamp01(float v) {
@@ -202,7 +218,17 @@ ImU32 KindColor(Kind k, const opt::Options& o) {
     }
 }
 
+void SetImage(int slot, ImTextureID texture, ImVec2 size) {
+    if (slot >= 0 && slot < IMG_COUNT) {
+        g_images[slot].texture = texture;
+        g_images[slot].size = size;
+    }
+}
+
 void DrawCrosshair(ImDrawList* dl, ImVec2 c, float scale, const opt::Options& o) {
+    if (o.crosshair == 2 && Picture(dl, IMG_CROSSHAIR, c, scale * o.crosshairSize / 100.0f, 1.0f)) {
+        return;
+    }
     float r = 3.4f * scale * o.crosshairSize / 100.0f;
     dl->AddCircleFilled(c, r + 1.6f * scale, IM_COL32(0, 0, 0, 200), 20);
     dl->AddCircleFilled(c, r, Opaque(o.cCrosshair), 20);
@@ -247,6 +273,25 @@ void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kin
                 float stay) {
     bool kill = kind == KILL;
     float life, hold;
+    if (style == 4) { // imagens: mesmos tempos e o mesmo pulo do Ponto; sem a imagem, o Ponto
+        int slot = kind == KILL ? IMG_KILL : kind == HEADSHOT ? IMG_HEAD : kind == ARMOUR ? IMG_ARMOUR : IMG_HIT;
+        if (slot == IMG_ARMOUR && !g_images[IMG_ARMOUR].texture) {
+            slot = IMG_HIT;
+        }
+        if (!g_images[slot].texture) {
+            style = 0;
+        } else {
+            life = kill ? 1.2f : kind == HEADSHOT ? 0.55f : 0.35f;
+            hold = kill ? 0.85f : kind == HEADSHOT ? 0.3f : 0.15f;
+            if (age >= life) {
+                return;
+            }
+            float a = age < hold ? 1.0f : 1.0f - (age - hold) / (life - hold);
+            float pop = 1.0f + 0.35f * (1.0f - EaseOut(age / 0.1f));
+            Picture(dl, slot, c, scale * pop, a);
+            return;
+        }
+    }
     if (style == 0) { // ponto: abate fica mais (o "morte" da Mira Centralizada durava 150 quadros)
         life = kill ? 1.2f : kind == HEADSHOT ? 0.55f : 0.35f;
         hold = kill ? 0.85f : kind == HEADSHOT ? 0.3f : 0.15f;

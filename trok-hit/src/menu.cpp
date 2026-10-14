@@ -76,7 +76,7 @@ void MarkerPreview(float x, float w) {
         float cx = x + w * (i + 0.5f) / 5;
         ImVec2 c(cx, at.y + 40 * u);
         if (i == 0) {
-            if (o.crosshair == 1) {
+            if (o.crosshair >= 1) { // ponto do Trok ou a imagem (sem a imagem, o ponto)
                 hud::DrawCrosshair(dl, c, scale, o);
             } else { // a do jogo: um circulo, so para lembrar
                 dl->AddCircle(c, 11 * scale, col::White(150), 32, 1.4f * scale);
@@ -93,18 +93,27 @@ void MarkerPreview(float x, float w) {
 void TabMira(Rows& r, float x, float w) {
     opt::Options& o = opt::Get();
     const opt::Options& d = opt::Defaults();
-    static const char* const mira[] = {"A do jogo", "Ponto do Trok"};
-    r.Segmented("Mira", &o.crosshair, mira, 2, d.crosshair);
-    if (o.crosshair == 1) {
+    static const char* const mira[] = {"A do jogo", "Ponto do Trok", "Imagem"};
+    r.Segmented("Mira", &o.crosshair, mira, 3, d.crosshair);
+    if (o.crosshair >= 1) {
         r.Toggle("Sempre vis\xC3\xADvel (tamb\xC3\xA9m sem mirar)", &o.crosshairAlways);
         r.Slider("Tamanho da mira", &o.crosshairSize, 50, 200, 10, "%d%%", d.crosshairSize);
-        r.Color("Cor da mira", &o.cCrosshair, d.cCrosshair);
+        if (o.crosshair == 1) {
+            r.Color("Cor da mira", &o.cCrosshair, d.cCrosshair);
+        }
     }
     r.Section("Sinal de acerto");
     r.Toggle("Sinal de acerto na mira", &o.onAim);
-    static const char* const style[] = {"Ponto", "Cl\xC3\xA1ssico (X)", "Discreto", "Anel"};
-    r.Cycle("Efeito", &o.marker, style, 4, d.marker);
+    static const char* const style[] = {"Ponto", "Cl\xC3\xA1ssico (X)", "Discreto", "Anel", "Imagens"};
+    r.Cycle("Efeito", &o.marker, style, 5, d.marker);
     r.Slider("Tamanho do efeito", &o.markerSize, 50, 200, 10, "%d%%", d.markerSize);
+    if (o.crosshair == 2 || o.marker == 4) {
+        r.Action("Pasta das imagens", "Abrir pasta");
+        r.Info("Trocar as imagens",
+               "PNG com fundo transparente na pasta Trok Hitmarker\\mira: mira, acerto, colete, cabeca e abate. "
+               "Sem colete.png, vale o acerto.png. O tamanho \xC3\xA9 o da imagem numa tela de 1080 (32 px = 32 px), "
+               "vezes o Tamanho do menu. Trocou o arquivo, vale na hora.");
+    }
     r.Section("Cores do acerto");
     r.Color("Na vida", &o.cHealth, d.cHealth);
     r.Color("No colete", &o.cArmour, d.cArmour);
@@ -218,7 +227,7 @@ bool Frame() {
     bool escape = keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
 
     float width = 700 * u;
-    float height = std::min(io.DisplaySize.y * 0.8f, 640 * u);
+    float height = std::min(io.DisplaySize.y * 0.8f, 690 * u);
     PushStyle();
     bool keep = BeginShell("##trokHit", "Trok Hitmarker", VERSION_TAG, width, height, S.shell);
     ImVec2 pos = ImGui::GetWindowPos();

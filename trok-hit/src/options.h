@@ -17,13 +17,15 @@ struct Options {
     int preset = 0; // estilo pronto aplicado por ultimo (so para o menu mostrar)
 
     // ---- Mira
-    int crosshair = 1;       // 0 a do jogo, 1 ponto do Trok (como a Mira Centralizada; o GTA nao desenha a dele)
+    int crosshair = 1;       // 0 a do jogo, 1 ponto do Trok (como a Mira Centralizada), 2 imagem (mira\mira.png);
+                             // com 1 ou 2 o GTA nao desenha a dele
     bool crosshairAlways = true; // ponto do Trok: aparece tambem sem mirar (a pe; some no carro, sniper e bazucas)
     int crosshairSize = 100; // %
     ImU32 cCrosshair = IM_COL32(255, 255, 255, 255);
 
     // ---- Sinal de acerto na mira
-    int marker = 0;          // 0 Ponto (o ponto muda: acerto, cabeca, abate), 1 Classico (X), 2 Discreto, 3 Anel
+    int marker = 0;          // 0 Ponto (o ponto muda: acerto, cabeca, abate), 1 Classico (X), 2 Discreto, 3 Anel,
+                             // 4 imagens (mira\acerto.png, colete.png, cabeca.png, abate.png)
     bool onAim = true;       // sinal de acerto onde a mira esta (le onde o GTA desenhou a mira neste quadro, entao
                              // segue mod que centraliza ou sobe a mira; sem opcao de lugar)
     int markerSize = 100;    // %

@@ -466,6 +466,9 @@ int main(int argc, char** argv) {
     Menu(2, dir + "/12-menu-informer.ppm", 690, 1230);
     Menu(4, dir + "/13-menu-sons.ppm", 690, 1230);
     Menu(3, dir + "/14-menu-recebido.ppm", 690, 1230);
+    o.crosshair = 2, o.marker = 4; // imagens da pasta (sem os arquivos, a previa cai no Ponto)
+    Menu(0, dir + "/16-menu-mira-imagens.ppm", 690, 1230);
+    o = opt::Options();
 
     printf("concept: %d falhas\n", failures);
     return failures ? 1 : 0;
