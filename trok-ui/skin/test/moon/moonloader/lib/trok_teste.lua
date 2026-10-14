@@ -8,15 +8,20 @@ function M.rect(script, what)
     host_rect(script, what, a.x, a.y, b.x, b.y)
 end
 
+-- Valores do painel para o host (modo cliques): caixa, volume e se a janela esta aberta.
+function M.values(s, open)
+    return string.format('check=%d volume=%.0f aberto=%d', s.check.v and 1 or 0, s.volume.v, open.v and 1 or 0)
+end
+
 function M.state()
     return {check = imgui.ImBool(true), volume = imgui.ImFloat(65), nome = imgui.ImBuffer('Victor_Trok', 64),
-            modo = imgui.ImInt(1)}
+            modo = imgui.ImInt(1), saved = 0}
 end
 
 function M.widgets(name, s)
     imgui.Text('Configura\195\167\195\181es do menu (' .. name .. ')')
     M.rect(name, 'texto')
-    imgui.Button('Salvar')
+    if imgui.Button('Salvar') then s.saved = s.saved + 1 end
     M.rect(name, 'salvar')
     imgui.SameLine()
     imgui.Button('Fechar')

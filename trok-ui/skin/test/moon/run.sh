@@ -64,6 +64,7 @@ run() {
     rm -rf "$dir"
     mkdir -p "$dir/moonloader/resource/trok"
     cp "$OUT/moon_host.exe" "$OUT/lua51.dll" "dist/Trok Skin.asi" "$dir/"
+    if [ "${LAYOUT_ASI:-}" = 1 ]; then cp "dist/Trok Skin Layout.asi" "$dir/Trok Skin.asi"; fi # versao de teste
     cp -r test/moon/moonloader/. "$dir/moonloader/"
     cp "$MOON/imgui.lua" "$dir/moonloader/lib/imgui.lua"
     cp "$dll" "$dir/moonloader/lib/MoonImGui.dll"
@@ -83,5 +84,11 @@ run versao skin $'tema=1\nfonte=1' "$OUT/MoonImGui_v199.dll"
 run alternar skin $'tema=1\nfonte=0' "" alternar
 run "acentuação" skin $'tema=1\nfonte=1'
 run manter_script skin $'tema=1\nfonte=1\nmanter_scripts=painel_b.lua'
+# Versao de teste (Trok Skin Layout.asi, layout=1 de fabrica): tamanho de fonte e espacamentos da casa.
+LAYOUT_ASI=1 run layout skin $'tema=1\nfonte=1'
+# Kit da versao Layout com mouse e teclado: interruptor, slider, Esc (com e sem o chat do SA-MP) e o X.
+LAYOUT_ASI=1 run cliques skin $'tema=1\nfonte=1' "" cliques
+# Versao normal com os mesmos cliques: os controles sao os do ImGui e o Esc fica com o jogo.
+run cliques_normal skin $'tema=1\nfonte=1' "" cliques
 
 python3 test/moon/compare.py "$OUT"

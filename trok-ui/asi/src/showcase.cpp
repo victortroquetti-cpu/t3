@@ -260,13 +260,10 @@ void DrawMenu() {
     bool fresh = S.menuAge++ == 0;
     bool keysOk = !fresh && KeyboardFree() && !S.confirm;
     Keys keys = ReadKeys(keysOk);
-    if (keysOk && ImGui::IsKeyPressed(ImGuiKey_Tab, false)) {
-        S.tab = (S.tab + (io.KeyShift ? TAB_COUNT - 1 : 1)) % TAB_COUNT;
-    }
     bool escape = keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
 
     float width = 640 * u;
-    float height = std::min(io.DisplaySize.y * 0.72f, 540 * u);
+    float height = std::min(io.DisplaySize.y * 0.72f, 560 * u);
     PushStyle();
     bool keep = BeginShell("##trokUiShowcase", "Trok UI", VERSION_TAG, width, height, S.shell);
 
@@ -296,12 +293,12 @@ void DrawMenu() {
     ImGui::Dummy(ImVec2(0, 6 * u));
     ImGui::EndChild();
 
-    static const std::vector<Hint> hints = {
-        {"Setas", "Ajustar", false}, {"Tab", "Trocar de aba", false}, {"Esc", "Fechar", true}};
+    // Sem dica de Tab: no SA-MP o Tab abre o placar (as abas trocam com o mouse).
+    static const std::vector<Hint> hints = {{"Setas", "Ajustar", false}, {"Esc", "Fechar", true}};
     int clicked = EndShell(hints);
     PopStyle();
 
-    if (!keep || clicked == 2 || escape) {
+    if (!keep || clicked == 1 || escape) {
         S.open = false;
     }
 }
@@ -403,10 +400,10 @@ void DrawDialog() {
     bool isList = S.dialog == Dialog::List || S.dialog == Dialog::Table;
     if (S.dialog == Dialog::List) {
         width = std::max(width, 420 * u);
-        content += 5 * 30 * u;
+        content += 5 * 32 * u;
     } else if (S.dialog == Dialog::Table) {
         width = std::max(width, 480 * u);
-        content += 26 * u + 4 * 30 * u;
+        content += 28 * u + 4 * 32 * u;
     }
     float height = HeaderHeight() + 18 * u + content + 18 * u + FooterHeight();
     height = std::min(height, io.DisplaySize.y * 0.8f);

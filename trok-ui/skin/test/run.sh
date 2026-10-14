@@ -57,6 +57,7 @@ run() {
     rm -rf "$dir"
     mkdir -p "$dir/moonloader/resource/trok"
     cp "$OUT/skin_host.exe" "dist/Trok Skin.asi" "$dir/"
+    if [ "${LAYOUT_ASI:-}" = 1 ]; then cp "dist/Trok Skin Layout.asi" "$dir/Trok Skin.asi"; fi # versao de teste
     cp test/moonloader/*.lua "$dir/moonloader/" # a skin le o arquivo de cada script (mod da casa ou nao)
     cp "$OUT/$dll" "$dir/cimguidx9.dll"
     python3 ../asi/test/smoke/make_fake_samp.py "$dir/samp.dll"
@@ -73,5 +74,11 @@ run versao skin $'tema=1\nfonte=1' cimguidx9_v199.dll
 run alternar skin $'tema=1\nfonte=0' cimguidx9.dll alternar
 run "acentuação" skin $'tema=1\nfonte=1'
 run manter_script skin $'tema=1\nfonte=1\nmanter_scripts=painel_b.lua'
+# Versao de teste (Trok Skin Layout.asi, layout=1 de fabrica): tamanho de fonte e espacamentos da casa.
+LAYOUT_ASI=1 run layout skin $'tema=1\nfonte=1'
+# Kit da versao Layout com mouse e teclado: interruptor, slider, Esc (com e sem o chat do SA-MP) e o X.
+LAYOUT_ASI=1 run cliques skin $'tema=1\nfonte=1' cimguidx9.dll cliques
+# Versao normal com os mesmos cliques: os controles sao os do ImGui e o Esc fica com o jogo.
+run cliques_normal skin $'tema=1\nfonte=1' cimguidx9.dll cliques
 
 python3 test/compare.py "$OUT"

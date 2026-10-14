@@ -2,7 +2,8 @@
 
 // Trok UI -- kit de componentes da casa (Victor_Trok) para mods .asi com Dear ImGui 1.89.9.
 // Tudo e desenhado a mao no draw list, sem os widgets cinza padrao do ImGui. As medidas saem
-// dos mods publicados (Trok Kill List, Trok Dialogs e Trok Radar) e escalam com u = altura/1080*0.85.
+// dos mods publicados (Trok Kill List, Trok Dialogs e Trok Radar) e escalam com u = altura/1080*0.7225, 15% menor que
+// a conta do Kill List.
 // Fontes da casa: moonloader\resource\trok\font.ttf (Gotham Medium) e lucide.ttf (icones).
 
 #include "imgui.h"
@@ -14,9 +15,9 @@ namespace tui {
 // ---------------------------------------------------------------- tokens
 
 struct Fonts {
-    ImFont* body = nullptr;      // 16u -- rotulos e textos
-    ImFont* title = nullptr;     // 20u -- titulo do cabecalho
-    ImFont* desc = nullptr;      // 13.5u -- numeros, valores, dicas, versao
+    ImFont* body = nullptr;      // 17u -- rotulos e textos
+    ImFont* title = nullptr;     // 18u -- titulo do cabecalho
+    ImFont* desc = nullptr;      // 14.5u -- abas, botoes, numeros, valores, dicas, versao
     ImFont* icon = nullptr;      // 18u -- lucide.ttf
     ImFont* iconSmall = nullptr; // 13u -- lucide.ttf (check, lupa)
 };
@@ -49,6 +50,8 @@ void BuildFonts(float screenHeight, const char* gameDir);
 
 ImVec2 TextSize(ImFont* font, const char* text);
 void Text(ImDrawList* dl, ImFont* font, float x, float y, ImU32 color, const char* text);
+// Tracinho discreto que marca "este e o valor padrao", centrado em (x, y).
+void DefaultMark(ImDrawList* dl, float x, float y, ImU32 color);
 float Anim(ImGuiID id, float target, float speed = 14.0f);
 
 // ---------------------------------------------------------------- icones (lucide)
@@ -121,7 +124,7 @@ struct Keys {
 
 // Lista de linhas numeradas. Use dentro da janela (ou de um child com rolagem).
 // Valor padrao: barras mostram uma linha vertical no padrao; setas, giro e segmentado mostram um
-// ponto; todos ganham "Restaurar" quando saem do padrao (a dica mostra qual e o padrao).
+// tracinho; todos ganham "Restaurar" quando saem do padrao (a dica mostra qual e o padrao).
 class Rows {
 public:
     void Begin(const char* id, float x, float width, int* selected, const Keys& keys, bool showNumbers = true);
@@ -143,6 +146,7 @@ public:
     void Loading(const char* label, const char* status);
     void Badges(const char* label, const char* const* badges, const int* kinds, int count); // 0 neutro, 1 forte, 2 contorno
     void Info(const char* label, const char* tooltip);
+    void Value(const char* label, const char* value); // so leitura: o valor a direita
     void Section(const char* title);
 
     // Itens de lista (estilo Trok Dialogs). Devolvem true quando o item e ativado (Enter, clique duplo, 1-9).
@@ -161,7 +165,7 @@ private:
     void Label(const char* label, bool hovered);
     void Number(bool hovered, float centerY);
     bool Restore(bool differs, float controlLeft, const char* defaultText);
-    void DefaultDot(float x, float y);
+    void DefaultMark(float x, float y);
     void Finish(float height);
     bool Selected() const { return *selected_ == index_; }
     ImGuiID Id(const char* suffix) const;

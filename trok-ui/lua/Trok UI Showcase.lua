@@ -24,7 +24,7 @@ local VERSION_TAG = 'v1.0.0'
 -- TROK UI -- kit de componentes da casa para mods Lua (mimgui).
 -- Copie este bloco inteiro para um mod novo. Tudo e desenhado a mao no draw list, sem os
 -- widgets cinza padrao do ImGui. As medidas saem dos mods publicados (Trok Kill List,
--- Trok Dialogs e Trok Radar) e escalam com u = altura/1080*0.85, como no Kill List.
+-- Trok Dialogs e Trok Radar) e escalam com u = altura/1080*0.7225: 15% menor que a conta do Kill List.
 -- Fontes da casa: resource\trok\font.ttf (Gotham Medium) e resource\trok\lucide.ttf (icones).
 -- =====================================================================================
 
@@ -94,8 +94,9 @@ local function vec(x, y)
     return imgui.ImVec2(x, y)
 end
 
+-- 15% menor que a conta do Kill List (altura/1080*0.85, minimo 0.55): tudo vezes 0.85.
 function ui.scale(screenY)
-    return math.max(0.55, (screenY / 1080) * 0.85)
+    return math.max(0.4675, (screenY / 1080) * 0.7225)
 end
 
 -- Chamar dentro do imgui.OnInitialize.
@@ -115,9 +116,9 @@ function ui.buildFonts()
         local cfg = imgui.ImFontConfig()
         cfg.OversampleH = 2
         cfg.OversampleV = 2
-        ui.fonts.body = io.Fonts:AddFontFromFileTTF(body, 16 * u, cfg, ranges)
-        ui.fonts.title = io.Fonts:AddFontFromFileTTF(body, 20 * u, cfg, ranges)
-        ui.fonts.desc = io.Fonts:AddFontFromFileTTF(body, 13.5 * u, cfg, ranges)
+        ui.fonts.body = io.Fonts:AddFontFromFileTTF(body, 17 * u, cfg, ranges)
+        ui.fonts.title = io.Fonts:AddFontFromFileTTF(body, 18 * u, cfg, ranges)
+        ui.fonts.desc = io.Fonts:AddFontFromFileTTF(body, 14.5 * u, cfg, ranges)
     else
         local default = io.Fonts:AddFontDefault()
         ui.fonts.body, ui.fonts.title, ui.fonts.desc = default, default, default
@@ -651,7 +652,7 @@ function ui.beginShell(id, title, version, width, height, shell, extraFlags)
     local titleX = pos.x + (size.x - titleSize.x - gap - versionSize.x) * 0.5
     drawText(dl, ui.fonts.title, titleX, pos.y + (headerH - titleSize.y) * 0.5, pal('text'), title)
     if version then
-        drawText(dl, ui.fonts.desc, titleX + titleSize.x + gap, pos.y + (headerH - versionSize.y) * 0.5 + 2 * u,
+        drawText(dl, ui.fonts.desc, titleX + titleSize.x + gap, pos.y + (headerH - versionSize.y) * 0.5 + 1 * u,
             pal('version'), version)
     end
 
@@ -783,7 +784,7 @@ local function popupItem(id, label, checked, isDefault, width)
     local u = ui.u
     local dl = imgui.GetWindowDrawList()
     local p = imgui.GetCursorScreenPos()
-    local h = 26 * u
+    local h = 28 * u
     local clicked = imgui.InvisibleButton(id, vec(width, h))
     local hovered = imgui.IsItemHovered()
     if hovered then
@@ -962,7 +963,7 @@ Rows.__index = Rows
 -- keys = { up, down, left, right, enter, space, digit } vindos do laco principal.
 -- selected = linha selecionada (1..n). Depois de desenhar, leia rows.selected.
 -- Valor padrao: barras mostram uma linha vertical no padrao; setas, giro e segmentado mostram um
--- ponto; todos ganham "Restaurar" quando saem do padrao (a dica mostra qual e o padrao).
+-- tracinho; todos ganham "Restaurar" quando saem do padrao (a dica mostra qual e o padrao).
 function ui.rows(id, x, width, selected, keys, showNumbers)
     local u = ui.u
     local self = setmetatable({}, Rows)
@@ -973,7 +974,7 @@ function ui.rows(id, x, width, selected, keys, showNumbers)
     self.keys = keys or {}
     self.numbers = showNumbers ~= false
     self.index = 0
-    self.rowH, self.gap, self.recuo = 28 * u, 2 * u, 12 * u
+    self.rowH, self.gap, self.recuo = 30 * u, 2 * u, 12 * u
     self.numberW = textSize(ui.fonts.desc, '99').x
     self.labelX = self.numbers and x + self.recuo + self.numberW + 9 * u or x + self.recuo
     self.y = imgui.GetCursorScreenPos().y
@@ -1065,9 +1066,17 @@ function Rows:restoreButton(differs, controlLeft, defaultText)
     return clicked
 end
 
--- Ponto discreto que marca "este e o valor padrao" (setas, giro e segmentado).
-function Rows:defaultDot(x, y)
-    self.dl:AddCircleFilled(vec(x, y), 1.6 * ui.u, pal('marker'), 12)
+-- Tracinho discreto que marca "este e o valor padrao": 8u de largura, 1.5u de espessura (pelo menos 1 px) e pontas
+-- arredondadas, centrado em (x, y).
+function ui.defaultMark(dl, x, y, color)
+    local u = ui.u
+    local h = math.max(1, 1.5 * u) * 0.5
+    dl:AddRectFilled(vec(x - 4 * u, y - h), vec(x + 4 * u, y + h), color, h)
+end
+
+-- Marca do valor padrao nas setas, no giro e no segmentado.
+function Rows:defaultMark(x, y)
+    ui.defaultMark(self.dl, x, y, pal('marker'))
 end
 
 function Rows:finish(height)
@@ -1091,8 +1100,8 @@ end
 function Rows:action(label, button)
     self:start()
     local u = ui.u
-    local bw = math.max(136 * u, textSize(ui.fonts.desc, button).x + 28 * u)
-    local bh = 24 * u
+    local bw = math.max(144 * u, textSize(ui.fonts.desc, button).x + 30 * u)
+    local bh = 26 * u
     local bx, by = self:right() - bw, self.y + (self.rowH - bh) * 0.5
     imgui.SetCursorScreenPos(vec(bx, by))
     local clicked = imgui.InvisibleButton(self:uid('##acao'), vec(bw, bh))
@@ -1145,7 +1154,7 @@ local function drawArrows(self, a, text, leftOff, rightOff, isDefault)
     drawText(self.dl, ui.fonts.desc, a.cx + a.aw + (a.vw - ts.x) * 0.5, centerY - ts.y * 0.5,
         a.hv and pal('text') or pal('column'), text)
     if isDefault then
-        self:defaultDot(a.cx + a.aw + a.vw * 0.5, centerY + 9 * ui.u)
+        self:defaultMark(a.cx + a.aw + a.vw * 0.5, centerY + 9.5 * ui.u)
     end
 end
 
@@ -1209,7 +1218,7 @@ end
 function Rows:toggle(label, value)
     self:start()
     local u = ui.u
-    local tw, th = 40 * u, 22 * u
+    local tw, th = 44 * u, 24 * u
     local tx, ty = self:right() - tw, self.y + (self.rowH - th) * 0.5
     imgui.SetCursorScreenPos(vec(tx, ty))
     local clicked = imgui.InvisibleButton(self:uid('##b'), vec(tw, th))
@@ -1246,9 +1255,9 @@ function Rows:segmented(label, index, options, default)
     local u = ui.u
     local segW = 0
     for _, option in ipairs(options) do
-        segW = math.max(segW, textSize(ui.fonts.desc, option).x + 26 * u)
+        segW = math.max(segW, textSize(ui.fonts.desc, option).x + 30 * u)
     end
-    local sh, sw = 24 * u, segW * #options
+    local sh, sw = 26 * u, segW * #options
     local sx, sy = self:right() - sw, self.y + (self.rowH - sh) * 0.5
     local changed, hoveredSeg = false, nil
     for i = 1, #options do
@@ -1282,7 +1291,7 @@ function Rows:segmented(label, index, options, default)
         local segX = sx + segW * (i - 1)
         drawText(self.dl, ui.fonts.desc, segX + (segW - ts.x) * 0.5, sy + (sh - ts.y) * 0.5 - 1 * u, color, option)
         if i == default then
-            self:defaultDot(segX + segW * 0.5, sy + sh - 4 * u)
+            self:defaultMark(segX + segW * 0.5, sy + sh - 4 * u)
         end
     end
     self:finish(self.rowH)
@@ -1294,7 +1303,7 @@ end
 function Rows:slider(label, value, min, max, step, fmt, default)
     self:start()
     local u = ui.u
-    local valueW, trackW, knobR = 56 * u, 180 * u, 7 * u
+    local valueW, trackW, knobR = 56 * u, 180 * u, 8 * u
     local right = self:right()
     local tx, centerY = right - valueW - 10 * u - trackW, self.y + self.rowH * 0.5
     local changed = false
@@ -1333,7 +1342,7 @@ function Rows:slider(label, value, min, max, step, fmt, default)
     self.dl:AddRectFilled(vec(tx, centerY - th * 0.5), vec(fx, centerY + th * 0.5), pal('strong'), th * 0.5)
     -- Linha vertical no valor padrao, por baixo da bolinha.
     local dx = math.floor(tx + trackW * (default - min) / (max - min)) + 0.5
-    self.dl:AddLine(vec(dx, centerY - 7 * u), vec(dx, centerY + 7 * u), white((sHovered or active) and 130 or 90),
+    self.dl:AddLine(vec(dx, centerY - 8 * u), vec(dx, centerY + 8 * u), white((sHovered or active) and 130 or 90),
         1.5 * u)
     local kr = (sHovered or active) and knobR + 1 * u or knobR
     self.dl:AddCircleFilled(vec(fx, centerY), kr, pal('text'), 24)
@@ -1370,7 +1379,7 @@ function Rows:keybind(label, vk, default)
     end
 
     local shown = capturing and 'Pressione uma tecla' or keyName(vk)
-    local cw, ch = math.max(64 * u, textSize(ui.fonts.desc, shown).x + 22 * u), 24 * u
+    local cw, ch = math.max(68 * u, textSize(ui.fonts.desc, shown).x + 24 * u), 26 * u
     local cx, cy = self:right() - cw, self.y + (self.rowH - ch) * 0.5
     imgui.SetCursorScreenPos(vec(cx, cy))
     local clicked = imgui.InvisibleButton(myId, vec(cw, ch))
@@ -1410,7 +1419,7 @@ local PRESETS = {
 function Rows:color(label, color, default)
     self:start()
     local u = ui.u
-    local sw, sh = 34 * u, 20 * u
+    local sw, sh = 36 * u, 22 * u
     local sx, sy = self:right() - sw, self.y + (self.rowH - sh) * 0.5
     local hex = hexColor(color)
     local hs = textSize(ui.fonts.desc, hex)
@@ -1457,7 +1466,7 @@ function Rows:color(label, color, default)
             color[1], color[2], color[3] = math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5)
             changed = true
         end
-        local side, barW, pad = 168 * u, 14 * u, 8 * u
+        local side, barW, pad = 168 * u, 16 * u, 8 * u
         imgui.Dummy(vec(0, pad * 0.5))
         local p = imgui.GetCursorScreenPos()
         local px, py = p.x + pad * 0.5, p.y
@@ -1503,7 +1512,7 @@ function Rows:color(label, color, default)
         local hexNow = hexColor(color)
         drawText(pdl, ui.fonts.desc, hx + barW - textSize(ui.fonts.desc, hexNow).x, bottom, pal('text'), hexNow)
 
-        -- Primeira amostra = a cor padrao (com o ponto da casa); depois, cores rapidas.
+        -- Primeira amostra = a cor padrao (com o tracinho da casa); depois, cores rapidas.
         local slots = { default }
         for _, preset in ipairs(PRESETS) do
             slots[#slots + 1] = preset
@@ -1513,7 +1522,7 @@ function Rows:color(label, color, default)
         for i, swatch in ipairs(slots) do
             local x = px + (i - 1) * (presetW + 4 * u)
             imgui.SetCursorScreenPos(vec(x, presetY))
-            if imgui.InvisibleButton('##pre' .. i, vec(presetW, 16 * u)) then
+            if imgui.InvisibleButton('##pre' .. i, vec(presetW, 18 * u)) then
                 color[1], color[2], color[3] = swatch[1], swatch[2], swatch[3]
                 local h, s, v = rgbToHsv(swatch[1] / 255, swatch[2] / 255, swatch[3] / 255)
                 hsv.h, hsv.s, hsv.v = h, s, v
@@ -1526,19 +1535,18 @@ function Rows:color(label, color, default)
                     ui.tooltip(popupId .. '##padrao', 'Cor padr\195\163o (' .. hexColor(default) .. ')')
                 end
             end
-            pdl:AddRectFilled(vec(x, presetY), vec(x + presetW, presetY + 16 * u), rgba(swatch[1], swatch[2], swatch[3]),
+            pdl:AddRectFilled(vec(x, presetY), vec(x + presetW, presetY + 18 * u), rgba(swatch[1], swatch[2], swatch[3]),
                 4 * u)
             if i == 1 then
                 local lum = (swatch[1] * 3 + swatch[2] * 6 + swatch[3]) / 10
-                pdl:AddCircleFilled(vec(x + presetW * 0.5, presetY + 8 * u), 2 * u,
-                    lum > 140 and rgba(0, 0, 0, 150) or white(200), 12)
+                ui.defaultMark(pdl, x + presetW * 0.5, presetY + 9 * u, lum > 140 and rgba(0, 0, 0, 150) or white(200))
             end
             if pHovered or sameColor(swatch, color) then
-                pdl:AddRect(vec(x - 1.5, presetY - 1.5), vec(x + presetW + 1.5, presetY + 16 * u + 1.5), white(200),
+                pdl:AddRect(vec(x - 1.5, presetY - 1.5), vec(x + presetW + 1.5, presetY + 18 * u + 1.5), white(200),
                     5 * u, nil, 1)
             end
         end
-        imgui.SetCursorScreenPos(vec(px, presetY + 16 * u))
+        imgui.SetCursorScreenPos(vec(px, presetY + 18 * u))
         imgui.Dummy(vec(side + pad + barW + pad * 0.5, pad))
         if ui.closePopup then
             imgui.CloseCurrentPopup()
@@ -1554,7 +1562,7 @@ end
 function Rows:dropdown(label, index, options, default)
     self:start()
     local u = ui.u
-    local dw, dh = 170 * u, 24 * u
+    local dw, dh = 180 * u, 26 * u
     local dx, dy = self:right() - dw, self.y + (self.rowH - dh) * 0.5
     local changed = false
     local popupId = self:uid('##lista')
@@ -1616,7 +1624,7 @@ local function fieldRow(self, label, kind, id, buffer, placeholder, multilineLin
     self:start()
     local u = ui.u
     local fw = 240 * u
-    local fh = multilineLines and ui.fonts.desc.FontSize * multilineLines + 14 * u or 24 * u
+    local fh = multilineLines and ui.fonts.desc.FontSize * multilineLines + 14 * u or 26 * u
     local rowH = multilineLines and fh + 8 * u or self.rowH
     local fx = self:right() - fw
     local fy = multilineLines and self.y + 4 * u or self.y + (self.rowH - fh) * 0.5
@@ -1701,14 +1709,14 @@ end
 function Rows:badges(label, badges)
     self:start()
     local u = ui.u
-    local right, centerY, bh = self:right(), self.y + self.rowH * 0.5, 20 * u
+    local right, centerY, bh = self:right(), self.y + self.rowH * 0.5, 22 * u
     local hovered = self:row(self.rowH, false)
     self:label(label, hovered)
     local x = right
     for i = #badges, 1, -1 do
         local text, kind = badges[i][1], badges[i][2]
         local ts = textSize(ui.fonts.desc, text)
-        local bw = ts.x + 16 * u
+        local bw = ts.x + 18 * u
         x = x - bw
         local color = pal('column')
         if kind == 'forte' then
@@ -1719,7 +1727,7 @@ function Rows:badges(label, badges)
         else
             self.dl:AddRectFilled(vec(x, centerY - bh * 0.5), vec(x + bw, centerY + bh * 0.5), white(16), bh * 0.5)
         end
-        drawText(self.dl, ui.fonts.desc, x + 8 * u, centerY - ts.y * 0.5, color, text)
+        drawText(self.dl, ui.fonts.desc, x + 9 * u, centerY - ts.y * 0.5, color, text)
         x = x - 6 * u
     end
     self:finish(self.rowH)
@@ -1778,7 +1786,7 @@ end
 function Rows:tableHeader(columns, widths)
     local u = ui.u
     self.y = imgui.GetCursorScreenPos().y
-    local h, x = 24 * u, self.labelX
+    local h, x = 26 * u, self.labelX
     for i, column in ipairs(columns) do
         local ts = textSize(ui.fonts.desc, column)
         drawText(self.dl, ui.fonts.desc, x, self.y + (h - ts.y) * 0.5, pal('hint'), column)
@@ -2113,7 +2121,8 @@ local function tabDialogs(r)
     if r:action('Tabela com cabe\195\167alho', 'Abrir') then openDialog('tabela') end
 end
 
-local MENU_HINTS = { { 'Setas', 'Ajustar' }, { 'Tab', 'Trocar de aba' }, { 'Esc', 'Fechar', true } }
+-- Sem dica de Tab: no SA-MP o Tab abre o placar (as abas trocam com o mouse).
+local MENU_HINTS = { { 'Setas', 'Ajustar' }, { 'Esc', 'Fechar', true } }
 
 local function drawMenu()
     local u = ui.u
@@ -2121,13 +2130,10 @@ local function drawMenu()
     S.menuAge = S.menuAge + 1
     -- Com a confirmacao aberta, as teclas sao dela (o menu nao pode consumi-las antes).
     local keys = S.confirm and {} or takeKeys(not fresh and keyboardFree())
-    if keys.tab then
-        S.tab = (S.tab - 1 + (keys.shift and #TABS - 1 or 1)) % #TABS + 1
-    end
 
     local _, screenY = getScreenResolution()
     local width = 640 * u
-    local height = math.min(screenY * 0.72, 540 * u)
+    local height = math.min(screenY * 0.72, 560 * u)
     ui.pushStyle()
     -- Com a confirmacao na frente, o menu nao recebe cliques (fica escurecido por baixo).
     local flags = S.confirm and imgui.WindowFlags.NoInputs or 0
@@ -2175,7 +2181,7 @@ local function drawMenu()
     local clicked = ui.endShell(MENU_HINTS)
     ui.popStyle()
 
-    if not keep or clicked == 3 or keys.escape then
+    if not keep or clicked == 2 or keys.escape then
         S.open = false
     end
 end
@@ -2256,10 +2262,10 @@ local function drawDialog()
     end
     if d.items then
         width = math.max(width, 420 * u)
-        content = content + #d.items * 30 * u
+        content = content + #d.items * 32 * u
     elseif d.rows then
         width = math.max(width, 480 * u)
-        content = content + 26 * u + #d.rows * 30 * u
+        content = content + 28 * u + #d.rows * 32 * u
     end
     local height = math.min(ui.headerHeight() + 18 * u + content + 18 * u + ui.footerHeight(), screenY * 0.8)
 
@@ -2426,6 +2432,10 @@ imgui.OnFrame(
     function()
         return rendererReady and uiActive() and not isPauseMenuActive()
     end,
+    function()
+        -- O Tab e do SA-MP (placar): o ImGui da vitrine nunca o ve apertado (senao pularia para um campo de texto).
+        imgui.GetIO().KeysDown[0x09] = false -- VK_TAB
+    end,
     function(frame)
         frame.HideCursor = false
         frame.LockPlayer = true
@@ -2448,7 +2458,7 @@ imgui.OnFrame(
 -- ---------------------------------------------------------------- teclado e comando
 
 local VK = {
-    TAB = 0x09, ENTER = 0x0D, SHIFT = 0x10, ESC = 0x1B, SPACE = 0x20,
+    TAB = 0x09, ENTER = 0x0D, ESC = 0x1B, SPACE = 0x20,
     LEFT = 0x25, UP = 0x26, RIGHT = 0x27, DOWN = 0x28, BACK = 0x08,
 }
 
@@ -2473,8 +2483,9 @@ end
 -- Teclado lido direto das mensagens da janela (como o WndProc do .asi): com a vitrine aberta o jogo
 -- e o SA-MP nao recebem as teclas, mas o mimgui continua recebendo. Teclas soltas (WM_KEYUP) sempre
 -- passam: sem o "soltar" a tecla ficaria presa no GTA. Setas repetem enquanto seguradas.
--- Excecoes: T e F6 abrem o chat do SA-MP (menos digitando num campo da vitrine), e com o chat ou um
--- dialogo do servidor aberto a vitrine larga o teclado para nao reagir ao que se digita la.
+-- Excecoes: T e F6 abrem o chat do SA-MP (menos digitando num campo da vitrine), o Tab abre o placar do
+-- SA-MP (sempre: a vitrine nao usa o Tab), e com o chat ou um dialogo do servidor aberto a vitrine larga o
+-- teclado para nao reagir ao que se digita la.
 local held = {}
 local CHAT_KEYS = { [0x54] = true, [0x75] = true } -- T, F6
 local sampKeyboardAt = -1
@@ -2516,9 +2527,6 @@ local function onKey(vk, repeated)
         else
             pending.escape = true
         end
-    elseif vk == VK.TAB then
-        pending.tab = true
-        pending.shift = held[VK.SHIFT] == true
     elseif vk >= 0x31 and vk <= 0x39 then pending.digit = vk - 0x30
     elseif vk >= 0x61 and vk <= 0x69 then pending.digit = vk - 0x60
     end
@@ -2537,6 +2545,9 @@ function onWindowMessage(msg, wparam, lparam)
     local used = keyDown or msg == 0x102 or msg == 0x20A
     if not used or not uiActive() or isPauseMenuActive() or sampOwnsKeyboard() then
         return
+    end
+    if wparam == VK.TAB and (keyDown or msg == 0x102) then
+        return -- Tab (e o "\t" que vem junto) segue para o SA-MP abrir o placar
     end
     local typing = imgui.GetIO().WantTextInput or ui.capturing ~= nil
     if not typing and ((keyDown and CHAT_KEYS[wparam]) or (msg == 0x102 and (wparam == 0x74 or wparam == 0x54))) then

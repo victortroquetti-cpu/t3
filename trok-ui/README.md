@@ -7,6 +7,8 @@ Dois mods de visualização com **todos os controles de menu da casa**, um em **
 | Lua | `lua/Trok UI Showcase.lua` | `/trokuilua` |
 | .asi | `asi/dist/Trok UI Showcase.asi` | `/trokui` (sem SA-MP 0.3.7 R1: **F10**) |
 | Trok Skin (.asi) | `skin/dist/Trok Skin.asi` | sozinho; `/trokskin` liga e desliga (ver [Trok Skin](#trok-skin-o-visual-da-casa-nos-mods-dos-outros)) |
+| Trok Tags (.asi) | `tags/dist/Trok Tags.asi` | sozinho; `/troktags` abre o menu (ver [Trok Tags](#trok-tags-nametags-balões-e-textos-fixos-da-casa)) |
+| Trok Veículos (.asi) | `veiculos/dist/Trok Veiculos.asi` | sozinho; `/trokveiculos` abre o menu (ver [Trok Veículos](#trok-veículos-a-placa-dos-veículos)) |
 
 Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diálogos**), diálogos de exemplo, confirmação, notificações e o modo de mover.
 
@@ -20,9 +22,9 @@ Os dois são a mesma vitrine, com 5 abas (**Linhas, Texto, Listas, Avisos, Diál
 
 ## Fonte e ícones
 
-- **Texto:** `font.ttf` em 3 tamanhos: corpo **16u**, título **20u** e descrição **13.5u** (números, valores, dicas, versão).
+- **Texto:** `font.ttf` em 3 tamanhos: corpo **17u**, título **18u** e pequeno **14.5u** (abas, botões, números, valores, dicas, versão).
 - **Ícones:** `lucide.ttf` em **18u** (e **13u** para os pequenos: check, lupa, setinha da lista suspensa). A 13u o traço do Lucide fica abaixo de 1 px, então a fonte pequena é carregada com `RasterizerMultiply = 1.6` para ter o mesmo peso da de 18u.
-- **Escala:** `u = max(0.55, altura_da_tela / 1080 * 0.85)`. Toda medida deste guia está em `u`.
+- **Escala:** `u = max(0.4675, altura_da_tela / 1080 * 0.7225)`, 15% menor que a conta do Kill List (`altura / 1080 * 0.85`, mínimo 0.55). Toda medida deste guia está em `u`.
 
 O `lucide.ttf` de `moonloader\resource\trok` é o Lucide completo: 1.796 ícones, nos códigos `U+E038` a `U+E74E` (área de uso particular). O `lucide-static` 1.53.0 traz 77 a mais, e os códigos antigos não mudam. O Dialogs e o Radar embutem um recorte com só 6 deles. O kit usa os códigos oficiais e desenha o glifo quando ele existe. Se o arquivo faltar, ou se for o recorte, desenha um substituto no mesmo traço:
 
@@ -60,26 +62,27 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 | `number` / hover / selecionado | branco 78 / 110 / 150 | número à esquerda da linha |
 | `strong` | `226` | "ligado": trilho do toggle, barra, marcas |
 | `ink` | `18` | texto e marca sobre o `strong` |
-| `marker` | branco 70 | ponto do valor padrão |
+| `marker` | branco 70 | tracinho do valor padrão |
 
 ### Medidas
 
-- **Janela:** cantos de 10u e padding de 18u × 16u. Configuração com abas: 640u de largura e altura de até 72% da tela. Configuração simples: 420u.
+- **Janela:** cantos de 10u e padding de 18u × 16u. Configuração com abas: 640u × 560u (no máximo 72% da altura da tela). Configuração simples: 420u.
 - **Cabeçalho (44u):** título e versão centralizados, divisor, X do lucide à direita. Arrastar pelo cabeçalho move a janela.
-- **Abas (34u):** largura igual para todas, texto em 13.5u e indicador de 2u que desliza sob a aba ativa (texto + 7u de cada lado).
-- **Linha (28u, intervalo de 2u):** recuo de 12u, número à esquerda, rótulo em 16u, controle à direita. Fundo da seleção e do hover com cantos de 6u.
+- **Abas (34u):** largura igual para todas, texto em 14.5u e indicador de 2u que desliza sob a aba ativa (texto + 7u de cada lado).
+- **Linha (30u, intervalo de 2u):** recuo de 12u, número à esquerda, rótulo em 17u, controle à direita. Fundo da seleção e do hover com cantos de 6u.
+- **Controles:** botão, segmentado, tecla, lista suspensa e campos com 26u de altura (texto em 14.5u); interruptor de 44u × 24u; amostra de cor de 36u × 22u; etiquetas de 22u; bolinha da barra com raio de 8u; itens dos menus flutuantes com 28u.
 - **Rodapé (36u):** faixa preta a 18% e dicas `Tecla Ação`, com 6u entre tecla e ação e 22u entre dicas. Na configuração ficam à esquerda; nos diálogos, à direita (`Enter Ok`, `Esc Cancelar`). Dicas clicáveis acendem no hover.
 - **Rolagem:** barra fina de 4u.
 
 ### Regras de comportamento
 
-1. **Teclado em tudo:** ↑/↓ escolhem a linha, ←/→ ajustam, Enter ativa, Espaço marca, Tab/Shift+Tab trocam de aba, 1–9 escolhem itens de lista, Esc fecha (primeiro o popup aberto, depois a janela). A linha escolhida pelo teclado rola para ficar visível.
+1. **Teclado em tudo:** ↑/↓ escolhem a linha, ←/→ ajustam, Enter ativa, Espaço marca, 1–9 escolhem itens de lista, Esc fecha (primeiro o popup aberto, depois a janela). A linha escolhida pelo teclado rola para ficar visível. O Tab não é do menu: no SA-MP ele abre o placar, então passa direto, e as abas trocam com o mouse. O mesmo vale para o T e o F6, que abrem o chat.
 2. **Valor padrão sempre marcado:**
    - **Barras:** linha vertical no ponto padrão (por baixo da bolinha), como no Trok Radar.
-   - **Setas e giro:** ponto sob o valor quando ele é o padrão.
-   - **Segmentado:** ponto sob a opção padrão.
+   - **Setas e giro:** tracinho discreto sob o valor quando ele é o padrão (8u × 1.5u, pontas arredondadas).
+   - **Segmentado:** tracinho sob a opção padrão.
    - **Lista suspensa:** etiqueta "padrão" na opção.
-   - **Cor:** a primeira amostra do seletor é a cor padrão, com o ponto.
+   - **Cor:** a primeira amostra do seletor é a cor padrão, com o tracinho.
    - **Todos:** **Restaurar** aparece à esquerda do controle quando o valor sai do padrão, e a dica mostra qual é o padrão.
 3. **Botões e cliques:** primeiro os botões invisíveis do controle (eles ganham o hover), depois o fundo da linha, e o desenho por último. Nada usa os widgets cinza do ImGui.
 4. **Primeiro quadro sem teclado:** o Enter que mandou o comando (ou abriu a tela) não aciona nada dentro dela.
@@ -159,11 +162,178 @@ Para achar o código de outro ícone: o nome está em [lucide.dev/icons](https:/
 - `Trok Skin.ini` (criado ao lado do .asi): `tema=1` e `fonte=1` ligam ou desligam o tema e a fonte. `manter=Título|Outro título` deixa janelas como o autor fez, e `manter_scripts=mod.lua|outro.lua` deixa scripts inteiros.
 - `Trok Skin.log` diz o que aconteceu: cada script pelo nome (padronizado ou intocado), cada janela com a decisão (padronizada, mantida, HUD transparente) e cada fonte trocada. A cada `/trokskin` sai um resumo por script. Se nenhum menu de outro mod apareceu ainda, o chat avisa.
 
-**Limites:** vale para mimgui e para o imgui antigo. Menus desenhados com `renderDrawBox` e os `.asi` ficam como estão. Como o layout não muda, menus de outros não ganham o que depende de saber o significado de cada opção (linhas numeradas, marca do padrão, dicas de tecla). A setinha de recolher do ImGui continua: ela só some mudando o comportamento da janela. No imgui antigo, texto desenhado com tamanho explícito (`AddText` com tamanho) não é compensado, e janelas filhas sem borda não ganham contorno nos campos (no 1.52 o contorno é da janela onde o campo está).
+**Versão de teste sem a barreira do layout: `skin/dist/Trok Skin Layout.asi`.** É o mesmo mod, já com `layout=1`, que também padroniza o que mexe no layout:
+- **Tamanho das fontes:** a primeira fonte de cada mod (a Trebuchet 14 do mimgui e do imgui antigo) vai para o tamanho de texto da casa, 17 × a escala da tela (12,3 px em 1080p, com a escala da casa). As outras fontes do mod, inclusive as embutidas, como ícones, acompanham na mesma proporção, então o título do mod continua maior que o texto.
+- **Espaçamentos do kit:** margem da janela 18 × 16, campos com 26 de altura, 6 entre um campo e outro (as linhas de 30 do kit), 8 entre o controle e o rótulo, recuo 12, barra de rolagem 6 e pegador do slider 10, tudo vezes a escala.
+- **Cara do kit:** cada janela padronizada troca a barra de título do ImGui pelo cabeçalho do kit: título centralizado na fonte de título, X à direita e a linha embaixo. As linhas separadoras do mod somem, e a do cabeçalho fica sendo a única linha da janela. Não há rodapé: nos menus da casa ele é a faixa das dicas de tecla, e menu de outro mod não tem dicas. Os controles mais comuns são desenhados como no kit:
+  - o botão fica com as medidas do kit: texto na fonte pequena (14,5), 26 de altura e 15 de folga de cada lado, fundo claro com contorno. Largura que o mod deu e cor que ele pôs no botão continuam;
+  - a caixa de marcar vira o interruptor (44 × 24);
+  - o slider vira a trilha fina com a bolinha e o valor ao lado;
+  - a lista suspensa ganha a caixa e o chevron do kit;
+  - o cabeçalho recolhível ganha o chevron no lugar do triângulo.
+
+  Cada controle mantém o id e o que devolve ao mod.
+- **Esc fecha:** como nos menus da casa, o Esc fecha primeiro a lista aberta e depois a janela em foco, como o X, e o jogo não recebe a tecla (o menu de pausa não abre junto). Com menus de mods diferentes abertos, fecha o que você abriu ou clicou por último. Janela sem X não fecha. O Esc fica com o jogo quando:
+  - nenhuma janela com X está em foco;
+  - você está digitando num campo;
+  - o menu de pausa está aberto;
+  - o chat ou um diálogo do SA-MP está na tela.
+
+  A skin lê o chat e os diálogos do SA-MP 0.3.7 R1. Nas outras versões, o Esc que fecha o chat pode fechar o menu junto.
+- **O que continua igual:** mods da casa, janelas `##trok`, `manter` e `manter_scripts`. O HUD transparente fica no mesmo lugar: os espaçamentos dele voltam aos do autor, só a fonte acompanha o script.
+- **O risco:** janela de tamanho fixo, coluna em posição fixa ou botão de largura fixa podem cortar texto ou sobrar espaço. Na janela de tamanho fixo, o cabeçalho do kit toma um pouco da altura e o fim do conteúdo pode passar a rolar. Janela que se ajusta ao conteúdo, como a do TKeyBinder, se acomoda sozinha.
+- **O Enter não seleciona:** menus do ImGui são de mouse e não têm linha selecionada. Para o Enter selecionar, os menus precisariam de navegação por teclado (setas movendo o destaque). Ela existe no mimgui, mas disputa as setas, o Enter e o espaço com o jogo, e o imgui antigo nem tem.
+
+Use **um dos dois** `.asi`, nunca os dois juntos: se os dois estiverem na pasta, o segundo a carregar se desliga e avisa no log. No `Trok Skin.ini`, a linha `layout=0` ou `layout=1` vale para qualquer um deles; sem a linha, vale o padrão de cada versão. O `/trokskin` desliga e religa os espaçamentos na hora; a fonte só volta ao recarregar os scripts.
+
+![TKeyBinder em 1080p: original, Trok Skin e Trok Skin Layout](docs/11-skin-layout.png)
+
+*O TKeyBinder em 1080p: original (esquerda), com o Trok Skin (meio) e com o Trok Skin Layout (direita).*
+
+**Limites:** vale para mimgui e para o imgui antigo. Menus desenhados com `renderDrawBox` e os `.asi` ficam como estão. Como o layout não muda, menus de outros não ganham o que depende de saber o significado de cada opção (linhas numeradas, marca do padrão, dicas de tecla). Na versão normal, a setinha de recolher do ImGui continua: ela só some mudando o comportamento da janela, o que a versão Layout faz ao trocar a barra de título pelo cabeçalho do kit. No imgui antigo, texto desenhado com tamanho explícito (`AddText` com tamanho) não é compensado, e janelas filhas sem borda não ganham contorno nos campos (no 1.52 o contorno é da janela onde o campo está).
 
 **Como funciona:**
 - **mimgui:** carrega uma DLL nativa só (`lib\mimgui\cimguidx9.dll`) que todos os scripts chamam. A skin desvia, com o MinHook, as funções dessa DLL que importam: início de quadro, abertura de janela, fontes e texto com tamanho explícito. O desvio entra no momento em que a DLL carrega, antes de qualquer script usar. A DLL fica presa na memória, para os desvios sobreviverem ao Ctrl+R.
-- **imgui antigo:** é um módulo C do Lua (`lib\MoonImGui.dll`) que cada script abre no seu próprio estado Lua pelo `require 'imgui'`. A skin desvia o `luaopen_MoonImGui` e, com a tabela do módulo pronta (antes do resto do `imgui.lua`), roda naquele script um ajuste em Lua (`skin/src/moon_patch.lua`, embutido no .asi). O ajuste troca três coisas, só pela API Lua do próprio moon_imgui: o renderizador (para saber o começo de cada quadro), o `imgui.Begin` e o `AddFontFromFileTTF` do atlas de fontes do script. Ler as 43 cores pela API custa uns 60 µs por janela. Por isso a skin lê o estilo pela FFI do LuaJIT, mas só depois de conferir que a FFI vê exatamente os mesmos valores que a API (senão fica na API); assim cai para uns 3 µs. O ajuste nunca mexe na pilha de push/pop do ImGui: no 1.52, um pop fora do lugar abre uma caixa de assert e trava o jogo. Qualquer erro desliga a skin só naquele script e devolve o visual dele.
+- **imgui antigo:** é um módulo C do Lua (`lib\MoonImGui.dll`) que cada script abre no seu próprio estado Lua pelo `require 'imgui'`. A skin desvia o `luaopen_MoonImGui` e, com a tabela do módulo pronta (antes do resto do `imgui.lua`), roda naquele script um ajuste em Lua (`skin/src/moon_patch.lua`, embutido no .asi). O ajuste troca três coisas, só pela API Lua do próprio moon_imgui: o renderizador (para saber o começo de cada quadro), o `imgui.Begin` e o `AddFontFromFileTTF` do atlas de fontes do script. Ler as 43 cores pela API custa uns 60 µs por janela. Por isso a skin lê o estilo pela FFI do LuaJIT, mas só depois de conferir que a FFI vê exatamente os mesmos valores que a API (senão fica na API); assim cai para uns 3 µs. O ajuste nunca mexe na pilha de push/pop do ImGui: no 1.52, um pop fora do lugar abre uma caixa de assert e trava o jogo. Os tamanhos de fonte e os espaçamentos que ele aplica ficam em múltiplos de 1/64 de pixel: o 1.52 decide se a lista suspensa abre para cima comparando, em float, o espaço embaixo dela com a altura dela, e com medidas quebradas essa conta erra no último bit e a lista abria para cima mesmo com espaço embaixo. Qualquer erro desliga a skin só naquele script e devolve o visual dele.
+- **Kit e Esc (versão Layout):** os controles do kit e o cabeçalho reaproveitam o id e o retorno de cada controle do mod. Por isso o valor muda, o slider arrasta e o X fecha como antes, e o teste confere tudo com mouse e teclado simulados.
+  - **Botão:** é o botão do próprio ImGui, com a fonte, a folga e as cores do kit empurradas só durante a chamada. Assim a repetição (`PushButtonRepeat`) e o alinhamento da linha continuam iguais.
+  - **Como o Esc chega à skin:** no mimgui, pelo `ImGui_ImplWin32_WndProcHandler`, por onde passam as teclas de cada script. Para o jogo não receber a tecla, a skin liga o `io.WantCaptureKeyboard`, e o próprio mimgui segura a mensagem. No imgui antigo, pelo `DispatchWindowMessage` do renderizador, onde a skin chama o `consumeWindowMessage`.
+  - **Fechar só a lista aberta:** no mimgui, a skin manda o "cancelar" da navegação do ImGui. No 1.52, devolve o foco à janela, e o próprio ImGui fecha o popup que ficou sem foco.
+  - **Qual menu recebe o Esc:** cada script tem o seu ImGui, e o clique que um segura o outro nem vê. Então a skin, que é uma só para todos, guarda qual menu foi aberto ou clicado por último, e só esse recebe o Esc.
+
+## Trok Tags: nametags, balões e textos fixos da casa
+
+`tags/dist/Trok Tags.asi` troca tudo o que o SA-MP desenha em cima dos personagens pelo desenho da casa:
+- a nametag (nome, ID, vida, colete e AFK);
+- os balões de fala (`SetPlayerChatBubble`);
+- os textos 3D que o servidor prende no jogador, como o "RG" do Horizonte RP.
+
+Também acrescenta indicadores que o SA-MP não tem: tempo de AFK, digitando, ping alto e vida baixa pulsando. Copie para a pasta do GTA (ou `scripts\`). Funciona só no SA-MP 0.3.7 R1: em qualquer outra versão não encosta em nada e diz o motivo no `Trok Tags.log`, ao lado do .asi.
+
+![Trok Tags numa rua](docs/12-tags-cena.png)
+
+![Estados da nametag](docs/13-tags-nametag.png)
+
+![Balões e textos fixos](docs/14-tags-baloes-fixos.png)
+
+*Capturas do teste de renderização (`tags/test/run.sh`), com a fonte e os ícones da casa, em 1080p.*
+
+**A regra: o Trok Tags nunca mostra mais do que o servidor mostraria.** Senão ele vira mod vantajoso.
+- **Nametag:** aparece só em quem o próprio SA-MP decidiu desenhar naquele quadro. O mod intercepta a chamada de desenho do SA-MP, que já passou por todos os limites do servidor: distância, parede, `ShowNameTags` e `ShowPlayerNameTagForPlayer`. Ninguém escondido aparece.
+- **Distância:** a do menu vai de 5 m até a do servidor, nunca além; dá só para diminuir.
+- **Textos fixos:** cada um respeita a distância e o "atrás de parede" que o servidor deu a ele, com o próprio teste de parede do SA-MP.
+- **Balões:** a distância de cada balão. Se o servidor esconde nametag atrás de parede, os balões somem atrás de parede também.
+- **Sigla e ID:** quando o servidor esconde a nametag (o Horizonte esconde e mostra o "RG"), o mod deixa o RG no estilo da casa e, só se você ligar na aba Fixos, põe a sigla do nome e o ID nas pontas dessa linha (`VI 48213 12`). O nome e o ID já estão no placar (Tab), então isso não dá vantagem. Vida, colete e AFK continuam só com a nametag do servidor.
+- **Diálogo do servidor ou placar (Tab) na tela:** o desenho some até eles fecharem. O Trok Tags desenha por cima de tudo e ficaria em cima deles (as nametags do SA-MP ficam atrás).
+- **Indicadores** vêm do que o SA-MP já tem:
+  - **AFK:** o status do jogador, o mesmo do ícone de pausa;
+  - **ping:** o do placar (com o indicador ligado, o mod faz a cada 10 s o mesmo pedido que o Tab faz);
+  - **digitando:** só quando o servidor manda um balão de "digitando...", porque o SA-MP não tem essa informação.
+
+**Etiquetas:**
+- `[conteúdo]` vira etiqueta no nome, nos balões e nos textos fixos.
+- `PALAVRA:` no começo de um texto fixo (o `RG:`) vira etiqueta, fica como texto ou some, como você escolher: `RG: 48213` mostra a etiqueta RG e o número.
+- `(( ... ))` no começo do balão vira a etiqueta OOC.
+- As cores `{RRGGBB}` do servidor continuam. Cor escura demais para ler sobre o fundo escuro é clareada.
+
+**Menu (`/troktags`):** abas Nametag, Balões, Fixos, Indicadores e Servidor. Setas escolhem e ajustam, Esc fecha.
+- **Nametag:** liga e desliga o mod, estilo (pílula ou limpo), cor do jogador (na faixa ou no nome), ID, vida e colete, etiquetas no nome, tamanho (80 a 130%), distância e desbotar com a distância.
+- **Balões:** estilo da casa, largura máxima, etiquetas, OOC e fundo.
+- **Fixos:** estilo da casa, etiquetas, a palavra do começo (etiqueta, texto ou escondida), cor da etiqueta (do texto, azul ou branca) e cor do texto (do servidor ou branco). Embaixo, para quem está sem a nametag do servidor: sigla do nome (não, 2 letras ou iniciais), ID do jogador e a cor dos dois (azul, branco ou a do texto). Elas entram na linha do texto fixo mais perto da cabeça, a que fica no lugar da nametag. Uma prévia mostra o resultado na hora.
+- **Indicadores:** AFK, tempo de AFK, digitando, ping alto (com o limite, padrão 250 ms) e vida baixa pulsando.
+- **Servidor:** só leitura. Mostra o que o servidor definiu (distância da nametag, parede, nametags ligadas) e as regras acima.
+
+![Menu: abas Fixos (com o exemplo do Horizonte ligado) e Servidor](docs/15-tags-menu.png)
+
+![A linha do RG com as escolhas da aba Fixos](docs/16-tags-sigla-id.png)
+
+**Escolhas por servidor:** ficam no `Trok Tags.ini`, ao lado do .asi, numa seção `[padrao]` e numa seção por servidor (`[ip:porta]`). Ao entrar num servidor vale o `[padrao]` com a seção dele por cima. Cada mudança é gravada nas duas, então um servidor novo começa com as últimas escolhas. As chaves são as do menu: `ligado`, `estilo`, `cor`, `id`, `barras`, `etiqueta_nome`, `tamanho`, `distancia` (0 = a do servidor), `desbotar`, `baloes`, `largura_balao`, `etiqueta_balao`, `ooc`, `opacidade_balao`, `fixos`, `etiqueta_fixo`, `palavra_fixo` (0 etiqueta, 1 texto, 2 escondida), `cor_etiqueta_fixo`, `cor_texto_fixo`, `sigla_fixo` (0 não, 1 duas letras, 2 iniciais), `id_fixo`, `cor_sigla_fixo` (0 azul, 1 branco, 2 a do texto), `afk`, `afk_tempo`, `digitando`, `ping`, `ping_limite` e `vida_baixa`.
+
+**Se algo der errado, o SA-MP volta sozinho:**
+- A troca só vale enquanto o desenho do Trok Tags está rodando. Se ele parar por 300 ms, o SA-MP volta a desenhar as nametags e os textos 3D. Os balões que o mod já tinha pego voltam para o SA-MP com o tempo que faltava.
+- Antes de mexer nos balões, o mod confere a estrutura deles: a memória tem que ser gravável e o "existe" de todos os 1004 jogadores tem que valer 0 ou 1. Se não conferir, os balões continuam os do SA-MP e o menu e o log avisam.
+- Desligar o Trok Tags, os balões ou os textos fixos no menu devolve aquela parte ao SA-MP na hora.
+
+**Como funciona:**
+- **Ganchos no `samp.dll` R1 (MinHook):**
+  - `CPlayerTags::DrawLabel` (`+0x686C0`) anota quem o SA-MP desenharia, com a cor e a distância, e não desenha;
+  - `CPlayerTags::DrawHealthBar` (`+0x689C0`) não desenha;
+  - `CLabelPool::Draw` (`+0x1340`) tira da vez do SA-MP só os textos 3D presos a jogadores que estão por perto (com personagem no jogo), e só durante o desenho dele. O `m_bNotEmpty` é zerado e volta logo depois, então os dados continuam lá para o resto do SA-MP.
+- **Balões:** no começo de cada quadro (`BeginScene` do d3d9, antes de o SA-MP desenhar), os balões novos são copiados e o "existe" deles é zerado.
+- **Desenho:** no Present, na mesma base da vitrine .asi. A posição é a do osso da cabeça (`CPed::GetBonePosition`) mais 25 cm, projetada com o `CSprite::CalcScreenCoors` do GTA.
+- **Endereços:** vêm dos cabeçalhos do R1 da [SAMP-API](https://github.com/BlastHackNet/SAMP-API) (compilados para imprimir os deslocamentos). Os balões são a única estrutura que a SAMP-API não mapeia no R1: o ponteiro (`+0x21A0DC`) vem da mesma posição relativa do R3 e é conferido no jogo, como acima.
+
+**Limites:**
+- Só no SA-MP 0.3.7 R1.
+- O "digitando" depende do servidor mandar o balão: o mod reconhece "digitando...", "escrevendo...", "typing...", "..." e parecidos, e troca pelos três pontinhos na nametag.
+- O tempo de AFK conta a partir de quando o mod viu a pausa, então quem já estava AFK quando você chegou começa do zero.
+- **Ainda não foi conferido dentro do GTA de verdade**, só no GTA de mentira e no renderizador por software (veja abaixo). O ponto mais sensível é o ponteiro dos balões. Se o `Trok Tags.log` disser "nao conferiu", os balões ficam os do SA-MP e o log diz o motivo.
+
+## Trok Veículos: a placa dos veículos
+
+`veiculos/dist/Trok Veiculos.asi` põe uma placa embaixo de cada veículo do SA-MP, no estilo da casa. A placa mostra nome do modelo, ID, vida, blindagem, pneus furados e se o veículo está trancado. Copie para a pasta do GTA (ou `scripts\`); `/trokveiculos` abre o menu. Funciona só no SA-MP 0.3.7 R1: em qualquer outra versão não faz nada e diz o motivo no `Trok Veiculos.log`, ao lado do .asi.
+
+![Trok Veículos numa rua](docs/17-veiculos-cena.png)
+
+![Estados da placa](docs/18-veiculos-estados.png)
+
+*Capturas do teste de renderização (`veiculos/test/run.sh`), com a fonte e os ícones da casa, em 1080p.*
+
+**A placa:**
+- **Linha de cima:** os pneus, o nome do modelo, o ID, o cadeado (trancado para você) e a vida em número. O número ganha o escudo quando tem blindagem e a chama quando o carro pega fogo. Quando tudo isso não cabe (nome comprido, ID de 4 dígitos, blindagem), a placa fica mais larga em vez de cortar o nome.
+- **Pneus:** só aparecem com pneu furado. É o chassi visto de cima, com a frente para cima e o pneu furado em vermelho; na moto são duas rodas.
+- **Barra azul:** a blindagem, que é a vida acima de 1000. No Horizonte, o carro blindado fica com 5000: 1000 do carro e 4000 de blindagem, que gasta primeiro. O teto da barra é o maior valor visto naquele carro, ou um valor fixo escolhido no menu.
+- **Barra da vida do motor (0 a 1000):** a cor segue a fumaça do GTA.
+  - branca acima de 650;
+  - âmbar com fumaça branca;
+  - laranja com fumaça preta (abaixo de 390);
+  - vermelha pulsando quando pega fogo (abaixo de 250, a marca na barra). O GTA explode o carro alguns segundos depois.
+- **O seu dano:** a parte da barra que saiu fica branca e escorre, e o número (`–120`) sobe e some.
+- **Linha de detalhes (opcional):** como no `/dl`, com número do modelo, distância e lugares.
+- **Vazio e longe:** veículo sem ninguém dentro fica com a placa mais apagada. Perto dos 20 m a placa vira só a barra e vai apagando, sem cortar de uma vez.
+
+**A regra: nunca mais do que o `/dl` mostraria.**
+- **Alcance:** até 20 m de você, o mesmo do `/dl`. O mod mede com a mesma função do SA-MP, e no menu dá só para diminuir.
+- **Informação:** só o que o `/dl` mostra (modelo, ID, vida, distância, lugares) e o que dá para ver no próprio carro (pneu furado, trancado).
+- **Parede:** atrás de parede a placa some, com o mesmo teste de parede que o SA-MP usa nos textos 3D. O `/dl` mostra através da parede; no menu, "Atrás de parede: Como o /dl" deixa igual a ele.
+- **Diálogo do servidor ou placar (Tab) na tela:** as placas somem até eles fecharem.
+
+**Mostrar: sempre ou ao dar dano.**
+- **Sempre:** toda placa dentro do alcance.
+- **Ao dar dano:** só a placa do veículo que você acertou. Ela some alguns segundos depois do último dano (6 s, ajustável de 3 a 15).
+- **Como o mod sabe que o dano foi seu:** a vida dos outros chega pelo sync, um pouco depois do tiro. Então conta como seu o dano que chega até 1,5 s depois de você atirar com a mira em cima do veículo, ou até 0,8 s depois de o seu veículo encostar nele. É uma dedução: se outra pessoa acertar o mesmo carro no mesmo instante, a placa também abre.
+
+**O seu veículo:** com "Esconder o meu" (padrão), o veículo em que você está, dirigindo ou de carona, não ganha placa.
+
+**Menu (`/trokveiculos`):** abas Exibir, Barras, Informações e Servidor. Setas escolhem e ajustam, Esc fecha.
+- **Exibir:** liga e desliga o mod, mostrar (sempre ou ao dar dano), quanto tempo a placa fica depois do dano, esconder o meu, veículos vazios, posição (embaixo ou em cima do veículo), tamanho, distância (5 a 20 m), atrás de parede (esconder ou como o `/dl`) e desbotar no fim do alcance.
+- **Barras:** blindagem, teto da blindagem (maior visto ou fixo), cores da fumaça e do fogo, linha do fogo, dano que você deu e número do dano, com uma prévia.
+- **Informações:** nome do modelo, ID, vida em número, pneus furados, cadeado e a linha de detalhes (número do modelo, distância e lugares), com uma prévia.
+- **Servidor:** só leitura. Mostra o endereço, o alcance do `/dl`, a sua distância e as regras acima.
+
+![Menu: abas Exibir e Informações](docs/19-veiculos-menu.png)
+
+**Escolhas por servidor:** ficam no `Trok Veiculos.ini`, ao lado do .asi, como no Trok Tags: `[padrao]` e uma seção por servidor (`[ip:porta]`). As chaves são as do menu: `ligado`, `mostrar` (0 sempre, 1 ao dar dano), `tempo_dano`, `esconder_meu`, `vazios`, `posicao` (0 embaixo, 1 em cima), `tamanho`, `distancia` (0 = os 20 m do `/dl`), `parede` (0 esconder, 1 como o `/dl`), `desbotar`, `blindagem`, `teto_blindagem` (0 maior visto, 1 fixo), `teto_fixo`, `cores`, `linha_fogo`, `dano_barra`, `dano_numero`, `nome`, `id`, `vida_numero`, `pneus`, `cadeado`, `det_modelo`, `det_distancia` e `det_lugares`.
+
+**Como funciona:**
+- **Só leitura:** o mod não esconde nem troca nada do SA-MP, e o `/dl` continua funcionando por fora. Não há gancho no samp.dll; só o Present e o Reset do d3d9 são desviados, para desenhar, como no Trok Tags.
+- **Veículos:** vêm da `CVehiclePool` do samp.dll R1. Os endereços foram conferidos compilando os cabeçalhos do R1 da SAMP-API: o veículo do SA-MP fica em `+0x1134`, o "existe" em `+0x3074` e o do GTA em `+0x4FB4`.
+- **Funções do próprio SA-MP:**
+  - `CEntity::GetDistanceToLocalPlayer`, a conta do `/dl`;
+  - `CVehicle::IsOccupied`, `IsWrecked` e `GetMaxPassengers`;
+  - `CLabel::HasNoObstacles`, o teste de parede;
+  - `CPed::IsInVehicle` e `GetVehicle`, para achar o seu veículo.
+- **Do GTA, só o que o samp.dll também lê:**
+  - a vida (`+0x4C0`);
+  - os pneus (`+0x5A5` no carro, `+0x65C` na moto);
+  - o tipo do veículo, pela vtable.
+- **Posição da placa:** os oito cantos da caixa do modelo são projetados na tela, e a placa fica embaixo do retângulo que eles formam.
+- **Alcance:** os 20 m saíram do código do `/dl` num samp.dll 0.3.7.
+
+**Limites:**
+- Só no SA-MP 0.3.7 R1.
+- "Ao dar dano" é uma dedução (veja acima). Conta o tiro do personagem e a batida do seu veículo; canhão de veículo (Rhino, Hunter) ainda não.
+- **Ainda não foi conferido dentro do GTA de verdade**, só no GTA de mentira e no renderizador por software (veja abaixo). O alcance de 20 m foi lido num samp.dll 0.3.7 de outra versão; no R1 ele precisa ser confirmado no jogo.
 
 ## Reaproveitar nos próximos mods
 
@@ -178,10 +348,10 @@ Duas regras que custaram caro na primeira versão:
 ## Compilar e testar
 
 - **.asi:** `asi/build.sh` baixa o Dear ImGui 1.89.9 e o MinHook e compila com MinGW (i686), gerando `asi/dist/Trok UI Showcase.asi`.
-- **.asi num GTA de mentira:** `asi/test/smoke/run.sh` roda o .asi no Wine 32 bits (com Xvfb) com um processo que expõe o device d3d9 nos endereços do `gta_sa.exe` e carrega um `samp.dll` falso com os endereços do 0.3.7 R1. Depois digita `/trokui` duas vezes e confere os pixels do back buffer: o menu tem que abrir por cima de tudo e fechar, e o cursor do SA-MP tem que ir para o modo 2 e voltar. Com o menu aberto, confere também quais teclas chegam ao jogo: o T chega, a seta não, e com o chat aberto tudo chega. São 5 cenários: device direto; proxy estilo SA-MP com dois ganchos de vtable na regra do Dialogs/Radar (lida no binário do Dialogs 2.28); sem `0xC8CF88`; só pela classe da janela; e um wrapper que esconde o device real.
+- **.asi num GTA de mentira:** `asi/test/smoke/run.sh` roda o .asi no Wine 32 bits (com Xvfb) com um processo que expõe o device d3d9 nos endereços do `gta_sa.exe` e carrega um `samp.dll` falso com os endereços do 0.3.7 R1. Depois digita `/trokui` duas vezes e confere os pixels do back buffer: o menu tem que abrir por cima de tudo e fechar, e o cursor do SA-MP tem que ir para o modo 2 e voltar. Com o menu aberto, confere também quais teclas chegam ao jogo: o T (chat) e o Tab (placar) chegam, a seta não, e com o chat aberto tudo chega. São 5 cenários: device direto; proxy estilo SA-MP com dois ganchos de vtable na regra do Dialogs/Radar (lida no binário do Dialogs 2.28); sem `0xC8CF88`; só pela classe da janela; e um wrapper que esconde o device real.
 - **Capturas sem o jogo:** `asi/test/run.sh <pasta>` roda a vitrine num rasterizador por software e salva PNGs de cada tela. Com `TROK_FONT=…/font.ttf TROK_ICONS=…/lucide.ttf`, usa a fonte e os ícones da casa (foi assim que as imagens acima foram geradas).
-- **Lua sem o jogo:** `cd lua && luajit test/mock_run.lua` roda todas as abas, popups, diálogos e o modo de mover num mimgui simulado. O teste confere se cada Push tem o seu Pop, se cada Begin tem End, os canais do draw list, os ids repetidos e os tipos dos argumentos. Também confere que nenhum campo mostra o rótulo do ImGui (o id tem que começar com `##`), que o mimgui inicializa sozinho e as regras do chat acima.
-- **Trok Skin:** `skin/build.sh` gera `skin/dist/Trok Skin.asi`. `skin/test/run.sh` compila o `cimguidx9.dll` do mimgui 1.7.1 a partir das fontes dele e roda, no Wine, um "moonloader" de mentira com quatro scripts: um com tema claro (e "Trok" no nome, sem o kit), um com fundo vermelho empurrado e texto e botão vermelhos, um HUD transparente e um mod da casa renomeado (`casa.lua`, com janela `##trok`). São 58 verificações. Entre elas:
+- **Lua sem o jogo:** `cd lua && luajit test/mock_run.lua` roda todas as abas, popups, diálogos e o modo de mover num mimgui simulado. O teste confere se cada Push tem o seu Pop, se cada Begin tem End, os canais do draw list, os ids repetidos e os tipos dos argumentos. Também confere que nenhum campo mostra o rótulo do ImGui (o id tem que começar com `##`), que o mimgui inicializa sozinho, as regras do chat acima e que o Tab vai para o SA-MP sem o ImGui da vitrine ver.
+- **Trok Skin:** `skin/build.sh` gera `skin/dist/Trok Skin.asi` e a versão de teste `skin/dist/Trok Skin Layout.asi` (o mesmo código, com `layout=1` de fábrica). `skin/test/run.sh` compila o `cimguidx9.dll` do mimgui 1.7.1 a partir das fontes dele e roda, no Wine, um "moonloader" de mentira com quatro scripts: um com tema claro (e "Trok" no nome, sem o kit), um com fundo vermelho empurrado e texto e botão vermelhos, um HUD transparente e um mod da casa renomeado (`casa.lua`, com janela `##trok`). São 127 verificações. Entre elas:
   - os retângulos de todos os controles ficam idênticos com o tema;
   - a tela desligada é idêntica, pixel a pixel, à sem a skin;
   - `/trokskin` desliga e religa na hora;
@@ -189,12 +359,49 @@ Duas regras que custaram caro na primeira versão:
   - o texto com a fonte da casa tem a mesma largura (até 6%);
   - tudo continua igual depois de descarregar e recarregar a DLL;
   - um ImGui de outra versão é recusado;
-  - a fonte abre numa pasta com acento.
-- **Trok Skin no imgui antigo:** `skin/test/moon/run.sh` compila o LuaJIT 2.1 como `lua51.dll` (precisa do gcc com multilib) e baixa o moon_imgui 1.1.5 (`imgui.lua` + `MoonImGui.dll`) de uma cópia pública, conferindo o SHA-256. Com `MOONIMGUI_DIR=…\moonloader\lib`, usa os do jogo. No Wine, cada script roda no seu estado Lua com o `imgui.lua` de verdade, como no moonloader, nos mesmos quatro papéis do teste do mimgui (o mod da casa renomeado usa a pasta `resource\trok`, como os de verdade). São 74 verificações: as mesmas do mimgui, mais o host terminar (um assert do 1.52 travaria numa caixa de mensagem), os campos que o 1.52 deixa a 30% irem para o fundo da casa, a borda e o divisor do título, e o Ctrl+R com todos os scripts fechando e abrindo de novo.
+  - a fonte abre numa pasta com acento;
+  - a versão Layout dá ao texto, aos campos, ao espaço entre linhas e à margem exatamente as medidas do kit, deixa o HUD no lugar e o mod da casa idêntico, pixel a pixel;
+  - a versão Layout tem o cabeçalho, o botão, o interruptor e o slider do kit, e não tem rodapé nem a linha separadora no meio;
+  - com mouse e teclado simulados (o clique e a tecla chegam como no jogo, e o script que segura um esconde dos outros):
+    - o interruptor, o slider e o botão mudam os valores do mod;
+    - o Esc fecha primeiro a lista aberta, depois a janela, e a tecla pega não chega ao jogo;
+    - o Esc nunca age com o chat do SA-MP aberto, nem no menu de outro script quando você mexeu por último em outro;
+    - o X do cabeçalho fecha;
+    - na versão normal, o Esc continua só do jogo.
+- **Trok Skin no imgui antigo:** `skin/test/moon/run.sh` compila o LuaJIT 2.1 como `lua51.dll` (precisa do gcc com multilib) e baixa o moon_imgui 1.1.5 (`imgui.lua` + `MoonImGui.dll`) de uma cópia pública, conferindo o SHA-256. Com `MOONIMGUI_DIR=…\moonloader\lib`, usa os do jogo. No Wine, cada script roda no seu estado Lua com o `imgui.lua` de verdade, como no moonloader, nos mesmos quatro papéis do teste do mimgui (o mod da casa renomeado usa a pasta `resource\trok`, como os de verdade). São 145 verificações: as mesmas do mimgui (com os mesmos cliques e teclas), mais o host terminar (um assert do 1.52 travaria numa caixa de mensagem), os campos que o 1.52 deixa a 30% irem para o fundo da casa, a borda e o divisor do título, o Ctrl+R com todos os scripts fechando e abrindo de novo, e a versão Layout com as mesmas medidas do kit.
+- **Trok Tags:** `tags/build.sh` gera `tags/dist/Trok Tags.asi` (usa o kit e as dependências da vitrine .asi). `tags/test/run.sh <pasta> [fundo.png]` desenha num rasterizador por software a cena, os estados, os estilos, a linha do RG com a sigla e o ID e as abas do menu (as imagens acima saíram dele, com `TROK_FONT`/`TROK_ICONS`). Também confere a sigla do nome (2 letras e iniciais, sem a etiqueta do começo).
+- **Trok Tags num GTA de mentira:** `tags/test/smoke/run.sh` roda o .asi no Wine 32 bits com um processo que faz o papel do GTA e do SA-MP:
+  - um `samp.dll` falso com os endereços do R1, em que as funções de desenho só contam quantas vezes foram chamadas;
+  - as estruturas que o mod lê: `CNetGame` conectado em `127.0.0.1:7777`, pools, quatro jogadores remotos (um deles sem nametag, só com o RG), textos 3D e balões;
+  - o `CalcScreenCoors` e o `GetBonePosition` do GTA.
+
+  A cada quadro ele chama o desenho do SA-MP entre `BeginScene` e `EndScene` e depois o Present. O teste confere, entre outras coisas:
+  - as nametags e barras do SA-MP somem e os textos 3D presos ao jogador saem só durante o desenho dele (os do mundo e os de jogador fora de alcance ficam);
+  - o balão passa para o Trok Tags;
+  - os pixels em cima de cada cabeça: quem o servidor deixa sem nametag fica só com o RG, e a sigla e o ID só entram nele quando ligados;
+  - parar o Present devolve tudo ao SA-MP, balões incluídos, e voltar o Present retoma;
+  - o ping é pedido uma vez, o diálogo do servidor esconde o desenho e o `/troktags` abre e fecha o menu com o cursor do SA-MP.
+
+  São 6 cenários: device direto, proxy estilo SA-MP, `ligado=0`, `samp.dll` de outra versão, estrutura de balões que não confere e sigla e ID ligados.
+- **Trok Veículos:** `veiculos/build.sh` gera `veiculos/dist/Trok Veiculos.asi`. `veiculos/test/run.sh <pasta> [fundo.png]` desenha a cena, os estados e as quatro abas do menu num rasterizador por software (as imagens acima saíram dele) e confere o pneu furado em vermelho.
+- **Trok Veículos num GTA de mentira:** `veiculos/test/smoke/run.sh` roda o .asi no Wine com um processo que faz o papel do GTA e do SA-MP:
+  - uma `CVehiclePool` com 6 veículos;
+  - o personagem local dentro do próprio carro;
+  - as funções do R1 que o mod chama, caindo em funções do teste.
+
+  O teste confere:
+  - a placa embaixo de cada veículo até 20 m e não além;
+  - o seu carro escondido e o carro atrás da parede escondido (e mostrado com "como o /dl");
+  - pneu furado em vermelho, blindagem em azul e fogo em vermelho;
+  - o diálogo do servidor escondendo as placas;
+  - "ao dar dano" abrindo só a placa do veículo que você acertou, com o `–120`, e fechando depois;
+  - o `/trokveiculos` abrindo e fechando o menu.
+
+  São 4 cenários e 70 verificações.
 - **Lua em ASCII:** `python3 tools/lua_ascii.py "lua/Trok UI Showcase.lua"` converte acentos em escapes `\ddd`, como no Kill List.
 
 > O .asi passa nos 5 cenários do GTA de mentira, com o d3d9 de verdade do Wine. A versão anterior falhava nos cenários sem `0xC8CF88`, com o mesmo sintoma relatado: o comando funciona e nada aparece. O Lua passa no mimgui simulado, que agora imita a inicialização preguiçosa. Dentro do GTA de verdade, os dois ainda precisam ser conferidos.
 
 ## Terceiros
 
-O .asi inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). O teste do imgui antigo baixa o [LuaJIT](https://github.com/LuaJIT/LuaJIT) (MIT, © Mike Pall) e o moon_imgui (© FYP), que não vão no repositório nem no .asi. As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.
+O .asi (e o Trok Tags e o Trok Veículos) inclui o [Dear ImGui](https://github.com/ocornut/imgui) 1.89.9 (MIT, © Omar Cornut) e o [MinHook](https://github.com/TsudaKageyu/minhook) (BSD 2-Clause, © Tsuda Kageyu; o HDE32 dentro dele é © Vyacheslav Patkov). O Trok Skin inclui o MinHook e o `imstb_truetype.h` do Dear ImGui (stb_truetype, domínio público/MIT, © Sean Barrett) e usa os headers do Dear ImGui 1.72 para ler os structs do mimgui ([mimgui](https://github.com/THE-FYP/mimgui), MIT, © FYP). Os endereços e estruturas do SA-MP 0.3.7 R1 do Trok Tags e do Trok Veículos foram conferidos com os cabeçalhos da [SAMP-API](https://github.com/BlastHackNet/SAMP-API) (MIT, © LUCHARE e BlastHack), que não vai no .asi. O teste do imgui antigo baixa o [LuaJIT](https://github.com/LuaJIT/LuaJIT) (MIT, © Mike Pall) e o moon_imgui (© FYP), que não vão no repositório nem no .asi. As licenças completas vêm junto com o código baixado pelo `asi/build.sh` em `asi/third_party/`.

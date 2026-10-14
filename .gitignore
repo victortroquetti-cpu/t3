@@ -5,6 +5,10 @@ trok-ui/asi/test/out/
 trok-ui/skin/third_party/
 trok-ui/skin/build/
 trok-ui/skin/test/out/
+trok-ui/tags/build/
+trok-ui/tags/test/out/
+trok-ui/veiculos/build/
+trok-ui/veiculos/test/out/
 
 # Trok Shadows
 trok-shadows/build/
@@ -18,3 +22,7 @@ trok-shadows-menu/test/original/
 # Trok Chat
 trok-chat/build/
 trok-chat/test/out/
+
+# Trok Hitmarker
+trok-hit/build/
+trok-hit/test/out/

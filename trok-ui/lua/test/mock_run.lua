@@ -96,7 +96,7 @@ end
 
 local io = {
     Fonts = {}, ConfigFlags = 0, DeltaTime = 1 / 60, MousePos = vec(0, 0), MouseDelta = vec(0, 0),
-    WantTextInput = false, MouseDrawCursor = false,
+    WantTextInput = false, MouseDrawCursor = false, KeysDown = {},
 }
 local fontFiles = {}
 function io.Fonts:GetGlyphRangesCyrillic() return 'cyrillic' end
@@ -240,8 +240,10 @@ end })
 local initCallback
 local frames = {}
 imgui.OnInitialize = function(cb) initCallback = cb end
-imgui.OnFrame = function(cond, draw)
-    local f = { cond = cond, draw = draw, HideCursor = true }
+-- Como o mimgui: OnFrame(condicao, desenho) ou OnFrame(condicao, antes do quadro, desenho).
+imgui.OnFrame = function(cond, before, draw)
+    if not draw then before, draw = nil, before end
+    local f = { cond = cond, before = before, draw = draw, HideCursor = true }
     frames[#frames + 1] = f
     return f
 end
@@ -312,6 +314,12 @@ local function step(opts)
                 check(#fontFiles >= 5, 'fontes da casa nao carregadas (' .. #fontFiles .. ')')
                 break
             end
+        end
+    end
+    for i, f in ipairs(frames) do
+        if initialized and wants[i] and f.before then
+            local okb, errb = pcall(f.before, f)
+            if not okb then fail('antes do quadro: ' .. tostring(errb)) end
         end
     end
     for i, f in ipairs(frames) do
@@ -416,9 +424,16 @@ local function sent(msg, vk)
 end
 check(not sent(0x100, 0x54) and not sent(0x102, 0x74), 'T nao chegou ao SA-MP com a vitrine aberta')
 check(not sent(0x100, 0x75), 'F6 nao chegou ao SA-MP com a vitrine aberta')
+-- Tab e do SA-MP (placar): passa sempre, ate digitando num campo, e o ImGui da vitrine nunca o ve apertado.
+check(not sent(0x100, 0x09) and not sent(0x102, 0x09), 'Tab nao chegou ao SA-MP (placar) com a vitrine aberta')
+io.KeysDown[0x09] = true
+run(1)
+check(io.KeysDown[0x09] == false, 'o ImGui da vitrine viu o Tab apertado (pularia para um campo de texto)')
+check(not texts['Trocar de aba'], 'a dica de Tab (trocar de aba) ainda aparece no rodape')
 check(sent(0x100, 0x28), 'seta para baixo deveria ficar na vitrine')
 io.WantTextInput = true
 check(sent(0x100, 0x54) and sent(0x102, 0x74), 'T digitado num campo da vitrine vazou para o SA-MP')
+check(not sent(0x100, 0x09), 'Tab digitando num campo nao chegou ao SA-MP (placar)')
 io.WantTextInput = false
 chatOpen = true
 check(not sent(0x100, 0x28) and not sent(0x100, 0x0D) and not sent(0x102, 0x31), 'vitrine segurou tecla com o chat aberto')

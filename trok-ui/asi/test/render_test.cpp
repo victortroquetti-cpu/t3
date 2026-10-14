@@ -2,6 +2,7 @@
 // software e grava PPMs. Uso: ./render_test <pasta de saida>
 #include "imgui.h"
 #include "showcase.h"
+#include "trok_ui.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -91,6 +92,23 @@ static void Click(float x, float y) {
     io.AddMouseButtonEvent(0, true); Frame(); io.AddMouseButtonEvent(0, false); Frame();
 }
 static void Idle(int n) { for (int i = 0; i < n; ++i) Frame(); }
+// Ponto dentro do menu dado na escala em que o roteiro foi medido (u = 900/1080*0.85) e levado para a escala atual:
+// o menu fica no meio da tela e tudo nele escala com u, entao o mouse continua em cima do mesmo item.
+static void MouseIn(float x, float y) {
+    float k = tui::u / (900 / 1080.0f * 0.85f);
+    Mouse(W * 0.5f + (x - W * 0.5f) * k, H * 0.5f + (y - H * 0.5f) * k);
+}
+// Troca de aba com um clique (o Tab e do SA-MP: abre o placar). As 5 abas dividem a largura do menu, que fica no
+// meio da tela; depois o mouse volta para onde estava, para as telas seguintes nao mudarem. Leva 5 quadros (a tecla
+// levava 2): quem chama espera 3 a menos depois, para as animacoes chegarem iguais as telas.
+static void ClickTab(int i, float backX, float backY) {
+    float u = tui::u;
+    float width = 640 * u, height = std::min(H * 0.72f, 560 * u);
+    float x = W * 0.5f - std::ceil(width) * 0.5f + 18 * u, y = H * 0.5f - std::ceil(height) * 0.5f + tui::HeaderHeight();
+    float tabW = (width - 36 * u) / 5;
+    Click(x + tabW * (i + 0.5f), y + tui::TabsHeight() * 0.5f);
+    MouseIn(backX, backY);
+}
 
 int main(int argc, char** argv) {
     std::string dir = argc > 1 ? argv[1] : ".";
@@ -109,7 +127,7 @@ int main(int argc, char** argv) {
     Frame();
     io.AddKeyEvent(ImGuiKey_Enter, false);
     Idle(30);
-    Mouse(800, 330);
+    MouseIn(800, 330);
     Idle(20);
     Frame(true, dir + "/01_linhas.ppm");
     for (int i = 0; i < 6; ++i) Key(ImGuiKey_DownArrow);
@@ -126,17 +144,17 @@ int main(int argc, char** argv) {
     Key(ImGuiKey_Escape); Key(ImGuiKey_DownArrow); Key(ImGuiKey_Enter); Idle(20);
     Frame(true, dir + "/04b_dropdown.ppm");
     Key(ImGuiKey_Escape); Idle(5);
-    Key(ImGuiKey_Tab); Idle(30);
+    ClickTab(1, 800, 330); Idle(27);
     Frame(true, dir + "/05_texto.ppm");
     Key(ImGuiKey_DownArrow); Key(ImGuiKey_Enter);
     io.AddInputCharactersUTF8("segredo123"); Idle(10);
     Frame(true, dir + "/06_texto_digitando.ppm");
     Key(ImGuiKey_Escape); Idle(5);
-    Key(ImGuiKey_Tab); Idle(30);
+    ClickTab(2, 800, 330); Idle(27);
     Key(ImGuiKey_3); Idle(10);
     Frame(true, dir + "/07_listas.ppm");
-    Key(ImGuiKey_Tab); Idle(30);
-    Mouse(700, 480); Idle(40);
+    ClickTab(3, 800, 330); Idle(27);
+    MouseIn(700, 480); Idle(40);
     Frame(true, dir + "/08_avisos.ppm");
     for (int i = 0; i < 6; ++i) Key(ImGuiKey_DownArrow);
     Key(ImGuiKey_Enter); Idle(20);
@@ -144,7 +162,7 @@ int main(int argc, char** argv) {
     Key(ImGuiKey_Escape); Idle(5);
     Key(ImGuiKey_UpArrow); Key(ImGuiKey_Enter); Idle(15);
     Frame(true, dir + "/10_toast.ppm");
-    Key(ImGuiKey_Tab); Idle(20);
+    ClickTab(4, 700, 480); Idle(17);
     Key(ImGuiKey_DownArrow); Key(ImGuiKey_DownArrow); Key(ImGuiKey_Enter); Idle(20);
     io.AddInputCharactersUTF8("abc123"); Idle(5);
     Frame(true, dir + "/11_dialogo_senha.ppm");
@@ -158,12 +176,12 @@ int main(int argc, char** argv) {
     Key(ImGuiKey_UpArrow); Key(ImGuiKey_UpArrow); Key(ImGuiKey_UpArrow); Key(ImGuiKey_UpArrow); Key(ImGuiKey_Enter); Idle(15);
     Frame(true, dir + "/14_dialogo_mensagem.ppm");
     Key(ImGuiKey_Enter); Idle(10);
-    Key(ImGuiKey_Tab); Idle(20);
+    ClickTab(0, 700, 480); Idle(17);
     for (int i = 0; i < 12; ++i) Key(ImGuiKey_UpArrow);
     Key(ImGuiKey_Enter); Idle(10);
     Frame(true, dir + "/15_mover.ppm");
     // Arrasta a previa (canto superior direito por padrao) ate o meio da tela.
-    float px = W - 0.708f * (260 + 40) + 40, py = 0.708f * 120 + 20;
+    float px = W - tui::u * (260 + 40) + 40, py = tui::u * 120 + 20;
     io.AddMousePosEvent(px, py); Frame();
     io.AddMouseButtonEvent(0, true); Frame();
     for (int i = 1; i <= 20; ++i) { io.AddMousePosEvent(px - i * 30, py + i * 15); Frame(); }
