@@ -314,32 +314,6 @@ static void BoardNumbers(ImDrawList* dl) {
           "\"~46\": o servidor n\xC3\xA3o mostrou a vida do alvo caindo (vida escondida), ent\xC3\xA3o vale o n\xC3\xBAmero do GTA, com o ~ na frente.");
 }
 
-static void ExtraMove(ImDrawList* dl) {
-    // modo Mover: cada coisa com uma moldura tracejada que o mouse arrasta
-    struct Box {
-        ImVec2 a, b;
-        const char* name;
-    } boxes[] = {{{1142, 370}, {1478, 560}, "Informer: dado"},
-                 {{432, 370}, {778, 560}, "Informer: levado"}};
-    for (const Box& b : boxes) {
-        for (float x = b.a.x; x < b.b.x; x += 14) {
-            dl->AddLine(ImVec2(x, b.a.y), ImVec2(std::min(x + 7, b.b.x), b.a.y), IM_COL32(255, 255, 255, 160), 1.5f);
-            dl->AddLine(ImVec2(x, b.b.y), ImVec2(std::min(x + 7, b.b.x), b.b.y), IM_COL32(255, 255, 255, 160), 1.5f);
-        }
-        for (float y = b.a.y; y < b.b.y; y += 14) {
-            dl->AddLine(ImVec2(b.a.x, y), ImVec2(b.a.x, std::min(y + 7, b.b.y)), IM_COL32(255, 255, 255, 160), 1.5f);
-            dl->AddLine(ImVec2(b.b.x, y), ImVec2(b.b.x, std::min(y + 7, b.b.y)), IM_COL32(255, 255, 255, 160), 1.5f);
-        }
-        Small(dl, b.a.x + 4, b.a.y - 20, b.name);
-    }
-    const char* help = "Arraste cada caixa  |  Esc ou bot\xC3\xA3o direito cancela";
-    ImVec2 ts = tui::TextSize(tui::fonts.desc, help);
-    ImVec2 c(960, 1000);
-    dl->AddRectFilled(ImVec2(c.x - ts.x * 0.5f - 16, c.y - 15), ImVec2(c.x + ts.x * 0.5f + 16, c.y + 15),
-                      IM_COL32(14, 16, 20, 225), 15);
-    tui::Text(dl, tui::fonts.desc, c.x - ts.x * 0.5f, c.y - ts.y * 0.5f, IM_COL32(255, 255, 255, 220), help);
-}
-
 static void Menu(int tab, const std::string& out, int x0, int x1) {
     ImGuiIO& io = ImGui::GetIO();
     menu::SetTab(tab);
@@ -487,10 +461,25 @@ int main(int argc, char** argv) {
     Check(Lit(930, 512, 990, 568, 0.5f) > 40, "hitmarker na mira centralizada");
     o = opt::Options();
 
-    // 9. Modo Mover: cada caixa com um exemplo dentro
-    s = Fight();
-    Frame(s, true, 0.8f, ExtraMove);
-    Save(dir + "/09-mover.ppm", 380, 290, 1540, 1040);
+    // 9. Modo Mover (o do menu): as duas caixas do informer, com um exemplo dentro, arrastadas com o mouse
+    menu::StartMove();
+    for (int f = 0; f < 3; ++f) {
+        io.DeltaTime = 1.0f / 60.0f;
+        io.AddMousePosEvent(1300, 470);
+        ImGui::NewFrame();
+        menu::Frame();
+        ImGui::Render();
+    }
+    Clear(0.8f);
+    Render(ImGui::GetDrawData());
+    Save(dir + "/09-mover.ppm", 380, 290, 1540, 1080);
+    Check(Lit(1150, 380, 1480, 560, 0.45f) > 300, "mover: exemplo do informer dado na caixa dele");
+    for (bool down : {true, false}) { // Esc: sai sem mudar nada
+        io.AddKeyEvent(ImGuiKey_Escape, down);
+        ImGui::NewFrame();
+        menu::Frame();
+        ImGui::Render();
+    }
 
     // 10-11. Menu
     menu::Toggle();

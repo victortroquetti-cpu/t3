@@ -32,6 +32,11 @@ struct State {
     Shell shell;
     int age = 0;
     int preset = 0;
+    int request = REQ_NONE;
+    // Mover: as duas caixas do informer andam com o mouse; Enter grava, Esc ou o botao direito desiste.
+    bool moving = false;
+    int drag = -1; // 0 dado, 1 levado
+    opt::Place place[2];
 } S;
 
 Keys ReadKeys(bool allowed) {
@@ -61,8 +66,7 @@ void MoveSelection(int* selected, int count, const Keys& k, Rows& rows) {
     }
 }
 
-// Previa embaixo da aba: os quatro hitmarkers parados no meio da animacao, com o nome de cada um.
-// Previa embaixo da aba: a mira e os quatro sinais de acerto parados no meio da animacao, com o nome de cada um.
+// Previa no alto da aba: a mira e os quatro sinais de acerto parados no meio da animacao, com o nome de cada um.
 void MarkerPreview(float x, float w) {
     opt::Options& o = opt::Get();
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -81,6 +85,27 @@ void MarkerPreview(float x, float w) {
     }
     ImGui::Dummy(ImVec2(w, h + 4 * u));
 }
+
+// Configuracao pronta: so liga e desliga as partes (cores, sons, imagens, tamanhos e posicoes ficam).
+void ApplyPreset(int preset) {
+    opt::Options& o = opt::Get();
+    o.preset = preset;
+    o.enabled = true;
+    o.informer = 0;
+    o.combo = true;
+    if (preset == 0) { // Trok
+        o.onAim = o.fxHit = o.fxArmour = o.fxHead = o.fxKill = true;
+        o.numbers = 0;
+        o.numbersSum = true;
+        o.hitLocal = true;
+        o.direction = o.edgeFlash = true;
+    } else { // Damage Informer
+        o.numbers = 2;
+        o.hitLocal = false;
+    }
+}
+
+void BeginMove();
 
 void TabMira(Rows& r, float x, float w) {
     opt::Options& o = opt::Get();
@@ -104,7 +129,9 @@ void TabMira(Rows& r, float x, float w) {
            "Colete, cabe\xC3\xA7" "a e abate desligados mostram a imagem do acerto normal naquele tiro. Desligar o "
            "Acerto tira o sinal dos tiros normais (os ligados continuam).");
     r.Section("Imagens");
-    r.Action("Pasta das imagens", "Abrir pasta");
+    if (r.Action("Pasta das imagens", "Abrir pasta")) {
+        S.request = REQ_OPEN_IMAGES;
+    }
     r.Info("Trocar o visual",
            "Cada coisa \xC3\xA9 um PNG na pasta Trok Hitmarker\\mira: mira, acerto, colete, cabeca, abate e corpo (o X "
            "do local do acerto). Edite ou troque o arquivo; apagou, volta a imagem padr\xC3\xA3o. Qualquer resolu\xC3\xA7\xC3\xA3o "
@@ -150,6 +177,10 @@ void TabInformer(Rows& r) {
     r.Toggle("AFK no lugar do dano", &o.afk);
     r.Toggle("Combo (acertos e dano somado)", &o.combo);
     r.Slider("Combo fecha depois de", &o.comboWindow, 1, 10, 1, "%d s", d.comboWindow);
+    r.Slider("Tamanho", &o.informerSize, 50, 200, 10, "%d%%", d.informerSize);
+    if (r.Action("Posi\xC3\xA7\xC3\xA3o na tela", "Mover")) {
+        BeginMove();
+    }
 }
 
 void TabRecebido(Rows& r) {
@@ -176,8 +207,12 @@ void TabSons(Rows& r) {
     r.Toggle("Abate na cabe\xC3\xA7" "a", &o.sKillHead);
     r.Toggle("Morte", &o.sDeath);
     r.Slider("Volume", &o.volume, 0, 100, 5, "%d%%", d.volume);
-    r.Action("Ouvir os sons", "Tocar");
-    r.Action("Pasta dos sons", "Abrir pasta");
+    if (r.Action("Ouvir os sons", "Tocar")) {
+        S.request = REQ_PLAY_SOUNDS;
+    }
+    if (r.Action("Pasta dos sons", "Abrir pasta")) {
+        S.request = REQ_OPEN_SOUNDS;
+    }
     r.Info("Trocar um som",
            "Ponha um .mp3 ou .wav com o mesmo nome na pasta Trok Hitmarker\\sons: acerto, cabeca, dano_levado, abate, "
            "abate_cabeca e morte. Vale na hora, sem reiniciar o jogo.");
@@ -188,21 +223,189 @@ void TabGeral(Rows& r) {
     r.Toggle("Trok Hitmarker ligado", &o.enabled);
     static const char* const presets[] = {"Trok", "Damage Informer"};
     r.Cycle("Configura\xC3\xA7\xC3\xA3o pronta", &S.preset, presets, 2, 0);
-    r.Action("Aplicar a configura\xC3\xA7\xC3\xA3o", "Aplicar");
+    if (r.Action("Aplicar a configura\xC3\xA7\xC3\xA3o", "Aplicar")) {
+        ApplyPreset(S.preset);
+        Toast(presets[S.preset], "Configura\xC3\xA7\xC3\xA3o aplicada. Cores, sons e imagens ficaram como estavam.");
+    }
     r.Info("O que cada uma liga",
-           "Trok: sinal na mira, local do acerto, n\xC3\xBAmeros saindo do alvo, seta e borda de dano recebido. Damage "
-           "Informer: o informer cl\xC3\xA1ssico (nick e n\xC3\xBAmero subindo, com o combo), sem n\xC3\xBAmeros no alvo. "
-           "As imagens da mira n\xC3\xA3o mudam: o visual \xC3\xA9 o dos PNG da pasta.");
-    r.Action("Posi\xC3\xA7\xC3\xB5" "es na tela", "Mover");
+           "Trok: sinal na mira, local do acerto, n\xC3\xBAmeros saindo do alvo, informer cl\xC3\xA1ssico, seta e borda "
+           "de dano recebido. Damage Informer: s\xC3\xB3 o informer cl\xC3\xA1ssico (nick e n\xC3\xBAmero subindo, com o "
+           "combo), sem n\xC3\xBAmeros no alvo nem local do acerto. Cores, sons e as imagens da mira n\xC3\xA3o mudam.");
+    if (r.Action("Posi\xC3\xA7\xC3\xB5" "es na tela", "Mover")) {
+        BeginMove();
+    }
     r.Value("Escolhas salvas", "por servidor");
-    r.Action("Padr\xC3\xB5" "es do Trok Hitmarker", "Restaurar");
+    if (r.Action("Padr\xC3\xB5" "es do Trok Hitmarker", "Restaurar")) {
+        o = opt::Defaults();
+        S.preset = 0;
+        Toast("Padr\xC3\xB5" "es restaurados", "Todas as op\xC3\xA7\xC3\xB5" "es voltaram ao padr\xC3\xA3o do Trok Hitmarker.");
+    }
+}
+
+// Um exemplo do informer em cada caixa (o layout escolhido), para ver onde ele fica.
+void SampleState(hud::State* st) {
+    hud::Line g;
+    g.nick = "Victor_Trok";
+    g.id = 12;
+    g.nickColor = IM_COL32(255, 186, 74, 255);
+    g.hits = 3;
+    g.total = 138;
+    hud::Hit h;
+    h.value = 46;
+    for (float age : {1.1f, 0.6f, 0.15f}) {
+        h.age = age;
+        g.recent.push_back(h);
+    }
+    hud::Line t;
+    t.nick = "Trok_Bot";
+    t.id = 3;
+    t.nickColor = IM_COL32(120, 200, 255, 255);
+    t.hits = 1;
+    t.total = 33;
+    h.age = 0.4f;
+    h.value = 33;
+    t.recent.push_back(h);
+    st->given = {g};
+    st->taken = {t};
+}
+
+// As caixas, em pixels: o classico vai do numero subindo ate o nick; a lista, tres linhas.
+void MoveBox(int which, const opt::Options& o, ImVec2 screen, ImVec2* a, ImVec2* b) {
+    float k = screen.y / 1080.0f, s = k * o.informerSize / 100.0f;
+    const opt::Place& p = S.place[which];
+    ImVec2 at(p.x * screen.x, p.y * screen.y);
+    float w = o.informer == 1 ? 250 * s : 330 * s;
+    float top = o.informer == 1 ? at.y : at.y - 155 * k - 8 * s;
+    float bottom = o.informer == 1 ? at.y + 3 * 37 * s : at.y + 22 * k + 24 * s;
+    float pad = 8 * s;
+    if (which == 0) {
+        *a = ImVec2(at.x - pad, top - pad);
+        *b = ImVec2(at.x + w + pad, bottom + pad);
+    } else {
+        *a = ImVec2(at.x - w - pad, top - pad);
+        *b = ImVec2(at.x + pad, bottom + pad);
+    }
+}
+
+void Dashed(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 c, float t) {
+    float step = 14 * u, dash = 7 * u;
+    for (float x = a.x; x < b.x; x += step) {
+        dl->AddLine(ImVec2(x, a.y), ImVec2(std::min(x + dash, b.x), a.y), c, t);
+        dl->AddLine(ImVec2(x, b.y), ImVec2(std::min(x + dash, b.x), b.y), c, t);
+    }
+    for (float y = a.y; y < b.y; y += step) {
+        dl->AddLine(ImVec2(a.x, y), ImVec2(a.x, std::min(y + dash, b.y)), c, t);
+        dl->AddLine(ImVec2(b.x, y), ImVec2(b.x, std::min(y + dash, b.y)), c, t);
+    }
+}
+
+void MoveFrame() {
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 screen = io.DisplaySize;
+    opt::Options view = opt::Get();
+    view.given = S.place[0];
+    view.taken = S.place[1];
+    if (view.informer == 2) {
+        view.informer = 0; // desligado: mostra o classico so para posicionar
+    }
+    view.enabled = true;
+    view.edgeFlash = view.direction = view.onAim = view.hitLocal = false;
+    view.numbers = 2;
+    view.crosshair = 0;
+
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(screen);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::Begin("##trokHitMover", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings |
+                     ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(ImVec2(0, 0), screen, IM_COL32(0, 0, 0, 70));
+    hud::State st;
+    SampleState(&st);
+    hud::Draw(dl, st, view, screen);
+
+    static const char* const names[] = {"Informer: dado", "Informer: levado"};
+    for (int i = 0; i < 2; ++i) {
+        ImVec2 a, b;
+        MoveBox(i, view, screen, &a, &b);
+        ImGui::SetCursorScreenPos(a);
+        ImGui::PushID(i);
+        ImGui::InvisibleButton("##caixa", ImVec2(std::max(1.0f, b.x - a.x), std::max(1.0f, b.y - a.y)));
+        bool hovered = ImGui::IsItemHovered();
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 0.0f)) {
+            S.drag = i;
+            opt::Place& p = S.place[i];
+            p.x = std::max(0.02f, std::min(0.98f, p.x + io.MouseDelta.x / screen.x));
+            p.y = std::max(0.05f, std::min(0.95f, p.y + io.MouseDelta.y / screen.y));
+        }
+        ImGui::PopID();
+        if (hovered || S.drag == i) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        }
+        Dashed(dl, a, b, col::White(S.drag == i ? 230 : hovered ? 200 : 150), 1.5f * u);
+        Text(dl, fonts.desc, a.x + 4 * u, a.y - fonts.desc->FontSize - 6 * u, col::White(220), names[i]);
+    }
+    if (!ImGui::IsMouseDown(0)) {
+        S.drag = -1;
+    }
+
+    const char* help = "Arraste cada caixa  |  Enter salva  |  Esc ou bot\xC3\xA3o direito cancela";
+    ImVec2 hs = TextSize(fonts.body, help);
+    float px = (screen.x - hs.x) * 0.5f - 18 * u, py = screen.y - 28 * u - hs.y - 24 * u;
+    dl->AddRectFilled(ImVec2(px, py), ImVec2(px + hs.x + 36 * u, py + hs.y + 24 * u), IM_COL32(12, 12, 12, 252), 10 * u);
+    dl->AddRect(ImVec2(px, py), ImVec2(px + hs.x + 36 * u, py + hs.y + 24 * u), col::White(14), 10 * u, 0, 1.0f);
+    Text(dl, fonts.body, px + 18 * u, py + 12 * u, col::text, help);
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)) {
+        opt::Get().given = S.place[0];
+        opt::Get().taken = S.place[1];
+        S.moving = false;
+        S.age = 0;
+        Toast("Posi\xC3\xA7\xC3\xB5" "es salvas", "O informer ficou onde voc\xC3\xAA deixou.");
+    } else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsMouseClicked(1)) {
+        S.moving = false; // desistiu: fica onde estava
+        S.age = 0;
+    }
+}
+
+void BeginMove() {
+    S.moving = true;
+    S.drag = -1;
+    S.place[0] = opt::Get().given;
+    S.place[1] = opt::Get().taken;
 }
 
 } // namespace
 
+void StartMove() {
+    BeginMove();
+}
+
+int TakeRequest() {
+    int r = S.request;
+    S.request = REQ_NONE;
+    return r;
+}
+
+const char* Version() {
+    return VERSION_TAG;
+}
+
+bool WantsFrame() {
+    return S.open || S.moving || ToastsVisible();
+}
+
 void Toggle() {
+    if (S.moving) {
+        return;
+    }
     S.open = !S.open;
     S.age = 0;
+    S.preset = opt::Get().preset;
 }
 
 void SetTab(int tab) {
@@ -210,14 +413,21 @@ void SetTab(int tab) {
 }
 
 bool CapturesInput() {
-    return S.open;
+    return S.open || S.moving;
 }
 
 bool Frame() {
+    opt::Options before;
+    memcpy(&before, &opt::Get(), sizeof(before)); // byte a byte: o memcmp do fim nao ve lixo no preenchimento
+    if (S.moving) {
+        MoveFrame();
+        DrawToasts();
+        return memcmp(&before, &opt::Get(), sizeof(before)) != 0;
+    }
     if (!S.open) {
+        DrawToasts();
         return false;
     }
-    opt::Options before = opt::Get();
     ImGuiIO& io = ImGui::GetIO();
     bool fresh = S.age++ == 0;
     bool keysOk = !fresh && !io.WantTextInput && !CapturingKey();
@@ -258,9 +468,10 @@ bool Frame() {
     static const std::vector<Hint> hints = {{"Setas", "Ajustar", false}, {"Esc", "Fechar", true}};
     int clicked = EndShell(hints);
     PopStyle();
-    if (!keep || clicked == 1 || escape) {
+    if ((!keep || clicked == 1 || escape) && !S.moving) {
         S.open = false;
     }
+    DrawToasts();
     return memcmp(&before, &opt::Get(), sizeof(before)) != 0;
 }
 

@@ -74,7 +74,8 @@ struct State {
 // overlay carrega e passa a textura. Cada imagem inteira ocupa uma caixa fixa (mira e efeitos 40 px numa tela de
 // 1080, o corpo 48 px), vezes o Tamanho: qualquer resolucao de imagem serve. O visual e so o da imagem.
 enum ImageSlot { IMG_CROSSHAIR, IMG_HIT, IMG_ARMOUR, IMG_HEAD, IMG_KILL, IMG_BODY, IMG_COUNT };
-void SetImage(int slot, ImTextureID texture);
+// u1/v1: ate onde a imagem vai na textura; aspect: largura / altura (imagem que nao e quadrada cabe inteira na caixa).
+void SetImage(int slot, ImTextureID texture, float u1 = 1.0f, float v1 = 1.0f, float aspect = 1.0f);
 
 // Fontes extras no atlas (numeros grandes em Arial Black ou na fonte da casa). Chamar antes de construir o atlas.
 void AddFonts(float screenHeight, const char* houseFont, const char* numberFont);

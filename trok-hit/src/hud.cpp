@@ -16,17 +16,28 @@ namespace {
 ImFont* g_text = nullptr;   // fonte da casa (nicks, rotulos)
 ImFont* g_number = nullptr; // numeros: Arial Black ou a fonte da casa
 ImFont* g_house = nullptr;  // numeros na fonte da casa
-ImTextureID g_images[IMG_COUNT] = {};
+struct Loaded {
+    ImTextureID texture = nullptr;
+    ImVec2 uv = ImVec2(1, 1);
+    float aspect = 1.0f;
+};
+Loaded g_images[IMG_COUNT];
 constexpr float AIM_BOX = 40.0f;  // px numa tela de 1080: mira e efeitos (todos na mesma caixa, um no lugar do outro)
 constexpr float BODY_BOX = 48.0f; // o X do corpo
 
 // A imagem inteira numa caixa quadrada de box px, centrada em c.
 void Picture(ImDrawList* dl, int slot, ImVec2 c, float box, float alpha) {
-    if (!g_images[slot] || alpha <= 0) {
+    const Loaded& p = g_images[slot];
+    if (!p.texture || alpha <= 0) {
         return;
     }
-    float h = box * 0.5f;
-    dl->AddImage(g_images[slot], ImVec2(c.x - h, c.y - h), ImVec2(c.x + h, c.y + h), ImVec2(0, 0), ImVec2(1, 1),
+    float hw = box * 0.5f, hh = box * 0.5f;
+    if (p.aspect > 1.0f) {
+        hh /= p.aspect;
+    } else if (p.aspect > 0.0f && p.aspect < 1.0f) {
+        hw *= p.aspect;
+    }
+    dl->AddImage(p.texture, ImVec2(c.x - hw, c.y - hh), ImVec2(c.x + hw, c.y + hh), ImVec2(0, 0), p.uv,
                  IM_COL32(255, 255, 255, static_cast<int>(255 * (alpha > 1 ? 1 : alpha))));
 }
 constexpr float PI = 3.14159265f;
@@ -185,12 +196,22 @@ void AddFonts(float screenHeight, const char* houseFont, const char* numberFont)
     ImFontConfig cfg;
     cfg.OversampleH = 2;
     static const ImWchar ranges[] = {0x0020, 0x00FF, 0x2013, 0x2026, 0};
-    g_text = io.Fonts->AddFontFromFileTTF(houseFont, std::round(24 * k), &cfg, ranges);
-    g_house = io.Fonts->AddFontFromFileTTF(houseFont, std::round(48 * k), &cfg, ranges);
-    g_number = io.Fonts->AddFontFromFileTTF(numberFont, std::round(48 * k), &cfg, ranges);
-    if (!g_number) {
-        g_number = g_house;
-    }
+    // Sem o arquivo, a fonte embutida do ImGui (feia, mas nada quebra).
+    auto add = [&](const char* path, float size) {
+        FILE* f = path ? fopen(path, "rb") : nullptr;
+        if (f) {
+            fclose(f);
+            if (ImFont* font = io.Fonts->AddFontFromFileTTF(path, size, &cfg, ranges)) {
+                return font;
+            }
+        }
+        ImFontConfig def;
+        def.SizePixels = size;
+        return io.Fonts->AddFontDefault(&def);
+    };
+    g_text = add(houseFont, std::round(24 * k));
+    g_house = add(houseFont, std::round(48 * k));
+    g_number = numberFont && numberFont[0] ? add(numberFont, std::round(48 * k)) : g_house;
 }
 
 int Effective(Kind kind, Kind under, const opt::Options& o) {
@@ -218,9 +239,11 @@ ImU32 KindColor(Kind k, const opt::Options& o) {
     }
 }
 
-void SetImage(int slot, ImTextureID texture) {
+void SetImage(int slot, ImTextureID texture, float u1, float v1, float aspect) {
     if (slot >= 0 && slot < IMG_COUNT) {
-        g_images[slot] = texture;
+        g_images[slot].texture = texture;
+        g_images[slot].uv = ImVec2(u1, v1);
+        g_images[slot].aspect = aspect;
     }
 }
 
