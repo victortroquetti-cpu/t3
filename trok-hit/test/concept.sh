@@ -14,6 +14,16 @@ if [ ! -d "$I" ]; then
 fi
 mkdir -p "$OUT"
 python3 -I test/scene.py "$OUT/fundo.png"
+# as imagens padrao (res/mira), em .rgba para o teste: largura, altura (int32) e os pixels RGBA
+python3 -I res/make_images.py "$OUT/mira"
+python3 -I -c "
+import os, struct, sys
+from PIL import Image
+d = sys.argv[1]
+for n in ('mira', 'acerto', 'colete', 'cabeca', 'abate', 'corpo'):
+    im = Image.open(os.path.join(d, 'mira', n + '.png')).convert('RGBA')
+    open(os.path.join(d, n + '.rgba'), 'wb').write(struct.pack('<ii', *im.size) + im.tobytes())
+" "$OUT"
 python3 -I -c "
 import sys
 from PIL import Image
@@ -57,4 +67,5 @@ for i, (im, label) in enumerate(zip(ims, ['Levou na vida (vermelho)', 'Levou no 
     os.remove(im.filename)
 img.save(os.path.join(d, '15-borda.png'))
 " "$OUT" "$FONT"
-rm -f -- "$OUT/concept" "$OUT/fundo.rgb"
+rm -f -- "$OUT/concept" "$OUT/fundo.rgb" "$OUT"/*.rgba
+rm -rf -- "$OUT/mira"

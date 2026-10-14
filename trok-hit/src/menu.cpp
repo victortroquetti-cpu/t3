@@ -68,8 +68,8 @@ void MarkerPreview(float x, float w) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 at = ImGui::GetCursorScreenPos();
     float h = 92 * u;
-    dl->AddRectFilled(ImVec2(x, at.y + 6 * u), ImVec2(x + w, at.y + h), col::White(6), 8 * u);
-    const char* names[] = {"Mira", "Vida", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
+    dl->AddRectFilled(ImVec2(x, at.y + 2 * u), ImVec2(x + w, at.y + h), col::White(6), 8 * u);
+    const char* names[] = {"Mira", "Acerto", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
     hud::Kind kinds[] = {hud::HEALTH, hud::HEALTH, hud::ARMOUR, hud::HEADSHOT, hud::KILL};
     float scale = ImGui::GetIO().DisplaySize.y / 1080.0f * 1.3f;
     for (int i = 0; i < 5; ++i) {
@@ -85,36 +85,30 @@ void MarkerPreview(float x, float w) {
 void TabMira(Rows& r, float x, float w) {
     opt::Options& o = opt::Get();
     const opt::Options& d = opt::Defaults();
-    static const char* const mira[] = {"A do jogo", "Ponto do Trok", "Imagem"};
-    r.Segmented("Mira", &o.crosshair, mira, 3, d.crosshair);
+    MarkerPreview(x, w); // em cima: muda na hora com as opcoes de baixo
+    static const char* const mira[] = {"A do jogo", "Do Trok"};
+    r.Segmented("Mira", &o.crosshair, mira, 2, d.crosshair);
+    r.Slider("Tamanho (mira e efeitos)", &o.crosshairSize, 50, 200, 10, "%d%%", d.crosshairSize);
     if (o.crosshair == 0) {
         r.Toggle("Mira est\xC3\xA1tica (n\xC3\xA3o abre ao atirar)", &o.crosshairStatic);
-    }
-    if (o.crosshair >= 1) {
+    } else {
         r.Toggle("Sempre vis\xC3\xADvel (tamb\xC3\xA9m sem mirar)", &o.crosshairAlways);
-        r.Slider("Tamanho da mira", &o.crosshairSize, 50, 200, 10, "%d%%", d.crosshairSize);
-        if (o.crosshair == 1) {
-            r.Color("Cor da mira", &o.cCrosshair, d.cCrosshair);
-        }
     }
-    r.Section("Sinal de acerto");
-    r.Toggle("Sinal de acerto na mira", &o.onAim);
-    static const char* const style[] = {"Ponto", "Cl\xC3\xA1ssico (X)", "Discreto", "Anel", "Imagens"};
-    r.Cycle("Efeito", &o.marker, style, 5, d.marker);
-    r.Slider("Tamanho do efeito", &o.markerSize, 50, 200, 10, "%d%%", d.markerSize);
-    if (o.crosshair == 2 || o.marker == 4) {
-        r.Action("Pasta das imagens", "Abrir pasta");
-        r.Info("Trocar as imagens",
-               "PNG com fundo transparente na pasta Trok Hitmarker\\mira: mira, acerto, colete, cabeca e abate. "
-               "Sem colete.png, vale o acerto.png. O tamanho \xC3\xA9 o da imagem numa tela de 1080 (32 px = 32 px), "
-               "vezes o Tamanho do menu. Trocou o arquivo, vale na hora.");
-    }
-    r.Section("Cores do acerto");
-    r.Color("Na vida", &o.cHealth, d.cHealth);
-    r.Color("No colete", &o.cArmour, d.cArmour);
-    r.Color("Na cabe\xC3\xA7" "a", &o.cHead, d.cHead);
-    r.Color("Abate", &o.cKill, d.cKill);
-    MarkerPreview(x, w);
+    r.Section("Sinal de acerto na mira");
+    r.Toggle("Sinal de acerto", &o.onAim);
+    r.Toggle("Acerto", &o.fxHit);
+    r.Toggle("Colete com imagem pr\xC3\xB3pria", &o.fxArmour);
+    r.Toggle("Cabe\xC3\xA7" "a com imagem pr\xC3\xB3pria", &o.fxHead);
+    r.Toggle("Abate com imagem pr\xC3\xB3pria", &o.fxKill);
+    r.Info("Desligar um deles",
+           "Colete, cabe\xC3\xA7" "a e abate desligados mostram a imagem do acerto normal naquele tiro. Desligar o "
+           "Acerto tira o sinal dos tiros normais (os ligados continuam).");
+    r.Section("Imagens");
+    r.Action("Pasta das imagens", "Abrir pasta");
+    r.Info("Trocar o visual",
+           "Cada coisa \xC3\xA9 um PNG na pasta Trok Hitmarker\\mira: mira, acerto, colete, cabeca, abate e corpo (o X "
+           "do local do acerto). Edite ou troque o arquivo; apagou, volta a imagem padr\xC3\xA3o. Qualquer resolu\xC3\xA7\xC3\xA3o "
+           "serve: a imagem inteira vira o tamanho da mira. Vale na hora.");
 }
 
 void TabDano(Rows& r) {
@@ -132,8 +126,13 @@ void TabDano(Rows& r) {
     r.Slider("Tamanho", &o.numbersSize, 50, 200, 10, "%d%%", d.numbersSize);
     static const char* const font[] = {"Arial Black", "Da casa"};
     r.Segmented("Fonte dos n\xC3\xBAmeros", &o.numbersFont, font, 2, d.numbersFont);
+    r.Section("Cores dos n\xC3\xBAmeros");
+    r.Color("Na vida", &o.cHealth, d.cHealth);
+    r.Color("No colete", &o.cArmour, d.cArmour);
+    r.Color("Na cabe\xC3\xA7" "a", &o.cHead, d.cHead);
+    r.Color("Abate", &o.cKill, d.cKill);
     r.Section("Local do acerto (no corpo)");
-    r.Toggle("Marcar onde o tiro pegou", &o.hitLocal);
+    r.Toggle("Marcar onde o tiro pegou (corpo.png)", &o.hitLocal);
     r.Slider("Fica no corpo", &o.hitLocalTime, 1, 5, 1, "%d s", d.hitLocalTime);
     r.Slider("Tamanho no corpo", &o.hitLocalSize, 50, 150, 10, "%d%%", d.hitLocalSize);
 }
@@ -187,9 +186,13 @@ void TabSons(Rows& r) {
 void TabGeral(Rows& r) {
     opt::Options& o = opt::Get();
     r.Toggle("Trok Hitmarker ligado", &o.enabled);
-    static const char* const presets[] = {"Trok", "Damage Informer", "CoD", "Valorant", "Apex"};
-    r.Cycle("Estilo pronto", &S.preset, presets, 5, 0);
-    r.Action("Aplicar o estilo", "Aplicar");
+    static const char* const presets[] = {"Trok", "Damage Informer"};
+    r.Cycle("Configura\xC3\xA7\xC3\xA3o pronta", &S.preset, presets, 2, 0);
+    r.Action("Aplicar a configura\xC3\xA7\xC3\xA3o", "Aplicar");
+    r.Info("O que cada uma liga",
+           "Trok: sinal na mira, local do acerto, n\xC3\xBAmeros saindo do alvo, seta e borda de dano recebido. Damage "
+           "Informer: o informer cl\xC3\xA1ssico (nick e n\xC3\xBAmero subindo, com o combo), sem n\xC3\xBAmeros no alvo. "
+           "As imagens da mira n\xC3\xA3o mudam: o visual \xC3\xA9 o dos PNG da pasta.");
     r.Action("Posi\xC3\xA7\xC3\xB5" "es na tela", "Mover");
     r.Value("Escolhas salvas", "por servidor");
     r.Action("Padr\xC3\xB5" "es do Trok Hitmarker", "Restaurar");

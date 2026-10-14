@@ -22,6 +22,7 @@ struct Marker {    // um acerto: o sinal na mira e a marca no corpo
     bool bodyVisible = true; // a parte esta na frente da camera
     float age = 0; // s
     Kind kind = HEALTH;
+    Kind under = HEALTH; // no abate: o que o tiro pegou (vale se o efeito de abate estiver desligado)
 };
 
 struct Number {    // numero de dano que sobe
@@ -69,26 +70,26 @@ struct State {
     Kind flashKind = HEALTH;      // HEALTH, ARMOUR ou HEADSHOT: a cor da borda
 };
 
-// Imagens da pasta "Trok Hitmarker\mira" (PNG que o usuario edita). O overlay carrega e passa a textura; sem a
-// imagem, a mira e o efeito caem no desenho do Ponto. Tamanho: o da imagem numa tela de 1080, vezes o "Tamanho".
-enum ImageSlot { IMG_CROSSHAIR, IMG_HIT, IMG_ARMOUR, IMG_HEAD, IMG_KILL, IMG_COUNT };
-void SetImage(int slot, ImTextureID texture, ImVec2 size);
+// As imagens da pasta "Trok Hitmarker\mira" (PNG que o usuario edita; sem o arquivo, a padrao que vem no .asi). O
+// overlay carrega e passa a textura. Cada imagem inteira ocupa uma caixa fixa (mira e efeitos 40 px numa tela de
+// 1080, o corpo 48 px), vezes o Tamanho: qualquer resolucao de imagem serve. O visual e so o da imagem.
+enum ImageSlot { IMG_CROSSHAIR, IMG_HIT, IMG_ARMOUR, IMG_HEAD, IMG_KILL, IMG_BODY, IMG_COUNT };
+void SetImage(int slot, ImTextureID texture);
 
 // Fontes extras no atlas (numeros grandes em Arial Black ou na fonte da casa). Chamar antes de construir o atlas.
 void AddFonts(float screenHeight, const char* houseFont, const char* numberFont);
 ImU32 KindColor(Kind k, const opt::Options& o);
+// O efeito que um acerto mostra na mira, com o que estiver desligado no menu; -1 = nenhum.
+int Effective(Kind kind, Kind under, const opt::Options& o);
 
 void Draw(ImDrawList* dl, const State& s, const opt::Options& o, ImVec2 screen);
 
 // Partes soltas (o menu desenha a previa com elas).
-void DrawCrosshair(ImDrawList* dl, ImVec2 at, float scale, const opt::Options& o, ImU32 tint = 0, float tintAmount = 0,
-                   float grow = 0);
-// O ponto da mira tomando a cor do acerto (efeito Ponto) e a mira com o efeito por cima, para as previas.
-void DrawAimTint(ImDrawList* dl, ImVec2 at, float scale, float age, Kind kind, const opt::Options& o);
+void DrawCrosshair(ImDrawList* dl, ImVec2 at, float scale, const opt::Options& o);
+bool DrawEffect(ImDrawList* dl, ImVec2 at, float scale, float age, Kind kind, const opt::Options& o); // false: acabou
+// A mira com o efeito no lugar dela (como no jogo), para as previas; age 99 = so a mira.
 void DrawAimPreview(ImDrawList* dl, ImVec2 at, float scale, float age, Kind kind, const opt::Options& o);
-// stay > 0: a marca fica inteira ate quase o fim de stay segundos (local do acerto); 0 = o piscar da mira.
-void DrawMarker(ImDrawList* dl, ImVec2 at, int style, float scale, float age, Kind kind, const opt::Options& o,
-                float stay = 0);
+void DrawBodyMarker(ImDrawList* dl, ImVec2 at, float scale, float age, float stay);
 void DrawNumber(ImDrawList* dl, const Number& n, float scale, const opt::Options& o);
 
 } // namespace hud

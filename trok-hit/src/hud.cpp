@@ -16,21 +16,18 @@ namespace {
 ImFont* g_text = nullptr;   // fonte da casa (nicks, rotulos)
 ImFont* g_number = nullptr; // numeros: Arial Black ou a fonte da casa
 ImFont* g_house = nullptr;  // numeros na fonte da casa
-struct Img {
-    ImTextureID texture = nullptr;
-    ImVec2 size;
-} g_images[IMG_COUNT];
+ImTextureID g_images[IMG_COUNT] = {};
+constexpr float AIM_BOX = 40.0f;  // px numa tela de 1080: mira e efeitos (todos na mesma caixa, um no lugar do outro)
+constexpr float BODY_BOX = 48.0f; // o X do corpo
 
-// Desenha a imagem centrada em c (tamanho da imagem a 1080 vezes scale); false se a imagem nao existe.
-bool Picture(ImDrawList* dl, int slot, ImVec2 c, float scale, float alpha) {
-    const Img& im = g_images[slot];
-    if (!im.texture) {
-        return false;
+// A imagem inteira numa caixa quadrada de box px, centrada em c.
+void Picture(ImDrawList* dl, int slot, ImVec2 c, float box, float alpha) {
+    if (!g_images[slot] || alpha <= 0) {
+        return;
     }
-    ImVec2 h(im.size.x * scale * 0.5f, im.size.y * scale * 0.5f);
-    dl->AddImage(im.texture, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 0), ImVec2(1, 1),
-                 IM_COL32(255, 255, 255, static_cast<int>(255 * (alpha < 0 ? 0 : alpha > 1 ? 1 : alpha))));
-    return true;
+    float h = box * 0.5f;
+    dl->AddImage(g_images[slot], ImVec2(c.x - h, c.y - h), ImVec2(c.x + h, c.y + h), ImVec2(0, 0), ImVec2(1, 1),
+                 IM_COL32(255, 255, 255, static_cast<int>(255 * (alpha > 1 ? 1 : alpha))));
 }
 constexpr float PI = 3.14159265f;
 
@@ -77,19 +74,6 @@ ImFont* NumberFont(const opt::Options& o) {
 
 float KindSize(Kind k) {
     return k == KILL ? 1.25f : k == HEADSHOT ? 1.12f : 1.0f;
-}
-
-// ---------------------------------------------------------------- hitmarker
-
-void Classic(ImDrawList* dl, ImVec2 c, float r0, float r1, float th, ImU32 color, bool outline) {
-    for (int i = 0; i < 4; ++i) {
-        float dx = (i & 1) ? 0.7071f : -0.7071f, dy = (i & 2) ? 0.7071f : -0.7071f;
-        ImVec2 a(c.x + dx * r0, c.y + dy * r0), b(c.x + dx * r1, c.y + dy * r1);
-        if (outline) {
-            dl->AddLine(a, b, Alpha(IM_COL32(0, 0, 0, 255), 0.55f * (((color >> 24) & 0xFF) / 255.0f)), th + 2.4f);
-        }
-        dl->AddLine(a, b, color, th);
-    }
 }
 
 // ---------------------------------------------------------------- informer
@@ -209,6 +193,22 @@ void AddFonts(float screenHeight, const char* houseFont, const char* numberFont)
     }
 }
 
+int Effective(Kind kind, Kind under, const opt::Options& o) {
+    if (kind == KILL && !o.fxKill) {
+        kind = under;
+    }
+    if (kind == HEADSHOT && !o.fxHead) {
+        kind = HEALTH;
+    }
+    if (kind == ARMOUR && !o.fxArmour) {
+        kind = HEALTH;
+    }
+    if (kind == HEALTH && !o.fxHit) {
+        return -1;
+    }
+    return kind;
+}
+
 ImU32 KindColor(Kind k, const opt::Options& o) {
     switch (k) {
     case ARMOUR: return o.cArmour;
@@ -218,159 +218,60 @@ ImU32 KindColor(Kind k, const opt::Options& o) {
     }
 }
 
-void SetImage(int slot, ImTextureID texture, ImVec2 size) {
+void SetImage(int slot, ImTextureID texture) {
     if (slot >= 0 && slot < IMG_COUNT) {
-        g_images[slot].texture = texture;
-        g_images[slot].size = size;
+        g_images[slot] = texture;
     }
 }
 
-// Tempos do Ponto: o abate fica mais (o "morte" da Mira Centralizada durava 150 quadros).
-static void PontoTiming(Kind kind, float* life, float* hold) {
+// Quanto cada efeito fica (o abate mais: o "morte" da Mira Centralizada durava 150 quadros) e quando comeca a sumir.
+static void Timing(Kind kind, float* life, float* hold) {
     *life = kind == KILL ? 1.2f : kind == HEADSHOT ? 0.55f : 0.35f;
     *hold = kind == KILL ? 0.85f : kind == HEADSHOT ? 0.3f : 0.15f;
 }
 
-static ImU32 Mix(ImU32 a, ImU32 b, float t) {
-    t = Clamp01(t);
-    int r = static_cast<int>(((a >> IM_COL32_R_SHIFT) & 0xFF) * (1 - t) + ((b >> IM_COL32_R_SHIFT) & 0xFF) * t);
-    int g = static_cast<int>(((a >> IM_COL32_G_SHIFT) & 0xFF) * (1 - t) + ((b >> IM_COL32_G_SHIFT) & 0xFF) * t);
-    int bl = static_cast<int>(((a >> IM_COL32_B_SHIFT) & 0xFF) * (1 - t) + ((b >> IM_COL32_B_SHIFT) & 0xFF) * t);
-    return IM_COL32(r, g, bl, 255);
+void DrawCrosshair(ImDrawList* dl, ImVec2 c, float scale, const opt::Options& o) {
+    Picture(dl, IMG_CROSSHAIR, c, AIM_BOX * scale * o.crosshairSize / 100.0f, 1.0f);
 }
 
-// O ponto do Trok (ou a imagem da mira). tint/tintAmount: a cor do acerto que o ponto toma por um instante; grow:
-// o pulo. E o mesmo ponto da mira, nunca um segundo por cima.
-void DrawCrosshair(ImDrawList* dl, ImVec2 c, float scale, const opt::Options& o, ImU32 tint, float tintAmount,
-                   float grow) {
-    if (o.crosshair == 2 && Picture(dl, IMG_CROSSHAIR, c, scale * o.crosshairSize / 100.0f * (1 + grow), 1.0f)) {
-        return;
-    }
-    float r = 3.4f * scale * o.crosshairSize / 100.0f * (1 + grow);
-    ImU32 color = tintAmount > 0 ? Mix(o.cCrosshair, tint, tintAmount) : Opaque(o.cCrosshair);
-    dl->AddCircleFilled(c, r + 1.6f * scale, IM_COL32(0, 0, 0, 200), 20);
-    dl->AddCircleFilled(c, r, color, 20);
-}
-
-// Ponto: so os detalhes em volta da mira (o ponto em si e o da mira, que muda de cor). Acerto: um anel abrindo.
-// Cabeca: quatro tracos em cruz e o anel. Abate: o X na cor do abate.
-static void PontoDetails(ImDrawList* dl, ImVec2 c, float s, float age, float life, float a, Kind kind,
-                         const opt::Options& o) {
-    ImU32 color = Alpha(KindColor(kind, o), a);
-    ImU32 dark = Alpha(IM_COL32(0, 0, 0, 255), 0.75f * a);
-    float rd = 3.6f * s;
-    float pop = 1.0f - EaseOut(age / 0.1f); // 1 -> 0 no primeiro decimo de segundo
-    if (kind == KILL) {
-        float r0 = rd + 3.5f * s, r1 = rd + (11 + 5 * pop) * s;
-        for (int i = 0; i < 4; ++i) {
-            float dx = (i & 1) ? 0.7071f : -0.7071f, dy = (i & 2) ? 0.7071f : -0.7071f;
-            ImVec2 p0(c.x + dx * r0, c.y + dy * r0), p1(c.x + dx * r1, c.y + dy * r1);
-            dl->AddLine(p0, p1, dark, 6.2f * s);
-            dl->AddLine(p0, p1, color, 3.6f * s);
-        }
-        return;
-    }
-    if (kind == HEADSHOT) {
-        float r0 = rd + 2.8f * s, r1 = rd + (8.5f + 4 * pop) * s;
-        for (int i = 0; i < 4; ++i) {
-            float dx = i == 0 ? 1.0f : i == 1 ? -1.0f : 0.0f, dy = i == 2 ? 1.0f : i == 3 ? -1.0f : 0.0f;
-            ImVec2 p0(c.x + dx * r0, c.y + dy * r0), p1(c.x + dx * r1, c.y + dy * r1);
-            dl->AddLine(p0, p1, dark, 5.6f * s);
-            dl->AddLine(p0, p1, color, 3.0f * s);
-        }
-    }
-    float ring = EaseOut(age / life);
-    dl->AddCircle(c, rd + 2 * s + 10 * s * ring, Alpha(KindColor(kind, o), a * (1.0f - ring) * 0.8f), 32, 1.6f * s);
-}
-
-void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kind kind, const opt::Options& o,
-                float stay);
-
-void DrawAimTint(ImDrawList* dl, ImVec2 c, float scale, float age, Kind kind, const opt::Options& o) {
+// O efeito do acerto: a imagem dele da um pulo (35% maior, voltando em 0,1 s), fica e some.
+bool DrawEffect(ImDrawList* dl, ImVec2 c, float scale, float age, Kind kind, const opt::Options& o) {
     float life, hold;
-    PontoTiming(kind, &life, &hold);
-    if (!o.onAim || o.marker != 0 || o.crosshair != 1 || kind == KILL || age >= life) {
-        DrawCrosshair(dl, c, scale, o);
-        return;
+    Timing(kind, &life, &hold);
+    if (age >= life) {
+        return false;
     }
     float a = age < hold ? 1.0f : 1.0f - (age - hold) / (life - hold);
-    float pop = 0.6f * (1.0f - EaseOut(age / 0.1f));
-    DrawCrosshair(dl, c, scale, o, KindColor(kind, o), a, pop);
+    float pop = 1.0f + 0.35f * (1.0f - EaseOut(age / 0.1f));
+    int slot = kind == KILL ? IMG_KILL : kind == HEADSHOT ? IMG_HEAD : kind == ARMOUR ? IMG_ARMOUR : IMG_HIT;
+    Picture(dl, slot, c, AIM_BOX * scale * o.crosshairSize / 100.0f * pop, a);
+    return true;
 }
 
 void DrawAimPreview(ImDrawList* dl, ImVec2 c, float scale, float age, Kind kind, const opt::Options& o) {
-    if (o.crosshair >= 1) {
-        DrawAimTint(dl, c, scale, age, kind, o);
-    } else {
-        dl->AddCircle(c, 11 * scale, IM_COL32(255, 255, 255, 150), 32, 1.4f * scale); // a do jogo, so para lembrar
+    int fx = Effective(kind, HEALTH, o);
+    float life, hold;
+    Timing(fx < 0 ? HEALTH : static_cast<Kind>(fx), &life, &hold);
+    bool effect = o.onAim && fx >= 0 && age < life;
+    if (o.crosshair == 1 && !effect) {
+        DrawCrosshair(dl, c, scale, o);
+    } else if (o.crosshair == 0) { // a do jogo, so para lembrar
+        dl->AddCircle(c, 11 * scale * o.crosshairSize / 100.0f, IM_COL32(255, 255, 255, 150), 32, 1.4f * scale);
     }
-    DrawMarker(dl, c, o.marker, scale * o.markerSize / 100.0f, age, kind, o, 0);
+    if (effect) {
+        DrawEffect(dl, c, scale, age, static_cast<Kind>(fx), o);
+    }
 }
 
-void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kind kind, const opt::Options& o,
-                float stay) {
-    bool kill = kind == KILL;
-    float life, hold;
-    if (style == 4) { // imagens: mesmos tempos e o mesmo pulo do Ponto; sem a imagem, o Ponto
-        int slot = kind == KILL ? IMG_KILL : kind == HEADSHOT ? IMG_HEAD : kind == ARMOUR ? IMG_ARMOUR : IMG_HIT;
-        if (slot == IMG_ARMOUR && !g_images[IMG_ARMOUR].texture) {
-            slot = IMG_HIT;
-        }
-        if (!g_images[slot].texture) {
-            style = 0;
-        } else {
-            life = kill ? 1.2f : kind == HEADSHOT ? 0.55f : 0.35f;
-            hold = kill ? 0.85f : kind == HEADSHOT ? 0.3f : 0.15f;
-            if (age >= life) {
-                return;
-            }
-            float a = age < hold ? 1.0f : 1.0f - (age - hold) / (life - hold);
-            float pop = 1.0f + 0.35f * (1.0f - EaseOut(age / 0.1f));
-            Picture(dl, slot, c, scale * pop, a);
-            return;
-        }
-    }
-    if (style == 0) {
-        PontoTiming(kind, &life, &hold);
-    } else {
-        life = kill ? 0.65f : style == 2 ? 0.2f : 0.32f;
-        hold = kill ? 0.4f : style == 2 ? 0.08f : 0.16f;
-    }
-    if (stay > 0) {
-        life = stay;
-        hold = std::max(0.1f, stay - 0.35f);
-    }
-    if (age >= life) {
+// Local do acerto: o X fica inteiro ate quase o fim de stay segundos.
+void DrawBodyMarker(ImDrawList* dl, ImVec2 c, float scale, float age, float stay) {
+    if (age >= stay) {
         return;
     }
-    float a = age < hold ? 1.0f : 1.0f - (age - hold) / (life - hold);
-    ImU32 color = Alpha(KindColor(kind, o), a);
-    float pop = 1.0f + (kill ? 0.6f : 0.45f) * (1.0f - EaseOut(age / 0.08f));
-    float big = kill ? 1.3f : kind == HEADSHOT ? 1.12f : 1.0f;
-    float s = scale;
-    switch (style) {
-    case 0:
-        PontoDetails(dl, c, s, age, life, a, kind, o);
-        break;
-    case 1: // classico: o X do CoD
-        Classic(dl, c, 8 * s * pop, 19 * s * pop * big, (kill ? 3.4f : 2.6f) * s, color, true);
-        break;
-    case 2: // discreto: risquinhos finos
-        Classic(dl, c, 5 * s * pop, 11 * s * pop * big, 1.6f * s, color, false);
-        break;
-    default: { // anel que abre
-        float r = (9 + 7 * EaseOut(age / std::min(life, 0.32f))) * s * big;
-        dl->AddCircle(c, r + 1.2f * s, Alpha(IM_COL32(0, 0, 0, 255), 0.5f * a), 40, 4.2f * s);
-        dl->AddCircle(c, r, color, 40, 2.2f * s);
-        if (kill) {
-            dl->AddCircle(c, r * 0.55f, color, 32, 2.0f * s);
-        }
-        if (kind == HEADSHOT) {
-            dl->AddCircleFilled(c, 2.4f * s, color, 12);
-        }
-        break;
-    }
-    }
+    float hold = std::max(0.1f, stay - 0.35f);
+    float a = age < hold ? 1.0f : 1.0f - (age - hold) / (stay - hold);
+    float pop = 1.0f + 0.35f * (1.0f - EaseOut(age / 0.1f));
+    Picture(dl, IMG_BODY, c, BODY_BOX * scale * pop, a);
 }
 
 void DrawNumber(ImDrawList* dl, const Number& n, float scale, const opt::Options& o) {
@@ -465,31 +366,35 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
         InformerList(dl, st.taken, tAt, false, o, k);
     }
 
-    // local do acerto: a marca fica na parte do corpo que o tiro pegou (o samp.cpp atualiza a posicao do osso)
+    // local do acerto: o X fica na parte do corpo que o tiro pegou (o samp.cpp atualiza a posicao do osso)
     if (o.hitLocal) {
-        float bs = k * o.markerSize / 100.0f * o.hitLocalSize / 100.0f;
         for (const Marker& m : st.markers) {
-            if (m.bodyVisible) {
-                DrawMarker(dl, m.body, 1, bs, m.age, m.kind, o, static_cast<float>(o.hitLocalTime)); // sempre o X
+            if (m.bodyVisible && Effective(m.kind, m.under, o) >= 0) {
+                DrawBodyMarker(dl, m.body, k * o.hitLocalSize / 100.0f, m.age, static_cast<float>(o.hitLocalTime));
             }
         }
     }
 
-    // o ponto do Trok (no lugar da mira do jogo) e o sinal de acerto, onde a mira esta neste quadro
-    if (o.crosshair >= 1 && st.showCrosshair) {
-        const Marker* latest = nullptr;
+    // a mira e o sinal de acerto, onde a mira esta neste quadro: o efeito do acerto mais novo fica no lugar da mira
+    // do Trok enquanto aparece (a imagem do efeito ja traz o ponto); com a mira do jogo, vai por cima dela
+    const Marker* active = nullptr;
+    int activeFx = -1;
+    if (o.onAim) {
         for (const Marker& m : st.markers) {
-            if (!latest || m.age < latest->age) {
-                latest = &m;
+            int fx = Effective(m.kind, m.under, o);
+            float life, hold;
+            Timing(fx < 0 ? HEALTH : static_cast<Kind>(fx), &life, &hold);
+            if (fx >= 0 && m.age < life && (!active || m.age < active->age)) {
+                active = &m;
+                activeFx = fx;
             }
         }
-        DrawAimTint(dl, st.crosshair, k, latest ? latest->age : 99.0f, latest ? latest->kind : HEALTH, o);
     }
-    if (o.onAim) {
-        float ms = k * o.markerSize / 100.0f;
-        for (const Marker& m : st.markers) {
-            DrawMarker(dl, st.crosshair, o.marker, ms, m.age, m.kind, o);
-        }
+    if (o.crosshair == 1 && st.showCrosshair && !active) {
+        DrawCrosshair(dl, st.crosshair, k, o);
+    }
+    if (active) {
+        DrawEffect(dl, st.crosshair, k, active->age, static_cast<Kind>(activeFx), o);
     }
 }
 

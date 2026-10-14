@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -24,6 +25,13 @@ static int W = 1920, H = 1080;
 static std::vector<float> fb, background;
 static unsigned char* tex;
 static int tw, th;
+struct Texture {
+    std::vector<unsigned char> rgba;
+    int w = 0, h = 0;
+};
+static Texture images[hud::IMG_COUNT];
+static const unsigned char* curTex;
+static int curW, curH;
 static int failures = 0;
 static const ImVec2 CROSS(1018, 432); // a mira do GTA: 53% x 40% da tela
 
@@ -59,8 +67,8 @@ static void Raster(const ImDrawVert& a, const ImDrawVert& b, const ImDrawVert& c
             float w2 = 1 - w0 - w1;
             if (w0 < 0 || w1 < 0 || w2 < 0) continue;
             float u = w0 * a.uv.x + w1 * b.uv.x + w2 * c.uv.x, v = w0 * a.uv.y + w1 * b.uv.y + w2 * c.uv.y;
-            int tx = std::min(tw - 1, std::max(0, (int)(u * tw))), ty = std::min(th - 1, std::max(0, (int)(v * th)));
-            const unsigned char* t = &tex[(ty * tw + tx) * 4];
+            int tx = std::min(curW - 1, std::max(0, (int)(u * curW))), ty = std::min(curH - 1, std::max(0, (int)(v * curH)));
+            const unsigned char* t = &curTex[(ty * curW + tx) * 4];
             float col[4];
             for (int i = 0; i < 4; ++i) {
                 float ca = ((a.col >> (8 * i)) & 0xFF) / 255.f, cb = ((b.col >> (8 * i)) & 0xFF) / 255.f,
@@ -78,6 +86,12 @@ static void Render(ImDrawData* dd) {
         const ImDrawList* cl = dd->CmdLists[n];
         for (const ImDrawCmd& cmd : cl->CmdBuffer) {
             if (cmd.UserCallback) continue;
+            intptr_t id = (intptr_t)cmd.GetTexID();
+            if (id >= 10 && id < 10 + hud::IMG_COUNT && !images[id - 10].rgba.empty()) {
+                curTex = images[id - 10].rgba.data(), curW = images[id - 10].w, curH = images[id - 10].h;
+            } else {
+                curTex = tex, curW = tw, curH = th;
+            }
             for (unsigned i = 0; i < cmd.ElemCount; i += 3) {
                 const ImDrawIdx* idx = &cl->IdxBuffer[cmd.IdxOffset + i];
                 Raster(cl->VtxBuffer[cmd.VtxOffset + idx[0]], cl->VtxBuffer[cmd.VtxOffset + idx[1]],
@@ -114,7 +128,7 @@ static const ImVec2 HEAD(1018, 423), CHEST(1018, 490), LEFTARM(1066, 500), LEG(1
 static const ImU32 LUCAS = IM_COL32(255, 152, 51, 255), ENZO = IM_COL32(160, 110, 255, 255);
 
 static void GameCrosshair(ImDrawList* dl, ImVec2 at) {
-    dl->AddCircle(at, 15, IM_COL32(255, 255, 255, 150), 40, 1.6f);
+    dl->AddCircle(at, 15 * opt::Get().crosshairSize / 100.0f, IM_COL32(255, 255, 255, 150), 40, 1.6f);
     dl->AddCircleFilled(at, 1.8f, IM_COL32(255, 255, 255, 190), 12);
 }
 
@@ -202,38 +216,44 @@ static void Frame(const hud::State& s, bool crosshair, float dim, void (*extra)(
 
 static void BoardMarkers(ImDrawList* dl) {
     opt::Options o = opt::Get();
-    const char* styles[] = {"Ponto", "Cl\xC3\xA1ssico (X)", "Discreto", "Anel"};
-    const char* kinds[] = {"Mira", "Vida", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
+    // 1. as imagens como vem (ampliadas), com o nome do arquivo
+    const char* files[] = {"mira.png", "acerto.png", "colete.png", "cabeca.png", "abate.png", "corpo.png"};
+    Label(dl, 60, 40, "As imagens que v\xC3\xAAm junto (pasta Trok Hitmarker\\mira), ampliadas: edite como quiser");
+    for (int i = 0; i < 6; ++i) {
+        float x = 120 + i * 170, y = 150;
+        dl->AddRectFilled(ImVec2(x - 64, y - 64), ImVec2(x + 64, y + 64), IM_COL32(255, 255, 255, 10), 8);
+        dl->AddImage((ImTextureID)(intptr_t)(10 + i), ImVec2(x - 64, y - 64), ImVec2(x + 64, y + 64));
+        Small(dl, x, y + 74, files[i], true);
+    }
+    // 2. no tamanho do jogo: a mira do Trok e a do jogo, com cada efeito no lugar
+    Label(dl, 60, 290, "No tamanho do jogo (100%)");
+    const char* kinds[] = {"Mira", "Acerto", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
     hud::Kind k[] = {hud::HEALTH, hud::HEALTH, hud::ARMOUR, hud::HEADSHOT, hud::KILL};
-    float x0 = 330, y0 = 150, cw = 150, rh = 110;
-    for (int c = 0; c < 5; ++c) Label(dl, x0 + c * cw, y0 - 60, kinds[c], true);
-    for (int r = 0; r < 4; ++r) {
-        Label(dl, 60, y0 + r * rh - 10, styles[r]);
+    const char* rows[] = {"Do Trok", "A do jogo"};
+    for (int r = 0; r < 2; ++r) {
+        Small(dl, 60, 352 + r * 80, rows[r]);
+        o.crosshair = r == 0 ? 1 : 0;
         for (int c = 0; c < 5; ++c) {
-            ImVec2 at(x0 + c * cw, y0 + r * rh);
-            o.marker = r;
-            o.crosshair = r == 0 ? 1 : 0; // o Ponto com o ponto do Trok; os outros por cima da mira do jogo
-            hud::DrawAimPreview(dl, at, 1.5f, c == 0 ? 99.0f : 0.12f, k[c], o);
+            ImVec2 at(260 + c * 150, 360 + r * 80);
+            if (r == 0) Small(dl, at.x, 316, kinds[c], true);
+            hud::DrawAimPreview(dl, at, 1.0f, c == 0 ? 99.0f : 0.15f, k[c], o);
         }
     }
-    // o Ponto, quadro a quadro: acerto, cabeca e abate
-    float y = y0 + 4 * rh + 30;
-    Label(dl, 60, y - 10, "Ponto, quadro a quadro");
+    // 3. o pulo e o sumir, quadro a quadro
+    Label(dl, 60, 540, "Quadro a quadro (em tempo, n\xC3\xA3o em quadros: igual em qualquer FPS)");
     float ages[] = {0.0f, 0.05f, 0.12f, 0.3f, 0.6f, 1.0f};
     const char* ms[] = {"0 ms", "50 ms", "120 ms", "300 ms", "600 ms", "1 s"};
     hud::Kind rowKind[] = {hud::HEALTH, hud::HEADSHOT, hud::KILL};
-    const char* rowName[] = {"vida", "cabe\xC3\xA7" "a", "abate"};
+    const char* rowName[] = {"acerto", "cabe\xC3\xA7" "a", "abate"};
+    o.crosshair = 1;
     for (int rr = 0; rr < 3; ++rr) {
-        Small(dl, 200, y + rr * 70 - 8, rowName[rr]);
+        Small(dl, 60, 600 + rr * 70 - 8, rowName[rr]);
         for (int i = 0; i < 6; ++i) {
-            ImVec2 at(x0 + i * 120, y + rr * 70);
-            o.marker = 0, o.crosshair = 1;
+            ImVec2 at(260 + i * 120, 600 + rr * 70);
             hud::DrawAimPreview(dl, at, 1.5f, ages[i], rowKind[rr], o);
-            if (rr == 2) Small(dl, at.x, at.y + 34, ms[i], true);
+            if (rr == 2) Small(dl, at.x, at.y + 36, ms[i], true);
         }
     }
-    Small(dl, 60, y + 3 * 70 + 26,
-          "Tudo em tempo, n\xC3\xA3o em quadros: acerto 0,35 s, cabe\xC3\xA7" "a 0,55 s, abate 1,2 s, em qualquer FPS.");
 }
 
 static void BoardNumbers(ImDrawList* dl) {
@@ -359,6 +379,22 @@ int main(int argc, char** argv) {
     io.Fonts->Build();
     io.Fonts->GetTexDataAsRGBA32(&tex, &tw, &th);
     io.Fonts->SetTexID((ImTextureID)1);
+    const char* names[] = {"mira", "acerto", "colete", "cabeca", "abate", "corpo"};
+    for (int i = 0; i < hud::IMG_COUNT; ++i) {
+        std::string path = dir + "/" + names[i] + ".rgba";
+        FILE* f = fopen(path.c_str(), "rb");
+        if (!f) continue;
+        int wh[2];
+        if (fread(wh, sizeof(int), 2, f) == 2) {
+            images[i].w = wh[0], images[i].h = wh[1];
+            images[i].rgba.resize((size_t)wh[0] * wh[1] * 4);
+            if (fread(images[i].rgba.data(), 1, images[i].rgba.size(), f) == images[i].rgba.size()) {
+                hud::SetImage(i, (ImTextureID)(intptr_t)(10 + i));
+            }
+        }
+        fclose(f);
+    }
+    Check(!images[0].rgba.empty() && !images[5].rgba.empty(), "imagens padrao carregadas");
     opt::Options& o = opt::Get();
 
     // 1. Estilo Trok: hitmarker, numeros no personagem, local do acerto, direcao e borda vermelha (sem o informer)
@@ -394,7 +430,7 @@ int main(int argc, char** argv) {
     hud::State empty;
     empty.crosshair = CROSS;
     Frame(empty, false, 0.35f, BoardMarkers);
-    Save(dir + "/04-hitmarker.ppm", 0, 40, 1160, 960);
+    Save(dir + "/04-hitmarker.ppm", 0, 0, 1180, 880);
 
     // 5. Numeros
     Frame(empty, false, 0.35f, BoardNumbers);
@@ -426,19 +462,19 @@ int main(int argc, char** argv) {
 
     // 15. A borda na cor do que foi atingido: vida, colete e cabeca
     hud::Kind kinds[] = {hud::HEALTH, hud::ARMOUR, hud::HEADSHOT};
-    const char* names[] = {"/15a.ppm", "/15b.ppm", "/15c.ppm"};
+    const char* borders[] = {"/15a.ppm", "/15b.ppm", "/15c.ppm"};
     for (int i = 0; i < 3; ++i) {
         s = hud::State();
         s.crosshair = CROSS;
         s.flash = 0.9f;
         s.flashKind = kinds[i];
         Frame(s, true, 1.0f);
-        Save(dir + names[i]);
+        Save(dir + borders[i]);
     }
 
     // 8. A mira seguida de verdade: a do GTA (53% x 40%) e a de um mod que centraliza a mira (50% x 50%)
     o = opt::Options();
-    o.numbers = 2, o.direction = false, o.edgeFlash = false, o.crosshair = 0, o.marker = 1;
+    o.numbers = 2, o.direction = false, o.edgeFlash = false, o.crosshair = 0;
     s = Fight();
     s.taken.clear();
     s.given.clear();
@@ -463,11 +499,12 @@ int main(int argc, char** argv) {
     Menu(2, dir + "/12-menu-informer.ppm", 690, 1230);
     Menu(4, dir + "/13-menu-sons.ppm", 690, 1230);
     Menu(3, dir + "/14-menu-recebido.ppm", 690, 1230);
-    o.crosshair = 2, o.marker = 4; // imagens da pasta (sem os arquivos, a previa cai no Ponto)
-    Menu(0, dir + "/16-menu-mira-imagens.ppm", 690, 1230);
-    o = opt::Options();
-    o.crosshair = 0, o.crosshairStatic = true, o.marker = 1; // a mira do jogo, parada
+    Menu(5, dir + "/16-menu-geral.ppm", 690, 1230);
+    o.crosshair = 0, o.crosshairStatic = true; // a mira do jogo, parada
     Menu(0, dir + "/17-menu-mira-do-jogo.ppm", 690, 1230);
+    o = opt::Options();
+    o.crosshairSize = 150, o.fxHead = false, o.fxKill = false; // mira maior, sem cabeca e sem abate proprios
+    Menu(0, dir + "/18-menu-mira-tamanho.ppm", 690, 1230);
     o = opt::Options();
 
     printf("concept: %d falhas\n", failures);
