@@ -1,5 +1,5 @@
 // Trok Hitmarker (.asi) -- Victor_Trok
-// O menu do /trokhit no kit da casa: Mira, Numeros, Informer, Recebido, Sons e Geral.
+// O menu do /trokhit no kit da casa: Mira, Dano, Informer, Recebido, Sons e Geral.
 
 #include "menu.h"
 
@@ -21,7 +21,7 @@ using namespace tui;
 
 constexpr const char* VERSION_TAG = "v1.0";
 
-const char* const TABS[] = {"Mira", "N\xC3\xBAmeros", "Informer", "Recebido", "Sons", "Geral"};
+const char* const TABS[] = {"Mira", "Dano", "Informer", "Recebido", "Sons", "Geral"};
 constexpr int TAB_COUNT = 6;
 
 struct State {
@@ -73,7 +73,7 @@ void MarkerPreview(float x, float w) {
     for (int i = 0; i < 4; ++i) {
         float cx = x + w * (i + 0.5f) / 4;
         float scale = ImGui::GetIO().DisplaySize.y / 1080.0f * o.markerSize / 100.0f;
-        hud::DrawMarker(dl, ImVec2(cx, at.y + 40 * u), o.marker == 3 ? 0 : o.marker, scale, 0.1f, kinds[i], o);
+        hud::DrawMarker(dl, ImVec2(cx, at.y + 40 * u), o.marker, scale, 0.1f, kinds[i], o);
         ImVec2 ts = TextSize(fonts.desc, names[i]);
         Text(dl, fonts.desc, cx - ts.x * 0.5f, at.y + 68 * u, col::hint, names[i]);
     }
@@ -83,23 +83,26 @@ void MarkerPreview(float x, float w) {
 void TabMira(Rows& r, float x, float w) {
     opt::Options& o = opt::Get();
     const opt::Options& d = opt::Defaults();
-    static const char* const style[] = {"Cl\xC3\xA1ssico", "Discreto", "Anel", "Desligado"};
-    r.Cycle("Hitmarker", &o.marker, style, 4, d.marker);
-    static const char* const where[] = {"Na mira", "No corpo", "Nos dois"};
-    r.Segmented("Onde aparece", &o.markerWhere, where, 3, d.markerWhere);
+    static const char* const style[] = {"Cl\xC3\xA1ssico", "Discreto", "Anel"};
+    r.Cycle("Hitmarker", &o.marker, style, 3, d.marker);
     r.Slider("Tamanho", &o.markerSize, 50, 200, 10, "%d%%", d.markerSize);
+    r.Section("Na mira");
+    r.Toggle("Sinal de acerto na mira", &o.onAim);
+    static const char* const aim[] = {"A do jogo", "Centro", "Escolhida"};
+    r.Segmented("Posi\xC3\xA7\xC3\xA3o da mira", &o.aim, aim, 3, d.aim);
+    r.Section("No corpo");
+    r.Toggle("Local do acerto", &o.hitLocal);
+    r.Slider("Fica no corpo", &o.hitLocalTime, 1, 5, 1, "%d s", d.hitLocalTime);
+    r.Slider("Tamanho no corpo", &o.hitLocalSize, 50, 150, 10, "%d%%", d.hitLocalSize);
     r.Section("Cores");
     r.Color("Acerto na vida", &o.cHealth, d.cHealth);
     r.Color("Acerto no colete", &o.cArmour, d.cArmour);
     r.Color("Na cabe\xC3\xA7" "a", &o.cHead, d.cHead);
     r.Color("Abate", &o.cKill, d.cKill);
-    r.Section("Abate");
-    r.Toggle("Aviso de abate", &o.killBanner);
-    r.Toggle("Sequ\xC3\xAAncia de abates", &o.killStreak);
     MarkerPreview(x, w);
 }
 
-void TabNumeros(Rows& r) {
+void TabDano(Rows& r) {
     opt::Options& o = opt::Get();
     const opt::Options& d = opt::Defaults();
     static const char* const where[] = {"No personagem", "Na tela", "Desligado"};
@@ -128,10 +131,8 @@ void TabInformer(Rows& r) {
     r.Color("Cor fixa ao levar dano", &o.cTaken, d.cTaken);
     r.Toggle("Nome da arma", &o.weapon);
     r.Toggle("AFK no lugar do dano", &o.afk);
-    r.Section("Combo no alvo");
-    r.Toggle("Cart\xC3\xA3o do combo", &o.combo);
+    r.Toggle("Combo (acertos e dano somado)", &o.combo);
     r.Slider("Combo fecha depois de", &o.comboWindow, 1, 10, 1, "%d s", d.comboWindow);
-    r.Toggle("Partes do corpo acertadas", &o.bodyMap);
 }
 
 void TabRecebido(Rows& r) {
@@ -139,7 +140,6 @@ void TabRecebido(Rows& r) {
     r.Toggle("De onde veio o tiro", &o.direction);
     r.Toggle("Nome de quem atirou", &o.directionName);
     r.Toggle("Borda vermelha", &o.edgeFlash);
-    r.Toggle("Resumo quando voc\xC3\xAA morre", &o.deathRecap);
 }
 
 void TabSons(Rows& r) {
@@ -200,7 +200,7 @@ bool Frame() {
     bool escape = keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
 
     float width = 700 * u;
-    float height = std::min(io.DisplaySize.y * 0.8f, 580 * u);
+    float height = std::min(io.DisplaySize.y * 0.8f, 640 * u);
     PushStyle();
     bool keep = BeginShell("##trokHit", "Trok Hitmarker", VERSION_TAG, width, height, S.shell);
     ImVec2 pos = ImGui::GetWindowPos();
@@ -220,7 +220,7 @@ bool Frame() {
     rows.Begin(TABS[S.tab], cp.x + 4 * u, rowW, sel, keys, true);
     switch (S.tab) {
     case 0: TabMira(rows, cp.x + 4 * u, rowW); break;
-    case 1: TabNumeros(rows); break;
+    case 1: TabDano(rows); break;
     case 2: TabInformer(rows); break;
     case 3: TabRecebido(rows); break;
     case 4: TabSons(rows); break;

@@ -17,11 +17,12 @@ struct Options {
     int preset = 0; // estilo pronto aplicado por ultimo (so para o menu mostrar)
 
     // ---- Mira: o hitmarker
-    int marker = 0;          // 0 Classico (X), 1 Discreto, 2 Anel, 3 desligado
-    int markerWhere = 0;     // 0 na mira, 1 no corpo (onde o tiro pegou), 2 nos dois
+    int marker = 0;          // 0 Classico (X), 1 Discreto, 2 Anel
+    bool onAim = true;       // sinal de acerto na mira
     int markerSize = 100;    // %
-    bool killBanner = true;  // aviso de abate embaixo da mira, com a sequencia
-    bool killStreak = true;
+    // A mira de verdade: 0 segue a do jogo (le onde o GTA desenhou a mira neste quadro, entao vale com mod que
+    // centraliza ou sobe a mira), 1 centro da tela, 2 lugar escolhido no modo Mover (mira desenhada por outro mod)
+    int aim = 0;
 
     // ---- Numeros de dano
     int numbers = 0;         // 0 sobem do personagem, 1 sobem na tela (ao lado da mira), 2 desligado
@@ -29,6 +30,11 @@ struct Options {
     int numbersSize = 100;   // %
     int numbersFont = 0;     // 0 Arial Black (como o damage informer antigo), 1 fonte da casa
     int source = 0;          // 0 dano real (vida + colete que o alvo perdeu), 1 dano que o GTA calcula
+
+    // ---- Local do acerto: a marca fica na parte do corpo que o tiro pegou por alguns segundos, acompanhando o alvo
+    bool hitLocal = true;
+    int hitLocalTime = 2;    // s
+    int hitLocalSize = 80;   // %
 
     // ---- Informer (o layout do damage informer, com nome e combo)
     int informer = 0;        // 0 Classico, 1 Lista, 2 desligado
@@ -38,16 +44,13 @@ struct Options {
     bool afk = true;         // "AFK" no lugar do dano de quem esta pausado
     int informerSize = 100;
 
-    // ---- Combo no alvo (cartao com vida + colete reais e o dano somado)
-    bool combo = true;
+    bool combo = true;       // (x3 - 138) ao lado do numero: acertos e dano real somado no mesmo alvo
     int comboWindow = 3;     // s sem acertar ate o combo fechar
-    bool bodyMap = true;     // bonequinho com as partes acertadas
 
     // ---- Recebido
     bool direction = true;   // arco apontando de onde veio o tiro
     bool directionName = true;
     bool edgeFlash = true;   // borda vermelha ao levar dano
-    bool deathRecap = true;  // resumo da troca quando voce morre
 
     // ---- Cores (ARGB do ImGui)
     ImU32 cHealth = IM_COL32(255, 255, 255, 255);  // dano na vida
@@ -65,9 +68,7 @@ struct Options {
     // ---- Posicoes
     Place given = {0.60f, 0.40f};   // informer: dano dado (o lugar do damage informer antigo)
     Place taken = {0.30f, 0.40f};   // informer: dano levado
-    Place comboAt = {0.53f, 0.50f}; // cartao do combo (embaixo da mira)
-    Place banner = {0.50f, 0.68f};  // aviso de abate
-    Place recap = {0.50f, 0.60f};   // resumo da morte
+    Place aimAt = {0.50f, 0.50f};   // a mira, quando "lugar escolhido"
 };
 
 Options& Get();

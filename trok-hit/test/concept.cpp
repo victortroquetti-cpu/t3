@@ -113,9 +113,9 @@ static int Lit(int x0, int y0, int x1, int y1, float floorLum) {
 static const ImVec2 HEAD(1018, 423), CHEST(1018, 490), LEFTARM(1066, 500), LEG(1000, 640);
 static const ImU32 LUCAS = IM_COL32(255, 152, 51, 255), ENZO = IM_COL32(160, 110, 255, 255);
 
-static void GameCrosshair(ImDrawList* dl) {
-    dl->AddCircle(CROSS, 15, IM_COL32(255, 255, 255, 150), 40, 1.6f);
-    dl->AddCircleFilled(CROSS, 1.8f, IM_COL32(255, 255, 255, 190), 12);
+static void GameCrosshair(ImDrawList* dl, ImVec2 at) {
+    dl->AddCircle(at, 15, IM_COL32(255, 255, 255, 150), 40, 1.6f);
+    dl->AddCircleFilled(at, 1.8f, IM_COL32(255, 255, 255, 190), 12);
 }
 
 static void Label(ImDrawList* dl, float x, float y, const char* text, bool center = false, ImU32 c = 0) {
@@ -126,30 +126,6 @@ static void Label(ImDrawList* dl, float x, float y, const char* text, bool cente
 static void Small(ImDrawList* dl, float x, float y, const char* text, bool center = false) {
     ImVec2 ts = tui::TextSize(tui::fonts.desc, text);
     tui::Text(dl, tui::fonts.desc, center ? x - ts.x * 0.5f : x, y, IM_COL32(255, 255, 255, 130), text);
-}
-
-// O combo do exemplo: Lucas tinha 100 de colete + 100 de vida. Doze 50, tres de M4 (10 cada) e uma Deagle na
-// cabeca (46): o colete acaba e sobram 74 de vida.
-static hud::Combo LucasCombo() {
-    hud::Combo c;
-    c.nick = "Lucas_Mendes";
-    c.id = 3;
-    c.nickColor = LUCAS;
-    c.damage = 126;
-    c.hits = 5;
-    c.heads = 1;
-    c.pool = 200;
-    c.health = 74;
-    c.armour = 0;
-    c.ghost = 46;
-    c.ghostAge = 0.15f;
-    c.age = 0.2f;
-    c.window = 3;
-    c.zones[hud::TORSO] = 3;
-    c.zones[hud::HEAD] = 1;
-    c.zones[hud::LEFT_ARM] = 1;
-    c.weapons = "Doze, M4, Deagle";
-    return c;
 }
 
 static hud::Line LucasLine() {
@@ -181,10 +157,13 @@ static hud::Line EnzoLine() {
 static hud::State Fight() {
     hud::State s;
     s.crosshair = CROSS;
+    // os tiros de antes ainda marcados no corpo (perna e peito) e o da cabeca agora
     hud::Marker m;
-    m.body = HEAD;
-    m.age = 0.05f;
-    m.kind = hud::HEADSHOT;
+    m.body = LEG, m.age = 1.3f, m.kind = hud::ARMOUR;
+    s.markers.push_back(m);
+    m.body = CHEST, m.age = 0.6f, m.kind = hud::ARMOUR;
+    s.markers.push_back(m);
+    m.body = HEAD, m.age = 0.05f, m.kind = hud::HEADSHOT;
     s.markers.push_back(m);
     hud::Number n;
     // no jogo, o numero sai do lado direito do ponto acertado (a mira fica livre)
@@ -198,8 +177,6 @@ static hud::State Fight() {
     s.numbers.push_back(n);
     s.given = {LucasLine()};
     s.taken = {EnzoLine()};
-    s.hasCombo = true;
-    s.combo = LucasCombo();
     hud::Incoming in;
     in.angle = -0.95f;
     in.age = 0.3f;
@@ -217,7 +194,7 @@ static void Frame(const hud::State& s, bool crosshair, float dim, void (*extra)(
     io.DeltaTime = 1.0f / 60.0f;
     ImGui::NewFrame();
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
-    if (crosshair) GameCrosshair(dl);
+    if (crosshair) GameCrosshair(dl, s.crosshair);
     hud::Draw(dl, s, opt::Get(), io.DisplaySize);
     if (extra) extra(dl);
     ImGui::Render();
@@ -307,50 +284,13 @@ static void BoardNumbers(ImDrawList* dl) {
           "\"~46\": o servidor n\xC3\xA3o mostrou a vida do alvo caindo (vida escondida), ent\xC3\xA3o vale o n\xC3\xBAmero do GTA, com o ~ na frente.");
 }
 
-static void BoardCombo(ImDrawList* dl) {
-    opt::Options& o = opt::Get();
-    struct Step {
-        const char* title;
-        hud::Combo c;
-    };
-    std::vector<Step> steps;
-    hud::Combo c;
-    c.nick = "Lucas_Mendes", c.id = 3, c.nickColor = LUCAS, c.window = 3, c.age = 0.3f, c.ghostAge = 0.15f;
-    c.pool = 200, c.damage = 50, c.hits = 1, c.health = 100, c.armour = 50, c.ghost = 50, c.weapons = "Doze";
-    c.zones[hud::TORSO] = 1;
-    steps.push_back({"1. Doze certeira em quem tem colete + vida (200)", c});
-    c.damage = 80, c.hits = 4, c.armour = 20, c.ghost = 10, c.weapons = "Doze, M4", c.age = 1.1f;
-    c.zones[hud::TORSO] = 3, c.zones[hud::LEFT_ARM] = 1;
-    steps.push_back({"2. Depois, tr\xC3\xAAs de M4: o combo vai somando", c});
-    steps.push_back({"3. Deagle na cabe\xC3\xA7" "a: o colete acaba, sobram 74", LucasCombo()});
-    c = LucasCombo();
-    c.damage = 200, c.hits = 7, c.health = 0, c.ghost = 74, c.kill = true, c.age = 0.4f, c.zones[hud::TORSO] = 5;
-    steps.push_back({"4. Abate: 200 de 200", c});
-    hud::Combo v;
-    v.nick = "Pedro_Henrique", v.id = 21, v.nickColor = IM_COL32(120, 200, 255, 255), v.window = 3, v.age = 0.5f;
-    v.pool = 100, v.damage = 46, v.hits = 1, v.health = 54, v.ghost = 46, v.ghostAge = 0.2f, v.weapons = "Deagle";
-    v.zones[hud::TORSO] = 1;
-    steps.push_back({"S\xC3\xB3 com vida: o total \xC3\xA9 100", v});
-    v.nick = "Catharina", v.id = 31, v.nickColor = IM_COL32(255, 120, 190, 255), v.pool = 200, v.damage = 200;
-    v.health = 0, v.armour = 0, v.ghost = 200, v.kill = true, v.killHead = true, v.heads = 1, v.zones[hud::TORSO] = 0;
-    v.zones[hud::HEAD] = 1, v.weapons = "Sniper";
-    steps.push_back({"Servidor onde HS sem capacete mata em 1", v});
-    for (size_t i = 0; i < steps.size(); ++i) {
-        float x = i % 2 ? 1380 : 560, y = 90 + (i / 2) * 170;
-        Small(dl, x, y - 30, steps[i].title, true);
-        hud::DrawCombo(dl, ImVec2(x, y), steps[i].c, 1.15f, o);
-    }
-}
-
 static void ExtraMove(ImDrawList* dl) {
     // modo Mover: cada coisa com uma moldura tracejada que o mouse arrasta
     struct Box {
         ImVec2 a, b;
         const char* name;
     } boxes[] = {{{1140, 330}, {1470, 482}, "Informer: dado"},
-                 {{565, 330}, {895, 482}, "Informer: levado"},
-                 {{862, 533}, {1174, 625}, "Combo no alvo"},
-                 {{850, 690}, {1070, 810}, "Aviso de abate"}};
+                 {{565, 330}, {895, 482}, "Informer: levado"}};
     for (const Box& b : boxes) {
         for (float x = b.a.x; x < b.b.x; x += 14) {
             dl->AddLine(ImVec2(x, b.a.y), ImVec2(std::min(x + 7, b.b.x), b.a.y), IM_COL32(255, 255, 255, 160), 1.5f);
@@ -411,16 +351,16 @@ int main(int argc, char** argv) {
     io.Fonts->SetTexID((ImTextureID)1);
     opt::Options& o = opt::Get();
 
-    // 1. Estilo Trok: hitmarker, numeros no personagem, combo no alvo, direcao e borda vermelha (sem o informer)
+    // 1. Estilo Trok: hitmarker, numeros no personagem, local do acerto, direcao e borda vermelha (sem o informer)
     o.informer = 2;
     Frame(Fight(), true, 1.0f);
     Save(dir + "/01-cena-trok.ppm");
     Check(Lit(990, 404, 1046, 460, 0.5f) > 40, "hitmarker na mira, sem numero por cima");
-    Check(Lit(760, 540, 1280, 640, 0.55f) > 800, "cartao do combo embaixo da mira");
+    Check(Lit(1000, 470, 1036, 510, 0.5f) > 30, "local do acerto marcado no peito");
 
     // 2. Estilo Damage Informer: o layout antigo (nick parado, numero subindo, combo ao lado), hitmarker no corpo
     o = opt::Options();
-    o.numbers = 2, o.combo = false, o.markerWhere = 1, o.direction = false, o.edgeFlash = false;
+    o.numbers = 2, o.onAim = false, o.direction = false, o.edgeFlash = false;
     o.cHealth = IM_COL32(255, 100, 69, 255), o.cArmour = IM_COL32(255, 100, 69, 255);
     o.cHead = IM_COL32(140, 199, 244, 255), o.cCombo = IM_COL32(255, 0, 0, 255);
     Frame(Fight(), true, 1.0f);
@@ -430,7 +370,7 @@ int main(int argc, char** argv) {
 
     // 3. Informer em lista, com a cor fixa no nick (verde ao dar, vermelho ao levar)
     o = opt::Options();
-    o.informer = 1, o.nickGiven = 1, o.nickTaken = 1, o.combo = false, o.numbers = 2;
+    o.informer = 1, o.nickGiven = 1, o.nickTaken = 1, o.hitLocal = false, o.numbers = 2;
     o.given = {0.58f, 0.37f}, o.taken = {0.32f, 0.37f};
     hud::State s = Fight();
     hud::Line other;
@@ -451,9 +391,15 @@ int main(int argc, char** argv) {
     Frame(empty, false, 0.35f, BoardNumbers);
     Save(dir + "/05-numeros.ppm", 80, 40, 1600, 780);
 
-    // 6. Combo no alvo
-    Frame(empty, false, 0.35f, BoardCombo);
-    Save(dir + "/06-combo.ppm", 180, 30, 1760, 600);
+    // 6. Local do acerto: logo depois dos tiros e 1,5 s depois (a perna ja sumiu, o peito esta sumindo)
+    o.numbers = 2, o.informer = 2, o.direction = false, o.edgeFlash = false;
+    s = Fight();
+    Frame(s, true, 0.85f);
+    Save(dir + "/06a.ppm", 868, 360, 1168, 720);
+    for (hud::Marker& mk : s.markers) mk.age += 1.5f;
+    Frame(s, true, 0.85f);
+    Save(dir + "/06b.ppm", 868, 360, 1168, 720);
+    o = opt::Options();
 
     // 7. Recebido: dois tiros (frente-esquerda e por tras a direita), aviso de abate e resumo da morte
     s = hud::State();
@@ -469,35 +415,32 @@ int main(int argc, char** argv) {
     Save(dir + "/07-recebido.ppm");
     Check(Lit(820, 280, 940, 380, 0.5f) > 100, "arco de quem atirou pela frente-esquerda");
 
-    s = hud::State();
-    s.crosshair = CROSS;
-    s.hasBanner = true;
-    s.banner.nick = "Lucas_Mendes", s.banner.nickColor = LUCAS, s.banner.weapon = "Deagle", s.banner.head = true;
-    s.banner.streak = 2, s.banner.age = 0.4f;
-    o.banner = {0.30f, 0.45f};
-    s.hasRecap = true;
-    s.recap.killer = "Enzo_Rampani", s.recap.killerColor = ENZO, s.recap.weapon = "M4", s.recap.head = true;
-    s.recap.given = 92, s.recap.givenHits = 4, s.recap.taken = 200, s.recap.takenHits = 9, s.recap.takenHeads = 1;
-    s.recap.hits = {"M4 10", "M4 10", "M4 10", "Deagle 46", "M4 10 (cabe\xC3\xA7" "a)"};
-    s.recap.age = 1.0f;
-    o.recap = {0.68f, 0.45f};
-    Frame(s, false, 0.45f);
-    Save(dir + "/08-abate-e-morte.ppm", 300, 300, 1620, 700);
+    // 8. A mira seguida de verdade: a do GTA (53% x 40%) e a de um mod que centraliza a mira (50% x 50%)
+    o = opt::Options();
+    o.numbers = 2, o.direction = false, o.edgeFlash = false;
+    s = Fight();
+    s.taken.clear();
+    s.given.clear();
+    o.informer = 2;
+    Frame(s, true, 0.75f);
+    Save(dir + "/08a.ppm", 700, 260, 1340, 620);
+    s.crosshair = ImVec2(960, 540);
+    Frame(s, true, 0.75f);
+    Save(dir + "/08b.ppm", 640, 368, 1280, 728);
+    Check(Lit(930, 512, 990, 568, 0.5f) > 40, "hitmarker na mira centralizada");
     o = opt::Options();
 
     // 9. Modo Mover: cada caixa com um exemplo dentro
     s = Fight();
-    s.hasBanner = true;
-    s.banner.nick = "Lucas_Mendes", s.banner.nickColor = LUCAS, s.banner.weapon = "Deagle", s.banner.age = 0.5f;
     Frame(s, true, 0.8f, ExtraMove);
     Save(dir + "/09-mover.ppm", 480, 290, 1560, 1040);
 
     // 10-11. Menu
     menu::Toggle();
     Menu(0, dir + "/10-menu-mira.ppm", 690, 1230);
-    Menu(2, dir + "/11-menu-informer.ppm", 690, 1230);
-    Menu(4, dir + "/12-menu-sons.ppm", 690, 1230);
-    Menu(5, dir + "/13-menu-geral.ppm", 690, 1230);
+    Menu(1, dir + "/11-menu-dano.ppm", 690, 1230);
+    Menu(2, dir + "/12-menu-informer.ppm", 690, 1230);
+    Menu(4, dir + "/13-menu-sons.ppm", 690, 1230);
 
     printf("concept: %d falhas\n", failures);
     return failures ? 1 : 0;

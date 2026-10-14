@@ -76,22 +76,6 @@ void Classic(ImDrawList* dl, ImVec2 c, float r0, float r1, float th, ImU32 color
     }
 }
 
-// ---------------------------------------------------------------- caveira (aviso de abate)
-
-void Skull(ImDrawList* dl, ImVec2 c, float r, ImU32 color, ImU32 hole) {
-    dl->AddCircleFilled(ImVec2(c.x, c.y - r * 0.12f), r, color, 28);
-    dl->AddRectFilled(ImVec2(c.x - r * 0.62f, c.y + r * 0.3f), ImVec2(c.x + r * 0.62f, c.y + r * 1.05f), color,
-                      r * 0.22f);
-    dl->AddCircleFilled(ImVec2(c.x - r * 0.4f, c.y + r * 0.02f), r * 0.27f, hole, 16);
-    dl->AddCircleFilled(ImVec2(c.x + r * 0.4f, c.y + r * 0.02f), r * 0.27f, hole, 16);
-    dl->AddTriangleFilled(ImVec2(c.x, c.y + r * 0.32f), ImVec2(c.x - r * 0.12f, c.y + r * 0.55f),
-                          ImVec2(c.x + r * 0.12f, c.y + r * 0.55f), hole);
-    for (int i = -1; i <= 1; ++i) {
-        dl->AddLine(ImVec2(c.x + i * r * 0.22f, c.y + r * 0.72f), ImVec2(c.x + i * r * 0.22f, c.y + r * 1.05f), hole,
-                    std::max(1.0f, r * 0.09f));
-    }
-}
-
 // ---------------------------------------------------------------- informer
 
 const char* KindLabel(const Hit& h, char* buf, size_t n) {
@@ -137,7 +121,7 @@ void InformerClassic(ImDrawList* dl, const Line& l, ImVec2 at, bool given, const
             KindLabel(h, text, sizeof(text));
         }
         Outlined(dl, nf, numSize, ImVec2(at.x, y), Alpha(c, a), text, 1.6f * s);
-        if (given && i + 1 == l.recent.size() && l.hits > 1 && !l.afk) {
+        if (given && o.combo && i + 1 == l.recent.size() && l.hits > 1 && !l.afk) {
             char combo[32];
             snprintf(combo, sizeof(combo), "(x%d \xC2\xB7 %d)", l.hits, l.total);
             ImVec2 ts = Size(nf, numSize, text);
@@ -224,13 +208,18 @@ ImU32 KindColor(Kind k, const opt::Options& o) {
     }
 }
 
-void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kind kind, const opt::Options& o) {
+void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kind kind, const opt::Options& o,
+                float stay) {
     bool kill = kind == KILL;
     float life = kill ? 0.65f : style == 1 ? 0.2f : 0.32f;
-    if (age >= life || style == 3) {
+    float hold = kill ? 0.4f : style == 1 ? 0.08f : 0.16f;
+    if (stay > 0) {
+        life = stay;
+        hold = std::max(0.1f, stay - 0.35f);
+    }
+    if (age >= life) {
         return;
     }
-    float hold = kill ? 0.4f : style == 1 ? 0.08f : 0.16f;
     float a = age < hold ? 1.0f : 1.0f - (age - hold) / (life - hold);
     ImU32 color = Alpha(KindColor(kind, o), a);
     float pop = 1.0f + (kill ? 0.6f : 0.45f) * (1.0f - EaseOut(age / 0.08f));
@@ -244,7 +233,7 @@ void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kin
         Classic(dl, c, 5 * s * pop, 11 * s * pop * big, 1.6f * s, color, false);
         break;
     default: { // anel que abre
-        float r = (9 + 7 * EaseOut(age / life)) * s * big;
+        float r = (9 + 7 * EaseOut(age / std::min(life, 0.32f))) * s * big;
         dl->AddCircle(c, r + 1.2f * s, Alpha(IM_COL32(0, 0, 0, 255), 0.5f * a), 40, 4.2f * s);
         dl->AddCircle(c, r, color, 40, 2.2f * s);
         if (kill) {
@@ -278,109 +267,6 @@ void DrawNumber(ImDrawList* dl, const Number& n, float scale, const opt::Options
     float x = n.from.x + n.drift * 34 * scale * EaseOut(n.age / 0.6f) - ts.x * 0.5f;
     float y = n.from.y - rise - ts.y * 0.5f;
     Outlined(dl, f, size, ImVec2(x, y), Alpha(KindColor(n.kind, o), a), text, 2.0f * scale);
-}
-
-void DrawBodyMap(ImDrawList* dl, ImVec2 tl, float h, const int* zones, const opt::Options& o, float alpha) {
-    float u = h / 54.0f;
-    float cx = tl.x + 14 * u;
-    auto zc = [&](int part) {
-        int n = zones[part];
-        if (n <= 0) {
-            return Alpha(IM_COL32(255, 255, 255, 46), alpha);
-        }
-        if (part == HEAD) {
-            return Alpha(o.cHead, alpha);
-        }
-        return Alpha(IM_COL32(255, 255, 255, std::min(255, 150 + n * 35)), alpha);
-    };
-    dl->AddCircleFilled(ImVec2(cx, tl.y + 5 * u), 4.6f * u, zc(HEAD), 20);
-    dl->AddRectFilled(ImVec2(cx - 6 * u, tl.y + 11.5f * u), ImVec2(cx + 6 * u, tl.y + 27 * u), zc(TORSO), 2.5f * u);
-    dl->AddRectFilled(ImVec2(cx - 6 * u, tl.y + 28 * u), ImVec2(cx + 6 * u, tl.y + 32 * u), zc(GROIN), 1.5f * u);
-    dl->AddRectFilled(ImVec2(cx - 11 * u, tl.y + 12 * u), ImVec2(cx - 7.5f * u, tl.y + 29 * u), zc(RIGHT_ARM), 1.6f * u);
-    dl->AddRectFilled(ImVec2(cx + 7.5f * u, tl.y + 12 * u), ImVec2(cx + 11 * u, tl.y + 29 * u), zc(LEFT_ARM), 1.6f * u);
-    dl->AddRectFilled(ImVec2(cx - 6 * u, tl.y + 33 * u), ImVec2(cx - 1 * u, tl.y + 53 * u), zc(RIGHT_LEG), 1.6f * u);
-    dl->AddRectFilled(ImVec2(cx + 1 * u, tl.y + 33 * u), ImVec2(cx + 6 * u, tl.y + 53 * u), zc(LEFT_LEG), 1.6f * u);
-}
-
-void DrawCombo(ImDrawList* dl, ImVec2 center, const Combo& c, float scale, const opt::Options& o) {
-    float s = scale;
-    float fade = c.kill ? (c.age < 2.2f ? 1.0f : 1.0f - (c.age - 2.2f) / 0.4f)
-                        : (c.age < c.window ? 1.0f : 1.0f - (c.age - c.window) / 0.4f);
-    if (fade <= 0) {
-        return;
-    }
-    float mapW = o.bodyMap ? 30 * s : 0;
-    float w = 268 * s + mapW, h = 78 * s;
-    ImVec2 p(std::floor(center.x - w * 0.5f), std::floor(center.y));
-    dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), Alpha(IM_COL32(14, 16, 20, 214), fade), 8 * s);
-    dl->AddRect(p, ImVec2(p.x + w, p.y + h), Alpha(IM_COL32(255, 255, 255, 18), fade), 8 * s, 0, 1.0f);
-    float pad = 12 * s;
-    float x = p.x + pad, right = p.x + w - pad - mapW;
-
-    // nick e id
-    dl->AddText(g_text, 16 * s, ImVec2(x, p.y + 10 * s), Alpha(Opaque(c.nickColor), fade), c.nick.c_str());
-    char id[8];
-    snprintf(id, sizeof(id), "%d", c.id);
-    float nx = x + Size(g_text, 16 * s, c.nick.c_str()).x + 6 * s;
-    dl->AddText(g_text, 13 * s, ImVec2(nx, p.y + 12 * s), Alpha(IM_COL32(255, 255, 255, 110), fade), id);
-
-    // o dano somado (ou o abate)
-    ImFont* nf = NumberFont(o);
-    char total[16], of[24];
-    snprintf(total, sizeof(total), "%d", c.damage);
-    snprintf(of, sizeof(of), "de %d", c.pool);
-    if (c.kill) {
-        const char* label = c.killHead ? "ABATE NA CABE\xC3\x87" "A" : "ABATE";
-        ImU32 kc = c.killHead ? o.cHead : o.cKill;
-        ImVec2 ls = Size(g_text, 14 * s, label);
-        dl->AddText(g_text, 14 * s, ImVec2(right - ls.x, p.y + 12 * s), Alpha(kc, fade), label);
-    } else {
-        ImVec2 ts = Size(nf, 24 * s, total), os = Size(g_text, 12 * s, of);
-        dl->AddText(g_text, 12 * s, ImVec2(right - os.x, p.y + 14 * s), Alpha(IM_COL32(255, 255, 255, 120), fade), of);
-        dl->AddText(nf, 24 * s, ImVec2(right - os.x - 6 * s - ts.x, p.y + 6 * s), Alpha(IM_COL32(255, 255, 255, 255), fade),
-                    total);
-    }
-
-    // barra: colete (cinza claro) + vida (vermelho), proporcional ao que o alvo tinha quando o combo comecou
-    float by = p.y + 36 * s, bh = 8 * s, bw = right - x;
-    float pool = static_cast<float>(std::max(c.pool, c.health + c.armour + c.ghost));
-    dl->AddRectFilled(ImVec2(x, by), ImVec2(x + bw, by + bh), Alpha(IM_COL32(255, 255, 255, 22), fade), bh * 0.5f);
-    float hx = x + bw * c.health / pool;
-    float ax = hx + bw * c.armour / pool;
-    if (c.health > 0) {
-        dl->AddRectFilled(ImVec2(x, by), ImVec2(hx, by + bh), Alpha(IM_COL32(229, 72, 77, 255), fade), bh * 0.5f,
-                          c.armour > 0 ? ImDrawFlags_RoundCornersLeft : ImDrawFlags_RoundCornersAll);
-    }
-    if (c.armour > 0) {
-        dl->AddRectFilled(ImVec2(hx, by), ImVec2(ax, by + bh), Alpha(IM_COL32(214, 222, 234, 255), fade), bh * 0.5f,
-                          c.health > 0 ? ImDrawFlags_RoundCornersRight : ImDrawFlags_RoundCornersAll);
-    }
-    if (c.ghost > 0 && c.ghostAge < 0.6f) {
-        float gx = ax + bw * c.ghost / pool;
-        float ga = 1.0f - c.ghostAge / 0.6f;
-        dl->AddRectFilled(ImVec2(ax, by + bh * (0.5f - 0.5f * ga)), ImVec2(gx, by + bh * (0.5f + 0.5f * ga)),
-                          Alpha(IM_COL32(255, 255, 255, 230), fade * ga), 1.5f * s);
-    }
-
-    // acertos, cabeca e armas
-    char info[96];
-    if (c.heads > 0) {
-        snprintf(info, sizeof(info), "%d acerto%s \xC2\xB7 %d na cabe\xC3\xA7" "a \xC2\xB7 %s", c.hits, c.hits == 1 ? "" : "s",
-                 c.heads, c.weapons.c_str());
-    } else {
-        snprintf(info, sizeof(info), "%d acerto%s \xC2\xB7 %s", c.hits, c.hits == 1 ? "" : "s", c.weapons.c_str());
-    }
-    dl->AddText(g_text, 12.5f * s, ImVec2(x, p.y + 52 * s), Alpha(IM_COL32(255, 255, 255, 150), fade), info);
-
-    // tempo que falta para o combo fechar
-    if (!c.kill) {
-        float left = Clamp01(1.0f - c.age / c.window);
-        dl->AddRectFilled(ImVec2(p.x + 8 * s, p.y + h - 3 * s), ImVec2(p.x + 8 * s + (w - 16 * s) * left, p.y + h - 1.5f * s),
-                          Alpha(IM_COL32(255, 255, 255, 70), fade), 1.0f);
-    }
-    if (o.bodyMap) {
-        DrawBodyMap(dl, ImVec2(p.x + w - pad - mapW + 4 * s, p.y + 12 * s), 54 * s, c.zones, o, fade);
-    }
 }
 
 void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen) {
@@ -453,95 +339,21 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
         InformerList(dl, st.taken, ImVec2(tAt.x + 300 * k * o.informerSize / 100.0f, tAt.y), false, o, k);
     }
 
-    // combo no alvo
-    if (o.combo && st.hasCombo) {
-        DrawCombo(dl, ImVec2(o.comboAt.x * screen.x, o.comboAt.y * screen.y), st.combo, k, o);
-    }
-
-    // hitmarker
-    float ms = k * o.markerSize / 100.0f;
-    for (const Marker& m : st.markers) {
-        if (o.markerWhere != 1) {
-            DrawMarker(dl, st.crosshair, o.marker, ms, m.age, m.kind, o);
-        }
-        if (o.markerWhere != 0) {
-            DrawMarker(dl, m.body, o.marker, ms * 0.8f, m.age, m.kind, o);
-        }
-    }
-
-    // aviso de abate
-    if (o.killBanner && st.hasBanner && st.banner.age < 2.6f) {
-        const Banner& b = st.banner;
-        float a = b.age < 2.2f ? 1.0f : 1.0f - (b.age - 2.2f) / 0.4f;
-        float pop = 1.0f + 0.25f * (1.0f - EaseOut(b.age / 0.12f));
-        ImVec2 c(o.banner.x * screen.x, o.banner.y * screen.y);
-        ImU32 accent = b.head ? o.cHead : o.cKill;
-        Skull(dl, ImVec2(c.x, c.y - 18 * k * pop), 15 * k * pop, Alpha(accent, a), Alpha(IM_COL32(14, 16, 20, 255), a));
-        const char* title = b.head ? "ABATE NA CABE\xC3\x87" "A" : "ABATE";
-        ImVec2 ts = Size(g_text, 20 * k, title);
-        Outlined(dl, g_text, 20 * k, ImVec2(c.x - ts.x * 0.5f, c.y + 6 * k), Alpha(IM_COL32(255, 255, 255, 255), a), title,
-                 1.3f * k);
-        char who[64];
-        snprintf(who, sizeof(who), "%s \xC2\xB7 %s", b.nick.c_str(), b.weapon.c_str());
-        ImVec2 ws = Size(g_text, 15 * k, who);
-        Outlined(dl, g_text, 15 * k, ImVec2(c.x - ws.x * 0.5f, c.y + 31 * k), Alpha(Opaque(b.nickColor), a), who, 1.2f * k);
-        if (o.killStreak) {
-            for (int i = 0; i < 5; ++i) {
-                ImVec2 d(c.x + (i - 2) * 16 * k, c.y + 60 * k);
-                float r = 4.5f * k;
-                ImU32 col = i < b.streak ? Alpha(accent, a) : Alpha(IM_COL32(255, 255, 255, 60), a);
-                dl->AddQuadFilled(ImVec2(d.x, d.y - r), ImVec2(d.x + r, d.y), ImVec2(d.x, d.y + r), ImVec2(d.x - r, d.y), col);
+    // local do acerto: a marca fica na parte do corpo que o tiro pegou (o samp.cpp atualiza a posicao do osso)
+    if (o.hitLocal) {
+        float bs = k * o.markerSize / 100.0f * o.hitLocalSize / 100.0f;
+        for (const Marker& m : st.markers) {
+            if (m.bodyVisible) {
+                DrawMarker(dl, m.body, o.marker, bs, m.age, m.kind, o, static_cast<float>(o.hitLocalTime));
             }
         }
     }
 
-    // resumo da morte
-    if (o.deathRecap && st.hasRecap) {
-        const Recap& r = st.recap;
-        float a = EaseOut(r.age / 0.25f);
-        float w = 440 * k, h = 150 * k;
-        ImVec2 p(std::floor(o.recap.x * screen.x - w * 0.5f), std::floor(o.recap.y * screen.y - h * 0.5f));
-        dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), Alpha(IM_COL32(14, 16, 20, 225), a), 10 * k);
-        dl->AddRect(p, ImVec2(p.x + w, p.y + h), Alpha(IM_COL32(255, 255, 255, 18), a), 10 * k, 0, 1.0f);
-        float x = p.x + 16 * k, y = p.y + 13 * k;
-        dl->AddText(g_text, 12 * k, ImVec2(x, y), Alpha(IM_COL32(255, 255, 255, 120), a), "VOC\xC3\x8A MORREU PARA");
-        y += 17 * k;
-        dl->AddText(g_text, 19 * k, ImVec2(x, y), Alpha(Opaque(r.killerColor), a), r.killer.c_str());
-        float tx = x + Size(g_text, 19 * k, r.killer.c_str()).x + 10 * k;
-        dl->AddText(g_text, 13.5f * k, ImVec2(tx, y + 4 * k), Alpha(IM_COL32(255, 255, 255, 160), a), r.weapon.c_str());
-        tx += Size(g_text, 13.5f * k, r.weapon.c_str()).x + 10 * k;
-        if (r.head) {
-            const char* hs = "na cabe\xC3\xA7" "a";
-            ImVec2 hsz = Size(g_text, 12 * k, hs);
-            dl->AddRectFilled(ImVec2(tx, y + 2 * k), ImVec2(tx + hsz.x + 12 * k, y + 21 * k), Alpha(o.cHead, a * 0.18f), 4 * k);
-            dl->AddText(g_text, 12 * k, ImVec2(tx + 6 * k, y + 5 * k), Alpha(o.cHead, a), hs);
-        }
-        y += 34 * k;
-        ImFont* nf = NumberFont(o);
-        auto column = [&](float cx, const char* label, int value, const char* sub, ImU32 c) {
-            dl->AddText(g_text, 12 * k, ImVec2(cx, y), Alpha(IM_COL32(255, 255, 255, 120), a), label);
-            char v[16];
-            snprintf(v, sizeof(v), "%d", value);
-            dl->AddText(nf, 26 * k, ImVec2(cx, y + 14 * k), Alpha(c, a), v);
-            float vx = cx + Size(nf, 26 * k, v).x + 8 * k;
-            dl->AddText(g_text, 12.5f * k, ImVec2(vx, y + 24 * k), Alpha(IM_COL32(255, 255, 255, 140), a), sub);
-        };
-        char gsub[32], tsub[48];
-        snprintf(gsub, sizeof(gsub), "%d acertos", r.givenHits);
-        if (r.takenHeads > 0) {
-            snprintf(tsub, sizeof(tsub), "%d acertos \xC2\xB7 %d na cabe\xC3\xA7" "a", r.takenHits, r.takenHeads);
-        } else {
-            snprintf(tsub, sizeof(tsub), "%d acertos", r.takenHits);
-        }
-        column(x, "VOC\xC3\x8A DEU", r.given, gsub, o.cGiven);
-        column(x + w * 0.47f, "VOC\xC3\x8A LEVOU", r.taken, tsub, o.cTaken);
-        y += 52 * k;
-        float cx = x;
-        for (const std::string& hstr : r.hits) {
-            ImVec2 hsz = Size(g_text, 12 * k, hstr.c_str());
-            dl->AddRectFilled(ImVec2(cx, y), ImVec2(cx + hsz.x + 12 * k, y + 19 * k), Alpha(IM_COL32(255, 255, 255, 16), a), 4 * k);
-            dl->AddText(g_text, 12 * k, ImVec2(cx + 6 * k, y + 3 * k), Alpha(IM_COL32(255, 255, 255, 170), a), hstr.c_str());
-            cx += hsz.x + 18 * k;
+    // sinal de acerto na mira (onde a mira esta neste quadro)
+    if (o.onAim) {
+        float ms = k * o.markerSize / 100.0f;
+        for (const Marker& m : st.markers) {
+            DrawMarker(dl, st.crosshair, o.marker, ms, m.age, m.kind, o);
         }
     }
 }

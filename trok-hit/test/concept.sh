@@ -29,4 +29,23 @@ from PIL import Image
 for f in sorted(glob.glob(os.path.join(sys.argv[1], '*.ppm'))):
     Image.open(f).save(f[:-4] + '.png'); os.remove(f)
 " "$OUT"
+# imagens em duas metades, lado a lado com legenda: o local do acerto (logo depois e 1,5 s depois) e a mira seguida
+python3 -I -c "
+import os, sys
+from PIL import Image, ImageDraw, ImageFont
+d, font = sys.argv[1], sys.argv[2]
+def pair(a, b, out, la, lb):
+    a, b = Image.open(os.path.join(d, a)), Image.open(os.path.join(d, b))
+    img = Image.new('RGB', (a.width + b.width + 16, a.height + 44), (20, 22, 26))
+    img.paste(a, (0, 44)); img.paste(b, (a.width + 16, 44))
+    f = ImageFont.truetype(font, 17)
+    dr = ImageDraw.Draw(img)
+    dr.text((14, 13), la, font=f, fill=(225, 225, 225))
+    dr.text((a.width + 30, 13), lb, font=f, fill=(225, 225, 225))
+    img.save(os.path.join(d, out))
+    for n in (a.filename, b.filename): os.remove(n)
+pair('06a.png', '06b.png', '06-local-do-acerto.png', 'Logo depois: perna, peito e cabeça', '1,5 s depois')
+pair('08a.png', '08b.png', '08-mira-seguida.png', 'Mira do GTA (53% x 40% da tela)',
+     'Mod que centraliza a mira (50% x 50%): o sinal vai junto')
+" "$OUT" "$FONT"
 rm -f -- "$OUT/concept" "$OUT/fundo.rgb"
