@@ -179,8 +179,6 @@ static hud::State Fight() {
     in.angle = -0.95f;
     in.age = 0.3f;
     in.damage = 10;
-    in.nick = "Enzo_Rampani";
-    in.nickColor = ENZO;
     s.incoming.push_back(in);
     s.flash = 0.35f;
     return s;
@@ -245,9 +243,10 @@ static void BoardNumbers(ImDrawList* dl) {
     hud::DrawNumber(dl, n, k, o);
     Small(dl, 780, 380, "4 tiros = 40", true);
 
-    Label(dl, 1120, 70, "Sobem na tela, ao lado da mira");
-    hud::DrawMarker(dl, ImVec2(1200, 300), 0, 1.0f, 0.06f, hud::HEALTH, o);
-    dl->AddCircle(ImVec2(1200, 300), 15, IM_COL32(255, 255, 255, 150), 40, 1.6f);
+    Label(dl, 1120, 70, "Sobem na tela, do lado do centro");
+    dl->AddLine(ImVec2(1192, 300), ImVec2(1208, 300), IM_COL32(255, 255, 255, 90), 1.5f);
+    dl->AddLine(ImVec2(1200, 292), ImVec2(1200, 308), IM_COL32(255, 255, 255, 90), 1.5f);
+    Small(dl, 1200, 316, "centro", true);
     float a2[] = {0.7f, 0.42f, 0.12f};
     int v2[] = {10, 10, 46};
     hud::Kind k2[] = {hud::HEALTH, hud::HEALTH, hud::HEADSHOT};
@@ -286,8 +285,8 @@ static void ExtraMove(ImDrawList* dl) {
     struct Box {
         ImVec2 a, b;
         const char* name;
-    } boxes[] = {{{1140, 330}, {1470, 482}, "Informer: dado"},
-                 {{565, 330}, {895, 482}, "Informer: levado"}};
+    } boxes[] = {{{1142, 370}, {1478, 560}, "Informer: dado"},
+                 {{432, 370}, {778, 560}, "Informer: levado"}};
     for (const Box& b : boxes) {
         for (float x = b.a.x; x < b.b.x; x += 14) {
             dl->AddLine(ImVec2(x, b.a.y), ImVec2(std::min(x + 7, b.b.x), b.a.y), IM_COL32(255, 255, 255, 160), 1.5f);
@@ -362,20 +361,19 @@ int main(int argc, char** argv) {
     o.cHead = IM_COL32(140, 199, 244, 255), o.cCombo = IM_COL32(255, 0, 0, 255);
     Frame(Fight(), true, 1.0f);
     Save(dir + "/02-cena-damage-informer.ppm");
-    Check(Lit(1150, 300, 1500, 480, 0.45f) > 300, "informer classico do dano dado (60% x 40%)");
-    Check(Lit(570, 300, 900, 480, 0.45f) > 300, "informer classico do dano levado (30% x 40%)");
+    Check(Lit(1150, 380, 1480, 560, 0.45f) > 300, "informer classico do dano dado, a direita do centro");
+    Check(Lit(440, 380, 770, 560, 0.45f) > 300, "informer classico do dano levado, a esquerda do centro");
 
     // 3. Informer em lista, com a cor fixa no nick (verde ao dar, vermelho ao levar)
     o = opt::Options();
     o.informer = 1, o.nickGiven = 1, o.nickTaken = 1, o.hitLocal = false, o.numbers = 2;
-    o.given = {0.58f, 0.37f}, o.taken = {0.32f, 0.37f};
     hud::State s = Fight();
     hud::Line other;
     other.nick = "Victor_Trok", other.id = 12, other.nickColor = IM_COL32(79, 140, 255, 255);
     other.hits = 1, other.total = 10, other.age = 1.4f;
     s.given.push_back(other);
     Frame(s, true, 1.0f);
-    Save(dir + "/03-informer-lista.ppm", 440, 300, 1760, 640);
+    Save(dir + "/03-informer-lista.ppm", 400, 300, 1520, 640);
 
     // 4. Hitmarkers
     o = opt::Options();
@@ -398,19 +396,31 @@ int main(int argc, char** argv) {
     Save(dir + "/06b.ppm", 868, 360, 1168, 720);
     o = opt::Options();
 
-    // 7. Recebido: dois tiros (frente-esquerda e por tras a direita), aviso de abate e resumo da morte
+    // 7. Recebido: dois tiros (frente-esquerda e por tras a direita); a seta fica em volta do centro da tela
     s = hud::State();
     s.crosshair = CROSS;
     hud::Incoming in;
-    in.angle = -0.95f, in.age = 0.2f, in.damage = 46, in.nick = "Enzo_Rampani", in.nickColor = ENZO;
+    in.angle = -0.95f, in.age = 0.2f, in.damage = 46;
     s.incoming.push_back(in);
-    in.angle = 2.5f, in.age = 0.7f, in.damage = 10, in.nick = "Lucas_Mendes", in.nickColor = LUCAS;
+    in.angle = 2.5f, in.age = 0.7f, in.damage = 10;
     s.incoming.push_back(in);
     s.flash = 0.8f;
     s.taken = {EnzoLine()};
     Frame(s, true, 1.0f);
     Save(dir + "/07-recebido.ppm");
-    Check(Lit(820, 280, 940, 380, 0.5f) > 100, "arco de quem atirou pela frente-esquerda");
+    Check(Lit(780, 400, 880, 500, 0.4f) > 60, "seta de quem atirou pela frente-esquerda, em volta do centro");
+
+    // 15. A borda na cor do que foi atingido: vida, colete e cabeca
+    hud::Kind kinds[] = {hud::HEALTH, hud::ARMOUR, hud::HEADSHOT};
+    const char* names[] = {"/15a.ppm", "/15b.ppm", "/15c.ppm"};
+    for (int i = 0; i < 3; ++i) {
+        s = hud::State();
+        s.crosshair = CROSS;
+        s.flash = 0.9f;
+        s.flashKind = kinds[i];
+        Frame(s, true, 1.0f);
+        Save(dir + names[i]);
+    }
 
     // 8. A mira seguida de verdade: a do GTA (53% x 40%) e a de um mod que centraliza a mira (50% x 50%)
     o = opt::Options();
@@ -430,7 +440,7 @@ int main(int argc, char** argv) {
     // 9. Modo Mover: cada caixa com um exemplo dentro
     s = Fight();
     Frame(s, true, 0.8f, ExtraMove);
-    Save(dir + "/09-mover.ppm", 480, 290, 1560, 1040);
+    Save(dir + "/09-mover.ppm", 380, 290, 1540, 1040);
 
     // 10-11. Menu
     menu::Toggle();

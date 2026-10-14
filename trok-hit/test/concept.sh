@@ -47,5 +47,14 @@ def pair(a, b, out, la, lb):
 pair('06a.png', '06b.png', '06-local-do-acerto.png', 'Logo depois: perna, peito e cabeça', '1,5 s depois')
 pair('08a.png', '08b.png', '08-mira-seguida.png', 'Mira do GTA (53% x 40% da tela)',
      'Mod que centraliza a mira (50% x 50%): o sinal vai junto')
+ims = [Image.open(os.path.join(d, n)) for n in ('15a.png', '15b.png', '15c.png')]
+f = ImageFont.truetype(font, 17)
+img = Image.new('RGB', (3 * 640 + 32, 360 + 44), (20, 22, 26))
+dr = ImageDraw.Draw(img)
+for i, (im, label) in enumerate(zip(ims, ['Levou na vida (vermelho)', 'Levou no colete (preto)', 'Levou na cabe\u00e7a (azul)'])):
+    img.paste(im.resize((640, 360), Image.LANCZOS), (i * 656, 44))
+    dr.text((i * 656 + 14, 13), label, font=f, fill=(225, 225, 225))
+    os.remove(im.filename)
+img.save(os.path.join(d, '15-borda.png'))
 " "$OUT" "$FONT"
 rm -f -- "$OUT/concept" "$OUT/fundo.rgb"

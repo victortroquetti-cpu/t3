@@ -23,7 +23,7 @@ struct Options {
     int markerSize = 100;    // %
 
     // ---- Numeros de dano
-    int numbers = 0;         // 0 sobem do personagem, 1 sobem na tela (ao lado da mira), 2 desligado
+    int numbers = 0;         // 0 sobem do personagem, 1 sobem na tela (ao lado do centro), 2 desligado
     bool numbersSum = true;  // tiros seguidos no mesmo alvo somam no mesmo numero
     int numbersSize = 100;   // %
     int numbersFont = 0;     // 0 Arial Black (como o damage informer antigo), 1 fonte da casa
@@ -45,9 +45,8 @@ struct Options {
     int comboWindow = 3;     // s sem acertar ate o combo fechar
 
     // ---- Recebido
-    bool direction = true;   // arco apontando de onde veio o tiro
-    bool directionName = true;
-    bool edgeFlash = true;   // borda vermelha ao levar dano
+    bool direction = true;   // seta vermelha em volta do centro da tela apontando de onde veio o tiro
+    bool edgeFlash = true;   // borda da tela ao levar dano, na cor do que foi atingido
 
     // ---- Cores (ARGB do ImGui)
     ImU32 cHealth = IM_COL32(255, 255, 255, 255);  // dano na vida
@@ -57,14 +56,17 @@ struct Options {
     ImU32 cGiven = IM_COL32(91, 227, 125, 255);    // nick (cor fixa) ao dar dano
     ImU32 cTaken = IM_COL32(255, 90, 90, 255);     // nick (cor fixa) e numero ao levar dano
     ImU32 cCombo = IM_COL32(255, 96, 96, 255);     // o "(x3 · 138)" do informer classico
+    ImU32 cEdgeHealth = IM_COL32(220, 28, 36, 255); // borda: levou dano na vida
+    ImU32 cEdgeArmour = IM_COL32(0, 0, 0, 255);     // borda: levou dano no colete
+    ImU32 cEdgeHead = IM_COL32(40, 120, 255, 255);  // borda: levou tiro na cabeca
 
     // ---- Sons (pasta "Trok Hitmarker\sons", mp3 ou wav com estes nomes)
     bool sHit = true, sHeadDiff = true, sTaken = true, sKill = true, sKillHead = true, sDeath = true;
     int volume = 80;
 
-    // ---- Posicoes
-    Place given = {0.60f, 0.40f};   // informer: dano dado (o lugar do damage informer antigo)
-    Place taken = {0.30f, 0.40f};   // informer: dano levado
+    // ---- Posicoes: tudo preso a tela (so o sinal de acerto acompanha a mira)
+    Place given = {0.60f, 0.47f};   // informer: dano dado, comeca aqui (a direita do centro, fora da seta)
+    Place taken = {0.40f, 0.47f};   // informer: dano levado, termina aqui (a esquerda do centro)
 };
 
 Options& Get();

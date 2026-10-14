@@ -1,13 +1,13 @@
 # Trok Hitmarker (conceito)
 
-Indicador de dano para o SA-MP 0.3.7 R1, no estilo da casa: sinal de acerto na mira, local do acerto marcado no corpo, números de dano, o informer com nome e combo, de onde veio o tiro levado e sons trocáveis. Cada parte liga e desliga sozinha, e as que fazem sentido juntas podem ficar juntas.
+Indicador de dano para o SA-MP 0.3.7 R1, no estilo da casa: sinal de acerto na mira, local do acerto marcado no corpo, números de dano, o informer com nome e combo, seta de onde veio o tiro levado, borda de dano recebido e sons trocáveis. Cada parte liga e desliga sozinha, e as que fazem sentido juntas podem ficar juntas.
 
 **Estado:** conceito para aprovação. As imagens abaixo saem do código de desenho de verdade (`src/hud.cpp` e `src/menu.cpp`, com o kit da casa), rasterizado no Linux por `test/concept.sh`. Ainda não existe o `.asi`.
 
 | | |
 |---|---|
 | ![](docs/01-cena-trok.png) | ![](docs/02-cena-damage-informer.png) |
-| Estilo Trok: sinal na mira, marcas no corpo, números saindo do alvo, de onde veio o tiro | Estilo Damage Informer: o layout antigo (60% e 30% da tela), com o dano real e o combo somando |
+| Estilo Trok: sinal na mira, marcas no corpo, números saindo do alvo, seta de onde veio o tiro | Estilo Damage Informer: nick parado e número subindo, simétrico ao centro, com o dano real e o combo somando |
 
 ## O que o projeto antigo faz (e o que muda)
 
@@ -17,10 +17,17 @@ Indicador de dano para o SA-MP 0.3.7 R1, no estilo da casa: sinal de acerto na m
 
 **No Trok Hitmarker:** o acerto continua vindo do pacote do SA-MP (é na hora e diz quem, arma e parte do corpo), mas o número é a **vida + colete que o alvo perdeu de verdade**, lidos do sync dele logo depois do tiro. Assim vale a regra de cada servidor sozinha: dano de arma configurado, colete, HS sem capacete que mata em 1. Se o servidor esconde a vida (o alvo não mostra a perda), aparece o número do GTA com um `~` na frente. O combo do informer soma o dano real no mesmo alvo. Tudo é medido em tempo, não em quadros.
 
-## Mira e corpo
+## Mira, corpo e centro da tela
+
+Só o sinal de acerto acompanha a mira. O resto fica preso à tela: a seta de onde veio o tiro gira em volta do centro, o informer fica dos dois lados do centro (dado à direita, levado à esquerda) e os números "na tela" sobem do lado do centro.
 
 - **Sinal na mira:** desenhado onde a mira está naquele quadro. O mod lê onde o próprio GTA desenhou a mira, então mod que centraliza ou sobe a mira não precisa de ajuste nem de opção no menu (`docs/08-mira-seguida.png`).
 - **Local do acerto:** a marca fica na parte do corpo que o tiro pegou (cabeça, tronco, braço, perna) por 1 a 5 s, acompanhando o alvo quando ele anda (`docs/06-local-do-acerto.png`).
+
+## Dano recebido
+
+- **Seta de onde veio o tiro:** sempre vermelha, em volta do centro da tela, apontando para quem atirou (em cima = pela frente, embaixo = por trás). Gira junto quando você vira a câmera.
+- **Borda de dano recebido:** as bordas da tela piscam na cor do que foi atingido: vida (vermelho), colete (preto) ou cabeça (azul). As três cores mudam no menu (`docs/15-borda.png`).
 
 ## Sons
 
@@ -28,4 +35,4 @@ Pasta `Trok Hitmarker\sons`, ao lado do `.asi`, com `.mp3` ou `.wav` destes nome
 
 ## Imagens
 
-`docs/04-hitmarker.png` (estilos e a animação), `05-numeros.png`, `06-local-do-acerto.png`, `03-informer-lista.png`, `07-recebido.png`, `08-mira-seguida.png`, `09-mover.png` e `10`–`13` (menu).
+`docs/04-hitmarker.png` (estilos e a animação), `05-numeros.png`, `06-local-do-acerto.png`, `03-informer-lista.png`, `07-recebido.png`, `15-borda.png`, `08-mira-seguida.png`, `09-mover.png` e `10`–`14` (menu).

@@ -134,9 +134,13 @@ void TabInformer(Rows& r) {
 
 void TabRecebido(Rows& r) {
     opt::Options& o = opt::Get();
-    r.Toggle("De onde veio o tiro", &o.direction);
-    r.Toggle("Nome de quem atirou", &o.directionName);
-    r.Toggle("Borda vermelha", &o.edgeFlash);
+    const opt::Options& d = opt::Defaults();
+    r.Toggle("Seta de onde veio o tiro", &o.direction);
+    r.Toggle("Borda de dano recebido", &o.edgeFlash);
+    r.Section("Cor da borda");
+    r.Color("Dano na vida", &o.cEdgeHealth, d.cEdgeHealth);
+    r.Color("Dano no colete", &o.cEdgeArmour, d.cEdgeArmour);
+    r.Color("Dano na cabe\xC3\xA7" "a", &o.cEdgeHead, d.cEdgeHead);
 }
 
 void TabSons(Rows& r) {

@@ -97,6 +97,9 @@ void InformerClassic(ImDrawList* dl, const Line& l, ImVec2 at, bool given, const
     snprintf(nick, sizeof(nick), "%s [%d]", l.nick.c_str(), l.id);
     float nickSize = 17 * s;
     ImVec2 np(at.x, at.y + 0.02f * 1080 * k);
+    if (!given) {
+        np.x -= Size(g_text, nickSize, nick).x; // o levado termina no ponto, simetrico ao dado
+    }
     Outlined(dl, g_text, nickSize, np, Alpha(nickColor, fade), nick, 1.3f * s);
     float numSize = 26 * s;
     ImFont* nf = NumberFont(o);
@@ -115,7 +118,8 @@ void InformerClassic(ImDrawList* dl, const Line& l, ImVec2 at, bool given, const
         } else {
             KindLabel(h, text, sizeof(text));
         }
-        Outlined(dl, nf, numSize, ImVec2(at.x, y), Alpha(c, a), text, 1.6f * s);
+        float nx = given ? at.x : at.x - Size(nf, numSize, text).x;
+        Outlined(dl, nf, numSize, ImVec2(nx, y), Alpha(c, a), text, 1.6f * s);
         if (given && o.combo && i + 1 == l.recent.size() && l.hits > 1 && !l.afk) {
             char combo[32];
             snprintf(combo, sizeof(combo), "(x%d \xC2\xB7 %d)", l.hits, l.total);
@@ -265,10 +269,11 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
     }
     float k = screen.y / 1080.0f;
 
-    // borda vermelha ao levar dano
+    // borda da tela ao levar dano: vida, colete ou cabeca, cada um na sua cor
     if (o.edgeFlash && st.flash > 0) {
-        ImU32 red = IM_COL32(200, 20, 30, static_cast<int>(100 * Clamp01(st.flash)));
-        ImU32 none = IM_COL32(200, 20, 30, 0);
+        ImU32 base = st.flashKind == ARMOUR ? o.cEdgeArmour : st.flashKind == HEADSHOT ? o.cEdgeHead : o.cEdgeHealth;
+        ImU32 red = Alpha(Opaque(base), (st.flashKind == ARMOUR ? 0.55f : 0.4f) * Clamp01(st.flash));
+        ImU32 none = Alpha(base, 0);
         float ew = screen.x * 0.11f, eh = screen.y * 0.13f;
         dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(ew, screen.y), red, none, none, red);
         dl->AddRectFilledMultiColor(ImVec2(screen.x - ew, 0), screen, none, red, red, none);
@@ -285,7 +290,7 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
             float a = in.age < 0.6f ? 1.0f : 1.0f - (in.age - 0.6f);
             a *= 0.55f + 0.45f * Clamp01(in.damage / 46.0f);
             float r = 165 * k, span = 0.36f;
-            ImVec2 c = st.crosshair;
+            ImVec2 c(screen.x * 0.5f, screen.y * 0.5f); // centro da tela, onde quer que a mira esteja
             float a0 = in.angle - span - PI / 2, a1 = in.angle + span - PI / 2;
             dl->PathArcTo(c, r, a0, a1, 32);
             dl->PathStroke(Alpha(IM_COL32(255, 40, 40, 255), 0.22f * a), 0, 16 * k);
@@ -297,19 +302,19 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
             dl->AddTriangleFilled(tip, ImVec2(c.x + dir.x * (r + 5 * k) + side.x * 9 * k, c.y + dir.y * (r + 5 * k) + side.y * 9 * k),
                                   ImVec2(c.x + dir.x * (r + 5 * k) - side.x * 9 * k, c.y + dir.y * (r + 5 * k) - side.y * 9 * k),
                                   Alpha(IM_COL32(255, 60, 56, 255), 0.9f * a));
-            if (o.directionName && !in.nick.empty()) {
-                const char* label = in.nick.c_str();
-                ImVec2 ts = Size(g_text, 15 * k, label);
-                ImVec2 lp(c.x + dir.x * (r + 42 * k) - ts.x * 0.5f, c.y + dir.y * (r + 40 * k) - ts.y * 0.5f);
-                Outlined(dl, g_text, 15 * k, lp, Alpha(Opaque(in.nickColor), a), label, 1.3f * k);
-            }
         }
     }
 
     // numeros
     float numScale = k * o.numbersSize / 100.0f;
-    if (o.numbers != 2) {
+    if (o.numbers == 0) {
         for (const Number& n : st.numbers) {
+            DrawNumber(dl, n, numScale, o);
+        }
+    } else if (o.numbers == 1) {
+        for (Number n : st.numbers) { // na tela: sobem do lado direito do centro
+            n.from = ImVec2(screen.x * 0.5f + 46 * numScale, screen.y * 0.5f - 12 * numScale);
+            n.drift = 0;
             DrawNumber(dl, n, numScale, o);
         }
     }
@@ -325,7 +330,7 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
         }
     } else if (o.informer == 1) {
         InformerList(dl, st.given, gAt, true, o, k);
-        InformerList(dl, st.taken, ImVec2(tAt.x + 250 * k * o.informerSize / 100.0f, tAt.y), false, o, k);
+        InformerList(dl, st.taken, tAt, false, o, k);
     }
 
     // local do acerto: a marca fica na parte do corpo que o tiro pegou (o samp.cpp atualiza a posicao do osso)

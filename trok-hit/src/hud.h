@@ -55,17 +55,17 @@ struct Incoming {   // tiro levado: de onde veio
     float angle = 0; // rad: 0 = na frente, + = para a direita (sentido horario na tela)
     float age = 0;
     int damage = 0;
-    std::string nick;
-    ImU32 nickColor = 0xFFFFFFFF;
 };
 
 struct State {
-    ImVec2 crosshair;             // onde a mira esta neste quadro (no GTA puro, 53% x 40% da tela)
+    ImVec2 crosshair;             // onde a mira esta neste quadro (no GTA puro, 53% x 40% da tela); so o sinal
+                                  // de acerto usa: o resto fica preso ao centro da tela
     std::vector<Marker> markers;
     std::vector<Number> numbers;
     std::vector<Line> given, taken;
     std::vector<Incoming> incoming;
-    float flash = 0;              // 0..1: borda vermelha
+    float flash = 0;              // 0..1: borda da tela ao levar dano
+    Kind flashKind = HEALTH;      // HEALTH, ARMOUR ou HEADSHOT: a cor da borda
 };
 
 // Fontes extras no atlas (numeros grandes em Arial Black ou na fonte da casa). Chamar antes de construir o atlas.
