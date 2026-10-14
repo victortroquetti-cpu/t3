@@ -19,7 +19,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v1.0";
+constexpr const char* VERSION_TAG = "v1.1";
 
 const char* const TABS[] = {"Mira", "Dano", "Informer", "Recebido", "Sons", "Geral"};
 constexpr int TAB_COUNT = 6;
@@ -66,7 +66,8 @@ void MoveSelection(int* selected, int count, const Keys& k, Rows& rows) {
     }
 }
 
-// Previa no alto da aba: a mira e os quatro sinais de acerto parados no meio da animacao, com o nome de cada um.
+// Previa no alto da aba Mira: a mira e os quatro sinais de acerto, cada um repetindo a animacao escolhida (um tiro a
+// cada 1,6 s, um depois do outro), com o nome embaixo.
 void MarkerPreview(float x, float w) {
     opt::Options& o = opt::Get();
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -76,13 +77,95 @@ void MarkerPreview(float x, float w) {
     const char* names[] = {"Mira", "Acerto", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
     hud::Kind kinds[] = {hud::HEALTH, hud::HEALTH, hud::ARMOUR, hud::HEADSHOT, hud::KILL};
     float scale = ImGui::GetIO().DisplaySize.y / 1080.0f * 1.3f;
+    float time = static_cast<float>(ImGui::GetTime());
     for (int i = 0; i < 5; ++i) {
         float cx = x + w * (i + 0.5f) / 5;
         ImVec2 c(cx, at.y + 40 * u);
-        hud::DrawAimPreview(dl, c, scale, i == 0 ? 99.0f : 0.12f, kinds[i], o); // 99 s: so a mira, parada
+        float age = i == 0 ? 99.0f : std::fmod(time + 1.6f - (i - 1) * 0.2f, 1.6f); // 99 s: so a mira
+        hud::DrawAimPreview(dl, c, scale, age, kinds[i], o);
         ImVec2 ts = TextSize(fonts.desc, names[i]);
         Text(dl, fonts.desc, cx - ts.x * 0.5f, at.y + 68 * u, col::hint, names[i]);
     }
+    ImGui::Dummy(ImVec2(w, h + 4 * u));
+}
+
+// Previa no alto da aba Dano: o que o alvo mostra com as escolhas de baixo, repetindo a cada 2,6 s. Um por tiro: tres
+// tiros (vida, colete, cabeca). Somando: quatro tiros de armas diferentes (o terceiro na cabeca) no mesmo numero, que
+// fecha e sai.
+void NumbersPreview(float x, float w) {
+    opt::Options& o = opt::Get();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 at = ImGui::GetCursorScreenPos();
+    float h = 104 * u;
+    dl->AddRectFilled(ImVec2(x, at.y + 2 * u), ImVec2(x + w, at.y + h), col::White(6), 8 * u);
+    if (o.numbers == 2) {
+        const char* off = "N\xC3\xBAmeros desligados";
+        ImVec2 ts = TextSize(fonts.desc, off);
+        Text(dl, fonts.desc, x + (w - ts.x) * 0.5f, at.y + (h - ts.y) * 0.5f, col::hint, off);
+        ImGui::Dummy(ImVec2(w, h + 4 * u));
+        return;
+    }
+    dl->PushClipRect(ImVec2(x, at.y + 2 * u), ImVec2(x + w, at.y + h), true);
+    opt::Options view = o;
+    view.numbers = 0;
+    float scale = ImGui::GetIO().DisplaySize.y / 1080.0f * 0.8f;
+    float t = std::fmod(static_cast<float>(ImGui::GetTime()), 2.6f);
+    ImVec2 c(x + w * 0.5f, at.y + h - 22 * u); // embaixo: os numeros sobem dentro do quadro
+    if (o.numbersCount == 1) {
+        const float hits[] = {0.0f, 0.35f, 0.7f, 1.05f};
+        const int values[] = {46, 13, 46, 41}; // Deagle, M4, Deagle na cabeca, Sniper: armas diferentes, um numero so
+        int body = 0, head = 0;
+        float last = 0, lastHead = -1;
+        for (int i = 0; i < 4; ++i) {
+            if (t < hits[i]) {
+                break;
+            }
+            bool isHead = i == 2;
+            if (isHead && o.splitHead) {
+                head += values[i];
+                lastHead = hits[i];
+            } else {
+                body += values[i];
+            }
+            last = hits[i];
+        }
+        float close = 1.05f + o.sumWindow * 0.25f; // a soma fecha (encurtada na previa)
+        hud::Number n;
+        n.from = c;
+        n.age = t;
+        n.stay = close;
+        n.value = body;
+        n.kind = hud::HEALTH;
+        n.bump = t - last;
+        hud::DrawNumber(dl, n, scale, view);
+        if (head > 0) {
+            n.value = head;
+            n.kind = hud::HEADSHOT;
+            n.lift = 40;
+            n.age = t - 0.7f;
+            n.stay = close - 0.7f;
+            n.bump = t - lastHead;
+            hud::DrawNumber(dl, n, scale, view);
+        }
+    } else {
+        const hud::Kind kinds[] = {hud::HEALTH, hud::ARMOUR, hud::HEADSHOT};
+        const float drifts[] = {-0.7f, 0.0f, 0.7f}; // cada um espalha para o seu lado
+        for (int i = 0; i < 3; ++i) {
+            float age = t - i * 0.45f;
+            if (age < 0) {
+                continue;
+            }
+            hud::Number n;
+            n.from = ImVec2(c.x + (i - 1) * 120 * u, c.y);
+            n.age = age;
+            n.value = 46;
+            n.kind = kinds[i];
+            n.drift = drifts[i];
+            n.bump = 1.0f;
+            hud::DrawNumber(dl, n, scale, view);
+        }
+    }
+    dl->PopClipRect();
     ImGui::Dummy(ImVec2(w, h + 4 * u));
 }
 
@@ -102,6 +185,7 @@ void ApplyPreset(int preset) {
     } else { // Damage Informer
         o.numbers = 2;
         o.hitLocal = false;
+        o.informerCount = 0; // o combo, como o antigo
     }
 }
 
@@ -125,6 +209,12 @@ void TabMira(Rows& r, float x, float w) {
     r.Toggle("Colete com imagem pr\xC3\xB3pria", &o.fxArmour);
     r.Toggle("Cabe\xC3\xA7" "a com imagem pr\xC3\xB3pria", &o.fxHead);
     r.Toggle("Abate com imagem pr\xC3\xB3pria", &o.fxKill);
+    static const char* const anims[] = {"Pulo", "Expandir", "Soco", "Giro", "Nenhuma"};
+    r.Cycle("Anima\xC3\xA7\xC3\xA3o", &o.fxAnim, anims, 5, d.fxAnim);
+    r.Info("As anima\xC3\xA7\xC3\xB5" "es",
+           "Pulo: a imagem cresce e volta. Expandir: nasce menor e abre para fora enquanto some, como o anel em volta "
+           "da mira do Fortnite. Soco: entra grande e torta e assenta num tranco. Giro: gira 45 graus enquanto some. "
+           "A imagem \xC3\xA9 sempre a da pasta; muda s\xC3\xB3 o movimento.");
     r.Info("Desligar um deles",
            "Colete, cabe\xC3\xA7" "a e abate desligados mostram a imagem do acerto normal naquele tiro. Desligar o "
            "Acerto tira o sinal dos tiros normais (os ligados continuam).");
@@ -138,12 +228,27 @@ void TabMira(Rows& r, float x, float w) {
            "serve: a imagem inteira vira o tamanho da mira. Vale na hora.");
 }
 
-void TabDano(Rows& r) {
+void TabDano(Rows& r, float x, float w) {
     opt::Options& o = opt::Get();
     const opt::Options& d = opt::Defaults();
+    NumbersPreview(x, w); // em cima: muda na hora com as opcoes de baixo
     static const char* const where[] = {"No personagem", "Na tela", "Desligado"};
     r.Segmented("N\xC3\xBAmeros de dano", &o.numbers, where, 3, d.numbers);
-    r.Toggle("Somar tiros seguidos no mesmo alvo", &o.numbersSum);
+    static const char* const count[] = {"Um por tiro", "Somando"};
+    r.Segmented("Contagem", &o.numbersCount, count, 2, d.numbersCount);
+    if (o.numbersCount == 0) {
+        r.Toggle("Rajada soma no mesmo n\xC3\xBAmero", &o.numbersSum);
+    } else {
+        r.Toggle("Separar a cabe\xC3\xA7" "a", &o.splitHead);
+        r.Slider("Soma fecha depois de", &o.sumWindow, 1, 5, 1, "%d s", d.sumWindow);
+    }
+    r.Info("Somando",
+           "Um n\xC3\xBAmero s\xC3\xB3 por alvo que vai crescendo a cada acerto, de qualquer arma, at\xC3\xA9 voc\xC3\xAA "
+           "ficar o tempo escolhido sem acertar (como o dano cumulativo do Fortnite). Na tela, um s\xC3\xB3 para todos os "
+           "alvos. Separar a cabe\xC3\xA7" "a: o dano na cabe\xC3\xA7" "a cresce num n\xC3\xBAmero dourado pr\xC3\xB3prio, em "
+           "cima do outro.");
+    static const char* const anims[] = {"Subir", "Arco", "Saltar", "Parado"};
+    r.Cycle("Anima\xC3\xA7\xC3\xA3o", &o.numbersAnim, anims, 4, d.numbersAnim);
     static const char* const source[] = {"Real", "Do GTA"};
     r.Segmented("Dano mostrado", &o.source, source, 2, d.source);
     r.Info("Como o dano real \xC3\xA9 medido",
@@ -158,6 +263,11 @@ void TabDano(Rows& r) {
     r.Color("No colete", &o.cArmour, d.cArmour);
     r.Color("Na cabe\xC3\xA7" "a", &o.cHead, d.cHead);
     r.Color("Abate", &o.cKill, d.cKill);
+    r.Toggle("Cor pela vida que sobrou", &o.colorByHealth);
+    r.Info("Cor pela vida",
+           "O n\xC3\xBAmero come\xC3\xA7" "a branco com a vida cheia e vai para o amarelo, o laranja e o vermelho conforme "
+           "a vida cai: a do oponente no dano que voc\xC3\xAA d\xC3\xA1, a sua no dano que voc\xC3\xAA leva (informer). Vale "
+           "tamb\xC3\xA9m para o informer. O abate continua vermelho.");
     r.Section("Local do acerto (no corpo)");
     r.Toggle("Marcar onde o tiro pegou (corpo.png)", &o.hitLocal);
     r.Slider("Fica no corpo", &o.hitLocalTime, 1, 5, 1, "%d s", d.hitLocalTime);
@@ -175,8 +285,20 @@ void TabInformer(Rows& r) {
     r.Segmented("Cor do nick ao levar dano", &o.nickTaken, nick, 2, d.nickTaken);
     r.Color("Cor fixa ao levar dano", &o.cTaken, d.cTaken);
     r.Toggle("AFK no lugar do dano", &o.afk);
-    r.Toggle("Combo (acertos e dano somado)", &o.combo);
-    r.Slider("Combo fecha depois de", &o.comboWindow, 1, 10, 1, "%d s", d.comboWindow);
+    r.Toggle("Cor pela vida que sobrou", &o.colorByHealth);
+    static const char* const count[] = {"Combo", "Somando"};
+    r.Segmented("Contagem", &o.informerCount, count, 2, d.informerCount);
+    if (o.informerCount == 0) {
+        r.Toggle("Combo (acertos e dano somado)", &o.combo);
+        r.Slider("Combo fecha depois de", &o.comboWindow, 1, 10, 1, "%d s", d.comboWindow);
+    } else {
+        r.Toggle("Separar a cabe\xC3\xA7" "a", &o.splitHead);
+        r.Slider("Soma fecha depois de", &o.comboWindow, 1, 10, 1, "%d s", d.comboWindow);
+    }
+    r.Info("Combo ou somando",
+           "Combo: cada acerto sobe com o seu n\xC3\xBAmero e o (x3 \xC2\xB7 138) ao lado. Somando: um n\xC3\xBAmero s\xC3\xB3 "
+           "em cima do nick, que cresce a cada acerto; com a cabe\xC3\xA7" "a separada, o dano na cabe\xC3\xA7" "a fica "
+           "num n\xC3\xBAmero dourado ao lado.");
     r.Slider("Tamanho", &o.informerSize, 50, 200, 10, "%d%%", d.informerSize);
     if (r.Action("Posi\xC3\xA7\xC3\xA3o na tela", "Mover")) {
         BeginMove();
@@ -235,6 +357,11 @@ void TabGeral(Rows& r) {
         BeginMove();
     }
     r.Value("Escolhas salvas", "por servidor");
+    r.Toggle("Anotar todos os acertos no log", &o.logAll);
+    r.Info("Conferir o dano real",
+           "Ligado, o Trok Hitmarker.log anota cada acerto: o dano que o GTA calculou e o que o alvo perdeu de verdade "
+           "(ou \"alvo disputado\" quando outra pessoa tamb\xC3\xA9m estava acertando ele). Desligado, s\xC3\xB3 os "
+           "primeiros de cada sess\xC3\xA3o.");
     if (r.Action("Padr\xC3\xB5" "es do Trok Hitmarker", "Restaurar")) {
         o = opt::Defaults();
         S.preset = 0;
@@ -455,7 +582,7 @@ bool Frame() {
     rows.Begin(TABS[S.tab], cp.x + 4 * u, rowW, sel, keys, true);
     switch (S.tab) {
     case 0: TabMira(rows, cp.x + 4 * u, rowW); break;
-    case 1: TabDano(rows); break;
+    case 1: TabDano(rows, cp.x + 4 * u, rowW); break;
     case 2: TabInformer(rows); break;
     case 3: TabRecebido(rows); break;
     case 4: TabSons(rows); break;

@@ -2,7 +2,8 @@
 """Gera um samp.dll de mentira para o smoke test do Trok Hitmarker (test/smoke/run.sh).
 
 Tem o ponto de entrada do SA-MP 0.3.7 R1 (o .asi reconhece a versao por ele) e stubs nos enderecos que o .asi usa ou
-desvia: os do dano (SendGiveDamage e SendTakeDamage contam e guardam o id), a mensagem de morte (conta), a cor do
+desvia: os do dano (SendGiveDamage e SendTakeDamage contam e guardam o id), a mensagem de morte e o bullet sync dos
+outros jogadores (contam), a cor do
 jogador (le o campo +0x1F8 do CRemotePlayer falso), o nick local, o AddCommand, o AddEntry e o cursor. As estruturas do
 SA-MP (CNetGame, pools, jogadores) o fake_gta.exe monta na memoria dele e liga nos ponteiros do samp.dll.
 
@@ -16,8 +17,8 @@ SIZE = 0x320000
 
 # Campos lidos e escritos pelo fake_gta.exe (RVA): DATA + 4 * indice.
 DATA = 0x300000
-(CMD_NAME, CMD_PROC, CHAT_COUNT, CURSOR_MODE, GIVE_COUNT, GIVE_ID, TAKE_COUNT, TAKE_ID, DEATH_COUNT,
- OBJECT) = (DATA + 4 * i for i in range(10))
+(CMD_NAME, CMD_PROC, CHAT_COUNT, CURSOR_MODE, GIVE_COUNT, GIVE_ID, TAKE_COUNT, TAKE_ID, DEATH_COUNT, BULLET_COUNT,
+ OBJECT) = (DATA + 4 * i for i in range(11))
 LOCAL_NAME = DATA + 0x100
 
 # Enderecos do SA-MP 0.3.7 R1 (os mesmos de src/main.cpp e src/samp.cpp).
@@ -25,6 +26,7 @@ ENTRY_R1 = 0x31DF13
 ENTRY_R3 = 0xCC4D0
 ADD_COMMAND, ADD_ENTRY, SET_CURSOR, UNLOCK_CAM = 0x65AD0, 0x64010, 0x9BD30, 0x9BC10
 SEND_GIVE, SEND_TAKE, DEATH_ADD, COLOR_ARGB, LOCAL_NAME_FN = 0x6770, 0x6660, 0x66A10, 0x12A00, 0x13CD0
+REMOTE_BULLET = 0x12BE0  # CRemotePlayer::Update(BulletData*)
 POINTERS = (0x21A0E4, 0x21A0E8, 0x21A10C)  # CChat, CInput, misc (o resto o fake_gta.exe liga)
 
 
@@ -56,6 +58,7 @@ def main():
     put(SEND_TAKE, inc(TAKE_COUNT) + b'\x8B\x44\x24\x04\xA3' + d(BASE + TAKE_ID) + b'\xC2\x10\x00')
     # CDeathWindow::AddMessage(this, killer, victim, kc, vc, weapon): conta; ret 14h
     put(DEATH_ADD, inc(DEATH_COUNT) + b'\xC2\x14\x00')
+    put(REMOTE_BULLET, inc(BULLET_COUNT) + b'\xC2\x04\x00')  # bullet sync de outro jogador: conta; ret 4
     put(COLOR_ARGB, b'\x8B\x81' + d(0x1F8) + b'\xC3')  # mov eax, [ecx+1F8h]; ret
     put(LOCAL_NAME_FN, b'\xB8' + d(BASE + LOCAL_NAME) + b'\xC3')  # mov eax, nick; ret
     put(LOCAL_NAME, b'Victor_Trok\0')

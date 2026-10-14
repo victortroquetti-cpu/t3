@@ -42,6 +42,28 @@ void Picture(ImDrawList* dl, int slot, ImVec2 c, float box, float alpha) {
 }
 constexpr float PI = 3.14159265f;
 
+// A mesma imagem girada angle rad em volta do centro (as animacoes Soco e Giro).
+void PictureTurned(ImDrawList* dl, int slot, ImVec2 c, float box, float alpha, float angle) {
+    const Loaded& p = g_images[slot];
+    if (!p.texture || alpha <= 0) {
+        return;
+    }
+    if (angle == 0.0f) {
+        Picture(dl, slot, c, box, alpha);
+        return;
+    }
+    float hw = box * 0.5f, hh = box * 0.5f;
+    if (p.aspect > 1.0f) {
+        hh /= p.aspect;
+    } else if (p.aspect > 0.0f && p.aspect < 1.0f) {
+        hw *= p.aspect;
+    }
+    float cs = std::cos(angle), sn = std::sin(angle);
+    auto at = [&](float x, float y) { return ImVec2(c.x + x * cs - y * sn, c.y + x * sn + y * cs); };
+    dl->AddImageQuad(p.texture, at(-hw, -hh), at(hw, -hh), at(hw, hh), at(-hw, hh), ImVec2(0, 0), ImVec2(p.uv.x, 0),
+                     p.uv, ImVec2(0, p.uv.y), IM_COL32(255, 255, 255, static_cast<int>(255 * (alpha > 1 ? 1 : alpha))));
+}
+
 float Clamp01(float v) {
     return v < 0 ? 0 : v > 1 ? 1 : v;
 }
@@ -49,6 +71,13 @@ float Clamp01(float v) {
 float EaseOut(float t) {
     t = Clamp01(t);
     return 1 - (1 - t) * (1 - t) * (1 - t);
+}
+
+// Passa um pouco do fim e volta (o pulo "elastico" do numero no estilo Arco).
+float EaseOutBack(float t) {
+    t = Clamp01(t);
+    const float c1 = 1.70158f, c3 = c1 + 1.0f;
+    return 1 + c3 * (t - 1) * (t - 1) * (t - 1) + c1 * (t - 1) * (t - 1);
 }
 
 ImU32 Alpha(ImU32 c, float a) {
@@ -96,7 +125,69 @@ const char* KindLabel(const Hit& h, char* buf, size_t n) {
 
 // Classico: o nick parado e os numeros subindo e sumindo por cima dele, como o damage informer antigo; o combo
 // (x3 - 138) ao lado do numero mais novo.
+// Somando: o nick parado e, em cima dele, um numero so que cresce a cada acerto (com a cabeca ao lado, dourada, se
+// estiver separada); some quando a soma fecha.
+void InformerSum(ImDrawList* dl, const Line& l, ImVec2 at, bool given, const opt::Options& o, float k) {
+    float s = k * o.informerSize / 100.0f;
+    float window = static_cast<float>(o.comboWindow);
+    float fade = l.age < window - 0.4f ? 1.0f : 1.0f - (l.age - (window - 0.4f)) / 0.4f;
+    if (fade <= 0) {
+        return;
+    }
+    int nickMode = given ? o.nickGiven : o.nickTaken;
+    ImU32 nickColor = nickMode == 0 ? Opaque(l.nickColor) : (given ? o.cGiven : o.cTaken);
+    char nick[64];
+    snprintf(nick, sizeof(nick), "%s [%d]", l.nick.c_str(), l.id);
+    float nickSize = 17 * s;
+    ImVec2 np(at.x, at.y + 0.02f * 1080 * k);
+    if (!given) {
+        np.x -= Size(g_text, nickSize, nick).x;
+    }
+    Outlined(dl, g_text, nickSize, np, Alpha(nickColor, fade), nick, 1.3f * s);
+
+    ImFont* nf = NumberFont(o);
+    float pop = l.bump < 0.12f ? 1.0f + 0.35f * (1.0f - EaseOut(l.bump / 0.12f)) : 1.0f;
+    float numSize = 30 * s * pop;
+    int head = o.splitHead ? l.head : 0;
+    int body = l.total - head;
+    char bodyText[16] = "", headText[16] = "";
+    if (l.afk) {
+        snprintf(bodyText, sizeof(bodyText), "AFK");
+    } else {
+        if (body > 0 || head == 0) {
+            snprintf(bodyText, sizeof(bodyText), l.estimated ? "~%d" : "%d", body);
+        }
+        if (head > 0) {
+            snprintf(headText, sizeof(headText), "%d", head);
+        }
+    }
+    Kind last = l.last == HEADSHOT && o.splitHead ? HEALTH : l.last;
+    ImU32 bodyColor = l.afk ? IM_COL32(204, 204, 204, 255) : given ? KindColor(last, o) : o.cTaken;
+    if (o.colorByHealth && l.life >= 0 && !l.afk) {
+        bodyColor = HealthColor(l.life);
+    }
+    if (l.last == KILL) {
+        bodyColor = o.cKill;
+    }
+    float baseY = at.y + 0.02f * 1080 * k - 30 * s - 4 * s; // a base do numero fica parada; o pulo cresce para cima
+    float y = baseY - (numSize - 30 * s);
+    ImVec2 bs = Size(nf, numSize, bodyText), hs = Size(nf, numSize, headText);
+    float gap = bodyText[0] && headText[0] ? 12 * s : 0;
+    float total = bs.x + gap + hs.x;
+    float x = given ? at.x : at.x - total;
+    if (bodyText[0]) {
+        Outlined(dl, nf, numSize, ImVec2(x, y), Alpha(bodyColor, fade), bodyText, 1.8f * s);
+    }
+    if (headText[0]) {
+        Outlined(dl, nf, numSize, ImVec2(x + bs.x + gap, y), Alpha(o.cHead, fade), headText, 1.8f * s);
+    }
+}
+
 void InformerClassic(ImDrawList* dl, const Line& l, ImVec2 at, bool given, const opt::Options& o, float k) {
+    if (o.informerCount == 1) {
+        InformerSum(dl, l, at, given, o, k);
+        return;
+    }
     float s = k * o.informerSize / 100.0f;
     float fade = l.age < 2.0f ? 1.0f : 1.0f - (l.age - 2.0f) / 0.5f;
     if (fade <= 0) {
@@ -122,6 +213,9 @@ void InformerClassic(ImDrawList* dl, const Line& l, ImVec2 at, bool given, const
         float a = 1.0f - h.age / 2.0f;
         float y = at.y - h.age * 0.07f * 1080 * k; // a velocidade do antigo: 7% da tela por segundo
         ImU32 c = given ? KindColor(h.kind, o) : o.cTaken;
+        if (o.colorByHealth && h.life >= 0 && h.kind != KILL) {
+            c = HealthColor(h.life);
+        }
         char text[16];
         if (l.afk) {
             snprintf(text, sizeof(text), "AFK");
@@ -165,24 +259,36 @@ void InformerList(ImDrawList* dl, const std::vector<Line>& lines, ImVec2 at, boo
         char id[8];
         snprintf(id, sizeof(id), "%d", l.id);
         dl->AddText(g_text, 12.5f * s, ImVec2(tx, ty + 2 * s), Alpha(IM_COL32(255, 255, 255, 110), fade), id);
+        bool summing = o.informerCount == 1;
+        int head = summing && o.splitHead ? l.head : 0;
         char total[32];
         if (l.afk) {
             snprintf(total, sizeof(total), "AFK");
         } else {
-            snprintf(total, sizeof(total), "%d", l.total);
+            snprintf(total, sizeof(total), l.estimated && summing ? "~%d" : "%d", l.total - head);
         }
         ImFont* nf = NumberFont(o);
-        float ns = 19 * s;
+        float ns = 19 * s * (summing && l.bump < 0.12f ? 1.0f + 0.3f * (1.0f - EaseOut(l.bump / 0.12f)) : 1.0f);
         ImVec2 ts = Size(nf, ns, total);
         float rx = x + w - 13 * s;
+        if (head > 0 && !l.afk) { // a cabeca, dourada, antes do total
+            char headText[16];
+            snprintf(headText, sizeof(headText), "%d", head);
+            ImVec2 hs = Size(nf, ns, headText);
+            dl->AddText(nf, ns, ImVec2(rx - ts.x - 10 * s - hs.x, y + (h - ns) * 0.5f - 1 * s), Alpha(o.cHead, fade),
+                        headText);
+        }
         char hits[16] = "";
-        if (l.hits > 1) {
+        if (l.hits > 1 && !summing) {
             snprintf(hits, sizeof(hits), "x%d", l.hits);
             ImVec2 hs = Size(g_text, 12.5f * s, hits);
             dl->AddText(g_text, 12.5f * s, ImVec2(rx - hs.x, ty + 2 * s), Alpha(IM_COL32(255, 255, 255, 120), fade), hits);
             rx -= hs.x + 8 * s;
         }
         ImU32 tc = l.afk ? IM_COL32(204, 204, 204, 255) : given ? IM_COL32(255, 255, 255, 255) : o.cTaken;
+        if (o.colorByHealth && l.life >= 0 && !l.afk) {
+            tc = l.last == KILL ? o.cKill : HealthColor(l.life);
+        }
         dl->AddText(nf, ns, ImVec2(rx - ts.x, y + (h - ns) * 0.5f - 1 * s), Alpha(tc, fade), total);
         y += h + 5 * s;
     }
@@ -230,6 +336,24 @@ int Effective(Kind kind, Kind under, const opt::Options& o) {
     return kind;
 }
 
+ImU32 HealthColor(float life) {
+    struct Stop {
+        float at;
+        float r, g, b;
+    };
+    static const Stop stops[] = {{0.0f, 255, 48, 48}, {0.33f, 255, 140, 26}, {0.66f, 255, 221, 51}, {1.0f, 255, 255, 255}};
+    life = life < 0 ? 0 : life > 1 ? 1 : life;
+    for (int i = 1; i < 4; ++i) {
+        if (life <= stops[i].at) {
+            const Stop &a = stops[i - 1], &b = stops[i];
+            float t = (life - a.at) / (b.at - a.at);
+            return IM_COL32(static_cast<int>(a.r + (b.r - a.r) * t), static_cast<int>(a.g + (b.g - a.g) * t),
+                            static_cast<int>(a.b + (b.b - a.b) * t), 255);
+        }
+    }
+    return IM_COL32(255, 255, 255, 255);
+}
+
 ImU32 KindColor(Kind k, const opt::Options& o) {
     switch (k) {
     case ARMOUR: return o.cArmour;
@@ -257,17 +381,43 @@ void DrawCrosshair(ImDrawList* dl, ImVec2 c, float scale, const opt::Options& o)
     Picture(dl, IMG_CROSSHAIR, c, AIM_BOX * scale * o.crosshairSize / 100.0f, 1.0f);
 }
 
-// O efeito do acerto: a imagem dele da um pulo (35% maior, voltando em 0,1 s), fica e some.
+// O efeito do acerto, na animacao escolhida (a imagem e sempre a da pasta; muda so o movimento):
+//   Pulo      35% maior, voltando em 0,1 s, fica e some
+//   Expandir  nasce menor e abre para fora enquanto some (como o anel em volta da mira do Fortnite)
+//   Soco      entra 60% maior e torto (12 graus) e assenta em 0,07 s, como um tranco
+//   Giro      gira 45 graus e cresce um pouco enquanto some
+//   Nenhuma   aparece e some
 bool DrawEffect(ImDrawList* dl, ImVec2 c, float scale, float age, Kind kind, const opt::Options& o) {
     float life, hold;
     Timing(kind, &life, &hold);
     if (age >= life) {
         return false;
     }
-    float a = age < hold ? 1.0f : 1.0f - (age - hold) / (life - hold);
-    float pop = 1.0f + 0.35f * (1.0f - EaseOut(age / 0.1f));
+    float fade = age < hold ? 1.0f : 1.0f - (age - hold) / (life - hold);
+    float size = 1.0f, angle = 0.0f, alpha = fade;
+    switch (o.fxAnim) {
+    case 1: {
+        float open = life * 0.35f;
+        size = 0.7f + 0.6f * EaseOut(age / life);
+        alpha = age < open ? 1.0f : 1.0f - (age - open) / (life - open);
+        break;
+    }
+    case 2:
+        size = 1.0f + 0.6f * (1.0f - EaseOut(age / 0.07f));
+        angle = 0.21f * (1.0f - EaseOut(age / 0.16f));
+        break;
+    case 3:
+        size = 1.0f + 0.15f * EaseOut(age / life);
+        angle = 0.785f * EaseOut(age / life);
+        break;
+    case 4:
+        break;
+    default:
+        size = 1.0f + 0.35f * (1.0f - EaseOut(age / 0.1f));
+        break;
+    }
     int slot = kind == KILL ? IMG_KILL : kind == HEADSHOT ? IMG_HEAD : kind == ARMOUR ? IMG_ARMOUR : IMG_HIT;
-    Picture(dl, slot, c, AIM_BOX * scale * o.crosshairSize / 100.0f * pop, a);
+    PictureTurned(dl, slot, c, AIM_BOX * scale * o.crosshairSize / 100.0f * size, alpha, angle);
     return true;
 }
 
@@ -297,26 +447,48 @@ void DrawBodyMarker(ImDrawList* dl, ImVec2 c, float scale, float age, float stay
     Picture(dl, IMG_BODY, c, BODY_BOX * scale * pop, a);
 }
 
+// O numero, na animacao escolhida. Fica parado n.stay s (somando: enquanto a soma esta aberta) e depois sai:
+//   Subir   sobe e some (o damage informer antigo)
+//   Arco    estoura grande, assenta com um repique e sai num arco para o lado, como o do Fortnite
+//   Saltar  pula e volta para o lugar
+//   Parado  nao anda: pulsa a cada acerto e some
 void DrawNumber(ImDrawList* dl, const Number& n, float scale, const opt::Options& o) {
     float life = n.kind == KILL ? 1.4f : 1.0f;
-    if (n.age >= life) {
+    float m = n.age - n.stay; // tempo de saida
+    if (m >= life) {
         return;
     }
-    float t = n.age / life;
-    float rise = (o.numbers == 1 ? 120 : 64) * scale * (1 - (1 - t) * (1 - t));
-    float pop = 1.0f + 0.5f * (1.0f - EaseOut(n.age / 0.1f));
-    if (n.bump < 0.14f) {
-        pop += 0.28f * (1.0f - n.bump / 0.14f);
+    float t = Clamp01(m / life);
+    float pop, dx = 0, dy = 0;
+    if (o.numbersAnim == 1) {
+        pop = n.age < 0.22f ? 1.8f - 0.8f * EaseOutBack(n.age / 0.22f) : 1.0f;
+        float side = n.drift < 0 ? -1.0f : 1.0f;
+        dx = side * 70 * scale * t;
+        dy = (-160 * t + 130 * t * t) * scale;
+        pop *= 1.0f - 0.25f * t;
+    } else {
+        pop = 1.0f + 0.5f * (1.0f - EaseOut(n.age / 0.1f));
+        if (o.numbersAnim == 2) {
+            dy = -70 * scale * 4 * t * (1 - t);
+            dx = n.drift * 20 * scale * t;
+        } else if (o.numbersAnim == 0) {
+            dy = -(o.numbers == 1 ? 120 : 64) * scale * (1 - (1 - t) * (1 - t));
+            dx = n.drift * 34 * scale * EaseOut(n.age / 0.6f);
+        }
     }
-    float a = n.age < life - 0.35f ? 1.0f : (life - n.age) / 0.35f;
+    if (n.bump < 0.14f) {
+        pop += 0.32f * (1.0f - n.bump / 0.14f);
+    }
+    float a = m < life - 0.35f ? 1.0f : (life - m) / 0.35f;
     float size = 30 * scale * KindSize(n.kind) * pop;
     char text[16];
     snprintf(text, sizeof(text), n.estimated ? "~%d" : "%d", n.value);
     ImFont* f = NumberFont(o);
     ImVec2 ts = Size(f, size, text);
-    float x = n.from.x + n.drift * 34 * scale * EaseOut(n.age / 0.6f) - ts.x * 0.5f;
-    float y = n.from.y - rise - ts.y * 0.5f;
-    Outlined(dl, f, size, ImVec2(x, y), Alpha(KindColor(n.kind, o), a), text, 2.0f * scale);
+    float x = n.from.x + dx - ts.x * 0.5f;
+    float y = n.from.y + dy - n.lift * scale - ts.y * 0.5f;
+    ImU32 color = o.colorByHealth && n.life >= 0 && n.kind != KILL ? HealthColor(n.life) : KindColor(n.kind, o);
+    Outlined(dl, f, size, ImVec2(x, y), Alpha(color, a), text, 2.0f * scale);
 }
 
 void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen) {

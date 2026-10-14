@@ -15,6 +15,7 @@ struct Events {
     void (*giveDamage)(int id, float damage, int weapon, int part);
     void (*takeDamage)(int id, float damage, int weapon, int part);
     void (*death)(const char* killer, const char* victim, int weapon); // nomes como o SA-MP guarda (CP_ACP)
+    void (*otherHit)(int target, int weapon); // a bala de OUTRO jogador acertou este jogador (bullet sync)
 };
 
 bool Install(DWORD base, const Events& events);

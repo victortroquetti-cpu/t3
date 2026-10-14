@@ -3,6 +3,9 @@
 //   CLocalPlayer::SendGiveDamage +0x6770 e SendTakeDamage +0x6660 (o pacote 115, o mesmo que o damage informer
 //   antigo lia pelo SAMPFUNCS), CDeathWindow::AddMessage +0x66A10 (a mensagem de morte do servidor),
 //   CRemotePlayer: colete +0x1B8, vida +0x1BC, estado +0x1D1 (2 = AFK); cor: CRemotePlayer::GetColorAsARGB +0x12A00.
+//   CRemotePlayer::Update(BulletData*) +0x12BE0: o bullet sync dos outros jogadores (o this e quem atirou; o BulletData
+//   e empacotado: tipo do alvo +0 (1 = jogador), id do alvo +1, arma +39). Serve para saber que outra pessoa tambem
+//   acertou o alvo, com que arma, e que a queda de vida dele nao e so sua.
 
 #include "samp.h"
 
@@ -24,6 +27,8 @@ constexpr DWORD FN_SEND_TAKE_DAMAGE = 0x6660;
 constexpr DWORD FN_DEATH_ADD_MESSAGE = 0x66A10;
 constexpr DWORD FN_GET_COLOR_ARGB = 0x12A00;
 constexpr DWORD FN_LOCAL_NAME = 0x13CD0; // CPlayerPool::GetLocalPlayerName
+constexpr DWORD FN_REMOTE_BULLET = 0x12BE0; // CRemotePlayer::Update(BulletData*)
+constexpr BYTE BULLET_HIT_PLAYER = 1;
 
 constexpr DWORD NG_HOST = 0x20, NG_PORT = 0x225, NG_STATE = 0x3BD, NG_POOLS = 0x3CD;
 constexpr int GAME_CONNECTED = 14;
@@ -39,12 +44,14 @@ constexpr DWORD DIALOG_ACTIVE = 0x28;
 typedef void(__thiscall* DamageFn)(void*, int, float, int, int);
 typedef void(__thiscall* DeathFn)(void*, const char*, const char*, DWORD, DWORD, char);
 typedef DWORD(__thiscall* ColorFn)(void*);
+typedef void(__thiscall* BulletFn)(void*, const BYTE*);
 typedef const char*(__thiscall* NameFn)(void*);
 
 DWORD g_samp = 0;
 Events g_events = {};
 DamageFn o_give = nullptr, o_take = nullptr;
 DeathFn o_death = nullptr;
+BulletFn o_bullet = nullptr;
 
 template <class T>
 T At(DWORD base, DWORD offset) {
@@ -124,6 +131,13 @@ void __fastcall HookDeath(void* self, void*, const char* killer, const char* vic
     o_death(self, killer, victim, kc, vc, weapon);
 }
 
+void __fastcall HookBullet(void* self, void*, const BYTE* data) {
+    if (g_events.otherHit && data && data[0] == BULLET_HIT_PLAYER) {
+        g_events.otherHit(data[1] | data[2] << 8, data[39]);
+    }
+    o_bullet(self, data);
+}
+
 } // namespace
 
 bool Install(DWORD base, const Events& events) {
@@ -155,6 +169,17 @@ bool Install(DWORD base, const Events& events) {
         }
     }
     HitLog("ganchos do samp.dll instalados (SendGiveDamage, SendTakeDamage, mensagem de morte)");
+    // Opcional: sem ele o mod ainda percebe outros atiradores pela vida do alvo caindo sem tiro seu.
+    void* bullet = reinterpret_cast<void*>(base + FN_REMOTE_BULLET);
+    MH_STATUS b = MH_CreateHook(bullet, reinterpret_cast<void*>(HookBullet), reinterpret_cast<void**>(&o_bullet));
+    if (b == MH_OK) {
+        b = MH_EnableHook(bullet);
+        if (b != MH_OK) {
+            MH_RemoveHook(bullet);
+        }
+    }
+    HitLog(b == MH_OK ? "gancho do bullet sync instalado (tiros dos outros jogadores)"
+                      : "gancho do bullet sync recusado (%d) -- outros atiradores so pela vida do alvo", b);
     return true;
 }
 

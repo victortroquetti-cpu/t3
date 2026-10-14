@@ -740,7 +740,7 @@ void SetupSamp() {
         HitLog("samp.dll nao e o 0.3.7 R1 -- o Trok Hitmarker fica desligado (nada foi alterado)");
         return;
     }
-    samp::Events events = {logic::OnGive, logic::OnTake, logic::OnDeath};
+    samp::Events events = {logic::OnGive, logic::OnTake, logic::OnDeath, logic::OnOtherHit};
     if (!samp::Install(g_samp, events)) {
         return;
     }

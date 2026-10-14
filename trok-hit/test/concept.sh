@@ -67,5 +67,18 @@ for i, (im, label) in enumerate(zip(ims, ['Levou na vida (vermelho)', 'Levou no 
     os.remove(im.filename)
 img.save(os.path.join(d, '15-borda.png'))
 " "$OUT" "$FONT"
+# os quadros das animacoes viram GIF (19: o sinal na mira, 20: os numeros)
+python3 -I -c "
+import glob, os, sys
+from PIL import Image
+d = sys.argv[1]
+for prefix, name in (('gif19', '19-animacao-sinal.gif'), ('gif20', '20-animacao-numeros.gif')):
+    files = sorted(glob.glob(os.path.join(d, prefix + '-*.png')))
+    frames = [Image.open(f).convert('RGB').quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+              for f in files]
+    frames[0].save(os.path.join(d, name), save_all=True, append_images=frames[1:], duration=50, loop=0, optimize=True)
+    for f in files:
+        os.remove(f)
+" "$OUT"
 rm -f -- "$OUT/concept" "$OUT/fundo.rgb" "$OUT"/*.rgba
 rm -rf -- "$OUT/mira"

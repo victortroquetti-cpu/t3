@@ -30,10 +30,17 @@ struct Options {
     // O que aparece na mira. Desligar colete, cabeca ou abate faz esse tiro mostrar o acerto normal; desligar o acerto
     // tira o sinal dos tiros normais.
     bool fxHit = true, fxArmour = true, fxHead = true, fxKill = true;
+    int fxAnim = 0;          // animacao do sinal: 0 Pulo, 1 Expandir (como o Fortnite), 2 Soco, 3 Giro, 4 Nenhuma
 
     // ---- Numeros de dano
     int numbers = 0;         // 0 sobem do personagem, 1 sobem na tela (ao lado do centro), 2 desligado
-    bool numbersSum = true;  // tiros seguidos no mesmo alvo somam no mesmo numero
+    int numbersCount = 0;    // 0 um numero por tiro, 1 somando: um numero so por alvo que vai crescendo
+    bool numbersSum = true;  // um por tiro: tiros seguidos (rajada) somam no mesmo numero
+    bool splitHead = false;  // somando: o dano na cabeca num numero separado (dourado)
+    int sumWindow = 2;       // s sem acertar ate a soma fechar
+    int numbersAnim = 0;     // 0 Subir, 1 Arco (como o Fortnite), 2 Saltar, 3 Parado
+    bool colorByHealth = false; // a cor dos numeros (e do informer) pela vida que sobrou: branco, amarelo, laranja,
+                                // vermelho (a do alvo no dano dado, a sua no levado)
     int numbersSize = 100;   // %
     int numbersFont = 0;     // 0 Arial Black (como o damage informer antigo), 1 fonte da casa
     int source = 0;          // 0 dano real (vida + colete que o alvo perdeu), 1 dano que o GTA calcula
@@ -52,6 +59,8 @@ struct Options {
 
     bool combo = true;       // (x3 - 138) ao lado do numero: acertos e dano real somado no mesmo alvo
     int comboWindow = 3;     // s sem acertar ate o combo fechar
+    int informerCount = 0;   // 0 cada tiro com o combo, 1 somando: um numero so que cresce (a cabeca separada se
+                             // splitHead)
 
     // ---- Recebido
     bool direction = true;   // seta vermelha em volta do centro da tela apontando de onde veio o tiro
@@ -72,6 +81,8 @@ struct Options {
     // ---- Sons (pasta "Trok Hitmarker\sons", mp3 ou wav com estes nomes)
     bool sHit = true, sHeadDiff = true, sTaken = true, sKill = true, sKillHead = true, sDeath = true;
     int volume = 80;
+
+    bool logAll = false;     // anota todos os acertos no Trok Hitmarker.log (para conferir o dano real no servidor)
 
     // ---- Posicoes: tudo preso a tela (so o sinal de acerto acompanha a mira)
     Place given = {0.60f, 0.47f};   // informer: dano dado, comeca aqui (a direita do centro, fora da seta)

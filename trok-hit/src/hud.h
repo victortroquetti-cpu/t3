@@ -33,6 +33,9 @@ struct Number {    // numero de dano que sobe
     bool estimated = false; // o alvo nao mostrou a perda (servidor esconde a vida): "~46", o valor do GTA
     float drift = 0;        // -1..1: espalha os numeros para nao subirem um em cima do outro
     float bump = 0;         // s desde o ultimo tiro somado (o numero da um pulinho)
+    float stay = 0;         // s parado no lugar antes de comecar a sair (somando: enquanto a soma esta aberta)
+    float life = -1;        // 0..1: a vida que sobrou ao alvo (cor pela vida); -1 = sem
+    float lift = 0;         // px (tela de 1080) acima do ponto: o numero da cabeca fica em cima do do corpo
 };
 
 struct Hit {        // um acerto no informer
@@ -40,6 +43,7 @@ struct Hit {        // um acerto no informer
     int value = 0;
     Kind kind = HEALTH;
     bool estimated = false;
+    float life = -1;    // 0..1: a vida que sobrou depois dele (cor pela vida)
 };
 
 struct Line {       // uma pessoa no informer (dado ou levado)
@@ -48,6 +52,11 @@ struct Line {       // uma pessoa no informer (dado ou levado)
     ImU32 nickColor = 0xFFFFFFFF; // a cor do jogador no SA-MP
     bool afk = false;
     int hits = 0, total = 0;      // combo: acertos e dano somado
+    int head = 0;                 // a parte do total que foi na cabeca
+    bool estimated = false;       // alguma parte do total e o numero do GTA (~)
+    Kind last = HEALTH;           // o ultimo acerto (a cor do total somando)
+    float life = -1;              // a vida que sobrou depois do ultimo acerto (cor pela vida)
+    float bump = 1;               // s desde o ultimo acerto (o total da um pulinho)
     float age = 0;                // desde o ultimo acerto
     std::vector<Hit> recent;      // numeros que ainda estao subindo
 };
@@ -80,6 +89,8 @@ void SetImage(int slot, ImTextureID texture, float u1 = 1.0f, float v1 = 1.0f, f
 // Fontes extras no atlas (numeros grandes em Arial Black ou na fonte da casa). Chamar antes de construir o atlas.
 void AddFonts(float screenHeight, const char* houseFont, const char* numberFont);
 ImU32 KindColor(Kind k, const opt::Options& o);
+// Branco com a vida cheia, amarelo, laranja e vermelho perto do fim (life 0..1).
+ImU32 HealthColor(float life);
 // O efeito que um acerto mostra na mira, com o que estiver desligado no menu; -1 = nenhum.
 int Effective(Kind kind, Kind under, const opt::Options& o);
 

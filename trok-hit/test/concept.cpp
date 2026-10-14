@@ -314,6 +314,179 @@ static void BoardNumbers(ImDrawList* dl) {
           "\"~46\": o servidor n\xC3\xA3o mostrou a vida do alvo caindo (vida escondida), ent\xC3\xA3o vale o n\xC3\xBAmero do GTA, com o ~ na frente.");
 }
 
+// ---------------------------------------------------------------- animacoes (quadros de GIF)
+
+static float g_animTime = 0;
+
+// 19. Cada linha uma animacao do sinal, cada coluna um efeito (a imagem e a mesma; muda o movimento).
+static void BoardFxAnims(ImDrawList* dl) {
+    opt::Options o = opt::Get();
+    const char* rows[] = {"Pulo", "Expandir", "Soco", "Giro", "Nenhuma"};
+    const char* cols[] = {"Acerto", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
+    hud::Kind kinds[] = {hud::HEALTH, hud::ARMOUR, hud::HEADSHOT, hud::KILL};
+    const float x0 = 220, y0 = 110, cw = 170, ch = 120;
+    for (int c = 0; c < 4; ++c) {
+        Label(dl, x0 + c * cw + cw * 0.5f, y0 - 40, cols[c], true);
+    }
+    for (int r = 0; r < 5; ++r) {
+        Label(dl, 60, y0 + r * ch + ch * 0.5f - 10, rows[r]);
+        o.fxAnim = r;
+        for (int c = 0; c < 4; ++c) {
+            ImVec2 a(x0 + c * cw + 8, y0 + r * ch + 6), b(x0 + (c + 1) * cw - 8, y0 + (r + 1) * ch - 6);
+            dl->AddRectFilled(a, b, IM_COL32(255, 255, 255, 10), 8);
+            ImVec2 center((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+            float age = std::fmod(g_animTime + 1.6f - c * 0.12f, 1.6f);
+            hud::DrawAimPreview(dl, center, 1.6f, age, kinds[c], o);
+        }
+    }
+}
+
+// 20. Os numeros: as quatro animacoes (tres tiros: vida, colete, cabeca) e o Somando, com e sem a cabeca separada.
+static void BoardNumberAnims(ImDrawList* dl) {
+    opt::Options o = opt::Get();
+    o.numbers = 0;
+    const char* rows[] = {"Subir", "Arco", "Saltar", "Parado", "Somando", "Somando, cabe\xC3\xA7" "a separada"};
+    const float x0 = 360, y0 = 100, rw = 700, rh = 132;
+    float t = g_animTime;
+    for (int r = 0; r < 6; ++r) {
+        float top = y0 + r * rh;
+        dl->AddRectFilled(ImVec2(x0, top + 6), ImVec2(x0 + rw, top + rh - 6), IM_COL32(255, 255, 255, 8), 8);
+        Label(dl, 60, top + rh * 0.5f - 10, rows[r]);
+        ImVec2 base(x0 + rw * 0.5f, top + rh - 34);
+        if (r < 4) {
+            o.numbersAnim = r;
+            const hud::Kind kinds[] = {hud::HEALTH, hud::ARMOUR, hud::HEADSHOT};
+            const float drifts[] = {0.0f, 0.7f, -0.7f};
+            for (int i = 0; i < 3; ++i) {
+                float age = t - i * 0.45f;
+                if (age < 0) continue;
+                hud::Number n;
+                n.from = ImVec2(base.x - 150 + i * 150, base.y);
+                n.age = age;
+                n.value = 46;
+                n.kind = kinds[i];
+                n.drift = drifts[i];
+                n.bump = 1.0f;
+                hud::DrawNumber(dl, n, 1.0f, o);
+            }
+        } else {
+            o.numbersAnim = 0;
+            bool split = r == 5;
+            const float hits[] = {0.0f, 0.35f, 0.7f, 1.05f};
+            const int values[] = {46, 13, 46, 41}; // Deagle, M4, Deagle na cabeca, Sniper
+            int body = 0, head = 0;
+            float last = 0, lastHead = 0;
+            for (int i = 0; i < 4; ++i) {
+                if (t < hits[i]) break;
+                if (i == 2 && split) {
+                    head += values[i];
+                    lastHead = hits[i];
+                } else {
+                    body += values[i];
+                }
+                last = hits[i];
+            }
+            if (t < hits[0]) continue;
+            hud::Number n;
+            n.from = base;
+            n.age = t;
+            n.stay = 1.7f;
+            n.value = body;
+            n.kind = hud::HEALTH;
+            n.bump = t - last;
+            hud::DrawNumber(dl, n, 1.0f, o);
+            if (head > 0) {
+                n.value = head;
+                n.kind = hud::HEADSHOT;
+                n.lift = 40;
+                n.age = t - 0.7f;
+                n.stay = 1.0f;
+                n.bump = t - lastHead;
+                hud::DrawNumber(dl, n, 1.0f, o);
+            }
+        }
+    }
+}
+
+// 21. O informer: combo e somando (com e sem a cabeca separada), o mesmo combate.
+static void BoardInformerSum(ImDrawList* dl) {
+    opt::Options o = opt::Get();
+    hud::State s;
+    hud::Line l;
+    l.nick = "Lucas_Mendes";
+    l.id = 3;
+    l.nickColor = LUCAS;
+    l.hits = 4;
+    l.total = 138;
+    l.head = 46;
+    l.age = 0.3f;
+    l.bump = 0.5f;
+    l.recent = {{1.1f, 46, hud::HEALTH}, {0.7f, 46, hud::HEALTH}, {0.3f, 46, hud::HEADSHOT}};
+    s.given = {l};
+    const char* titles[] = {"Combo (x3 \xC2\xB7 138)", "Somando", "Somando, cabe\xC3\xA7" "a separada"};
+    for (int i = 0; i < 3; ++i) {
+        float x = 120 + i * 560;
+        dl->AddRectFilled(ImVec2(x - 40, 120), ImVec2(x + 440, 460), IM_COL32(255, 255, 255, 8), 10);
+        Label(dl, x - 20, 136, titles[i]);
+        o.informer = 0;
+        o.informerCount = i == 0 ? 0 : 1;
+        o.splitHead = i == 2;
+        o.given = opt::Place{x / 1920.0f, 360 / 1080.0f};
+        o.numbers = 2, o.direction = false, o.edgeFlash = false, o.onAim = false, o.hitLocal = false;
+        hud::Draw(dl, s, o, ImVec2(1920, 1080));
+    }
+}
+
+// 22. Cor pela vida: o mesmo tiro com a vida que sobrou ao alvo caindo.
+static void BoardHealthColors(ImDrawList* dl) {
+    opt::Options o = opt::Get();
+    o.colorByHealth = true;
+    o.numbers = 0;
+    o.numbersAnim = 3; // parado
+    const float lives[] = {1.0f, 0.8f, 0.6f, 0.45f, 0.3f, 0.15f, 0.04f};
+    Label(dl, 100, 120, "Cor pela vida que sobrou ao alvo (no dano levado, a sua)");
+    for (int i = 0; i < 7; ++i) {
+        float x = 160 + i * 170;
+        hud::Number n;
+        n.from = ImVec2(x, 230);
+        n.age = 0.5f;
+        n.stay = 5.0f;
+        n.value = 46;
+        n.life = lives[i];
+        n.bump = 1.0f;
+        hud::DrawNumber(dl, n, 1.3f, o);
+        char text[32];
+        snprintf(text, sizeof(text), "vida %d", static_cast<int>(lives[i] * 100 + 0.5f));
+        Small(dl, x, 285, text, true);
+    }
+    hud::Number k;
+    k.from = ImVec2(160 + 7 * 170, 230);
+    k.age = 0.5f;
+    k.stay = 5.0f;
+    k.value = 46;
+    k.life = 0.0f;
+    k.kind = hud::KILL;
+    k.bump = 1.0f;
+    hud::DrawNumber(dl, k, 1.3f, o);
+    Small(dl, 160 + 7 * 170, 285, "abate", true);
+}
+
+static void Animate(void (*board)(ImDrawList*), float cycle, const std::string& prefix, int x0, int y0, int x1, int y1) {
+    const int fps = 20;
+    int frames = static_cast<int>(cycle * fps);
+    hud::State empty;
+    std::vector<float> photo;
+    photo.swap(background); // fundo liso: o GIF fica nitido e leve
+    for (int f = 0; f < frames; ++f) {
+        g_animTime = f / static_cast<float>(fps);
+        Frame(empty, false, 0.3f, board);
+        char name[64];
+        snprintf(name, sizeof(name), "%s-%03d.ppm", prefix.c_str(), f);
+        Save(name, x0, y0, x1, y1);
+    }
+    photo.swap(background);
+}
+
 static void Menu(int tab, const std::string& out, int x0, int x1) {
     ImGuiIO& io = ImGui::GetIO();
     menu::SetTab(tab);
@@ -495,6 +668,18 @@ int main(int argc, char** argv) {
     o.crosshairSize = 150, o.fxHead = false, o.fxKill = false; // mira maior, sem cabeca e sem abate proprios
     Menu(0, dir + "/18-menu-mira-tamanho.ppm", 690, 1230);
     o = opt::Options();
+
+    // 19-21. As animacoes (quadros que o concept.sh junta em GIF) e o informer somando
+    o = opt::Options();
+    Animate(BoardFxAnims, 1.6f, dir + "/gif19", 30, 50, 940, 720);
+    Animate(BoardNumberAnims, 2.6f, dir + "/gif20", 30, 80, 1090, 900);
+    hud::State none;
+    Frame(none, false, 0.3f, BoardInformerSum);
+    Save(dir + "/21-informer-somando.ppm", 60, 100, 1740, 480);
+    Check(Lit(680, 250, 1100, 420, 0.5f) > 200, "informer somando: um numero so em cima do nick");
+
+    Frame(none, false, 0.3f, BoardHealthColors);
+    Save(dir + "/22-cor-pela-vida.ppm", 40, 90, 1500, 320);
 
     printf("concept: %d falhas\n", failures);
     return failures ? 1 : 0;

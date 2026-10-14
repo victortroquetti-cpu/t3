@@ -15,6 +15,7 @@ void Reset(); // trocou de servidor ou saiu dele
 void OnGive(int id, float damage, int weapon, int part);
 void OnTake(int id, float damage, int weapon, int part);
 void OnDeath(const char* killer, const char* victim, int weapon);
+void OnOtherHit(int target, int weapon); // outro jogador acertou este alvo (bullet sync)
 
 // Um quadro (no Present): avanca o tempo, mede o dano real e monta o que o hud desenha.
 void Frame(float dt, ImVec2 screen, const game::Aim& aim, const opt::Options& o, hud::State* st);

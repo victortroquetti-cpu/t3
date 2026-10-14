@@ -38,6 +38,7 @@ run() {
     fi
     case $name in
         desligado) printf '[padrao]\r\nligado=0\r\n' >"$dir/Trok Hitmarker.ini" ;;
+        pvp-20 | pvp-20-sem-mensagem) printf '[padrao]\r\nanotar_todos=1\r\n' >"$dir/Trok Hitmarker.ini" ;;
         mira-do-jogo) printf '[padrao]\r\nmira=0\r\nmira_estatica=1\r\nmira_tamanho=150\r\n' >"$dir/Trok Hitmarker.ini" ;;
     esac
     if [ -n "${TROK_FONT:-}" ]; then cp "$TROK_FONT" "$dir/moonloader/resource/trok/font.ttf"; fi
@@ -46,7 +47,7 @@ run() {
         2>/dev/null | tr -d '\r' || status=1
     sed 's/^/   log| /' "$dir/Trok Hitmarker.log" 2>/dev/null | tr -d '\r' || echo "   (sem log do .asi)"
 }
-for scenario in ${SCENARIOS:-trok mira-do-jogo pasta-propria desligado outra-versao gta-errado}; do
+for scenario in ${SCENARIOS:-trok mira-do-jogo pasta-propria desligado outra-versao gta-errado pvp-20 pvp-20-sem-mensagem}; do
     run "$scenario"
 done
 exit $status

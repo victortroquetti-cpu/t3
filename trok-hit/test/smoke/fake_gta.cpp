@@ -19,12 +19,21 @@
 //   desligado     ligado=0: a mira do jogo intacta e nada na tela
 //   outra-versao  samp.dll com o ponto de entrada do R3: o .asi nao instala nada
 //   gta-errado    sem a marca do 1.0 US: o .asi nao instala nada
+//   pvp-20        troca de tiros com 20 jogadores num servidor com dano proprio (Deagle 70, M4 13, Sniper 90,
+//                 headshot de Deagle ou Sniper mata) e ping variando: voce atira em rajadas trocando de alvo, outros 6
+//                 atiradores acertam os mesmos alvos (com e sem bullet sync), gente morre e renasce. No fim, cada numero
+//                 do log (anotar_todos=1) e comparado com o dano que o "servidor" aplicou de verdade em cada tiro seu,
+//                 e cada abate com quem matou de verdade
+//   pvp-20-sem-mensagem  o mesmo, num servidor que nao manda mensagem de morte (o abate sai da vida zerada)
 
 #include <windows.h>
 #include <d3d9.h>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <vector>
+#include <algorithm>
 
 namespace {
 
@@ -253,28 +262,30 @@ void SetInVehicle(bool in) {
 
 struct Player {
     int id;
-    const char* name;
+    char name[24];
     DWORD color;
     float x, y;
     float health, armour;
 };
 
-const Player PLAYERS[] = {
+const Player BASE_PLAYERS[] = {
     {1, "Joao_Silva", 0xFF2ECC71, 0.0f, 10.0f, 100.0f, 0.0f},
     {2, "Maria_Souza", 0xFFF39C12, -3.0f, 12.0f, 30.0f, 0.0f},
     {3, "Pedro_Lima", 0xFF3498DB, 0.0f, -8.0f, 100.0f, 0.0f}, // atras da camera
     {4, "Ana_Costa", 0xFFE74C3C, 4.0f, 14.0f, 100.0f, 0.0f},  // o servidor esconde a vida (nunca cai)
 };
-constexpr int PLAYER_COUNT = 4;
+constexpr int MAX_FAKE = 24;
+Player PLAYERS[MAX_FAKE];
+int PLAYER_COUNT = 4;
 
 alignas(16) BYTE g_netGame[0x400];
 alignas(16) BYTE g_pools[0x40];
 alignas(16) BYTE g_playerPool[0x2000];
-alignas(16) BYTE g_infos[PLAYER_COUNT][0x100];
-alignas(16) BYTE g_remotes[PLAYER_COUNT][0x200];
-alignas(16) BYTE g_sampPeds[PLAYER_COUNT][0x300];
-GamePed g_peds[PLAYER_COUNT];
-GameMatrix g_pedMatrices[PLAYER_COUNT];
+alignas(16) BYTE g_infos[MAX_FAKE][0x100];
+alignas(16) BYTE g_remotes[MAX_FAKE][0x200];
+alignas(16) BYTE g_sampPeds[MAX_FAKE][0x300];
+GamePed g_peds[MAX_FAKE];
+GameMatrix g_pedMatrices[MAX_FAKE];
 alignas(16) BYTE g_dialog[0x100];
 alignas(16) BYTE g_scoreboard[0x40];
 alignas(16) BYTE g_localPlayer[0x100];
@@ -317,6 +328,10 @@ void BuildSamp() {
     Mem<BYTE*>(g_samp + SCOREBOARD) = g_scoreboard;
     Mem<BYTE*>(g_samp + NETGAME) = g_netGame; // por ultimo: com ele o .asi registra o /trokhit
 }
+
+typedef void(__thiscall* BulletFn)(void*, const BYTE*);
+constexpr DWORD FN_REMOTE_BULLET = 0x12BE0;
+constexpr DWORD F_BULLET_COUNT = 0x24;
 
 void Give(int id, float damage, int weapon, int part) {
     reinterpret_cast<DamageFn>(g_samp + FN_SEND_GIVE)(g_localPlayer, id, damage, weapon, part);
@@ -473,6 +488,338 @@ void CheckPct(bool ok, const char* what, double value) {
     Check(ok, g_text);
 }
 
+// ---------------------------------------------------------------- PvP de 20
+
+struct Rng {
+    unsigned s = 12345;
+    unsigned Next() {
+        s = s * 1664525u + 1013904223u;
+        return s >> 8;
+    }
+    float F() {
+        return (Next() & 0xFFFFFF) / 16777216.0f;
+    }
+    int I(int lo, int hi) {
+        return lo + static_cast<int>(F() * (hi - lo + 1));
+    }
+};
+
+enum EvKind { EV_APPLY, EV_SYNC, EV_MESSAGE, EV_RESPAWN, EV_BULLET };
+
+struct Ev {
+    DWORD at;
+    EvKind kind;
+    int k;        // indice do alvo em PLAYERS
+    int shooter;  // -1 = voce, senao o indice de quem atirou
+    int damage;   // dano do servidor (0 = headshot que mata); no bullet sync, a arma
+    int shot;     // seu tiro (indice em g_truth), -1 dos outros
+};
+
+struct Server {
+    float hp = 100, ar = 0;
+    bool alive = true;
+    int killer = -2;
+};
+
+std::vector<Ev> g_events;
+Server g_server[MAX_FAKE];
+std::vector<int> g_truth;     // o dano que cada tiro seu tirou de verdade
+std::vector<int> g_truthK;    // o alvo de cada tiro seu
+int g_trueKills[MAX_FAKE];    // abates seus de verdade por alvo
+int g_otherKills = 0;
+
+void Schedule(DWORD at, EvKind kind, int k, int shooter, int damage, int shot) {
+    g_events.push_back({at, kind, k, shooter, damage, shot});
+}
+
+void SyncNow(int k) {
+    Put<float>(g_remotes[k], 0x1BC, g_server[k].hp);
+    Put<float>(g_remotes[k], 0x1B8, g_server[k].ar);
+}
+
+void ApplyHit(const Ev& e, DWORD now, Rng& rng, bool messages) {
+    Server& s = g_server[e.k];
+    int real = 0;
+    if (s.alive) {
+        float dmg = e.damage == 0 ? s.hp + s.ar : static_cast<float>(e.damage);
+        float fromArmour = std::min(s.ar, dmg);
+        s.ar -= fromArmour;
+        float fromHealth = std::min(s.hp, dmg - fromArmour);
+        s.hp -= fromHealth;
+        real = static_cast<int>(fromArmour + fromHealth + 0.5f);
+        if (s.hp <= 0) {
+            s.alive = false;
+            s.killer = e.shooter;
+            if (e.shooter < 0) {
+                ++g_trueKills[e.k];
+            } else {
+                ++g_otherKills;
+            }
+            // a vida zerada e a mensagem de morte chegam juntas, uma um pouco antes da outra
+            Schedule(now + rng.I(0, 100), EV_SYNC, e.k, -1, 0, -1);
+            if (messages) {
+                Schedule(now + rng.I(0, 100), EV_MESSAGE, e.k, e.shooter, 0, -1);
+            }
+            Schedule(now + 1500, EV_RESPAWN, e.k, -1, 0, -1);
+        } else {
+            SyncNow(e.k);
+        }
+    }
+    if (e.shot >= 0) {
+        g_truth[e.shot] = real;
+    }
+}
+
+struct Parsed {
+    int target, value;
+    bool estimated, contested;
+    int weapon, part;
+};
+
+// O log com anotar_todos=1: cada acerto e cada abate, na ordem.
+void ReadLog(std::vector<Parsed>* hits, int kills[MAX_FAKE + 1]) {
+    FILE* f = fopen("Trok Hitmarker.log", "rb");
+    if (!f) {
+        return;
+    }
+    char line[512];
+    while (fgets(line, sizeof(line), f)) {
+        int id, part, weapon, value;
+        float gta;
+        const char* a = strstr(line, "acerto: id ");
+        if (a && sscanf(a, "acerto: id %d, parte %d, arma %d, GTA %f -> ", &id, &part, &weapon, &gta) == 4) {
+            const char* r = strstr(a, "-> ") + 3;
+            Parsed p = {id, 0, false, false, weapon, part};
+            const char* est = strstr(r, "(~");
+            if (est && sscanf(est, "(~%d)", &value) == 1) {
+                p.value = value;
+                p.estimated = true;
+            } else if (sscanf(r, "real %d", &value) == 1) {
+                p.value = value;
+            } else if (sscanf(r, "%d", &value) == 1) {
+                p.value = value;
+                p.contested = strstr(r, "disputado") != nullptr;
+            }
+            hits->push_back(p);
+        }
+        const char* k = strstr(line, "abate: id ");
+        if (k && sscanf(k, "abate: id %d", &id) == 1 && id >= 1 && id <= MAX_FAKE) {
+            ++kills[id];
+        }
+    }
+    fclose(f);
+}
+
+void FrameOnly() {
+    MSG msg;
+    while (PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessageA(&msg);
+    }
+    g_real->Clear(0, nullptr, D3DCLEAR_TARGET, CLEAR, 1.0f, 0);
+    if (SUCCEEDED(g_real->BeginScene())) {
+        reinterpret_cast<VoidFn>(GTA_DRAW_CROSSHAIRS)();
+        g_real->EndScene();
+    }
+    g_real->Present(nullptr, nullptr, nullptr, nullptr);
+}
+
+void RunPvp(bool messages) {
+    Rng rng;
+    if (getenv("PVP_SEED")) {
+        rng.s = static_cast<unsigned>(atoi(getenv("PVP_SEED")));
+    }
+    const int serverDamage[64] = {}; // so para o tamanho
+    (void)serverDamage;
+    struct Gun {
+        int weapon;
+        float gta;
+        int server;
+        int shots, spacing;
+        float head;
+    } guns[] = {{31, 9.9f, 13, 6, 100, 0.12f}, {24, 46.2f, 70, 3, 550, 0.2f}, {34, 41.25f, 90, 1, 0, 0.25f}};
+
+    // espera o .asi subir (ganchos, /trokhit)
+    DWORD start = GetTickCount();
+    while (GetTickCount() - start < 4600) {
+        FrameOnly();
+        Sleep(5);
+    }
+    g_aiming = true;
+    DWORD t0 = GetTickCount();
+    const DWORD FIGHT = 16000, WARMUP = 1200;
+    DWORD nextOurs = t0, nextOther = t0 + WARMUP;
+    int target = -1, gunIndex = 0, left = 0;
+    DWORD bullets0 = Field(F_BULLET_COUNT);
+    int ourShots = 0, otherHits = 0;
+    bool shot = false;
+    for (;;) {
+        DWORD now = GetTickCount();
+        bool fighting = now - t0 < FIGHT;
+        // os seus tiros: rajadas trocando de alvo e de arma
+        if (fighting && now >= nextOurs) {
+            if (left == 0 || target < 0 || !g_server[target].alive) {
+                int tries = 0;
+                do {
+                    target = rng.I(0, PLAYER_COUNT - 1);
+                } while (!g_server[target].alive && ++tries < 50);
+                float r = rng.F();
+                gunIndex = r < 0.5f ? 0 : r < 0.85f ? 1 : 2;
+                left = guns[gunIndex].shots;
+            }
+            const Gun& g = guns[gunIndex];
+            if (g_server[target].alive) {
+                bool head = rng.F() < g.head;
+                int part = head ? 9 : rng.I(3, 8);
+                int index = static_cast<int>(g_truth.size());
+                g_truth.push_back(0);
+                g_truthK.push_back(target);
+                Give(PLAYERS[target].id, g.gta, g.weapon, part);
+                bool kills = head && g.weapon != 31;
+                Schedule(now + rng.I(80, 300), EV_APPLY, target, -1, kills ? 0 : g.server, index);
+                ++ourShots;
+            }
+            --left;
+            nextOurs = now + (left > 0 ? g.spacing : 150);
+        }
+        // os outros: muitas vezes no mesmo alvo que voce
+        if (fighting && now >= nextOther) {
+            int k = rng.F() < 0.5f && target >= 0 ? target : rng.I(0, PLAYER_COUNT - 1);
+            int shooter = rng.I(0, 5);
+            if (shooter == k) {
+                shooter = (shooter + 1) % PLAYER_COUNT;
+            }
+            if (g_server[k].alive) {
+                float r = rng.F();
+                if (r < 0.9f) { // bala com bullet sync, com as armas do servidor (o resto: soco, explosao)
+                    bool deagle = r < 0.25f;
+                    Schedule(now, EV_BULLET, k, shooter, deagle ? 24 : 31, -1);
+                    int damage = deagle ? (rng.F() < 0.1f ? 0 : 70) : 13;
+                    Schedule(now + rng.I(50, 250), EV_APPLY, k, shooter, damage, -1);
+                } else {
+                    Schedule(now + rng.I(20, 120), EV_APPLY, k, shooter, rng.I(5, 12), -1);
+                }
+                ++otherHits;
+            }
+            nextOther = now + rng.I(70, 150);
+        }
+        // o "servidor"
+        for (size_t i = 0; i < g_events.size();) {
+            if (g_events[i].at > now) {
+                ++i;
+                continue;
+            }
+            Ev e = g_events[i];
+            g_events.erase(g_events.begin() + i);
+            switch (e.kind) {
+            case EV_APPLY: ApplyHit(e, now, rng, messages); break;
+            case EV_SYNC: SyncNow(e.k); break;
+            case EV_MESSAGE: {
+                const char* killer = e.shooter < 0 ? "Victor_Trok" : PLAYERS[e.shooter].name;
+                reinterpret_cast<DeathFn>(g_samp + FN_DEATH_ADD)(g_deathWindow, killer, PLAYERS[e.k].name, 0, 0, 24);
+                break;
+            }
+            case EV_RESPAWN:
+                g_server[e.k] = Server();
+                g_server[e.k].ar = rng.F() < 0.5f ? 50.0f : 0.0f;
+                SyncNow(e.k);
+                break;
+            case EV_BULLET: {
+                BYTE data[40] = {};
+                data[0] = 1;
+                data[1] = static_cast<BYTE>(PLAYERS[e.k].id & 0xFF);
+                data[2] = static_cast<BYTE>(PLAYERS[e.k].id >> 8);
+                data[39] = static_cast<BYTE>(e.damage); // a arma
+                reinterpret_cast<BulletFn>(g_samp + FN_REMOTE_BULLET)(g_remotes[e.shooter], data);
+                break;
+            }
+            }
+        }
+        FrameOnly();
+        if (!shot && now - t0 >= 8000) {
+            shot = true;
+            Capture("pvp.bmp");
+        }
+        if (!fighting && g_events.empty() && now - t0 >= FIGHT + 3000) {
+            break;
+        }
+        Sleep(4);
+    }
+    CheckN(Field(F_BULLET_COUNT) > bullets0, "bullet sync dos outros jogadores passou pelo samp.dll",
+           static_cast<int>(Field(F_BULLET_COUNT) - bullets0));
+
+    // o que o mod anotou x o que aconteceu
+    std::vector<Parsed> hits;
+    int modKills[MAX_FAKE + 1] = {};
+    ReadLog(&hits, modKills);
+    std::vector<std::vector<int>> truthBy(MAX_FAKE + 1);
+    for (size_t i = 0; i < g_truth.size(); ++i) {
+        truthBy[PLAYERS[g_truthK[i]].id].push_back(g_truth[i]);
+    }
+    std::vector<size_t> next(MAX_FAKE + 1, 0);
+    int exact = 0, nearby = 0, wrong = 0, estimated = 0, contested = 0, unmatched = 0, deadAir = 0;
+    long sumTrue = 0, sumMod = 0;
+    for (const Parsed& p : hits) {
+        if (p.target < 1 || p.target > MAX_FAKE || next[p.target] >= truthBy[p.target].size()) {
+            ++unmatched;
+            continue;
+        }
+        int truth = truthBy[p.target][next[p.target]++];
+        sumTrue += truth;
+        sumMod += p.value;
+        contested += p.contested;
+        if (p.estimated) {
+            ++estimated;
+        }
+        if (truth == 0) {
+            ++deadAir; // o alvo ja tinha morrido quando o seu tiro chegou
+        }
+        int diff = std::abs(p.value - truth);
+        if (diff > 5 && getenv("PVP_DETALHE")) {
+            printf("   longe: id %d, arma %d, parte %d, real %d, mostrado %d%s%s\n", p.target, p.weapon, p.part, truth, p.value,
+                   p.contested ? " (disputado)" : "", p.estimated ? " (~)" : "");
+        }
+        if (diff <= 1) {
+            ++exact;
+        } else if (diff <= 5) {
+            ++nearby;
+        } else {
+            ++wrong;
+        }
+    }
+    int trueKills = 0, countedKills = 0, falseKills = 0, missedKills = 0;
+    for (int k = 0; k < PLAYER_COUNT; ++k) {
+        int id = PLAYERS[k].id;
+        trueKills += g_trueKills[k];
+        countedKills += std::min(modKills[id], g_trueKills[k]);
+        falseKills += std::max(0, modKills[id] - g_trueKills[k]);
+        missedKills += std::max(0, g_trueKills[k] - modKills[id]);
+    }
+    int total = static_cast<int>(hits.size()) - unmatched;
+    printf("   tiros seus: %d (acertos de outros: %d)\n", ourShots, otherHits);
+    printf("   numeros: %d exatos (+-1), %d perto (+-5), %d longe; %d com alvo disputado, %d sem queda (~)\n", exact,
+           nearby, wrong, contested, estimated);
+    printf("   %d tiros chegaram com o alvo ja morto por outro (dano real 0)\n", deadAir);
+    printf("   soma: real %ld, mostrado %ld\n", sumTrue, sumMod);
+    printf("   abates seus: %d de verdade, %d contados, %d a mais, %d perdidos; abates dos outros: %d\n", trueKills,
+           countedKills, falseKills, missedKills, g_otherKills);
+    fflush(stdout);
+    CheckN(unmatched == 0 && total == ourShots, "todo tiro seu virou um numero (nenhum perdido ou trocado de alvo)",
+           total);
+    snprintf(g_text, sizeof(g_text), "numeros certos (+-5): %d de %d (%.0f%%)", exact + nearby, total,
+             total ? 100.0 * (exact + nearby) / total : 0.0);
+    Check(total > 0 && (exact + nearby) >= total * (messages ? 0.85 : 0.75), g_text);
+    if (messages) {
+        CheckN(falseKills == 0, "nenhum abate dos outros contado como seu", falseKills);
+        CheckN(missedKills == 0, "todo abate seu contado (o servidor manda a mensagem de morte)", missedKills);
+    } else {
+        // sem mensagem de morte, quem matou e estimado pela ordem das balas: na duvida o mod nao conta
+        CheckN(falseKills * 3 <= trueKills, "abates dos outros contados como seus: ate 1 em 3 (estimativa)", falseKills);
+        CheckN(missedKills * 2 <= trueKills, "abates seus contados pela vida zerada (ate 50% perdidos na duvida)",
+               missedKills);
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -486,6 +833,7 @@ int main(int argc, char** argv) {
     bool gameAim = strcmp(scenario, "mira-do-jogo") == 0;
     bool wrongGta = strcmp(scenario, "gta-errado") == 0;
     bool otherSamp = strcmp(scenario, "outra-versao") == 0;
+    bool pvp = strncmp(scenario, "pvp-20", 6) == 0;
     bool active = trok || gameAim; // o Trok Hitmarker liga (trok tambem vale para a pasta-propria)
 
     DWORD lo = reinterpret_cast<DWORD>(g_gtaMemory);
@@ -525,6 +873,24 @@ int main(int argc, char** argv) {
     }
     g_samp = reinterpret_cast<DWORD>(samp);
     g_shot = static_cast<DWORD*>(Alloc(W * H * 4));
+    if (pvp) { // 20 jogadores em frente da camera
+        PLAYER_COUNT = 20;
+        for (int i = 0; i < PLAYER_COUNT; ++i) {
+            Player& p = PLAYERS[i];
+            p.id = i + 1;
+            snprintf(p.name, sizeof(p.name), "Jogador_%02d", i + 1);
+            p.color = 0xFF000000 | (0x3498DB + i * 0x0A1F31);
+            p.x = -12.0f + (i % 5) * 6.0f;
+            p.y = 8.0f + (i / 5) * 6.0f;
+            p.health = 100.0f;
+            p.armour = i % 2 ? 50.0f : 0.0f;
+            g_server[i].ar = p.armour;
+        }
+    } else {
+        for (int i = 0; i < 4; ++i) {
+            PLAYERS[i] = BASE_PLAYERS[i];
+        }
+    }
     BuildSamp();
     Sleep(300);
 
@@ -546,6 +912,13 @@ int main(int argc, char** argv) {
         return 1;
     }
     Mem<IDirect3DDevice9*>(0xC97C28) = g_real;
+    if (pvp) {
+        RunPvp(strcmp(scenario, "pvp-20") == 0);
+        Check(LogHas("gancho do bullet sync instalado"), "log: gancho do bullet sync instalado");
+        printf(g_failures ? "FALHOU (%d)\n" : "PASSOU\n", g_failures);
+        fflush(stdout);
+        TerminateProcess(GetCurrentProcess(), g_failures ? 1 : 0);
+    }
 
     const POINT aim = {static_cast<LONG>(W * 0.53f), static_cast<LONG>(H * 0.4f)};
     const POINT joao = Screen(0.0f, 10.0f, 0.0f);
@@ -714,8 +1087,9 @@ int main(int argc, char** argv) {
         }
         if (step == 11 && t >= 6800) {
             if (active) {
-                Check(LogHas("acerto: id 4, parte 3, arma 24, GTA 46.2 -> a vida nao caiu em 1 s, vale o do GTA (~46)"),
-                      "log: sem queda de vida em 1 s, o numero e o do GTA (~46)");
+                Check(LogHas("acerto: id 4, parte 3, arma 24, GTA 46.2 -> a vida nao caiu em") &&
+                          LogHas("vale o do GTA (~46)"),
+                      "log: sem queda de vida a tempo, o numero e o do GTA (~46)");
             }
             ++step;
         }
