@@ -586,7 +586,7 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
         }
     }
     if (o.crosshair == 1 && st.showCrosshair && !active) {
-        DrawCrosshair(dl, st.crosshair, k, o);
+        DrawCrosshair(dl, st.crosshair, k * st.spread, o);
     }
     if (active) {
         DrawEffect(dl, st.crosshair, k, active->age, static_cast<Kind>(activeFx), o);

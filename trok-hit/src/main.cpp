@@ -451,8 +451,9 @@ void RenderOverlay(IDirect3DDevice9* device) {
 
     // A mira do jogo nos proximos quadros: escondida com a do Trok; parada e no tamanho escolhido com a do jogo.
     bool on = o.enabled && g_sampR1;
+    // No carro (as duas miras): so no drive-by.
     game::SetCrosshair(on && o.crosshair == 1, on && o.crosshair == 0 && o.crosshairStatic,
-                       on && o.crosshair == 0 ? o.crosshairSize / 100.0f : 1.0f);
+                       on && o.crosshair == 0 ? o.crosshairSize / 100.0f : 1.0f, on);
     game::Aim aim = game::TakeAim();
     logic::Frame(dt, io.DisplaySize, aim, o, &g_state);
 

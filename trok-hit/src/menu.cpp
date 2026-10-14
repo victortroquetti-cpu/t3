@@ -19,7 +19,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v1.1";
+constexpr const char* VERSION_TAG = "v1.2";
 
 const char* const TABS[] = {"Mira", "Dano", "Informer", "Recebido", "Sons", "Geral"};
 constexpr int TAB_COUNT = 6;
@@ -198,11 +198,15 @@ void TabMira(Rows& r, float x, float w) {
     static const char* const mira[] = {"A do jogo", "Do Trok"};
     r.Segmented("Mira", &o.crosshair, mira, 2, d.crosshair);
     r.Slider("Tamanho (mira e efeitos)", &o.crosshairSize, 50, 200, 10, "%d%%", d.crosshairSize);
-    if (o.crosshair == 0) {
-        r.Toggle("Mira est\xC3\xA1tica (n\xC3\xA3o abre ao atirar)", &o.crosshairStatic);
-    } else {
+    r.Toggle("Mira est\xC3\xA1tica (n\xC3\xA3o abre ao atirar)", &o.crosshairStatic);
+    if (o.crosshair == 1) {
         r.Toggle("Sempre vis\xC3\xADvel (tamb\xC3\xA9m sem mirar)", &o.crosshairAlways);
     }
+    r.Info("No carro e ao atirar",
+           "No carro, a mira (a do jogo e a do Trok) s\xC3\xB3 aparece no drive-by, mirando de passageiro. Sem a mira "
+           "est\xC3\xA1tica, a do Trok abre enquanto voc\xC3\xAA atira, junto com a do jogo; est\xC3\xA1tica, fica do "
+           "tamanho escolhido. A mira fica onde o GTA mira de verdade (onde a bala vai), ent\xC3\xA3o mod que muda a "
+           "posi\xC3\xA7\xC3\xA3o dela vale para a do Trok.");
     r.Section("Sinal de acerto na mira");
     r.Toggle("Sinal de acerto", &o.onAim);
     r.Toggle("Acerto", &o.fxHit);

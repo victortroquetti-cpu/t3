@@ -11,6 +11,7 @@
 
 #include "MinHook.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -35,6 +36,8 @@ constexpr DWORD PREFS_SHOW_HUD = 0xBA6769; // FrontEndMenuManager.m_bPrefsShowHu
 constexpr DWORD SCRIPT_DISPLAY_HUD = 0xA444A0;
 constexpr DWORD CAMERA = 0xB6F028;
 constexpr DWORD CAM_WIDESCREEN = 0x3D, CAM_ACTIVE = 0x59, CAM_LIST = 0x174, CAM_SIZE = 0x238, CAM_TARGET = 0x21C;
+constexpr DWORD CAM_MODE = 0x0C;
+constexpr WORD MODE_AIMWEAPON_FROMCAR = 0x37; // drive-by: a mira de passageiro
 constexpr DWORD ENT_MATRIX = 0x14, ENT_PLACEMENT = 0x04, ENT_RWOBJECT = 0x18;
 constexpr DWORD MAT_FORWARD = 0x10, MAT_POS = 0x30;
 constexpr DWORD PED_PLAYER_DATA = 0x480, PED_FLAGS = 0x46C, PED_STATE = 0x530, PED_HEALTH = 0x540, PED_ARMOUR = 0x548;
@@ -62,7 +65,7 @@ DrawRectFn o_drawRect = nullptr;
 RadiusFn o_radius = nullptr;
 
 // O que o Present pediu (lido dentro dos ganchos, na mesma thread).
-bool g_hide = false, g_fixed = false;
+bool g_hide = false, g_fixed = false, g_carRule = false;
 float g_size = 1.0f;
 DWORD g_asked = 0; // GetTickCount do ultimo pedido
 
@@ -103,6 +106,11 @@ bool InVehicle(DWORD ped) {
     return ((At<DWORD>(ped, PED_FLAGS) >> 8) & 1) && Ptr(At<DWORD>(ped, PED_VEHICLE));
 }
 
+WORD CameraMode() {
+    BYTE active = At<BYTE>(CAMERA, CAM_ACTIVE);
+    return active < 3 ? At<WORD>(CAMERA, CAM_LIST + active * CAM_SIZE + CAM_MODE) : 0;
+}
+
 void Grow(const Rect& r) {
     float xs[2] = {r.x0, r.x1}, ys[2] = {r.y0, r.y1};
     for (int i = 0; i < 2; ++i) {
@@ -126,7 +134,15 @@ void __cdecl HookCrosshairs() {
     DWORD ped = At<DWORD>(PLAYER_PED, 0);
     bool fresh = GetTickCount() - g_asked < 500; // o overlay esta vivo
     g_inside = true;
-    g_hideNow = fresh && g_hide && Ptr(ped) && !InVehicle(ped) && !ExcludedWeapon(ActiveWeapon(ped));
+    g_hideNow = false;
+    if (fresh && Ptr(ped)) {
+        bool car = InVehicle(ped);
+        if (car && CameraMode() != MODE_AIMWEAPON_FROMCAR) {
+            g_hideNow = g_carRule; // no carro, so no drive-by
+        } else {
+            g_hideNow = g_hide && !ExcludedWeapon(ActiveWeapon(ped)); // a do Trok no lugar (a pe ou no drive-by)
+        }
+    }
     g_haveCenter = false;
     g_any = false;
     o_crosshairs();
@@ -170,18 +186,21 @@ void __cdecl HookDrawRect(const Rect& rect, const Rgba& color) {
     }
 }
 
-// Mira estatica: durante o desenho, o raio e o de quem nao esta atirando.
+// Durante o desenho da mira: o quanto ela esta aberta pelos tiros (a do Trok abre junto) e, com a mira estatica, o
+// raio de quem nao esta atirando.
 float __fastcall HookRadius(void* self, void*) {
-    DWORD data = g_inside && g_fixed ? At<DWORD>(reinterpret_cast<DWORD>(self), PED_PLAYER_DATA) : 0;
+    DWORD data = g_inside ? At<DWORD>(reinterpret_cast<DWORD>(self), PED_PLAYER_DATA) : 0;
     if (!Ptr(data)) {
         return o_radius(self);
     }
+    float now = o_radius(self);
     float* counter = reinterpret_cast<float*>(data + PD_ATTACK_COUNTER);
     float saved = *counter;
     *counter = 0.0f;
-    float radius = o_radius(self);
+    float rest = o_radius(self);
     *counter = saved;
-    return radius;
+    g_aim.spread = rest > 0.0f ? std::max(1.0f, now / rest) : 1.0f;
+    return g_fixed ? rest : now;
 }
 
 } // namespace
@@ -235,10 +254,11 @@ bool Install() {
     return true;
 }
 
-void SetCrosshair(bool hide, bool fixed, float size) {
+void SetCrosshair(bool hide, bool fixed, float size, bool carRule) {
     g_hide = hide;
     g_fixed = fixed;
     g_size = size;
+    g_carRule = carRule;
     g_asked = GetTickCount();
 }
 
@@ -278,6 +298,7 @@ Local LocalPlayer() {
         DWORD target = At<DWORD>(CAMERA, CAM_LIST + active * CAM_SIZE + CAM_TARGET);
         l.followed = target == ped || (l.inVehicle && target == At<DWORD>(ped, PED_VEHICLE));
     }
+    l.driveBy = l.inVehicle && CameraMode() == MODE_AIMWEAPON_FROMCAR;
     return l;
 }
 

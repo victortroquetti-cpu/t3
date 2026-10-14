@@ -928,6 +928,7 @@ int main(int argc, char** argv) {
     int calls = 0, sprites = 0;
     DWORD gives = 0, deaths = 0, chatBefore = 0;
     int frame = 0, dropFrame = 0, takeFrame = 0;
+    int restBright = 0;
     for (;;) {
         MSG msg;
         while (PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -955,12 +956,9 @@ int main(int argc, char** argv) {
             Give(1, 46.2f, 24, 3); // Joao, no tronco
             Check(Field(F_GIVE_COUNT) == gives + 1 && Field(F_GIVE_ID) == 1,
                   "SendGiveDamage original continua sendo chamado (o pacote vai ao servidor)");
-            ++step;
-        }
-        if (step == 3 && t >= 4930) {
-            SetHealth(0, 54.0f); // o sync do Joao mostra a queda
+            SetHealth(0, 54.0f); // o sync do Joao ja mostra a queda (o sinal dura so 0,35 s: a captura vem logo)
             dropFrame = frame;
-            ++step;
+            step += 2;
         }
         if (step == 5 && t >= 5100) {
             Give(2, 46.2f, 24, 9); // Maria, na cabeca
@@ -1004,8 +1002,11 @@ int main(int argc, char** argv) {
             }
             ++step;
         }
-        if (step == 18 && t >= 9200) {
-            SetInVehicle(true);
+        if (step == 18 && t >= 9200) { // a pe, mirando e atirando: a do Trok abre junto com a do jogo
+            g_aiming = true;
+            if (trok) {
+                SetFiring(4.0f);
+            }
             ++step;
         }
 
@@ -1023,6 +1024,7 @@ int main(int argc, char** argv) {
             Check(g_crosshairCalls > calls, "CHud::DrawCrossHairs chamado pelo endereco do jogo");
             int drawn = g_spriteDraws - sprites;
             Check(Capture("mira.bmp"), "back buffer salvo (mira.bmp)");
+            restBright = Bright(aim.x - 40, aim.y - 40, aim.x + 40, aim.y + 40);
             if (trok) {
                 CheckN(drawn == 0, "mira do Trok: os quartos da mira do jogo nao chegam ao GTA", drawn);
                 CheckN(Bright(aim.x - 12, aim.y - 12, aim.x + 12, aim.y + 12) > 20,
@@ -1128,44 +1130,83 @@ int main(int argc, char** argv) {
             }
             ++step;
         }
-        if (step == 19 && t >= 9400) {
+        if (step == 19 && t >= 9450) {
+            Check(Capture("atirando.bmp"), "back buffer salvo (atirando.bmp)");
+            int open = Bright(aim.x - 40, aim.y - 40, aim.x + 40, aim.y + 40);
+            if (trok && !own) {
+                snprintf(g_text, sizeof(g_text), "atirando: a mira do Trok abre junto com a do jogo (%d pixels, parada %d)",
+                         open, restBright);
+                Check(open > restBright * 2, g_text);
+            }
+            if (trok) {
+                SetFiring(0.0f);
+            }
+            SetInVehicle(true); // no carro, mirando sem ser drive-by (o "jogo" ainda tenta desenhar a mira)
+            sprites = g_spriteDraws;
+            ++step;
+        }
+        if (step == 20 && t >= 9700) {
             Check(Capture("no_carro.bmp"), "back buffer salvo (no_carro.bmp)");
             int b = Bright(aim.x - 12, aim.y - 12, aim.x + 12, aim.y + 12);
-            CheckN(b == 0, "no carro: o ponto do Trok some", b);
+            CheckN(b == 0, "no carro sem drive-by: o ponto do Trok some", b);
+            if (active) {
+                CheckN(g_spriteDraws == sprites, "no carro sem drive-by: a mira do jogo tambem some",
+                       g_spriteDraws - sprites);
+            } else {
+                CheckN(g_spriteDraws > sprites, "desligado: a mira do jogo continua no carro", g_spriteDraws - sprites);
+            }
+            Mem<WORD>(GTA_THE_CAMERA + 0x174 + 0x0C) = 0x37; // drive-by: a camera de mira de passageiro
+            sprites = g_spriteDraws;
+            ++step;
+        }
+        if (step == 21 && t >= 9950) {
+            Check(Capture("drive_by.bmp"), "back buffer salvo (drive_by.bmp)");
+            int b = Bright(aim.x - 12, aim.y - 12, aim.x + 12, aim.y + 12);
+            if (trok) {
+                b = static_cast<int>(Covered(aim.x - 12, aim.y - 12, aim.x + 12, aim.y + 12) * 576); // qualquer cor
+                CheckN(b > 20, "drive-by: a mira do Trok aparece", b);
+                CheckN(g_spriteDraws == sprites, "drive-by: a do jogo continua escondida (a do Trok no lugar)",
+                       g_spriteDraws - sprites);
+            } else if (gameAim) {
+                CheckN(g_spriteDraws > sprites, "drive-by: a mira do jogo aparece", g_spriteDraws - sprites);
+            }
+            Mem<WORD>(GTA_THE_CAMERA + 0x174 + 0x0C) = 0;
+            SetInVehicle(false);
+            g_aiming = false;
             ++step;
         }
         // O menu pelo teclado: abrir e fechar nao grava nada; a seta muda o tamanho da mira e o INI grava depois.
-        if (step == 20) {
+        if (step == 22) {
             if (!trok) {
                 step = 30;
-            } else if (t >= 9500) {
+            } else if (t >= 10100) {
                 Check(!FileExists("Trok Hitmarker.ini"), "abrir e fechar o menu nao grava nada no INI");
                 SetInVehicle(false);
                 reinterpret_cast<CmdProc>(Field(F_CMD_PROC))("");
                 ++step;
             }
         }
-        if (step == 21 && t >= 9800) {
+        if (step == 23 && t >= 10400) {
             SendMessageA(hwnd, WM_KEYDOWN, VK_DOWN, 1); // linha 2: Tamanho (mira e efeitos)
             ++step;
         }
-        if (step == 22 && t >= 9850) {
+        if (step == 24 && t >= 10450) {
             SendMessageA(hwnd, WM_KEYUP, VK_DOWN, 0xC0000001);
             ++step;
         }
-        if (step == 23 && t >= 9900) {
+        if (step == 25 && t >= 10500) {
             SendMessageA(hwnd, WM_KEYDOWN, VK_RIGHT, 1); // +10%
             ++step;
         }
-        if (step == 24 && t >= 9950) {
+        if (step == 26 && t >= 10550) {
             SendMessageA(hwnd, WM_KEYUP, VK_RIGHT, 0xC0000001);
             ++step;
         }
-        if (step == 25 && t >= 10050) {
+        if (step == 27 && t >= 10650) {
             reinterpret_cast<CmdProc>(Field(F_CMD_PROC))("");
             ++step;
         }
-        if (step == 26 && t >= 11200) {
+        if (step == 28 && t >= 11800) {
             char path[MAX_PATH];
             GetFullPathNameA("Trok Hitmarker.ini", MAX_PATH, path, nullptr);
             int all = GetPrivateProfileIntA("padrao", "mira_tamanho", -1, path);

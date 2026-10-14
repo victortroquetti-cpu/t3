@@ -18,13 +18,14 @@ bool VersionOk(); // gta_sa.exe 1.0 US (o mesmo teste dos plugins do GTA)
 bool Install();   // ganchos da mira; false = nada foi alterado
 
 // Como desenhar a mira do jogo nos proximos quadros (o Present chama todo quadro). hide: a do Trok esta na tela no
-// lugar dela (o GTA nao desenha a dele, mas o mod ainda le onde ela cairia). Sem chamada recente (overlay parado), a
-// mira do jogo volta ao normal sozinha.
-void SetCrosshair(bool hide, bool fixed, float size);
+// lugar dela (o GTA nao desenha a dele, mas o mod ainda le onde ela cairia). carRule: no carro, a mira so aparece no
+// drive-by. Sem chamada recente (overlay parado), a mira do jogo volta ao normal sozinha.
+void SetCrosshair(bool hide, bool fixed, float size, bool carRule);
 
 struct Aim {
     bool drawn = false; // o GTA desenhou (ou ia desenhar) a mira neste quadro: o jogador esta mirando
     ImVec2 center;      // o centro dela, em pixels da tela
+    float spread = 1;   // o quanto a mira esta aberta pelos tiros (raio agora / raio parado; 1 = parada)
 };
 Aim TakeAim();                    // o que os ganchos viram desde a ultima chamada
 ImVec2 DefaultAim(ImVec2 screen); // onde o GTA poe a mira (CCamera::m_f3rdPersonCHairMultX/Y)
@@ -36,6 +37,7 @@ struct Local {
     bool alive = false;
     bool inVehicle = false;
     bool followed = false; // a camera esta no proprio personagem (nao em espectador, selecao de classe, cutscene)
+    bool driveBy = false;  // no carro, mirando de passageiro (a camera de mira do carro)
     int weapon = 0;
     float health = 0, armour = 0;
     Vec3 pos = {0, 0, 0};

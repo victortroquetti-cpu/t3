@@ -71,6 +71,7 @@ struct State {
     ImVec2 crosshair;             // onde a mira esta neste quadro (no GTA puro, 53% x 40% da tela); so a mira e o
                                   // sinal de acerto usam: o resto fica preso ao centro da tela
     bool showCrosshair = false;   // ponto do Trok neste quadro (mirando, ou "sempre visivel" a pe com arma que tem mira)
+    float spread = 1;             // a mira do Trok aberta pelos tiros (1 = parada), como a do jogo
     std::vector<Marker> markers;
     std::vector<Number> numbers;
     std::vector<Line> given, taken;

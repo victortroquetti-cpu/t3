@@ -111,6 +111,7 @@ std::deque<Taken> g_takenShots;
 float g_localHealth = -1, g_localArmour = 0; // o ultimo quadro (antes do tiro que chega agora)
 float g_baseHealth = 0, g_baseArmour = 0;    // base dos tiros levados pendentes
 bool g_localAlive = false;
+float g_spread = 1;   // a abertura da mira do Trok (suavizada)
 float g_flash = 0;
 hud::Kind g_flashKind = hud::HEALTH;
 float g_lastTakenSound = -1;
@@ -1062,9 +1063,15 @@ void Frame(float dt, ImVec2 screen, const game::Aim& aim, const opt::Options& o,
 
     // o que o hud desenha
     st->crosshair = aim.drawn ? aim.center : game::DefaultAim(screen);
-    // Mirando, a do jogo saiu da tela (game.cpp, mesmas condicoes): a do Trok aparece sempre no lugar dela.
-    bool own = o.crosshair == 1 && me.ped && !me.inVehicle && !game::ExcludedWeapon(me.weapon);
-    st->showCrosshair = own && (aim.drawn || (o.crosshairAlways && me.alive && me.followed && !game::HudHidden()));
+    // Mirando, a do jogo saiu da tela (game.cpp, mesmas condicoes): a do Trok aparece sempre no lugar dela. No carro,
+    // so no drive-by; "sempre visivel" e a pe.
+    bool own = o.crosshair == 1 && me.ped && !game::ExcludedWeapon(me.weapon) && (!me.inVehicle || me.driveBy);
+    bool always = o.crosshairAlways && !me.inVehicle && me.alive && me.followed && !game::HudHidden();
+    st->showCrosshair = own && (aim.drawn || me.driveBy || always);
+    // Abre junto com a do jogo enquanto voce atira (menos que ela: e uma imagem, nao um anel), a nao ser estatica.
+    float open = !o.crosshairStatic && aim.drawn ? std::min(2.2f, 1.0f + (aim.spread - 1.0f) * 0.6f) : 1.0f;
+    g_spread += (open - g_spread) * std::min(1.0f, dt * 18.0f); // sem tranco de um quadro para o outro
+    st->spread = g_spread;
     st->markers.clear();
     float bodyKeep = o.hitLocal ? static_cast<float>(o.hitLocalTime) : 0.0f;
     for (const Shot& s : g_shots) {
