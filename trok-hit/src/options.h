@@ -16,8 +16,14 @@ struct Options {
     bool enabled = true;
     int preset = 0; // estilo pronto aplicado por ultimo (so para o menu mostrar)
 
-    // ---- Mira: o hitmarker
-    int marker = 0;          // 0 Classico (X), 1 Discreto, 2 Anel
+    // ---- Mira
+    int crosshair = 1;       // 0 a do jogo, 1 ponto do Trok (como a Mira Centralizada; o GTA nao desenha a dele)
+    bool crosshairAlways = true; // ponto do Trok: aparece tambem sem mirar (a pe; some no carro, sniper e bazucas)
+    int crosshairSize = 100; // %
+    ImU32 cCrosshair = IM_COL32(255, 255, 255, 255);
+
+    // ---- Sinal de acerto na mira
+    int marker = 0;          // 0 Ponto (o ponto muda: acerto, cabeca, abate), 1 Classico (X), 2 Discreto, 3 Anel
     bool onAim = true;       // sinal de acerto onde a mira esta (le onde o GTA desenhou a mira neste quadro, entao
                              // segue mod que centraliza ou sobe a mira; sem opcao de lugar)
     int markerSize = 100;    // %
@@ -49,10 +55,11 @@ struct Options {
     bool edgeFlash = true;   // borda da tela ao levar dano, na cor do que foi atingido
 
     // ---- Cores (ARGB do ImGui)
-    ImU32 cHealth = IM_COL32(255, 255, 255, 255);  // dano na vida
-    ImU32 cArmour = IM_COL32(150, 200, 255, 255);  // dano no colete
-    ImU32 cHead = IM_COL32(255, 200, 61, 255);     // na cabeca
-    ImU32 cKill = IM_COL32(255, 74, 74, 255);      // abate
+    // As cores do acerto seguem a Mira Centralizada: acerto vermelho, cabeca azul, abate com o X vermelho.
+    ImU32 cHealth = IM_COL32(255, 64, 64, 255);    // dano na vida
+    ImU32 cArmour = IM_COL32(255, 255, 255, 255);  // dano no colete
+    ImU32 cHead = IM_COL32(111, 182, 255, 255);    // na cabeca
+    ImU32 cKill = IM_COL32(255, 59, 59, 255);      // abate
     ImU32 cGiven = IM_COL32(91, 227, 125, 255);    // nick (cor fixa) ao dar dano
     ImU32 cTaken = IM_COL32(255, 90, 90, 255);     // nick (cor fixa) e numero ao levar dano
     ImU32 cCombo = IM_COL32(255, 96, 96, 255);     // o "(x3 · 138)" do informer classico

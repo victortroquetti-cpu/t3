@@ -62,18 +62,28 @@ void MoveSelection(int* selected, int count, const Keys& k, Rows& rows) {
 }
 
 // Previa embaixo da aba: os quatro hitmarkers parados no meio da animacao, com o nome de cada um.
+// Previa embaixo da aba: a mira e os quatro sinais de acerto parados no meio da animacao, com o nome de cada um.
 void MarkerPreview(float x, float w) {
     opt::Options& o = opt::Get();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 at = ImGui::GetCursorScreenPos();
     float h = 92 * u;
     dl->AddRectFilled(ImVec2(x, at.y + 6 * u), ImVec2(x + w, at.y + h), col::White(6), 8 * u);
-    const char* names[] = {"Vida", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
-    hud::Kind kinds[] = {hud::HEALTH, hud::ARMOUR, hud::HEADSHOT, hud::KILL};
-    for (int i = 0; i < 4; ++i) {
-        float cx = x + w * (i + 0.5f) / 4;
-        float scale = ImGui::GetIO().DisplaySize.y / 1080.0f * o.markerSize / 100.0f;
-        hud::DrawMarker(dl, ImVec2(cx, at.y + 40 * u), o.marker, scale, 0.1f, kinds[i], o);
+    const char* names[] = {"Mira", "Vida", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
+    hud::Kind kinds[] = {hud::HEALTH, hud::HEALTH, hud::ARMOUR, hud::HEADSHOT, hud::KILL};
+    float scale = ImGui::GetIO().DisplaySize.y / 1080.0f * 1.3f;
+    for (int i = 0; i < 5; ++i) {
+        float cx = x + w * (i + 0.5f) / 5;
+        ImVec2 c(cx, at.y + 40 * u);
+        if (i == 0) {
+            if (o.crosshair == 1) {
+                hud::DrawCrosshair(dl, c, scale, o);
+            } else { // a do jogo: um circulo, so para lembrar
+                dl->AddCircle(c, 11 * scale, col::White(150), 32, 1.4f * scale);
+            }
+        } else {
+            hud::DrawMarker(dl, c, o.marker, scale * o.markerSize / 100.0f, 0.12f, kinds[i], o);
+        }
         ImVec2 ts = TextSize(fonts.desc, names[i]);
         Text(dl, fonts.desc, cx - ts.x * 0.5f, at.y + 68 * u, col::hint, names[i]);
     }
@@ -83,18 +93,21 @@ void MarkerPreview(float x, float w) {
 void TabMira(Rows& r, float x, float w) {
     opt::Options& o = opt::Get();
     const opt::Options& d = opt::Defaults();
-    static const char* const style[] = {"Cl\xC3\xA1ssico", "Discreto", "Anel"};
-    r.Cycle("Hitmarker", &o.marker, style, 3, d.marker);
-    r.Slider("Tamanho", &o.markerSize, 50, 200, 10, "%d%%", d.markerSize);
-    r.Section("Na mira");
+    static const char* const mira[] = {"A do jogo", "Ponto do Trok"};
+    r.Segmented("Mira", &o.crosshair, mira, 2, d.crosshair);
+    if (o.crosshair == 1) {
+        r.Toggle("Sempre vis\xC3\xADvel (tamb\xC3\xA9m sem mirar)", &o.crosshairAlways);
+        r.Slider("Tamanho da mira", &o.crosshairSize, 50, 200, 10, "%d%%", d.crosshairSize);
+        r.Color("Cor da mira", &o.cCrosshair, d.cCrosshair);
+    }
+    r.Section("Sinal de acerto");
     r.Toggle("Sinal de acerto na mira", &o.onAim);
-    r.Section("No corpo");
-    r.Toggle("Local do acerto", &o.hitLocal);
-    r.Slider("Fica no corpo", &o.hitLocalTime, 1, 5, 1, "%d s", d.hitLocalTime);
-    r.Slider("Tamanho no corpo", &o.hitLocalSize, 50, 150, 10, "%d%%", d.hitLocalSize);
-    r.Section("Cores");
-    r.Color("Acerto na vida", &o.cHealth, d.cHealth);
-    r.Color("Acerto no colete", &o.cArmour, d.cArmour);
+    static const char* const style[] = {"Ponto", "Cl\xC3\xA1ssico (X)", "Discreto", "Anel"};
+    r.Cycle("Efeito", &o.marker, style, 4, d.marker);
+    r.Slider("Tamanho do efeito", &o.markerSize, 50, 200, 10, "%d%%", d.markerSize);
+    r.Section("Cores do acerto");
+    r.Color("Na vida", &o.cHealth, d.cHealth);
+    r.Color("No colete", &o.cArmour, d.cArmour);
     r.Color("Na cabe\xC3\xA7" "a", &o.cHead, d.cHead);
     r.Color("Abate", &o.cKill, d.cKill);
     MarkerPreview(x, w);
@@ -115,6 +128,10 @@ void TabDano(Rows& r) {
     r.Slider("Tamanho", &o.numbersSize, 50, 200, 10, "%d%%", d.numbersSize);
     static const char* const font[] = {"Arial Black", "Da casa"};
     r.Segmented("Fonte dos n\xC3\xBAmeros", &o.numbersFont, font, 2, d.numbersFont);
+    r.Section("Local do acerto (no corpo)");
+    r.Toggle("Marcar onde o tiro pegou", &o.hitLocal);
+    r.Slider("Fica no corpo", &o.hitLocalTime, 1, 5, 1, "%d s", d.hitLocalTime);
+    r.Slider("Tamanho no corpo", &o.hitLocalSize, 50, 150, 10, "%d%%", d.hitLocalSize);
 }
 
 void TabInformer(Rows& r) {

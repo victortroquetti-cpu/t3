@@ -202,11 +202,58 @@ ImU32 KindColor(Kind k, const opt::Options& o) {
     }
 }
 
+void DrawCrosshair(ImDrawList* dl, ImVec2 c, float scale, const opt::Options& o) {
+    float r = 3.4f * scale * o.crosshairSize / 100.0f;
+    dl->AddCircleFilled(c, r + 1.6f * scale, IM_COL32(0, 0, 0, 200), 20);
+    dl->AddCircleFilled(c, r, Opaque(o.cCrosshair), 20);
+}
+
+// Ponto: o proprio ponto da mira reage. Acerto: fica na cor e pula, com um anel abrindo. Cabeca: na cor da cabeca, com
+// quatro tracos em cruz. Abate: o X na cor do abate em volta do ponto, que fica mais tempo.
+static void Dot(ImDrawList* dl, ImVec2 c, float s, float age, float life, float a, Kind kind, const opt::Options& o) {
+    ImU32 color = Alpha(KindColor(kind, o), a);
+    ImU32 dark = Alpha(IM_COL32(0, 0, 0, 255), 0.75f * a);
+    float rd = 3.6f * s;
+    float pop = 1.0f - EaseOut(age / 0.1f); // 1 -> 0 no primeiro decimo de segundo
+    if (kind == KILL) {
+        float r0 = rd + 3.5f * s, r1 = rd + (11 + 5 * pop) * s;
+        for (int i = 0; i < 4; ++i) {
+            float dx = (i & 1) ? 0.7071f : -0.7071f, dy = (i & 2) ? 0.7071f : -0.7071f;
+            ImVec2 p0(c.x + dx * r0, c.y + dy * r0), p1(c.x + dx * r1, c.y + dy * r1);
+            dl->AddLine(p0, p1, dark, 6.2f * s);
+            dl->AddLine(p0, p1, color, 3.6f * s);
+        }
+        dl->AddCircleFilled(c, rd + 1.6f * s, dark, 20);
+        dl->AddCircleFilled(c, rd, Alpha(Opaque(o.cCrosshair), a), 20);
+        return;
+    }
+    if (kind == HEADSHOT) {
+        float r0 = rd + 2.8f * s, r1 = rd + (8.5f + 4 * pop) * s;
+        for (int i = 0; i < 4; ++i) {
+            float dx = i == 0 ? 1.0f : i == 1 ? -1.0f : 0.0f, dy = i == 2 ? 1.0f : i == 3 ? -1.0f : 0.0f;
+            ImVec2 p0(c.x + dx * r0, c.y + dy * r0), p1(c.x + dx * r1, c.y + dy * r1);
+            dl->AddLine(p0, p1, dark, 5.6f * s);
+            dl->AddLine(p0, p1, color, 3.0f * s);
+        }
+    }
+    float ring = EaseOut(age / life);
+    dl->AddCircle(c, rd + 2 * s + 10 * s * ring, Alpha(KindColor(kind, o), a * (1.0f - ring) * 0.8f), 32, 1.6f * s);
+    float r = rd * (1.0f + 0.6f * pop);
+    dl->AddCircleFilled(c, r + 1.6f * s, dark, 20);
+    dl->AddCircleFilled(c, r, color, 20);
+}
+
 void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kind kind, const opt::Options& o,
                 float stay) {
     bool kill = kind == KILL;
-    float life = kill ? 0.65f : style == 1 ? 0.2f : 0.32f;
-    float hold = kill ? 0.4f : style == 1 ? 0.08f : 0.16f;
+    float life, hold;
+    if (style == 0) { // ponto: abate fica mais (o "morte" da Mira Centralizada durava 150 quadros)
+        life = kill ? 1.2f : kind == HEADSHOT ? 0.55f : 0.35f;
+        hold = kill ? 0.85f : kind == HEADSHOT ? 0.3f : 0.15f;
+    } else {
+        life = kill ? 0.65f : style == 2 ? 0.2f : 0.32f;
+        hold = kill ? 0.4f : style == 2 ? 0.08f : 0.16f;
+    }
     if (stay > 0) {
         life = stay;
         hold = std::max(0.1f, stay - 0.35f);
@@ -220,10 +267,13 @@ void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kin
     float big = kill ? 1.3f : kind == HEADSHOT ? 1.12f : 1.0f;
     float s = scale;
     switch (style) {
-    case 0: // classico: o X do CoD
+    case 0:
+        Dot(dl, c, s, age, life, a, kind, o);
+        break;
+    case 1: // classico: o X do CoD
         Classic(dl, c, 8 * s * pop, 19 * s * pop * big, (kill ? 3.4f : 2.6f) * s, color, true);
         break;
-    case 1: // discreto: risquinhos finos
+    case 2: // discreto: risquinhos finos
         Classic(dl, c, 5 * s * pop, 11 * s * pop * big, 1.6f * s, color, false);
         break;
     default: { // anel que abre
@@ -338,12 +388,15 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
         float bs = k * o.markerSize / 100.0f * o.hitLocalSize / 100.0f;
         for (const Marker& m : st.markers) {
             if (m.bodyVisible) {
-                DrawMarker(dl, m.body, o.marker, bs, m.age, m.kind, o, static_cast<float>(o.hitLocalTime));
+                DrawMarker(dl, m.body, 1, bs, m.age, m.kind, o, static_cast<float>(o.hitLocalTime)); // sempre o X
             }
         }
     }
 
-    // sinal de acerto na mira (onde a mira esta neste quadro)
+    // o ponto do Trok (no lugar da mira do jogo) e o sinal de acerto, onde a mira esta neste quadro
+    if (o.crosshair == 1 && st.showCrosshair) {
+        DrawCrosshair(dl, st.crosshair, k, o);
+    }
     if (o.onAim) {
         float ms = k * o.markerSize / 100.0f;
         for (const Marker& m : st.markers) {

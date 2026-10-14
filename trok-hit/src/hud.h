@@ -58,8 +58,9 @@ struct Incoming {   // tiro levado: de onde veio
 };
 
 struct State {
-    ImVec2 crosshair;             // onde a mira esta neste quadro (no GTA puro, 53% x 40% da tela); so o sinal
-                                  // de acerto usa: o resto fica preso ao centro da tela
+    ImVec2 crosshair;             // onde a mira esta neste quadro (no GTA puro, 53% x 40% da tela); so a mira e o
+                                  // sinal de acerto usam: o resto fica preso ao centro da tela
+    bool showCrosshair = false;   // ponto do Trok neste quadro (mirando, ou "sempre visivel" a pe com arma que tem mira)
     std::vector<Marker> markers;
     std::vector<Number> numbers;
     std::vector<Line> given, taken;
@@ -75,6 +76,7 @@ ImU32 KindColor(Kind k, const opt::Options& o);
 void Draw(ImDrawList* dl, const State& s, const opt::Options& o, ImVec2 screen);
 
 // Partes soltas (o menu desenha a previa com elas).
+void DrawCrosshair(ImDrawList* dl, ImVec2 at, float scale, const opt::Options& o);
 // stay > 0: a marca fica inteira ate quase o fim de stay segundos (local do acerto); 0 = o piscar da mira.
 void DrawMarker(ImDrawList* dl, ImVec2 at, int style, float scale, float age, Kind kind, const opt::Options& o,
                 float stay = 0);

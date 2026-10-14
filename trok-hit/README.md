@@ -21,8 +21,10 @@ Indicador de dano para o SA-MP 0.3.7 R1, no estilo da casa: sinal de acerto na m
 
 Só o sinal de acerto acompanha a mira. O resto fica preso à tela: a seta de onde veio o tiro gira em volta do centro, o informer fica dos dois lados do centro (dado à direita, levado à esquerda) e os números "na tela" sobem do lado do centro.
 
-- **Sinal na mira:** desenhado onde a mira está naquele quadro. O mod lê onde o próprio GTA desenhou a mira, então mod que centraliza ou sobe a mira não precisa de ajuste nem de opção no menu (`docs/08-mira-seguida.png`).
-- **Local do acerto:** a marca fica na parte do corpo que o tiro pegou (cabeça, tronco, braço, perna) por 1 a 5 s, acompanhando o alvo quando ele anda (`docs/06-local-do-acerto.png`).
+- **Mira:** a do jogo ou o **ponto do Trok** (o da Mira Centralizada, refeito no kit): ponto com contorno, na cor e no tamanho escolhidos, que pode ficar **sempre visível** (também sem mirar, a pé; some no carro e com sniper, bazuca e lança-mísseis, como no script original). Com o ponto do Trok, o GTA não desenha a mira dele.
+- **Sinal de acerto na mira:** efeitos Ponto (o próprio ponto reage: acerto na cor e pulando com um anel abrindo, cabeça com uma cruz, abate com o X em volta), Clássico (X), Discreto e Anel (`docs/04-hitmarker.png`). Medido em tempo (acerto 0,35 s, cabeça 0,55 s, abate 1,2 s), não em quadros como os 30/150 quadros da Mira Centralizada.
+- **Onde:** desenhado onde a mira está naquele quadro. O mod lê onde o próprio GTA desenhou a mira, então mod que centraliza ou sobe a mira não precisa de ajuste nem de opção no menu (`docs/08-mira-seguida.png`).
+- **Local do acerto:** o X fica na parte do corpo que o tiro pegou (cabeça, tronco, braço, perna) por 1 a 5 s, acompanhando o alvo quando ele anda (`docs/06-local-do-acerto.png`).
 
 ## Dano recebido
 

@@ -155,6 +155,7 @@ static hud::Line EnzoLine() {
 static hud::State Fight() {
     hud::State s;
     s.crosshair = CROSS;
+    s.showCrosshair = true;
     // os tiros de antes ainda marcados no corpo (perna e peito) e o da cabeca agora
     hud::Marker m;
     m.body = LEG, m.age = 1.3f, m.kind = hud::ARMOUR;
@@ -189,7 +190,7 @@ static void Frame(const hud::State& s, bool crosshair, float dim, void (*extra)(
     io.DeltaTime = 1.0f / 60.0f;
     ImGui::NewFrame();
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
-    if (crosshair) GameCrosshair(dl, s.crosshair);
+    if (crosshair && opt::Get().crosshair == 0) GameCrosshair(dl, s.crosshair); // com o ponto do Trok, o GTA nao desenha a dele
     hud::Draw(dl, s, opt::Get(), io.DisplaySize);
     if (extra) extra(dl);
     ImGui::Render();
@@ -201,25 +202,41 @@ static void Frame(const hud::State& s, bool crosshair, float dim, void (*extra)(
 
 static void BoardMarkers(ImDrawList* dl) {
     opt::Options o = opt::Get();
-    const char* styles[] = {"Cl\xC3\xA1ssico (CoD)", "Discreto", "Anel"};
-    const char* kinds[] = {"Vida", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
-    hud::Kind k[] = {hud::HEALTH, hud::ARMOUR, hud::HEADSHOT, hud::KILL};
-    float x0 = 330, y0 = 150, cw = 150, rh = 120;
-    for (int c = 0; c < 4; ++c) Label(dl, x0 + c * cw, y0 - 60, kinds[c], true);
-    for (int r = 0; r < 3; ++r) {
+    const char* styles[] = {"Ponto", "Cl\xC3\xA1ssico (X)", "Discreto", "Anel"};
+    const char* kinds[] = {"Mira", "Vida", "Colete", "Cabe\xC3\xA7" "a", "Abate"};
+    hud::Kind k[] = {hud::HEALTH, hud::HEALTH, hud::ARMOUR, hud::HEADSHOT, hud::KILL};
+    float x0 = 330, y0 = 150, cw = 150, rh = 110;
+    for (int c = 0; c < 5; ++c) Label(dl, x0 + c * cw, y0 - 60, kinds[c], true);
+    for (int r = 0; r < 4; ++r) {
         Label(dl, 60, y0 + r * rh - 10, styles[r]);
-        for (int c = 0; c < 4; ++c) hud::DrawMarker(dl, ImVec2(x0 + c * cw, y0 + r * rh), r, 1.3f, 0.1f, k[c], o);
+        for (int c = 0; c < 5; ++c) {
+            ImVec2 at(x0 + c * cw, y0 + r * rh);
+            if (c == 0) {
+                if (r == 0) hud::DrawCrosshair(dl, at, 1.5f, o);
+                else dl->AddCircle(at, 15, IM_COL32(255, 255, 255, 150), 40, 1.6f);
+            } else {
+                hud::DrawMarker(dl, at, r, 1.5f, 0.12f, k[c], o);
+            }
+        }
     }
-    // a animacao do classico, quadro a quadro
-    float y = y0 + 3 * rh + 40;
-    Label(dl, 60, y - 10, "Um acerto, quadro a quadro");
-    float ages[] = {0.0f, 0.03f, 0.08f, 0.16f, 0.22f, 0.28f};
-    const char* ms[] = {"0 ms", "30 ms", "80 ms", "160 ms", "220 ms", "280 ms"};
-    for (int i = 0; i < 6; ++i) {
-        hud::DrawMarker(dl, ImVec2(x0 + i * 110, y), 0, 1.3f, ages[i], hud::HEALTH, o);
-        Small(dl, x0 + i * 110, y + 40, ms[i], true);
+    // o Ponto, quadro a quadro: acerto, cabeca e abate
+    float y = y0 + 4 * rh + 30;
+    Label(dl, 60, y - 10, "Ponto, quadro a quadro");
+    float ages[] = {0.0f, 0.05f, 0.12f, 0.3f, 0.6f, 1.0f};
+    const char* ms[] = {"0 ms", "50 ms", "120 ms", "300 ms", "600 ms", "1 s"};
+    hud::Kind rowKind[] = {hud::HEALTH, hud::HEADSHOT, hud::KILL};
+    const char* rowName[] = {"vida", "cabe\xC3\xA7" "a", "abate"};
+    for (int rr = 0; rr < 3; ++rr) {
+        Small(dl, 200, y + rr * 70 - 8, rowName[rr]);
+        for (int i = 0; i < 6; ++i) {
+            ImVec2 at(x0 + i * 120, y + rr * 70);
+            hud::DrawCrosshair(dl, at, 1.5f, o); // o ponto continua por baixo
+            hud::DrawMarker(dl, at, 0, 1.5f, ages[i], rowKind[rr], o);
+            if (rr == 2) Small(dl, at.x, at.y + 34, ms[i], true);
+        }
     }
-    Small(dl, 60, y + 70, "Abate: fica vermelho, maior e dura 0,65 s. Cada tiro novo reinicia a anima\xC3\xA7\xC3\xA3o.");
+    Small(dl, 60, y + 3 * 70 + 26,
+          "Tudo em tempo, n\xC3\xA3o em quadros: acerto 0,35 s, cabe\xC3\xA7" "a 0,55 s, abate 1,2 s, em qualquer FPS.");
 }
 
 static void BoardNumbers(ImDrawList* dl) {
@@ -380,7 +397,7 @@ int main(int argc, char** argv) {
     hud::State empty;
     empty.crosshair = CROSS;
     Frame(empty, false, 0.35f, BoardMarkers);
-    Save(dir + "/04-hitmarker.ppm", 0, 40, 1120, 760);
+    Save(dir + "/04-hitmarker.ppm", 0, 40, 1160, 960);
 
     // 5. Numeros
     Frame(empty, false, 0.35f, BoardNumbers);
@@ -424,7 +441,7 @@ int main(int argc, char** argv) {
 
     // 8. A mira seguida de verdade: a do GTA (53% x 40%) e a de um mod que centraliza a mira (50% x 50%)
     o = opt::Options();
-    o.numbers = 2, o.direction = false, o.edgeFlash = false;
+    o.numbers = 2, o.direction = false, o.edgeFlash = false, o.crosshair = 0, o.marker = 1;
     s = Fight();
     s.taken.clear();
     s.given.clear();
