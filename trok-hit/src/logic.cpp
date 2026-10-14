@@ -45,6 +45,8 @@ struct Shot {
     float effect = 0; // quando o efeito na mira comecou (o abate recomeca)
     bool resolved = false, shown = false, kill = false;
     float zeroValue = -1;  // na queda que zerou a vida: o que este tiro tirou pela ordem das balas (-1 = nao conta)
+    bool exact = false;    // sabe o ponto exato onde a bala pegou
+    game::Vec3 offset = {0, 0, 0}; // esse ponto, a partir do osso da parte atingida (segue o alvo)
     hud::Kind kind = hud::HEALTH;  // o que aparece na mira (decidido na hora do tiro)
     hud::Kind under = hud::HEALTH; // no abate: o que o tiro pegou
 };
@@ -84,6 +86,8 @@ struct Taken { // tiro levado esperando a sua vida cair
 struct LNumber {
     hud::Number n;
     int target = -1, part = 3; // somando na tela: target -1 (um so para todos os alvos)
+    bool exact = false;        // no local do tiro: o ponto onde a bala pegou
+    game::Vec3 offset = {0, 0, 0};
     int slot = 0;              // somando: 0 corpo, 1 cabeca
     bool sum = false;          // somando (ainda pode crescer ate closeAt)
     float closeAt = 0;
@@ -263,8 +267,21 @@ void AddToLine(std::vector<hud::Line>& lines, int id, int value, hud::Kind kind,
     }
 }
 
-void AddNumber(int target, int part, int value, hud::Kind kind, bool estimated, bool head, float life,
-               const opt::Options& o) {
+// O local do tiro na tela: o osso da parte atingida mais onde a bala pegou nele (sem o ponto, o osso).
+bool HitOnScreen(DWORD ped, int part, bool exact, const game::Vec3& offset, ImVec2* out) {
+    game::Vec3 at;
+    if (!game::PartWorld(ped, part, &at)) {
+        return false;
+    }
+    if (exact) {
+        at = {at.x + offset.x, at.y + offset.y, at.z + offset.z};
+    }
+    return game::Project(at, out);
+}
+
+void AddNumber(const Shot& s, int value, hud::Kind kind, bool estimated, float life, const opt::Options& o) {
+    int target = s.target, part = s.part;
+    bool head = s.part == 9;
     if (o.numbers == 2) {
         return;
     }
@@ -293,6 +310,11 @@ void AddNumber(int target, int part, int value, hud::Kind kind, bool estimated, 
         ln.target = key;
         ln.slot = slot;
         ln.part = 3; // ao lado do peito; o da cabeca empilhado em cima (lift)
+        if (o.numbers == 3) { // no local do tiro: onde a soma comecou
+            ln.part = s.part;
+            ln.exact = s.exact;
+            ln.offset = s.offset;
+        }
         ln.n.value = value;
         ln.n.kind = slot == 1 ? hud::HEADSHOT : kind;
         ln.n.estimated = estimated;
@@ -324,6 +346,8 @@ void AddNumber(int target, int part, int value, hud::Kind kind, bool estimated, 
     LNumber ln;
     ln.target = target;
     ln.part = part;
+    ln.exact = s.exact;
+    ln.offset = s.offset;
     ln.n.value = value;
     ln.n.kind = kind;
     ln.n.estimated = estimated;
@@ -356,7 +380,7 @@ void Show(Shot& s, int value, hud::Kind kind, bool estimated, const opt::Options
         kind = hud::KILL;
     }
     float life = LifeAfter(s.target, value, !s.resolved);
-    AddNumber(s.target, s.part, value, kind, estimated, s.part == 9, life, o);
+    AddNumber(s, value, kind, estimated, life, o);
     AddToLine(g_given, s.target, value, kind, estimated, s.part == 9, life, o);
 }
 
@@ -884,6 +908,13 @@ void OnGive(int id, float damage, int weapon, int part) {
     s.time = s.effect = g_now;
     float health = 0, armour = 0;
     bool have = samp::Vitals(id, &health, &armour);
+    // onde a bala pegou (o gancho do impacto, no mesmo quadro): guardado a partir do osso, para seguir o alvo
+    DWORD ped = samp::PedOf(id);
+    game::Vec3 point, bone;
+    if (ped && game::TakeImpact(ped, &point) && game::PartWorld(ped, part, &bone)) {
+        s.exact = true;
+        s.offset = {point.x - bone.x, point.y - bone.y, point.z - bone.z};
+    }
     Target& t = g_targets[id];
     if (have && g_now >= t.watchUntil) { // nao vigiado: a base e o que o sync mostra agora
         t.health = health;
@@ -1084,16 +1115,20 @@ void Frame(float dt, ImVec2 screen, const game::Aim& aim, const opt::Options& o,
         m.kind = s.kind;
         m.under = s.under;
         DWORD ped = age < bodyKeep ? samp::PedOf(s.target) : 0;
-        m.bodyVisible = ped && game::PartOnScreen(ped, s.part, &m.body);
+        m.bodyVisible = ped && HitOnScreen(ped, s.part, s.exact, s.offset, &m.body); // o X no ponto do tiro
         st->markers.push_back(m);
     }
     st->numbers.clear();
     float ns = k * o.numbersSize / 100.0f;
     for (LNumber& ln : g_numbers) {
-        if (o.numbers == 0 && ln.target >= 0) {
+        if ((o.numbers == 0 || o.numbers == 3) && ln.target >= 0) {
             DWORD ped = samp::PedOf(ln.target);
             ImVec2 at;
-            if (ped && game::PartOnScreen(ped, ln.part, &at)) {
+            if (o.numbers == 3) { // no local do tiro: nasce onde a bala pegou
+                if (ped && HitOnScreen(ped, ln.part, ln.exact, ln.offset, &at)) {
+                    ln.n.from = at;
+                }
+            } else if (ped && game::PartOnScreen(ped, ln.part, &at)) {
                 ln.n.from = ImVec2(at.x + 44 * ns, at.y - 6 * ns); // ao lado do ponto do tiro: nao cobre a mira
             }
         }

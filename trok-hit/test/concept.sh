@@ -72,7 +72,8 @@ python3 -I -c "
 import glob, os, sys
 from PIL import Image
 d = sys.argv[1]
-for prefix, name in (('gif19', '19-animacao-sinal.gif'), ('gif20', '20-animacao-numeros.gif')):
+for prefix, name in (('gif19', '19-animacao-sinal.gif'), ('gif20', '20-animacao-numeros.gif'),
+                     ('gif23', '23-local-do-tiro.gif')):
     files = sorted(glob.glob(os.path.join(d, prefix + '-*.png')))
     frames = [Image.open(f).convert('RGB').quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
               for f in files]

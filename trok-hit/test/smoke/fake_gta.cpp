@@ -16,6 +16,8 @@
 //                 esta atirando e 1,5x maiores
 //   pasta-propria a pasta "Trok Hitmarker" ja existe com o que o usuario pos: acerto.mp3 e um acerto.png retangular
 //                 (o resto vem de dentro do .asi); no meio do jogo uma mira.png nova e copiada por cima e vale na hora
+//   local-do-tiro numeros=3 (no local do tiro), 50%: o CWeapon::DoBulletImpact de mentira diz que a bala pegou ao lado
+//                 do Joao; o numero e o X nascem ali, nao ao lado do tronco
 //   desligado     ligado=0: a mira do jogo intacta e nada na tela
 //   outra-versao  samp.dll com o ponto de entrada do R3: o .asi nao instala nada
 //   gta-errado    sem a marca do 1.0 US: o .asi nao instala nada
@@ -76,6 +78,7 @@ constexpr DWORD GTA_DRAW_CROSSHAIRS = 0x58E020, GTA_SPRITE_DRAW = 0x728350, GTA_
 constexpr DWORD GTA_WEAPON_RADIUS = 0x609CD0, GTA_CALC_SCREEN_COORS = 0x70CE30, GTA_GET_BONE_POSITION = 0x5E4280;
 constexpr DWORD GTA_THE_CAMERA = 0xB6F028, GTA_PLAYER_PED = 0xB7CD98;
 constexpr DWORD GTA_CHAIR_Y = 0xB6EC10, GTA_CHAIR_X = 0xB6EC14;
+constexpr DWORD GTA_BULLET_IMPACT = 0x73B550;
 
 // samp.dll 0.3.7 R1 (os mesmos de src/samp.cpp)
 constexpr DWORD NETGAME = 0x21A0F8, DIALOG = 0x21A0B8, SCOREBOARD = 0x21A0B4;
@@ -168,6 +171,11 @@ void __fastcall FakeSpriteDraw(void*, void*, const Rect& rect, const BYTE*) {
 void __cdecl FakeDrawRect(const Rect&, const BYTE*) {
     ++g_rectDraws;
 }
+
+// CWeapon::DoBulletImpact (thiscall, 6 argumentos): no jogo faz o sangue e o dano; aqui nao faz nada.
+void __fastcall FakeBulletImpact(void*, void*, void*, void*, void*, void*, void*, int) {}
+
+typedef void(__thiscall* ImpactFn)(void*, void*, void*, void*, void*, void*, int);
 
 // CHud::DrawCrossHairs: a mira redonda do 1.0 US (MODE_AIMWEAPON), pelos enderecos do jogo.
 void __cdecl FakeDrawCrossHairs() {
@@ -321,6 +329,7 @@ void BuildSamp() {
         Put<GameMatrix*>(g_peds[k].raw, 0x14, &g_pedMatrices[k]);
         Put<Vec3>(g_peds[k].raw, 0x04, Vec3{p.x, p.y, 0.0f});
         Put<void*>(g_peds[k].raw, 0x18, &g_peds[k]); // RwObject: tem modelo
+        Put<BYTE>(g_peds[k].raw, 0x36, 3);           // CEntity::m_nType: personagem
         Put<GamePed*>(g_sampPeds[k], 0x2A4, &g_peds[k]);
         Put<BYTE*>(remote, 0x00, g_sampPeds[k]);
     }
@@ -829,7 +838,8 @@ int main(int argc, char** argv) {
     }
     const char* scenario = argv[2];
     bool own = strcmp(scenario, "pasta-propria") == 0;
-    bool trok = strcmp(scenario, "trok") == 0 || own;
+    bool exact = strcmp(scenario, "local-do-tiro") == 0;
+    bool trok = strcmp(scenario, "trok") == 0 || own || exact;
     bool gameAim = strcmp(scenario, "mira-do-jogo") == 0;
     bool wrongGta = strcmp(scenario, "gta-errado") == 0;
     bool otherSamp = strcmp(scenario, "outra-versao") == 0;
@@ -847,7 +857,8 @@ int main(int argc, char** argv) {
               Redirect(GTA_DRAW_CROSSHAIRS, reinterpret_cast<void*>(FakeDrawCrossHairs)) &&
               Redirect(GTA_SPRITE_DRAW, reinterpret_cast<void*>(FakeSpriteDraw)) &&
               Redirect(GTA_DRAW_RECT, reinterpret_cast<void*>(FakeDrawRect)) &&
-              Redirect(GTA_WEAPON_RADIUS, reinterpret_cast<void*>(FakeRadius)),
+              Redirect(GTA_WEAPON_RADIUS, reinterpret_cast<void*>(FakeRadius)) &&
+              Redirect(GTA_BULLET_IMPACT, reinterpret_cast<void*>(FakeBulletImpact)),
           "funcoes de mentira do GTA no lugar (mira, raio, sprites, projecao, ossos)");
     BuildGame(!wrongGta);
 
@@ -953,6 +964,11 @@ int main(int argc, char** argv) {
         }
         if (step == 2 && t >= 4900) {
             gives = Field(F_GIVE_COUNT);
+            if (exact) { // a bala pegou 60 cm a esquerda e 30 cm acima do centro do Joao
+                BYTE weapon[0x20] = {}, start[12] = {}, end[12] = {};
+                Vec3 col[4] = {{-0.6f, 10.0f, 0.3f}};
+                reinterpret_cast<ImpactFn>(GTA_BULLET_IMPACT)(weapon, &g_local, &g_peds[0], start, end, col, 0);
+            }
             Give(1, 46.2f, 24, 3); // Joao, no tronco
             Check(Field(F_GIVE_COUNT) == gives + 1 && Field(F_GIVE_ID) == 1,
                   "SendGiveDamage original continua sendo chamado (o pacote vai ao servidor)");
@@ -1056,10 +1072,20 @@ int main(int argc, char** argv) {
             if (active) {
                 int red = Red(aim.x - 20, aim.y - 20, aim.x + 20, aim.y + 20);
                 CheckN(red > 30, "sinal de acerto (acerto.png, vermelho) na mira", red);
-                double num = Covered(joao.x + 5, joao.y - 80, joao.x + 90, joao.y + 10);
-                CheckPct(num > 0.04, "numero de dano subindo ao lado do Joao", num);
-                double body = Covered(joao.x - 18, joao.y - 18, joao.x + 18, joao.y + 18);
-                CheckPct(body > 0.05, "local do acerto (corpo.png) no tronco do Joao", body);
+                if (exact) {
+                    POINT hit = Screen(-0.6f, 10.0f, 0.3f);
+                    double num = Covered(hit.x - 30, hit.y - 60, hit.x + 30, hit.y + 12);
+                    CheckPct(num > 0.04, "numero nasce no local do tiro (o ponto exato da bala)", num);
+                    double side = Covered(joao.x + 25, joao.y - 60, joao.x + 90, joao.y + 10);
+                    CheckPct(side < 0.01, "e nao ao lado do tronco (o modo No personagem)", side);
+                    double body = Covered(hit.x - 14, hit.y - 14, hit.x + 14, hit.y + 14);
+                    CheckPct(body > 0.05, "o X do local do acerto tambem no ponto exato", body);
+                } else {
+                    double num = Covered(joao.x + 5, joao.y - 80, joao.x + 90, joao.y + 10);
+                    CheckPct(num > 0.04, "numero de dano subindo ao lado do Joao", num);
+                    double body = Covered(joao.x - 18, joao.y - 18, joao.x + 18, joao.y + 18);
+                    CheckPct(body > 0.05, "local do acerto (corpo.png) no tronco do Joao", body);
+                }
             } else {
                 CheckPct(Covered(0, 0, W, H) < 0.0005, "nada na tela depois do tiro", Covered(0, 0, W, H));
             }
@@ -1177,7 +1203,7 @@ int main(int argc, char** argv) {
         }
         // O menu pelo teclado: abrir e fechar nao grava nada; a seta muda o tamanho da mira e o INI grava depois.
         if (step == 22) {
-            if (!trok) {
+            if (!trok || exact) { // local-do-tiro ja comeca com o INI dele
                 step = 30;
             } else if (t >= 10100) {
                 Check(!FileExists("Trok Hitmarker.ini"), "abrir e fechar o menu nao grava nada no INI");
@@ -1230,6 +1256,7 @@ int main(int argc, char** argv) {
         Check(LogHas("gta_sa.exe 1.0 US confirmado"), "log: gta_sa.exe 1.0 US confirmado");
         Check(LogHas("ganchos do samp.dll instalados"), "log: ganchos do samp.dll instalados");
         Check(LogHas("ganchos da mira do GTA instalados"), "log: ganchos da mira do GTA instalados");
+        Check(LogHas("gancho do impacto da bala instalado"), "log: gancho do impacto da bala instalado");
         Check(LogHas("perfil: 127.0.0.1:7777"), "log: perfil do servidor 127.0.0.1:7777 carregado");
         Check(LogHas("acerto: id 1, parte 3, arma 24, GTA 46.2 -> real 46"), "log: dano real do Joao (46)");
         Check(LogHas("acerto: id 2, parte 9, arma 24, GTA 46.2 -> real 30"),

@@ -2,7 +2,7 @@
 
 Indicador de dano para o SA-MP 0.3.7 R1, no estilo da casa: sinal de acerto na mira, local do acerto marcado no corpo, números de dano real, o informer com nome e combo, seta de onde veio o tiro levado, borda de dano recebido e sons trocáveis. Cada parte liga e desliga sozinha, e as que fazem sentido juntas podem ficar juntas. Menu: `/trokhit`.
 
-**Estado:** v1.2, `.asi` compilado e testado fora do jogo (Wine, com um GTA e um samp.dll de mentira: `test/smoke/run.sh`, 8 cenários, entre eles uma troca de tiros simulada com 20 jogadores). Falta o teste no jogo de verdade.
+**Estado:** v1.3, `.asi` compilado e testado fora do jogo (Wine, com um GTA e um samp.dll de mentira: `test/smoke/run.sh`, 9 cenários, entre eles uma troca de tiros simulada com 20 jogadores). Falta o teste no jogo de verdade.
 
 | | |
 |---|---|
@@ -51,6 +51,17 @@ O sinal na mira tem cinco animações, e os números de dano quatro. A imagem co
 - **Sinal:** Pulo (cresce e volta), Expandir (nasce menor e abre para fora enquanto some, como o anel em volta da mira do Fortnite), Soco (entra grande e torto e assenta num tranco), Giro (gira 45 graus) e Nenhuma (`docs/19-animacao-sinal.gif`).
 - **Números:** Subir (o damage informer antigo), Arco (estoura grande, assenta com um repique e sai num arco para o lado, como no Fortnite), Saltar (pula e volta) e Parado (`docs/20-animacao-numeros.gif`).
 
+## Onde o número nasce
+
+Aba Dano, "Números de dano":
+
+- **No personagem:** sobe ao lado da parte do corpo atingida, sem cobrir a mira.
+- **No local do tiro:** nasce exatamente onde a bala pegou e sobe dali (`docs/23-local-do-tiro.gif`). É o hitmarker famoso de números pequenos e brancos: deixe o tamanho em 30–60% e as cores de vida, colete e cabeça em branco.
+- **Na tela:** ao lado do centro.
+- **Desligado.**
+
+O ponto exato vem do próprio GTA (`CWeapon::DoBulletImpact`, onde a sua bala bateu no personagem). Ele é guardado a partir do osso atingido, então o número e o X do local do acerto acompanham o alvo quando ele anda. Sem esse ponto (o gancho recusado, ou soco), vale o osso da parte atingida.
+
 ## Cor pela vida
 
 Opção nas abas Dano e Informer: o número começa branco com a vida cheia e vai para o amarelo, o laranja e o vermelho conforme a vida cai. No dano que você dá conta a vida do oponente; no que você leva (informer), a sua. O abate continua vermelho (`docs/22-cor-pela-vida.png`).
@@ -97,11 +108,11 @@ Pasta `Trok Hitmarker\sons`, ao lado do `.asi`, com `.mp3` ou `.wav` destes nome
 ## Compilar e testar
 
 - `./build.sh`: MinGW i686, usa o kit da casa e o ImGui/MinHook da vitrine (`../trok-ui/asi`). As imagens e os sons de `dist/Trok Hitmarker` entram no `.asi` (`res/embed.py`).
-- `test/smoke/run.sh`: Wine 32 bits + Xvfb. Cenários: `trok` (mira do Trok, acerto, número, local do acerto, abate, dano levado com seta e borda, dano sem queda de vida, menu e gravação do INI), `mira-do-jogo` (estática e 150%), `pasta-propria` (mp3, PNG retangular, troca da mira com o jogo rodando), `desligado`, `outra-versao`, `gta-errado`, `pvp-20` e `pvp-20-sem-mensagem` (a troca de tiros com 20; `PVP_SEED=n` muda a semente, `PVP_DETALHE=1` lista os números que erraram).
+- `test/smoke/run.sh`: Wine 32 bits + Xvfb. Cenários: `trok` (mira do Trok, acerto, número, local do acerto, abate, dano levado com seta e borda, dano sem queda de vida, menu e gravação do INI), `mira-do-jogo` (estática e 150%), `pasta-propria` (mp3, PNG retangular, troca da mira com o jogo rodando), `local-do-tiro` (o número e o X no ponto exato da bala), `desligado`, `outra-versao`, `gta-errado`, `pvp-20` e `pvp-20-sem-mensagem` (a troca de tiros com 20; `PVP_SEED=n` muda a semente, `PVP_DETALHE=1` lista os números que erraram).
 - `test/concept.sh`: as imagens de `docs/`, do código de desenho de verdade rasterizado no Linux.
 
 Bibliotecas de terceiros em `third_party/`: minimp3 (CC0) e stb_image (domínio público/MIT).
 
 ## Imagens
 
-`docs/04-hitmarker.png` (as imagens e a animação), `05-numeros.png`, `06-local-do-acerto.png`, `03-informer-lista.png`, `07-recebido.png`, `15-borda.png`, `08-mira-seguida.png`, `09-mover.png`, `10`–`18` (menu), `19-animacao-sinal.gif`, `20-animacao-numeros.gif`, `21-informer-somando.png` e `22-cor-pela-vida.png`.
+`docs/04-hitmarker.png` (as imagens e a animação), `05-numeros.png`, `06-local-do-acerto.png`, `03-informer-lista.png`, `07-recebido.png`, `15-borda.png`, `08-mira-seguida.png`, `09-mover.png`, `10`–`18` (menu), `19-animacao-sinal.gif`, `20-animacao-numeros.gif`, `21-informer-somando.png`, `22-cor-pela-vida.png` e `23-local-do-tiro.gif`.

@@ -33,7 +33,8 @@ struct Options {
     int fxAnim = 0;          // animacao do sinal: 0 Pulo, 1 Expandir (como o Fortnite), 2 Soco, 3 Giro, 4 Nenhuma
 
     // ---- Numeros de dano
-    int numbers = 0;         // 0 sobem do personagem, 1 sobem na tela (ao lado do centro), 2 desligado
+    int numbers = 0;         // 0 sobem do personagem (ao lado do acerto), 1 sobem na tela (ao lado do centro),
+                             // 2 desligado, 3 nascem no local do tiro (o ponto exato onde a bala pegou)
     int numbersCount = 0;    // 0 um numero por tiro, 1 somando: um numero so por alvo que vai crescendo
     bool numbersSum = true;  // um por tiro: tiros seguidos (rajada) somam no mesmo numero
     bool splitHead = false;  // somando: o dano na cabeca num numero separado (dourado)

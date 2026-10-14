@@ -6,6 +6,8 @@
 //   CPlayerPed::GetWeaponRadiusOnScreen 0x609CD0: so o HUD usa; o tamanho cresce com CPlayerData::m_fAttackButtonCounter
 //     (+0x2C), entao zerar o contador so durante o desenho deixa a mira parada sem mexer no espalhamento dos tiros.
 //   CPed::GetBonePosition 0x5E4280, CSprite::CalcScreenCoors 0x70CE30, TheCamera 0xB6F028.
+//   CWeapon::DoBulletImpact 0x73B550 (thiscall: dono, vitima, inicio, fim, CColPoint*, int): onde a bala pegou (o
+//   CColPoint comeca com o ponto). Serve para o numero nascer exatamente ali.
 
 #include "game.h"
 
@@ -27,6 +29,9 @@ constexpr DWORD FN_DRAW_RECT = 0x727B60;   // CSprite2d::DrawRect(CRect const&, 
 constexpr DWORD FN_WEAPON_RADIUS = 0x609CD0;
 constexpr DWORD FN_BONE_POSITION = 0x5E4280;
 constexpr DWORD FN_CALC_SCREEN = 0x70CE30;
+constexpr DWORD FN_BULLET_IMPACT = 0x73B550;
+constexpr DWORD ENT_TYPE = 0x36; // CEntity::m_nType (3 bits)
+constexpr BYTE ENTITY_PED = 3;
 
 constexpr DWORD PLAYER_PED = 0xB7CD98; // CWorld::Players[0].m_pPed
 constexpr DWORD SCREEN_W = 0xC17044, SCREEN_H = 0xC17048;
@@ -58,11 +63,21 @@ typedef void(__cdecl* DrawRectFn)(const Rect&, const Rgba&);
 typedef float(__thiscall* RadiusFn)(void*);
 typedef void(__thiscall* BoneFn)(void*, Vec3&, unsigned, bool);
 typedef bool(__cdecl* CalcScreenFn)(const Vec3&, Vec3*, float*, float*, bool, bool);
+typedef void(__thiscall* ImpactFn)(void*, void*, void*, void*, void*, void*, int);
 
 VoidFn o_crosshairs = nullptr;
 SpriteDrawFn o_spriteDraw = nullptr;
 DrawRectFn o_drawRect = nullptr;
 RadiusFn o_radius = nullptr;
+ImpactFn o_impact = nullptr;
+
+struct Impact {
+    DWORD ped = 0;
+    Vec3 point = {0, 0, 0};
+    DWORD tick = 0;
+};
+Impact g_impacts[8]; // as ultimas balas suas que pegaram em alguem
+int g_nextImpact = 0;
 
 // O que o Present pediu (lido dentro dos ganchos, na mesma thread).
 bool g_hide = false, g_fixed = false, g_carRule = false;
@@ -203,6 +218,21 @@ float __fastcall HookRadius(void* self, void*) {
     return g_fixed ? rest : now;
 }
 
+// A bala de alguem pegou em algo: se foi a sua num personagem, guarda o ponto (o SA-MP manda o dano logo depois).
+void __fastcall HookImpact(void* self, void*, void* owner, void* victim, void* start, void* end, void* colPoint,
+                           int arg) {
+    DWORD me = At<DWORD>(PLAYER_PED, 0);
+    DWORD v = reinterpret_cast<DWORD>(victim);
+    if (Ptr(me) && reinterpret_cast<DWORD>(owner) == me && Ptr(v) && v != me && colPoint &&
+        (At<BYTE>(v, ENT_TYPE) & 7) == ENTITY_PED) {
+        Impact& i = g_impacts[g_nextImpact++ % 8];
+        i.ped = v;
+        i.point = *static_cast<const Vec3*>(colPoint);
+        i.tick = GetTickCount();
+    }
+    o_impact(self, owner, victim, start, end, colPoint, arg);
+}
+
 } // namespace
 
 bool VersionOk() {
@@ -251,6 +281,17 @@ bool Install() {
         }
     }
     HitLog("ganchos da mira do GTA instalados (DrawCrossHairs, CSprite2d::Draw/DrawRect, raio da mira)");
+    // Opcional: sem ele, o numero nasce na parte do corpo (o osso), nao no ponto exato.
+    void* impact = reinterpret_cast<void*>(FN_BULLET_IMPACT);
+    MH_STATUS s = MH_CreateHook(impact, reinterpret_cast<void*>(HookImpact), reinterpret_cast<void**>(&o_impact));
+    if (s == MH_OK) {
+        s = MH_EnableHook(impact);
+        if (s != MH_OK) {
+            MH_RemoveHook(impact);
+        }
+    }
+    HitLog(s == MH_OK ? "gancho do impacto da bala instalado (o ponto exato do tiro)"
+                      : "gancho do impacto da bala recusado (%d) -- o numero nasce na parte do corpo", s);
     return true;
 }
 
@@ -321,23 +362,44 @@ bool Project(const Vec3& world, ImVec2* out) {
     return true;
 }
 
-bool PartOnScreen(DWORD ped, int part, ImVec2* out) {
+bool PartWorld(DWORD ped, int part, Vec3* out) {
     // Partes do SA-MP -> ossos do GTA: tronco, virilha, braco e antebraco de cada lado, perna (joelho), cabeca.
     static const unsigned bones[] = {3, 1, 33, 23, 42, 52, 8};
     Vec3 body;
     if (!PedPos(ped, &body) || !Ptr(At<DWORD>(ped, ENT_RWOBJECT))) {
         return false;
     }
-    Vec3 at = body;
+    *out = body;
     if (part >= 3 && part <= 9) {
         Vec3 bone = {0, 0, 0};
         reinterpret_cast<BoneFn>(FN_BONE_POSITION)(reinterpret_cast<void*>(ped), bone, bones[part - 3], false);
         float dx = bone.x - body.x, dy = bone.y - body.y, dz = bone.z - body.z;
         if (dx * dx + dy * dy + dz * dz < 9.0f) { // osso ja calculado (perto do corpo)
-            at = bone;
+            *out = bone;
         }
     }
-    return Project(at, out);
+    return true;
+}
+
+bool PartOnScreen(DWORD ped, int part, ImVec2* out) {
+    Vec3 at;
+    return PartWorld(ped, part, &at) && Project(at, out);
+}
+
+bool TakeImpact(DWORD ped, Vec3* point) {
+    Impact* best = nullptr;
+    DWORD now = GetTickCount();
+    for (Impact& i : g_impacts) {
+        if (i.ped == ped && ped && now - i.tick < 300 && (!best || i.tick >= best->tick)) {
+            best = &i;
+        }
+    }
+    if (!best) {
+        return false;
+    }
+    *point = best->point;
+    best->ped = 0;
+    return true;
 }
 
 float AngleFromCamera(const Vec3& from, const Vec3& target) {

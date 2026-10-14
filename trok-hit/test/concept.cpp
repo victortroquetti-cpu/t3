@@ -471,12 +471,39 @@ static void BoardHealthColors(ImDrawList* dl) {
     Small(dl, 160 + 7 * 170, 285, "abate", true);
 }
 
-static void Animate(void (*board)(ImDrawList*), float cycle, const std::string& prefix, int x0, int y0, int x1, int y1) {
+// 23. No local do tiro: numeros pequenos e brancos nascendo onde cada bala pegou (uma rajada de M4 no Lucas).
+static void BoardHitPoints(ImDrawList* dl) {
+    opt::Options o = opt::Get();
+    o.numbers = 3;
+    o.numbersSize = 50;
+    o.numbersAnim = 0;
+    o.cHealth = o.cArmour = o.cHead = IM_COL32(255, 255, 255, 255);
+    const ImVec2 points[] = {{1004, 478}, {1030, 500}, {1012, 432}, {1060, 505}, {996, 520}, {1022, 462}, {1008, 600}};
+    const int values[] = {13, 13, 46, 13, 13, 13, 13};
+    for (int i = 0; i < 7; ++i) {
+        float age = g_animTime - i * 0.22f;
+        if (age < 0) continue;
+        hud::Number n;
+        n.from = points[i];
+        n.age = age;
+        n.value = values[i];
+        n.kind = i == 2 ? hud::HEADSHOT : hud::HEALTH;
+        n.drift = i % 3 == 0 ? 0.0f : i % 3 == 1 ? 0.7f : -0.7f;
+        n.bump = 1.0f;
+        hud::DrawNumber(dl, n, 0.5f, o);
+    }
+    GameCrosshair(dl, ImVec2(1018, 470));
+}
+
+static void Animate(void (*board)(ImDrawList*), float cycle, const std::string& prefix, int x0, int y0, int x1, int y1,
+                    bool flat = true) {
     const int fps = 20;
     int frames = static_cast<int>(cycle * fps);
     hud::State empty;
     std::vector<float> photo;
-    photo.swap(background); // fundo liso: o GIF fica nitido e leve
+    if (flat) {
+        photo.swap(background); // fundo liso: o GIF fica nitido e leve
+    }
     for (int f = 0; f < frames; ++f) {
         g_animTime = f / static_cast<float>(fps);
         Frame(empty, false, 0.3f, board);
@@ -484,7 +511,9 @@ static void Animate(void (*board)(ImDrawList*), float cycle, const std::string& 
         snprintf(name, sizeof(name), "%s-%03d.ppm", prefix.c_str(), f);
         Save(name, x0, y0, x1, y1);
     }
-    photo.swap(background);
+    if (flat) {
+        photo.swap(background);
+    }
 }
 
 static void Menu(int tab, const std::string& out, int x0, int x1) {
@@ -673,6 +702,7 @@ int main(int argc, char** argv) {
     o = opt::Options();
     Animate(BoardFxAnims, 1.6f, dir + "/gif19", 30, 50, 940, 720);
     Animate(BoardNumberAnims, 2.6f, dir + "/gif20", 30, 80, 1090, 900);
+    Animate(BoardHitPoints, 2.6f, dir + "/gif23", 818, 330, 1218, 680, false);
     hud::State none;
     Frame(none, false, 0.3f, BoardInformerSum);
     Save(dir + "/21-informer-somando.ppm", 60, 100, 1740, 480);

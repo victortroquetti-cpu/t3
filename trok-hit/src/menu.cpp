@@ -19,7 +19,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v1.2";
+constexpr const char* VERSION_TAG = "v1.3";
 
 const char* const TABS[] = {"Mira", "Dano", "Informer", "Recebido", "Sons", "Geral"};
 constexpr int TAB_COUNT = 6;
@@ -236,8 +236,20 @@ void TabDano(Rows& r, float x, float w) {
     opt::Options& o = opt::Get();
     const opt::Options& d = opt::Defaults();
     NumbersPreview(x, w); // em cima: muda na hora com as opcoes de baixo
-    static const char* const where[] = {"No personagem", "Na tela", "Desligado"};
-    r.Segmented("N\xC3\xBAmeros de dano", &o.numbers, where, 3, d.numbers);
+    // a ordem do menu; o INI guarda 0 personagem, 1 tela, 2 desligado, 3 local do tiro (os antigos continuam valendo)
+    static const char* const where[] = {"No personagem", "No local do tiro", "Na tela", "Desligado"};
+    static const int stored[] = {0, 3, 1, 2};
+    int shown = 0;
+    while (shown < 3 && stored[shown] != o.numbers) {
+        ++shown;
+    }
+    if (r.Cycle("N\xC3\xBAmeros de dano", &shown, where, 4, 0)) {
+        o.numbers = stored[shown];
+    }
+    r.Info("Onde o n\xC3\xBAmero aparece",
+           "No personagem: sobe ao lado da parte do corpo atingida, sem cobrir a mira. No local do tiro: nasce "
+           "exatamente onde a bala pegou e sobe dali (o hitmarker famoso: deixe pequeno e branco). Na tela: ao lado "
+           "do centro. Os dois primeiros acompanham o alvo quando ele anda.");
     static const char* const count[] = {"Um por tiro", "Somando"};
     r.Segmented("Contagem", &o.numbersCount, count, 2, d.numbersCount);
     if (o.numbersCount == 0) {
@@ -259,7 +271,7 @@ void TabDano(Rows& r, float x, float w) {
            "Real: a vida e o colete que o alvo perdeu de verdade, do jeito que o servidor aplicou (arma configurada, "
            "headshot que mata de uma vez, colete). Do GTA: o valor que o jogo calcula para a arma (46.2 na Deagle), "
            "o mesmo que o damage informer antigo mostrava.");
-    r.Slider("Tamanho", &o.numbersSize, 50, 200, 10, "%d%%", d.numbersSize);
+    r.Slider("Tamanho", &o.numbersSize, 30, 200, 10, "%d%%", d.numbersSize);
     static const char* const font[] = {"Arial Black", "Da casa"};
     r.Segmented("Fonte dos n\xC3\xBAmeros", &o.numbersFont, font, 2, d.numbersFont);
     r.Section("Cores dos n\xC3\xBAmeros");

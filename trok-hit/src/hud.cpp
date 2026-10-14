@@ -535,7 +535,7 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
 
     // numeros
     float numScale = k * o.numbersSize / 100.0f;
-    if (o.numbers == 0) {
+    if (o.numbers == 0 || o.numbers == 3) {
         for (const Number& n : st.numbers) {
             DrawNumber(dl, n, numScale, o);
         }

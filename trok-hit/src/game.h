@@ -47,6 +47,10 @@ Local LocalPlayer();
 bool PedPos(DWORD ped, Vec3* out);
 // A parte do corpo (como o SA-MP manda: 3 tronco ... 9 cabeca) na tela. false: atras da camera ou sem modelo.
 bool PartOnScreen(DWORD ped, int part, ImVec2* out);
+// A parte do corpo no mundo (o osso dela; sem o osso, o corpo).
+bool PartWorld(DWORD ped, int part, Vec3* out);
+// O ponto exato onde a sua bala pegou neste personagem (CWeapon::DoBulletImpact), se foi ha pouco; consome.
+bool TakeImpact(DWORD ped, Vec3* point);
 bool Project(const Vec3& world, ImVec2* out);
 // Angulo de um ponto do mundo em relacao a para onde a camera olha (0 = na frente, + = a direita), visto de "from".
 float AngleFromCamera(const Vec3& from, const Vec3& target);
