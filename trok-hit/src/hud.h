@@ -81,7 +81,11 @@ ImU32 KindColor(Kind k, const opt::Options& o);
 void Draw(ImDrawList* dl, const State& s, const opt::Options& o, ImVec2 screen);
 
 // Partes soltas (o menu desenha a previa com elas).
-void DrawCrosshair(ImDrawList* dl, ImVec2 at, float scale, const opt::Options& o);
+void DrawCrosshair(ImDrawList* dl, ImVec2 at, float scale, const opt::Options& o, ImU32 tint = 0, float tintAmount = 0,
+                   float grow = 0);
+// O ponto da mira tomando a cor do acerto (efeito Ponto) e a mira com o efeito por cima, para as previas.
+void DrawAimTint(ImDrawList* dl, ImVec2 at, float scale, float age, Kind kind, const opt::Options& o);
+void DrawAimPreview(ImDrawList* dl, ImVec2 at, float scale, float age, Kind kind, const opt::Options& o);
 // stay > 0: a marca fica inteira ate quase o fim de stay segundos (local do acerto); 0 = o piscar da mira.
 void DrawMarker(ImDrawList* dl, ImVec2 at, int style, float scale, float age, Kind kind, const opt::Options& o,
                 float stay = 0);

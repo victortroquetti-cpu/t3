@@ -75,15 +75,7 @@ void MarkerPreview(float x, float w) {
     for (int i = 0; i < 5; ++i) {
         float cx = x + w * (i + 0.5f) / 5;
         ImVec2 c(cx, at.y + 40 * u);
-        if (i == 0) {
-            if (o.crosshair >= 1) { // ponto do Trok ou a imagem (sem a imagem, o ponto)
-                hud::DrawCrosshair(dl, c, scale, o);
-            } else { // a do jogo: um circulo, so para lembrar
-                dl->AddCircle(c, 11 * scale, col::White(150), 32, 1.4f * scale);
-            }
-        } else {
-            hud::DrawMarker(dl, c, o.marker, scale * o.markerSize / 100.0f, 0.12f, kinds[i], o);
-        }
+        hud::DrawAimPreview(dl, c, scale, i == 0 ? 99.0f : 0.12f, kinds[i], o); // 99 s: so a mira, parada
         ImVec2 ts = TextSize(fonts.desc, names[i]);
         Text(dl, fonts.desc, cx - ts.x * 0.5f, at.y + 68 * u, col::hint, names[i]);
     }
@@ -95,6 +87,9 @@ void TabMira(Rows& r, float x, float w) {
     const opt::Options& d = opt::Defaults();
     static const char* const mira[] = {"A do jogo", "Ponto do Trok", "Imagem"};
     r.Segmented("Mira", &o.crosshair, mira, 3, d.crosshair);
+    if (o.crosshair == 0) {
+        r.Toggle("Mira est\xC3\xA1tica (n\xC3\xA3o abre ao atirar)", &o.crosshairStatic);
+    }
     if (o.crosshair >= 1) {
         r.Toggle("Sempre vis\xC3\xADvel (tamb\xC3\xA9m sem mirar)", &o.crosshairAlways);
         r.Slider("Tamanho da mira", &o.crosshairSize, 50, 200, 10, "%d%%", d.crosshairSize);

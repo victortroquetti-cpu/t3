@@ -211,12 +211,9 @@ static void BoardMarkers(ImDrawList* dl) {
         Label(dl, 60, y0 + r * rh - 10, styles[r]);
         for (int c = 0; c < 5; ++c) {
             ImVec2 at(x0 + c * cw, y0 + r * rh);
-            if (c == 0) {
-                if (r == 0) hud::DrawCrosshair(dl, at, 1.5f, o);
-                else dl->AddCircle(at, 15, IM_COL32(255, 255, 255, 150), 40, 1.6f);
-            } else {
-                hud::DrawMarker(dl, at, r, 1.5f, 0.12f, k[c], o);
-            }
+            o.marker = r;
+            o.crosshair = r == 0 ? 1 : 0; // o Ponto com o ponto do Trok; os outros por cima da mira do jogo
+            hud::DrawAimPreview(dl, at, 1.5f, c == 0 ? 99.0f : 0.12f, k[c], o);
         }
     }
     // o Ponto, quadro a quadro: acerto, cabeca e abate
@@ -230,8 +227,8 @@ static void BoardMarkers(ImDrawList* dl) {
         Small(dl, 200, y + rr * 70 - 8, rowName[rr]);
         for (int i = 0; i < 6; ++i) {
             ImVec2 at(x0 + i * 120, y + rr * 70);
-            hud::DrawCrosshair(dl, at, 1.5f, o); // o ponto continua por baixo
-            hud::DrawMarker(dl, at, 0, 1.5f, ages[i], rowKind[rr], o);
+            o.marker = 0, o.crosshair = 1;
+            hud::DrawAimPreview(dl, at, 1.5f, ages[i], rowKind[rr], o);
             if (rr == 2) Small(dl, at.x, at.y + 34, ms[i], true);
         }
     }
@@ -468,6 +465,9 @@ int main(int argc, char** argv) {
     Menu(3, dir + "/14-menu-recebido.ppm", 690, 1230);
     o.crosshair = 2, o.marker = 4; // imagens da pasta (sem os arquivos, a previa cai no Ponto)
     Menu(0, dir + "/16-menu-mira-imagens.ppm", 690, 1230);
+    o = opt::Options();
+    o.crosshair = 0, o.crosshairStatic = true, o.marker = 1; // a mira do jogo, parada
+    Menu(0, dir + "/17-menu-mira-do-jogo.ppm", 690, 1230);
     o = opt::Options();
 
     printf("concept: %d falhas\n", failures);

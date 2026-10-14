@@ -19,6 +19,7 @@ struct Options {
     // ---- Mira
     int crosshair = 1;       // 0 a do jogo, 1 ponto do Trok (como a Mira Centralizada), 2 imagem (mira\mira.png);
                              // com 1 ou 2 o GTA nao desenha a dele
+    bool crosshairStatic = false; // a do jogo: nao abre enquanto atira (so o desenho; o espalhamento dos tiros e o mesmo)
     bool crosshairAlways = true; // ponto do Trok: aparece tambem sem mirar (a pe; some no carro, sniper e bazucas)
     int crosshairSize = 100; // %
     ImU32 cCrosshair = IM_COL32(255, 255, 255, 255);

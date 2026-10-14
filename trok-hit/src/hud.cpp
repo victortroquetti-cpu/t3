@@ -225,18 +225,37 @@ void SetImage(int slot, ImTextureID texture, ImVec2 size) {
     }
 }
 
-void DrawCrosshair(ImDrawList* dl, ImVec2 c, float scale, const opt::Options& o) {
-    if (o.crosshair == 2 && Picture(dl, IMG_CROSSHAIR, c, scale * o.crosshairSize / 100.0f, 1.0f)) {
-        return;
-    }
-    float r = 3.4f * scale * o.crosshairSize / 100.0f;
-    dl->AddCircleFilled(c, r + 1.6f * scale, IM_COL32(0, 0, 0, 200), 20);
-    dl->AddCircleFilled(c, r, Opaque(o.cCrosshair), 20);
+// Tempos do Ponto: o abate fica mais (o "morte" da Mira Centralizada durava 150 quadros).
+static void PontoTiming(Kind kind, float* life, float* hold) {
+    *life = kind == KILL ? 1.2f : kind == HEADSHOT ? 0.55f : 0.35f;
+    *hold = kind == KILL ? 0.85f : kind == HEADSHOT ? 0.3f : 0.15f;
 }
 
-// Ponto: o proprio ponto da mira reage. Acerto: fica na cor e pula, com um anel abrindo. Cabeca: na cor da cabeca, com
-// quatro tracos em cruz. Abate: o X na cor do abate em volta do ponto, que fica mais tempo.
-static void Dot(ImDrawList* dl, ImVec2 c, float s, float age, float life, float a, Kind kind, const opt::Options& o) {
+static ImU32 Mix(ImU32 a, ImU32 b, float t) {
+    t = Clamp01(t);
+    int r = static_cast<int>(((a >> IM_COL32_R_SHIFT) & 0xFF) * (1 - t) + ((b >> IM_COL32_R_SHIFT) & 0xFF) * t);
+    int g = static_cast<int>(((a >> IM_COL32_G_SHIFT) & 0xFF) * (1 - t) + ((b >> IM_COL32_G_SHIFT) & 0xFF) * t);
+    int bl = static_cast<int>(((a >> IM_COL32_B_SHIFT) & 0xFF) * (1 - t) + ((b >> IM_COL32_B_SHIFT) & 0xFF) * t);
+    return IM_COL32(r, g, bl, 255);
+}
+
+// O ponto do Trok (ou a imagem da mira). tint/tintAmount: a cor do acerto que o ponto toma por um instante; grow:
+// o pulo. E o mesmo ponto da mira, nunca um segundo por cima.
+void DrawCrosshair(ImDrawList* dl, ImVec2 c, float scale, const opt::Options& o, ImU32 tint, float tintAmount,
+                   float grow) {
+    if (o.crosshair == 2 && Picture(dl, IMG_CROSSHAIR, c, scale * o.crosshairSize / 100.0f * (1 + grow), 1.0f)) {
+        return;
+    }
+    float r = 3.4f * scale * o.crosshairSize / 100.0f * (1 + grow);
+    ImU32 color = tintAmount > 0 ? Mix(o.cCrosshair, tint, tintAmount) : Opaque(o.cCrosshair);
+    dl->AddCircleFilled(c, r + 1.6f * scale, IM_COL32(0, 0, 0, 200), 20);
+    dl->AddCircleFilled(c, r, color, 20);
+}
+
+// Ponto: so os detalhes em volta da mira (o ponto em si e o da mira, que muda de cor). Acerto: um anel abrindo.
+// Cabeca: quatro tracos em cruz e o anel. Abate: o X na cor do abate.
+static void PontoDetails(ImDrawList* dl, ImVec2 c, float s, float age, float life, float a, Kind kind,
+                         const opt::Options& o) {
     ImU32 color = Alpha(KindColor(kind, o), a);
     ImU32 dark = Alpha(IM_COL32(0, 0, 0, 255), 0.75f * a);
     float rd = 3.6f * s;
@@ -249,8 +268,6 @@ static void Dot(ImDrawList* dl, ImVec2 c, float s, float age, float life, float 
             dl->AddLine(p0, p1, dark, 6.2f * s);
             dl->AddLine(p0, p1, color, 3.6f * s);
         }
-        dl->AddCircleFilled(c, rd + 1.6f * s, dark, 20);
-        dl->AddCircleFilled(c, rd, Alpha(Opaque(o.cCrosshair), a), 20);
         return;
     }
     if (kind == HEADSHOT) {
@@ -264,9 +281,30 @@ static void Dot(ImDrawList* dl, ImVec2 c, float s, float age, float life, float 
     }
     float ring = EaseOut(age / life);
     dl->AddCircle(c, rd + 2 * s + 10 * s * ring, Alpha(KindColor(kind, o), a * (1.0f - ring) * 0.8f), 32, 1.6f * s);
-    float r = rd * (1.0f + 0.6f * pop);
-    dl->AddCircleFilled(c, r + 1.6f * s, dark, 20);
-    dl->AddCircleFilled(c, r, color, 20);
+}
+
+void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kind kind, const opt::Options& o,
+                float stay);
+
+void DrawAimTint(ImDrawList* dl, ImVec2 c, float scale, float age, Kind kind, const opt::Options& o) {
+    float life, hold;
+    PontoTiming(kind, &life, &hold);
+    if (!o.onAim || o.marker != 0 || o.crosshair != 1 || kind == KILL || age >= life) {
+        DrawCrosshair(dl, c, scale, o);
+        return;
+    }
+    float a = age < hold ? 1.0f : 1.0f - (age - hold) / (life - hold);
+    float pop = 0.6f * (1.0f - EaseOut(age / 0.1f));
+    DrawCrosshair(dl, c, scale, o, KindColor(kind, o), a, pop);
+}
+
+void DrawAimPreview(ImDrawList* dl, ImVec2 c, float scale, float age, Kind kind, const opt::Options& o) {
+    if (o.crosshair >= 1) {
+        DrawAimTint(dl, c, scale, age, kind, o);
+    } else {
+        dl->AddCircle(c, 11 * scale, IM_COL32(255, 255, 255, 150), 32, 1.4f * scale); // a do jogo, so para lembrar
+    }
+    DrawMarker(dl, c, o.marker, scale * o.markerSize / 100.0f, age, kind, o, 0);
 }
 
 void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kind kind, const opt::Options& o,
@@ -292,9 +330,8 @@ void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kin
             return;
         }
     }
-    if (style == 0) { // ponto: abate fica mais (o "morte" da Mira Centralizada durava 150 quadros)
-        life = kill ? 1.2f : kind == HEADSHOT ? 0.55f : 0.35f;
-        hold = kill ? 0.85f : kind == HEADSHOT ? 0.3f : 0.15f;
+    if (style == 0) {
+        PontoTiming(kind, &life, &hold);
     } else {
         life = kill ? 0.65f : style == 2 ? 0.2f : 0.32f;
         hold = kill ? 0.4f : style == 2 ? 0.08f : 0.16f;
@@ -313,7 +350,7 @@ void DrawMarker(ImDrawList* dl, ImVec2 c, int style, float scale, float age, Kin
     float s = scale;
     switch (style) {
     case 0:
-        Dot(dl, c, s, age, life, a, kind, o);
+        PontoDetails(dl, c, s, age, life, a, kind, o);
         break;
     case 1: // classico: o X do CoD
         Classic(dl, c, 8 * s * pop, 19 * s * pop * big, (kill ? 3.4f : 2.6f) * s, color, true);
@@ -439,8 +476,14 @@ void Draw(ImDrawList* dl, const State& st, const opt::Options& o, ImVec2 screen)
     }
 
     // o ponto do Trok (no lugar da mira do jogo) e o sinal de acerto, onde a mira esta neste quadro
-    if (o.crosshair == 1 && st.showCrosshair) {
-        DrawCrosshair(dl, st.crosshair, k, o);
+    if (o.crosshair >= 1 && st.showCrosshair) {
+        const Marker* latest = nullptr;
+        for (const Marker& m : st.markers) {
+            if (!latest || m.age < latest->age) {
+                latest = &m;
+            }
+        }
+        DrawAimTint(dl, st.crosshair, k, latest ? latest->age : 99.0f, latest ? latest->kind : HEALTH, o);
     }
     if (o.onAim) {
         float ms = k * o.markerSize / 100.0f;
