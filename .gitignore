@@ -26,3 +26,7 @@ trok-chat/test/out/
 # Trok Hitmarker
 trok-hit/build/
 trok-hit/test/out/
+
+# Trok Headmove
+trok-headmove/build/
+trok-headmove/test/out/
