@@ -2,7 +2,7 @@
 
 `/model <id>` cria o modelo flutuando um pouco à frente do seu personagem, girando devagar para você ver de todos os lados. Vale para objetos do `gta3.img`, do `gta_int.img` e do `samp.img`, e também para skins e veículos. É só na sua tela: nada vai para o servidor.
 
-**Estado:** v1.0, testado fora do jogo com um MoonLoader de mentira (`test/mock_run.lua`, 37 verificações). Falta o teste no jogo de verdade.
+**Estado:** v1.0, testado fora do jogo com um MoonLoader de mentira (`test/mock_run.lua`, 36 verificações). Falta o teste no jogo de verdade.
 
 ## Instalar
 
