@@ -265,6 +265,56 @@ body {
     top: 0;
 }
 
+/* canais ao vivo */
+
+.canal {
+    width: 212px;
+    height: 116px;
+    background-color: #173a3f;
+}
+
+.canal-nome {
+    position: absolute;
+    left: 14px;
+    top: 14px;
+    width: 184px;
+    height: 64px;
+    font-size: 23px;
+    line-height: 30px;
+    font-weight: bold;
+    color: #ffffff;
+    overflow: hidden;
+}
+
+.canal-selo {
+    position: absolute;
+    left: 14px;
+    top: 82px;
+    padding: 0 8px;
+    height: 22px;
+    line-height: 22px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffffff;
+    background-color: #d6342c;
+    -webkit-border-radius: 4px;
+    border-radius: 4px;
+}
+
+.canal.foco {
+    background-color: #1f525a;
+}
+
+/* barra de "continuar assistindo" nos pôsteres */
+
+.poster-progresso {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 6px;
+    background-color: #e5a00d;
+}
+
 /* previsão */
 
 .previsao {
@@ -434,6 +484,125 @@ body {
     font-size: 22px;
     color: #ffffff;
     background-color: rgba(30, 36, 48, 0.95);
+    -webkit-border-radius: 12px;
+    border-radius: 12px;
+}
+
+/* ---------- tocador de vídeo ---------- */
+
+#tocador {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+}
+
+#tocador.simulado {
+    background-color: #05070a;
+}
+
+#tocador-video {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+}
+
+#tocador-osd {
+    display: none;
+}
+
+#tocador-topo {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1160px;
+    padding: 36px 60px 26px 60px;
+    background-color: rgba(5, 7, 10, 0.70);
+}
+
+#tocador-selo {
+    display: none;
+    margin-right: 14px;
+    padding: 0 10px;
+    height: 30px;
+    line-height: 30px;
+    font-size: 17px;
+    font-weight: bold;
+    color: #ffffff;
+    background-color: #d6342c;
+    -webkit-border-radius: 5px;
+    border-radius: 5px;
+    vertical-align: middle;
+}
+
+#tocador-titulo {
+    font-size: 34px;
+    font-weight: bold;
+    vertical-align: middle;
+}
+
+#tocador-sub {
+    margin-top: 6px;
+    font-size: 21px;
+    color: #c9cfd9;
+}
+
+#tocador-base {
+    position: absolute;
+    left: 0;
+    top: 590px;
+    width: 1160px;
+    height: 94px;
+    padding: 18px 60px 18px 60px;
+    background-color: rgba(5, 7, 10, 0.70);
+}
+
+#tocador-barra {
+    position: relative;
+    width: 1160px;
+    height: 8px;
+    background-color: rgba(255, 255, 255, 0.25);
+    -webkit-border-radius: 4px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#tocador-progresso {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 8px;
+    background-color: #e5a00d;
+}
+
+#tocador-tempo {
+    margin-top: 12px;
+    font-size: 21px;
+    color: #e8ebf0;
+}
+
+#tocador-dicas {
+    margin-top: 8px;
+    font-size: 18px;
+    color: #9aa3b2;
+}
+
+#tocador-estado {
+    display: none;
+    position: absolute;
+    left: 290px;
+    top: 320px;
+    width: 660px;
+    padding: 18px 20px;
+    text-align: center;
+    font-size: 24px;
+    color: #ffffff;
+    background-color: rgba(5, 7, 10, 0.80);
     -webkit-border-radius: 12px;
     border-radius: 12px;
 }

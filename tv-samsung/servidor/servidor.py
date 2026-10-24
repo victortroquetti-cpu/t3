@@ -9,7 +9,9 @@ Roda no PC, na mesma rede da TV, e faz três coisas:
    servidor monta na hora a partir da pasta app/.
 2. Entrega clima (Open-Meteo) e filmes/séries em alta (TMDB) para o app. A TV de 2013
    nem sempre consegue HTTPS moderno, então o PC busca e repassa em HTTP simples.
-3. Mostra a pré-visualização do app no navegador: http://<IP do PC>/app/
+3. Toca vídeo: canais ao vivo do config.json (video.py) e os filmes e séries do
+   Jellyfin do PC (jellyfin.py), repassados à TV em HLS.
+4. Mostra a pré-visualização do app no navegador: http://<IP do PC>/app/
 
 Só usa a biblioteca padrão do Python 3.7+, sem instalar nada.
 
@@ -25,7 +27,6 @@ import os
 import re
 import shutil
 import socket
-import ssl
 import sys
 import threading
 import time
@@ -33,9 +34,14 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlparse
-from urllib.request import Request, urlopen
 
-VERSAO = "1.0.0"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import rede  # noqa: E402
+import video  # noqa: E402
+from jellyfin import JELLYFIN, id_valido  # noqa: E402
+
+VERSAO = rede.VERSAO
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PASTA_APP = os.path.join(RAIZ, "app")
@@ -61,6 +67,8 @@ TIPOS = {
 
 TAMANHOS_TMDB = ("w92", "w154", "w185", "w300", "w342", "w500", "w780")
 IMAGEM_TMDB = re.compile(r"^/api/img/(w\d+)/([A-Za-z0-9_-]{5,80}\.(?:jpg|png))$")
+IMAGEM_JELLYFIN = re.compile(r"^/api/jf/(img|fundo)/([0-9a-fA-F-]{8,40})$")
+REPASSE = re.compile(r"^/api/rel/([A-Za-z0-9_-]+)\.([a-z0-9]{2,4})$")
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="replace")
@@ -99,6 +107,8 @@ def config_publica(cfg):
         "longitude": float(cfg.get("longitude")),
         "apps": apps,
         "filmes": bool(cfg.get("tmdb_chave")),
+        "ao_vivo": bool(cfg.get("canais") or cfg.get("canais_listas")),
+        "jellyfin": JELLYFIN.configurado(cfg),
         "versao": VERSAO,
     }
 
@@ -117,54 +127,6 @@ def ip_local():
         s.close()
 
 
-def contexto_ssl():
-    try:
-        import certifi  # quando existir (macOS costuma precisar)
-        return ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        return ssl.create_default_context()
-
-
-SSL = contexto_ssl()
-
-
-def baixar(url, cabecalhos=None, limite=12):
-    pedido = Request(url, headers=dict({"User-Agent": "MinhaTV/" + VERSAO}, **(cabecalhos or {})))
-    with urlopen(pedido, timeout=limite, context=SSL) as resposta:
-        return resposta.read()
-
-
-def baixar_json(url, cabecalhos=None):
-    return json.loads(baixar(url, dict({"Accept": "application/json"}, **(cabecalhos or {}))).decode("utf-8"))
-
-
-class Cache:
-    """Guarda respostas por um tempo; se a internet falhar, devolve a última que deu certo."""
-
-    def __init__(self):
-        self.itens = {}
-        self.trava = threading.Lock()
-
-    def obter(self, chave, validade, buscar):
-        agora = time.time()
-        with self.trava:
-            item = self.itens.get(chave)
-        if item and agora - item[0] < validade:
-            return item[1]
-        try:
-            valor = buscar()
-        except Exception:
-            if item:
-                return item[1]
-            raise
-        with self.trava:
-            self.itens[chave] = (agora, valor)
-        return valor
-
-
-CACHE = Cache()
-
-
 # ---------------------------------------------------------------- clima e TMDB
 
 def clima(cfg):
@@ -176,8 +138,8 @@ def clima(cfg):
         "timezone": "auto",
         "forecast_days": 5,
     })
-    dados = CACHE.obter("clima:%s,%s" % (cfg["latitude"], cfg["longitude"]), 10 * 60,
-                        lambda: baixar_json("https://api.open-meteo.com/v1/forecast?" + consulta))
+    dados = rede.CACHE.obter("clima:%s,%s" % (cfg["latitude"], cfg["longitude"]), 10 * 60,
+                             lambda: rede.baixar_json("https://api.open-meteo.com/v1/forecast?" + consulta))
     return dict(dados, cidade=cfg.get("cidade") or "")
 
 
@@ -189,7 +151,7 @@ def tmdb(cfg, caminho, parametros):
         cabecalhos["Authorization"] = "Bearer " + chave
     else:  # "Chave da API" (v3)
         parametros["api_key"] = chave
-    return baixar_json("https://api.themoviedb.org/3" + caminho + "?" + urlencode(parametros), cabecalhos)
+    return rede.baixar_json("https://api.themoviedb.org/3" + caminho + "?" + urlencode(parametros), cabecalhos)
 
 
 def imagem(caminho, tamanho):
@@ -214,7 +176,7 @@ def em_alta(cfg, tipo):
                 "fundo": imagem(r.get("backdrop_path"), "w780"),
             })
         return {"itens": itens}
-    return CACHE.obter("alta:" + tipo, 60 * 60, buscar)
+    return rede.CACHE.obter("alta:" + tipo, 60 * 60, buscar)
 
 
 def duracao(minutos):
@@ -245,7 +207,7 @@ def titulo(cfg, tipo, id_titulo):
             "onde": onde,
             "fundo": imagem(r.get("backdrop_path"), "w780"),
         }
-    return CACHE.obter("titulo:%s:%s" % (tipo, id_titulo), 24 * 60 * 60, buscar)
+    return rede.CACHE.obter("titulo:%s:%s" % (tipo, id_titulo), 24 * 60 * 60, buscar)
 
 
 def imagem_tmdb(tamanho, arquivo):
@@ -253,7 +215,7 @@ def imagem_tmdb(tamanho, arquivo):
     pasta = os.path.join(PASTA_CACHE, "img")
     destino = os.path.join(pasta, "%s_%s" % (tamanho, arquivo))
     if not os.path.exists(destino):
-        dados = baixar("https://image.tmdb.org/t/p/%s/%s" % (tamanho, arquivo), limite=20)
+        dados = rede.baixar("https://image.tmdb.org/t/p/%s/%s" % (tamanho, arquivo), limite=20)
         os.makedirs(pasta, exist_ok=True)
         temporario = destino + ".tmp"
         with open(temporario, "wb") as f:
@@ -338,7 +300,7 @@ def widgetlist(tamanho_zip, endereco):
         '<widget id="%s">\n'
         '<title>%s</title>\n'
         '<compression size="%d" type="zip"/>\n'
-        '<description>Tela inicial limpa: apps, clima e filmes em alta.</description>\n'
+        '<description>Tela inicial limpa: apps, canais, seus vídeos, clima e filmes em alta.</description>\n'
         '<download>%s/%s</download>\n'
         '</widget>\n'
         '</list>\n'
@@ -405,6 +367,8 @@ class Pedido(BaseHTTPRequestHandler):
                 self.lista_de_widgets()
             elif caminho == "/" + ZIP_NOME:
                 self.pacote()
+            elif REPASSE.match(caminho):
+                self.repassar(*REPASSE.match(caminho).groups())
             elif caminho.startswith("/api/"):
                 self.api(caminho, consulta)
             elif caminho == "/app" or caminho == "/app/":
@@ -441,6 +405,46 @@ class Pedido(BaseHTTPRequestHandler):
         if self.command == "GET":
             self.avisar("A TV baixou o app (%d KB). Veja a TV: ela instala sozinha." % (len(dados) // 1024))
         self.responder(200, "application/zip", dados, {"Cache-Control": "no-cache"})
+
+    # ---- vídeo: repasse HLS do PC para a TV
+
+    def repassar(self, codigo, extensao):
+        try:
+            url = video.decodificar(codigo)
+        except ValueError:
+            self.erro_json(400, "endereço inválido")
+            return
+        if not video.REPASSE.permitido(url):
+            self.erro_json(403, "endereço fora da lista de canais")
+            return
+        try:
+            resposta = rede.abrir(url, limite=20)
+        except HTTPError as erro:
+            self.erro_json(502, "a fonte do vídeo respondeu %d" % erro.code)
+            return
+        except (URLError, socket.timeout, OSError) as erro:
+            self.avisar("Vídeo fora do ar (%s): %s" % (url[:60], erro))
+            self.erro_json(502, "a fonte do vídeo não respondeu")
+            return
+        with resposta:
+            if extensao == "m3u8":
+                texto = resposta.read().decode("utf-8", "replace")
+                corpo = video.reescrever(texto, resposta.geturl()).encode("utf-8")
+                self.responder(200, "application/vnd.apple.mpegurl", corpo, {"Cache-Control": "no-cache"})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", resposta.headers.get("Content-Type") or "video/mp2t")
+            if resposta.headers.get("Content-Length"):
+                self.send_header("Content-Length", resposta.headers.get("Content-Length"))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            if self.command == "HEAD":
+                return
+            while True:
+                pedaco = resposta.read(64 * 1024)
+                if not pedaco:
+                    break
+                self.wfile.write(pedaco)
 
     # ---- pré-visualização no navegador
 
@@ -506,6 +510,10 @@ a{color:#8fb6e8}code{background:#1b212b;padding:2px 6px;border-radius:4px}</styl
                     self.erro_json(503, "sem chave do TMDB no config.json")
                 else:
                     self.responder_json(titulo(cfg, tipo, id_titulo))
+            elif caminho.startswith("/api/canais") or caminho.startswith("/api/canal"):
+                self.api_canais(caminho, consulta, cfg)
+            elif caminho.startswith("/api/jellyfin/") or IMAGEM_JELLYFIN.match(caminho):
+                self.api_jellyfin(caminho, consulta, cfg)
             elif IMAGEM_TMDB.match(caminho):
                 tamanho, arquivo = IMAGEM_TMDB.match(caminho).groups()
                 if tamanho not in TAMANHOS_TMDB:
@@ -516,13 +524,62 @@ a{color:#8fb6e8}code{background:#1b212b;padding:2px 6px;border-radius:4px}</styl
             else:
                 self.erro_json(404, "não encontrado")
         except HTTPError as erro:
-            if erro.code == 401:
+            if erro.code == 401 and caminho.startswith("/api/jellyfin/"):
+                self.erro_json(502, "usuário ou senha do Jellyfin recusados")
+            elif erro.code == 401:
                 self.erro_json(502, "chave do TMDB recusada")
             else:
                 self.erro_json(502, "o serviço respondeu %d" % erro.code)
-        except (URLError, socket.timeout, OSError, ValueError) as erro:
+        except (URLError, socket.timeout, OSError, ValueError, KeyError) as erro:
             self.avisar("Falha ao buscar %s: %s" % (caminho, erro))
-            self.erro_json(502, "sem internet no PC")
+            if caminho.startswith("/api/jellyfin/") or caminho.startswith("/api/jf/"):
+                self.erro_json(502, "o Jellyfin não respondeu (ele está aberto no PC?)")
+            else:
+                self.erro_json(502, "sem internet no PC")
+
+    def api_canais(self, caminho, consulta, cfg):
+        canais = video.lista_de_canais(cfg)
+        if caminho == "/api/canais":
+            self.responder_json({"canais": [{"id": c["id"], "nome": c["nome"]} for c in canais]})
+            return
+        if caminho != "/api/canal":
+            self.erro_json(404, "não encontrado")
+            return
+        id_canal = (consulta.get("id") or [""])[0]
+        canal = next((c for c in canais if c["id"] == id_canal), None)
+        if not canal:
+            self.erro_json(404, "canal não encontrado")
+            return
+        endereco = video.endereco_para_tv(canal["url"], cfg.get("canais_pelo_pc", True) is not False)
+        self.responder_json(dict(endereco, nome=canal["nome"]))
+
+    def api_jellyfin(self, caminho, consulta, cfg):
+        if not JELLYFIN.configurado(cfg):
+            self.erro_json(503, "Jellyfin não configurado no config.json")
+            return
+        imagem = IMAGEM_JELLYFIN.match(caminho)
+        if imagem:
+            dados = JELLYFIN.imagem(cfg, imagem.group(2), imagem.group(1) == "fundo")
+            self.responder(200, TIPOS[".jpg"], dados, {"Cache-Control": "max-age=3600"})
+            return
+
+        def parametro(nome):
+            return (consulta.get(nome) or [""])[0]
+
+        item_id = parametro("id")
+        if caminho == "/api/jellyfin/inicio":
+            self.responder_json(JELLYFIN.inicio(cfg))
+        elif caminho == "/api/jellyfin/tocar" and id_valido(item_id):
+            dados = JELLYFIN.tocar(cfg, item_id, parametro("inicio") == "1")
+            dados["url"] = video.caminho_repasse(dados["url"], True)
+            self.responder_json(dados)
+        elif caminho == "/api/jellyfin/relatorio" and id_valido(item_id) and \
+                parametro("evento") in ("inicio", "progresso", "fim"):
+            JELLYFIN.relatar(cfg, parametro("evento"), item_id, parametro("fonte") or item_id,
+                             parametro("sessao"), int(parametro("ms") or 0), parametro("pausado") == "1")
+            self.responder_json({"ok": True})
+        else:
+            self.erro_json(400, "pedido inválido")
 
 
 # ---------------------------------------------------------------- início
@@ -572,11 +629,20 @@ def main():
     print(" Pré-visualização ... %s/app/" % servidor.endereco_publico())
     print(" Cidade do clima .... %s" % (cfg.get("cidade") or "?"))
     print(" Filmes em alta ..... %s" % ("ligado" if cfg["tmdb_chave"] else "desligado (falta a chave do TMDB no config.json)"))
+    if cfg.get("canais") or cfg.get("canais_listas"):
+        canais = "%d no config.json" % len(cfg.get("canais") or [])
+        if cfg.get("canais_listas"):
+            canais += " + %d lista(s) M3U" % len(cfg["canais_listas"])
+    else:
+        canais = "nenhum (veja 'Canais ao vivo' no README)"
+    print(" Canais ao vivo ..... %s" % canais)
+    print(" Jellyfin ........... %s" % (JELLYFIN.dados(cfg)[0] if JELLYFIN.configurado(cfg)
+                                         else "desligado (falta usuário e senha no config.json)"))
     print(linha)
     print(" Na TV (logada como 'develop'):")
     print("   Smart Hub > Apps > Mais Apps > Opções > Configuração de IP > %s" % ip)
     print("   Opções > Iniciar sincronização de apps")
-    print(" Deixe esta janela aberta: o clima e os filmes da TV passam por aqui.")
+    print(" Deixe esta janela aberta: clima, filmes e vídeos da TV passam por aqui.")
     print(" Para desligar: Ctrl+C")
     print(linha)
     if ip.startswith("127.") or ip.startswith("169.254."):

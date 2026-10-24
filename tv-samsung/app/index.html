@@ -8,11 +8,13 @@
 	<script type="text/javascript" src="$MANAGER_WIDGET/Common/API/Widget.js"></script>
 	<script type="text/javascript" src="$MANAGER_WIDGET/Common/API/TVKeyValue.js"></script>
 	<script type="text/javascript" src="$MANAGER_WIDGET/Common/API/Plugin.js"></script>
+	<script type="text/javascript" src="$MANAGER_WIDGET/Common/webapi/1.0/webapis.js"></script>
 
 	<!-- js/config.js é gerado pelo servidor do PC (endereço do PC, cidade, apps). -->
 	<script type="text/javascript" charset="utf-8" src="js/config.js"></script>
 	<script type="text/javascript" charset="utf-8" src="js/tv.js"></script>
 	<script type="text/javascript" charset="utf-8" src="js/dados.js"></script>
+	<script type="text/javascript" charset="utf-8" src="js/player.js"></script>
 	<script type="text/javascript" charset="utf-8" src="js/home.js"></script>
 
 	<link rel="stylesheet" type="text/css" href="css/home.css">
@@ -60,6 +62,24 @@
 		</div>
 
 		<div id="aviso"></div>
+	</div>
+
+	<!-- Tocador: o vídeo da TV fica por baixo da página; aqui só o painel por cima. -->
+	<div id="tocador">
+		<div id="tocador-video"></div>
+		<div id="tocador-osd">
+			<div id="tocador-topo">
+				<span id="tocador-selo">AO VIVO</span>
+				<span id="tocador-titulo"></span>
+				<div id="tocador-sub"></div>
+			</div>
+			<div id="tocador-base">
+				<div id="tocador-barra"><div id="tocador-progresso"></div></div>
+				<div id="tocador-tempo"></div>
+				<div id="tocador-dicas"></div>
+			</div>
+		</div>
+		<div id="tocador-estado"></div>
 	</div>
 </body>
 </html>

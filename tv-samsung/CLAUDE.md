@@ -49,6 +49,24 @@ ele (ou com um Claude rodando no PC dele).
 - `$MANAGER_WIDGET/Common/API/*.js` só existem na TV. Fora dela, o `tv.js` usa o teclado
   do PC (setas, Enter, Backspace = RETURN, R = vermelho).
 
+## Vídeo (canais e Jellyfin)
+
+- `app/js/player.js` (`Tocador`) usa `webapis.avplay` (`$MANAGER_WIDGET/Common/webapi/1.0/webapis.js`):
+  `getAVPlay` → `init({containerID, displayRect, bufferingCallback, playCallback})` → `open(url)` →
+  `play(ok, erro)`; `stop/pause/resume/jumpForward/jumpBackward`. HLS precisa do sufixo
+  `|COMPONENT=HLS`. O vídeo fica **por baixo** da página: enquanto toca, `#tela` some e o
+  `body` fica transparente. Nunca feche o app com vídeo tocando (`Home.encerrar` para o vídeo).
+- Toda URL de vídeo para a TV passa por `/api/rel/<base64>.<ext>` (`servidor/video.py`): o PC
+  baixa a playlist, reescreve os endereços para o repasse e entrega em HTTP simples. Só passam
+  servidores vindos do `config.json` ou de playlists já repassadas.
+- Canais vêm só do `config.json` (`canais`, `canais_listas`). **Não coloque listas de canais
+  no projeto**: quem escolhe as fontes é o usuário, e só transmissões oficiais e gratuitas.
+  Canais abertos comerciais: antena.
+- Jellyfin (`servidor/jellyfin.py`): entra com usuário e senha (`AuthenticateByName`), lista
+  Resume, NextUp e Latest (com o caminho novo do 10.9 como alternativa) e pede
+  `master.m3u8` em H.264 + AAC estéreo, até 1080p, com `StartTimeTicks` para continuar. O app
+  relata início, progresso (30 s) e fim em `/api/jellyfin/relatorio`, e o fim apaga a conversão.
+
 ## Rodar e testar
 
 ```
@@ -59,6 +77,9 @@ python3 ferramentas/verificar.py          # ES5, CSS e pacote, antes de mandar s
 python3 ferramentas/gerar_imagens.py      # redesenha os ícones (precisa do Pillow)
 ```
 
+Para testar sem a TV: simule também `window.webapis.avplay` (getAVPlay devolvendo um objeto com
+`init/open/play/stop/pause/resume/jumpForward/jumpBackward`) e confira os endereços abertos.
+
 O Playwright (quando houver) abre a pré-visualização em 1280x720. Para simular a TV,
 injete um `window.Common.API` falso (Widget, TVKeyValue com os códigos da TV, Plugin) e
 dispare `keydown` com o `keyCode` na `#ancora`.
@@ -68,6 +89,10 @@ dispare `keydown` com o `keyCode` na `#ancora`.
 - `app/`: o que vai para a TV (`config.xml`, `index.html`, `css/`, `js/`, `img/`, `icon/`).
 - `servidor/servidor.py`: instalação (`/widgetlist.xml`, `/MinhaTV.zip`), pré-visualização
   (`/app/`) e API (`/api/status`, `/api/config`, `/api/clima`, `/api/em-alta`,
-  `/api/titulo`, `/api/img/<tamanho>/<arquivo>`, com cache em `.cache/`).
+  `/api/titulo`, `/api/img/<tamanho>/<arquivo>`, `/api/canais`, `/api/canal`, `/api/rel/...`,
+  `/api/jellyfin/inicio|tocar|relatorio`, `/api/jf/img|fundo/<id>`, com cache em `.cache/`).
+- `servidor/rede.py` (internet, cache e `VERSAO`), `servidor/video.py`, `servidor/jellyfin.py`.
 - `config.exemplo.json` vira `config.json` (fora do git) na primeira execução.
-- Ao mudar o app, suba a `<ver>` do `config.xml` e a `VERSAO` do servidor.
+- Ao mudar o app, suba a `<ver>` do `config.xml` e a `VERSAO` em `servidor/rede.py`.
+- Em `app/js/dados.js`, a fila de pedidos se chama `pedidos`: não crie outra variável com o
+  nome de uma função exportada (uma `var` sobrescreve a função de mesmo nome).

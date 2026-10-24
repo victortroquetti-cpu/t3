@@ -39,8 +39,16 @@ var TV = (function () {
         liga(teclas.KEY_YELLOW, 'amarelo');
         liga(teclas.KEY_BLUE, 'azul');
         liga(teclas.KEY_INFO, 'info');
+        liga(teclas.KEY_CH_UP, 'canal+');
+        liga(teclas.KEY_CH_DOWN, 'canal-');
+        liga(teclas.KEY_PLAY, 'play');
+        liga(teclas.KEY_PAUSE, 'pausa');
+        liga(teclas.KEY_STOP, 'parar');
+        liga(teclas.KEY_FF, 'avancar');
+        liga(teclas.KEY_RW, 'retroceder');
     } else {
-        // Pré-visualização: setas, Enter, Backspace (RETURN), Esc (EXIT), R/G/Y/B (cores).
+        // Pré-visualização: setas, Enter, Backspace (RETURN), Esc (EXIT), R/G/Y/B (cores),
+        // PageUp/PageDown (canal), P (play/pausa), S (parar), vírgula e ponto (voltar/avançar).
         liga(37, 'esquerda');
         liga(39, 'direita');
         liga(38, 'cima');
@@ -53,6 +61,12 @@ var TV = (function () {
         liga(89, 'amarelo');
         liga(66, 'azul');
         liga(73, 'info');
+        liga(33, 'canal+');
+        liga(34, 'canal-');
+        liga(80, 'play');
+        liga(83, 'parar');
+        liga(190, 'avancar');
+        liga(188, 'retroceder');
     }
 
     function acao(codigo) {

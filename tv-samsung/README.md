@@ -1,8 +1,8 @@
 # Minha TV: tela inicial para a Samsung UN46F6400 (2013)
 
 Uma tela limpa e rápida para a sua Samsung: relógio, clima, atalhos para os apps,
-filmes e séries em alta e a previsão da semana. Sem anúncios, sem root e sem mexer no
-sistema da TV.
+canais ao vivo, os filmes e séries do seu PC (Jellyfin), filmes em alta e a previsão da
+semana. Sem anúncios, sem root e sem mexer no sistema da TV.
 
 ![Prévia da tela inicial no navegador do PC, com pôsteres de exemplo](docs/previa.png)
 
@@ -18,7 +18,9 @@ com o mesmo espírito.
 
 - um app em tela cheia com relógio, clima, apps, filmes/séries em alta e previsão;
 - abrir os apps da TV (YouTube, Netflix...) direto pelo Minha TV;
-- ver detalhes de um filme e "onde assistir" no Brasil, com um botão para abrir o app.
+- ver detalhes de um filme e "onde assistir" no Brasil, com um botão para abrir o app;
+- assistir canais ao vivo que você escolher (veja [Canais ao vivo](#canais-ao-vivo));
+- assistir os filmes e séries do PC, com "continuar de onde parou" (veja [Meus vídeos](#meus-vídeos-jellyfin)).
 
 **O que não dá, numa TV de 2013 sem root:**
 
@@ -34,13 +36,14 @@ nos apps recentes do Smart Hub.
  PC (cabo de rede)                                    TV (Wi-Fi, mesmo roteador)
  ┌─────────────────────────┐   1. instala o app     ┌──────────────────────┐
  │ servidor/servidor.py    │ ─────────────────────► │ Smart Hub "develop"  │
- │  • monta o MinhaTV.zip  │   2. clima e filmes    │  └ app Minha TV      │
- │  • busca clima e TMDB   │ ◄───────────────────── │                      │
+ │  • monta o MinhaTV.zip  │   2. clima, filmes,    │  └ app Minha TV      │
+ │  • busca clima e TMDB   │      canais e vídeos   │                      │
+ │  • repassa o vídeo      │ ◄───────────────────── │                      │
  └─────────────────────────┘                        └──────────────────────┘
 ```
 
 A TV de 2013 nem sempre consegue acessar sites modernos (HTTPS novo), por isso o PC
-busca o clima e os filmes e repassa para a TV. **Com o PC desligado, o app continua
+busca o clima, os filmes e o vídeo e repassa para a TV. **Com o PC desligado, o app continua
 abrindo**: o relógio e os apps funcionam, e o clima tenta ir direto ao Open-Meteo.
 
 ## Passo 1: baixar o projeto no PC
@@ -75,6 +78,9 @@ Para ver a tela no navegador do PC antes de ir para a TV, abra `http://<IP do PC
 Use as setas, Enter (OK), Backspace (RETURN) e a tecla R (botão vermelho).
 
 ## Passo 3: entrar como "develop" na TV
+
+> Vai fazer a limpeza do Smart Hub (veja [Otimização](#otimização))? Faça **antes** deste
+> passo: ela apaga o login "develop" e os apps instalados por ele.
 
 É o "modo desenvolvedor" das Samsung de 2013. Não muda nada no sistema e dá para
 desfazer.
@@ -113,6 +119,16 @@ app"*. A TV instala sozinha em alguns segundos.
 | INFO | Mostrar a versão e o IP do PC |
 | Volume e mudo | Continuam com a TV |
 
+Vendo um vídeo ou canal:
+
+| Botão do controle | O que faz |
+|---|---|
+| Cima/baixo ou CH +/- | Trocar de canal (ao vivo) |
+| OK, PLAY ou PAUSE | Pausar e continuar (vídeos do PC) |
+| Esquerda/direita | Voltar 10 s / avançar 30 s |
+| ⏪ / ⏩ | Voltar / avançar 1 minuto |
+| RETURN ou STOP | Parar e voltar para a tela inicial |
+
 ## Personalizar
 
 O servidor cria o arquivo `config.json` na primeira vez que roda:
@@ -127,7 +143,11 @@ O servidor cria o arquivo `config.json` na primeira vez que roda:
   "apps": [
     { "nome": "YouTube", "id": "111299001912", "cor": "#c4302b" },
     { "nome": "Netflix", "id": "11101200001", "cor": "#b20710" }
-  ]
+  ],
+  "canais": [],
+  "canais_listas": [],
+  "canais_pelo_pc": true,
+  "jellyfin": { "endereco": "http://localhost:8096", "usuario": "", "senha": "" }
 }
 ```
 
@@ -140,9 +160,77 @@ O servidor cria o arquivo `config.json` na primeira vez que roda:
 - **Apps:** cada app da TV tem um ID. Os de YouTube e Netflix acima são os conhecidos para
   as Samsung antigas. Para incluir outros, diga quais apps aparecem no seu Smart Hub.
 
+Os canais e o Jellyfin têm seções próprias logo abaixo.
+
 Mudou o `config.json`? Feche e abra o servidor de novo. A cidade e os apps mudam na
 próxima vez que você abrir o Minha TV, **sem reinstalar**. Mudanças no visual ou no código
 precisam de uma nova sincronização (passo 4, item 5).
+
+## Canais ao vivo
+
+O Minha TV toca transmissões em **HLS** (endereços que terminam em `.m3u8`), o formato que
+as emissoras usam nos sites "ao vivo". Você escolhe os canais e coloca no `config.json`:
+
+```json
+"canais": [
+  { "nome": "Nome do canal", "url": "https://endereço-da-transmissão/playlist.m3u8" },
+  { "nome": "Outro canal", "url": "https://..." }
+],
+"canais_listas": [ "https://endereço-de-uma-lista.m3u" ]
+```
+
+- `canais`: um por linha, com nome e endereço.
+- `canais_listas`: listas no formato M3U (até 300 canais por lista), se preferir.
+- `canais_pelo_pc`: deixe `true`. O vídeo passa pelo PC, que resolve o HTTPS moderno que a
+  TV não entende. Com `false`, a TV tenta abrir direto.
+
+Use só transmissões **oficiais e gratuitas** (as próprias emissoras, TVs públicas e
+legislativas). Para **Globo, SBT, Record, Band e os outros canais abertos**, o jeito
+gratuito e legal é uma **antena digital**: a sua TV já tem o receptor, e o botão
+**Ver TV** do Minha TV leva direto para ela.
+
+## Meus vídeos (Jellyfin)
+
+O [Jellyfin](https://jellyfin.org) é um servidor de mídia grátis: ele organiza os filmes e
+as séries que estão no seu PC, com capa e sinopse, e o Minha TV mostra tudo em três
+linhas: **Continuar assistindo**, **Próximos episódios** e **Filmes adicionados**.
+
+1. Baixe o **Jellyfin Server** para Windows em [jellyfin.org/downloads](https://jellyfin.org/downloads)
+   e instale.
+2. Abra `http://localhost:8096` no navegador e siga o assistente: idioma português, crie um
+   **usuário e senha** e adicione as pastas dos seus vídeos (Filmes, Séries).
+3. No `config.json`, preencha:
+   ```json
+   "jellyfin": { "endereco": "http://localhost:8096", "usuario": "seu usuário", "senha": "sua senha" }
+   ```
+4. Reinicie o servidor do Minha TV.
+
+O Jellyfin converte cada vídeo para o formato que a TV de 2013 toca (H.264 e som AAC, até
+1080p), e o vídeo passa pelo servidor do Minha TV. Quando você para um vídeo, o Jellyfin
+guarda onde parou. Converter usa o processador do PC; se travar, diminua a qualidade no
+Jellyfin (*Painel → Reprodução*).
+
+## Otimização
+
+**Sem root, dá para fazer já:**
+
+1. **Limpar o Smart Hub:** *MENU → Recursos Smart → Redefinir Smart Hub* (a senha padrão
+   é `0000`). Apaga os apps que você baixou, as contas e o cache, e o Smart Hub volta como
+   novo. Faça **antes** do passo 3.
+2. **Apagar os apps que não usa:** no Smart Hub, selecione o app, segure OK (ou aperte
+   TOOLS) até aparecer o menu e escolha **Excluir**. Os apps que vieram de fábrica (a loja Samsung Apps, por exemplo) não
+   saem sem root.
+3. **Desligar a atualização automática de software** (*MENU → Suporte → Atualização de
+   software*). Isso mantém a TV como está, o que também protege o root.
+
+Apagar apps libera espaço, mas **quase não libera memória RAM**: nesta TV, app fechado não
+roda em segundo plano. Quem ocupa a memória é o próprio sistema e o Smart Hub. O ganho de
+velocidade vem de usar o Minha TV no lugar do Smart Hub e de limpar o que o sistema carrega
+ao ligar, e esta segunda parte precisa de root.
+
+**Com root (SamyGO):** dá para ver quais programas ocupam a memória, tirar apps de fábrica
+como a loja, bloquear os servidores antigos da Samsung que a TV fica esperando e fazer o
+Minha TV abrir ao ligar. Isso é a próxima etapa.
 
 ## Se algo der errado
 
@@ -159,6 +247,11 @@ precisam de uma nova sincronização (passo 4, item 5).
 - **"Sem conexão com o PC" no topo do app:** o servidor está fechado ou o PC está desligado.
 - **Os filmes não aparecem:** falta a chave do TMDB, a chave está errada, ou o PC está sem
   internet. A própria tela do app explica qual dos casos é.
+- **Um canal não toca:** a transmissão pode estar fora do ar, ter mudado de endereço ou
+  usar um formato que a TV de 2013 não toca (H.265 ou HLS muito novo). A janela do servidor
+  mostra quando a fonte não responde. Teste o endereço no VLC do PC.
+- **"Usuário ou senha do Jellyfin recusados":** confira o `config.json`. **"O Jellyfin não
+  respondeu":** veja se o Jellyfin está aberto no PC (`http://localhost:8096`).
 
 ## Desfazer tudo
 
@@ -176,9 +269,13 @@ Nada mais na TV foi alterado.
 | [`app/js/home.js`](app/js/home.js) | A tela: linhas, foco, clima, detalhe dos filmes |
 | [`app/js/tv.js`](app/js/tv.js) | O que é da TV: teclas, abrir apps, volume |
 | [`app/js/dados.js`](app/js/dados.js) | Os pedidos ao servidor do PC |
+| [`app/js/player.js`](app/js/player.js) | O tocador de vídeo (canais e Jellyfin) |
 | [`app/css/home.css`](app/css/home.css) | O visual |
 | [`app/config.xml`](app/config.xml) | Nome, ícones e tamanho do app para o Smart Hub |
 | [`servidor/servidor.py`](servidor/servidor.py) | O servidor do PC (instalação, clima, TMDB) |
+| [`servidor/video.py`](servidor/video.py) | Canais ao vivo e o repasse do vídeo para a TV |
+| [`servidor/jellyfin.py`](servidor/jellyfin.py) | A conversa com o Jellyfin |
+| [`servidor/rede.py`](servidor/rede.py) | Acesso à internet e cache |
 | [`ferramentas/verificar.py`](ferramentas/verificar.py) | Confere se o app vai rodar na TV antiga |
 | [`ferramentas/gerar_imagens.py`](ferramentas/gerar_imagens.py) | Desenha os ícones |
 
@@ -193,6 +290,7 @@ As regras da TV antiga (JavaScript ES5, CSS simples, memória curta) estão em
   e [SamsungTV_IPTV](https://github.com/oasenov/SamsungTV_IPTV).
 - A ideia e o visual se inspiram no [Free My TV](https://github.com/simbasjungles/free-my-tv) (MIT).
 - Clima: [Open-Meteo](https://open-meteo.com/) (CC BY 4.0).
+- Vídeos do PC: [Jellyfin](https://jellyfin.org) (GPL), que roda à parte no seu PC.
 - Filmes e séries: este produto usa a API do TMDB, mas não é endossado nem certificado pelo
   [TMDB](https://www.themoviedb.org/).
 - Não é afiliado à Samsung nem aos serviços de streaming. Os nomes dos apps pertencem aos

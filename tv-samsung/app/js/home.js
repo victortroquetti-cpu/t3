@@ -1,5 +1,6 @@
 /*
- * A tela inicial: relógio, clima, prateleira de apps, filmes e séries em alta e previsão.
+ * A tela inicial: relógio, clima, apps, canais ao vivo, vídeos do Jellyfin, filmes e séries
+ * em alta e previsão. O vídeo em si fica com o js/player.js.
  * Tela fixa de 1280x720. Navegação por linhas (cima/baixo) e itens (esquerda/direita).
  *
  * ES5 puro e DOM simples: a TV de 2013 tem um navegador antigo e pouca memória.
@@ -14,6 +15,7 @@ var Home = (function () {
     // Tamanho dos itens de cada tipo de linha: largura, altura e espaço entre eles.
     var GEOMETRIA = {
         apps: { largura: 220, altura: 124, espaco: 24 },
+        canais: { largura: 220, altura: 124, espaco: 24 },
         posters: { largura: 150, altura: 225, espaco: 22 },
         previsao: { largura: 190, altura: 150, espaco: 22 },
         aviso: { largura: 760, altura: 110, espaco: 0 }
@@ -35,6 +37,10 @@ var Home = (function () {
         filmes: null,
         series: null,
         erroFilmes: null,
+        canais: null,
+        erroCanais: null,
+        jf: null,
+        erroJf: null,
         fundoAtual: '',
         fundoTimer: null,
         avisoTimer: null,
@@ -103,6 +109,22 @@ var Home = (function () {
 
     function numero(valor) {
         return Math.round(Number(valor));
+    }
+
+    // 3725000 -> "1:02:05"
+    function relogioVideo(ms) {
+        var s = Math.floor(ms / 1000);
+        var h = Math.floor(s / 3600);
+        var m = Math.floor((s % 3600) / 60);
+        s = s % 60;
+        return (h ? h + ':' + doisDigitos(m) : String(m)) + ':' + doisDigitos(s);
+    }
+
+    // 6300000 -> "1h 45min"
+    function duracaoVideo(ms) {
+        var minutos = Math.round(ms / 60000);
+        var h = Math.floor(minutos / 60);
+        return h ? h + 'h ' + doisDigitos(minutos % 60) + 'min' : minutos + ' min';
     }
 
     // ---------- relógio ----------
@@ -259,9 +281,52 @@ var Home = (function () {
         return linhaAviso(id, titulo, 'Carregando ' + nomeTipo + ' em alta...');
     }
 
+    function linhaCanais() {
+        var canais = estado.canais;
+        if (canais && canais.length) {
+            return { id: 'canais', titulo: 'Ao vivo', tipo: 'canais', itens: canais };
+        }
+        if (estado.pcOnline === false) {
+            return linhaAviso('canais', 'Ao vivo', 'O PC está desligado ou fora da rede: os canais passam por ele.');
+        }
+        if (canais) {
+            return linhaAviso('canais', 'Ao vivo', 'Nenhum canal ainda. Coloque os canais no config.json do PC (veja "Canais ao vivo" no README).');
+        }
+        return linhaAviso('canais', 'Ao vivo', estado.erroCanais ? 'Não deu para carregar os canais: ' + estado.erroCanais : 'Carregando os canais...');
+    }
+
+    function linhasJellyfin() {
+        if (!cfg().jellyfin) {
+            return [linhaAviso('jf', 'Meus vídeos', 'Para ver aqui os filmes e séries do PC, instale o Jellyfin no PC e coloque o usuário e a senha no config.json.')];
+        }
+        var jf = estado.jf;
+        if (!jf) {
+            if (estado.pcOnline === false) {
+                return [linhaAviso('jf', 'Meus vídeos', 'O PC está desligado ou fora da rede.')];
+            }
+            return [linhaAviso('jf', 'Meus vídeos', estado.erroJf ? 'Não deu para abrir o Jellyfin: ' + estado.erroJf : 'Carregando seus vídeos...')];
+        }
+        var linhas = [];
+        if (jf.continuar && jf.continuar.length) {
+            linhas.push({ id: 'jf-continuar', titulo: 'Continuar assistindo', tipo: 'posters', itens: jf.continuar });
+        }
+        if (jf.proximos && jf.proximos.length) {
+            linhas.push({ id: 'jf-proximos', titulo: 'Próximos episódios', tipo: 'posters', itens: jf.proximos });
+        }
+        if (jf.filmes && jf.filmes.length) {
+            linhas.push({ id: 'jf-filmes', titulo: 'Filmes adicionados', tipo: 'posters', itens: jf.filmes });
+        }
+        if (!linhas.length) {
+            linhas.push(linhaAviso('jf', 'Meus vídeos', 'A biblioteca do Jellyfin ainda está vazia.'));
+        }
+        return linhas;
+    }
+
     function montarLinhas() {
         var linhas = [];
         linhas.push({ id: 'apps', titulo: 'Apps', tipo: 'apps', itens: itensApps() });
+        linhas.push(linhaCanais());
+        linhas = linhas.concat(linhasJellyfin());
 
         if (cfg().filmes) {
             linhas.push(linhaTitulos('filmes', 'Em alta: filmes', estado.filmes, 'filmes'));
@@ -295,10 +360,19 @@ var Home = (function () {
             return '<div class="item app"' + id + ' style="' + pos + 'background-color:' + item.cor + ';">' +
                 '<div class="app-nome">' + esc(item.nome) + '</div></div>';
         }
+        if (linha.tipo === 'canais') {
+            return '<div class="item canal"' + id + ' style="' + pos + '">' +
+                '<div class="canal-nome">' + esc(item.nome) + '</div><div class="canal-selo">AO VIVO</div></div>';
+        }
         if (linha.tipo === 'posters') {
+            var progresso = '';
+            if (item.posicao_ms && item.duracao_ms) {
+                progresso = '<div class="poster-progresso" style="width:' + Math.min(100, Math.round(item.posicao_ms * 100 / item.duracao_ms)) + '%"></div>';
+            }
             return '<div class="item poster"' + id + ' style="' + pos + '">' +
                 '<div class="poster-nome">' + esc(item.titulo) + '</div>' +
-                '<img class="poster-img" id="img-' + linha.id + '-' + i + '" width="142" height="217" style="visibility:hidden" onload="this.style.visibility=\'visible\'"></div>';
+                '<img class="poster-img" id="img-' + linha.id + '-' + i + '" width="142" height="217" style="visibility:hidden" onload="this.style.visibility=\'visible\'">' +
+                progresso + '</div>';
         }
         if (linha.tipo === 'previsao') {
             return '<div class="item previsao"' + id + ' style="' + pos + '">' +
@@ -387,7 +461,11 @@ var Home = (function () {
         if (linha.tipo === 'posters') {
             carregarImagens(linha);
             var item = linha.itens[coluna];
-            $('sub-' + linha.id).innerHTML = item ? esc('  ·  ' + item.titulo + (item.ano ? ' (' + item.ano + ')' : '')) : '';
+            var sub = '';
+            if (item) {
+                sub = item.subtitulo ? item.titulo + ' \u00b7 ' + item.subtitulo : item.titulo + (item.ano ? ' (' + item.ano + ')' : '');
+            }
+            $('sub-' + linha.id).innerHTML = sub ? esc('  \u00b7  ' + sub) : '';
             trocarFundoDepois(item ? item.fundo : '');
         }
         limparSubtitulos(linha.id);
@@ -459,9 +537,13 @@ var Home = (function () {
         }
         if (linha.tipo === 'apps') {
             abrirApp(item);
+        } else if (linha.tipo === 'canais') {
+            assistirCanal(estado.colunas[linha.id] || 0);
+        } else if (linha.tipo === 'posters' && item.tipo === 'jellyfin') {
+            abrirDetalheJellyfin(item);
         } else if (linha.tipo === 'posters') {
             abrirDetalhe(item);
-        } else if (linha.id === 'filmes' || linha.id === 'series' || linha.id === 'previsao') {
+        } else {
             atualizarTudo();
         }
     }
@@ -479,6 +561,96 @@ var Home = (function () {
         if (!TV.abrirApp(item.id)) {
             aviso('Não consegui abrir ' + item.nome + ' (ID ' + item.id + ').', 5000);
         }
+    }
+
+    // ---------- vídeo: canais e Jellyfin ----------
+
+    function assistirCanal(indice) {
+        var canais = estado.canais || [];
+        if (!canais.length) {
+            return;
+        }
+        indice = (indice + canais.length) % canais.length;
+        var canal = canais[indice];
+        estado.colunas.canais = indice;
+        Dados.canal(canal.id, function (erro, r) {
+            if (erro) {
+                if (Tocador.ativo()) {
+                    Tocador.mensagem('Não consegui abrir ' + canal.nome + ': ' + erro);
+                } else {
+                    aviso('Não consegui abrir ' + canal.nome + ': ' + erro, 6000);
+                }
+                return;
+            }
+            Tocador.tocar({
+                titulo: canal.nome,
+                subtitulo: 'Canal ' + (indice + 1) + ' de ' + canais.length,
+                url: Dados.endereco(r.url),
+                hls: !!r.hls,
+                aoVivo: true,
+                trocarCanal: function (passo) {
+                    assistirCanal(indice + passo);
+                },
+                aoFechar: function () {
+                    focarAncora();
+                    aplicarFoco(true);
+                }
+            });
+        });
+    }
+
+    function abrirDetalheJellyfin(item) {
+        var botoes = [];
+        if (item.posicao_ms > 0) {
+            botoes.push({ nome: 'Continuar de ' + relogioVideo(item.posicao_ms), acao: 'jellyfin', doInicio: false });
+            botoes.push({ nome: 'Do início', acao: 'jellyfin', doInicio: true });
+        } else {
+            botoes.push({ nome: 'Assistir', acao: 'jellyfin', doInicio: true });
+        }
+        botoes.push({ nome: 'Voltar', acao: 'voltar' });
+        estado.detalhe = { item: item, botoes: botoes, foco: 0 };
+        $('detalhe-fundo').style.backgroundImage = item.fundo ? 'url(' + Dados.imagem(item.fundo) + ')' : 'none';
+        $('detalhe-titulo').innerHTML = esc(item.titulo);
+        desenharDetalhe({
+            extra: item.subtitulo,
+            ano: item.ano,
+            duracao: item.duracao_ms ? duracaoVideo(item.duracao_ms) : '',
+            sinopse: item.sinopse,
+            onde: 'pc'
+        });
+        mostrar($('detalhe'), true);
+    }
+
+    function assistirJellyfin(item, doInicio) {
+        aviso('Abrindo ' + item.titulo + '...');
+        Dados.jellyfinTocar(item.id, doInicio, function (erro, r) {
+            if (erro) {
+                aviso('Não consegui abrir o vídeo: ' + erro, 6000);
+                return;
+            }
+            fecharDetalhe();
+            var sessao = { id: item.id, fonte: r.fonte, sessao: r.sessao };
+            Tocador.tocar({
+                titulo: r.titulo || item.titulo,
+                subtitulo: r.subtitulo || item.subtitulo,
+                url: Dados.endereco(r.url),
+                hls: true,
+                aoVivo: false,
+                inicioMs: r.inicio_ms || 0,
+                duracaoMs: r.duracao_ms || item.duracao_ms || 0,
+                aoComecar: function () {
+                    Dados.jellyfinRelatorio('inicio', sessao, r.inicio_ms || 0, false);
+                },
+                aoProgresso: function (ms, pausado) {
+                    Dados.jellyfinRelatorio('progresso', sessao, ms, pausado);
+                },
+                aoFechar: function (ms) {
+                    focarAncora();
+                    // Primeiro o Jellyfin guarda onde parou, depois a lista "continuar" é atualizada.
+                    Dados.jellyfinRelatorio('fim', sessao, ms, false, buscarJellyfin);
+                }
+            });
+        });
     }
 
     // ---------- detalhe de um filme/série ----------
@@ -530,6 +702,7 @@ var Home = (function () {
 
     function desenharDetalhe(d) {
         var info = [];
+        if (d.extra) { info.push(d.extra); }
         if (d.ano) { info.push(d.ano); }
         if (d.nota) { info.push('Nota ' + String(d.nota).replace('.', ',')); }
         if (d.duracao) { info.push(d.duracao); }
@@ -545,6 +718,8 @@ var Home = (function () {
         var onde;
         if (d.erro) {
             onde = 'Não deu para ver onde assistir (' + d.erro + ').';
+        } else if (d.onde === 'pc') {
+            onde = 'No seu PC (Jellyfin)';
         } else if (d.onde === null) {
             onde = 'Procurando onde assistir...';
         } else if (d.onde.length) {
@@ -582,6 +757,8 @@ var Home = (function () {
             var botao = det.botoes[det.foco];
             if (botao.app) {
                 abrirApp(botao.app);
+            } else if (botao.acao === 'jellyfin') {
+                assistirJellyfin(det.item, botao.doInicio);
             } else {
                 fecharDetalhe();
             }
@@ -617,6 +794,8 @@ var Home = (function () {
                 buscarConfiguracao();
                 buscarClima();
                 buscarFilmes();
+                buscarCanais();
+                buscarJellyfin();
             }
             desenharLinhas();
         }
@@ -635,6 +814,7 @@ var Home = (function () {
             var atual = cfg();
             var mudouCidade = dados.latitude !== atual.latitude || dados.longitude !== atual.longitude;
             var mudouFilmes = !!dados.filmes !== !!atual.filmes;
+            var mudouVideo = !!dados.jellyfin !== !!atual.jellyfin || !!dados.ao_vivo !== !!atual.ao_vivo;
             for (var chave in dados) {
                 if (dados.hasOwnProperty(chave)) {
                     atual[chave] = dados[chave];
@@ -646,6 +826,10 @@ var Home = (function () {
             }
             if (mudouFilmes) {
                 buscarFilmes();
+            }
+            if (mudouVideo) {
+                buscarCanais();
+                buscarJellyfin();
             }
             desenharLinhas();
         });
@@ -694,12 +878,41 @@ var Home = (function () {
         });
     }
 
+    function buscarCanais() {
+        Dados.canais(function (erro, dados) {
+            if (erro) {
+                estado.erroCanais = erro;
+            } else {
+                estado.erroCanais = null;
+                estado.canais = dados.canais || [];
+            }
+            desenharLinhas();
+        });
+    }
+
+    function buscarJellyfin() {
+        if (!cfg().jellyfin) {
+            return;
+        }
+        Dados.jellyfin(function (erro, dados) {
+            if (erro) {
+                estado.erroJf = erro;
+            } else {
+                estado.erroJf = null;
+                estado.jf = dados;
+            }
+            desenharLinhas();
+        });
+    }
+
     function atualizarTudo() {
         aviso('Atualizando...');
         buscarStatus();
         buscarConfiguracao();
         buscarClima();
         buscarFilmes();
+        buscarCanais();
+        buscarJellyfin();
     }
 
     // ---------- teclas ----------
@@ -709,6 +922,15 @@ var Home = (function () {
         var acao = TV.acao(e.keyCode);
         if (!acao || acao === 'sair') {
             return; // EXIT fecha o app normalmente; volume e mudo ficam com a TV
+        }
+        if (Tocador.ativo()) {
+            if (acao === 'voltar') {
+                TV.segurarTecla(e);
+            } else if (e.preventDefault) {
+                e.preventDefault();
+            }
+            Tocador.tecla(acao);
+            return;
         }
         if (acao === 'voltar') {
             TV.segurarTecla(e);
@@ -771,14 +993,19 @@ var Home = (function () {
         buscarConfiguracao();
         buscarClima();
         buscarFilmes();
+        buscarCanais();
+        buscarJellyfin();
 
         estado.timers.push(setInterval(atualizarRelogio, 1000));
         estado.timers.push(setInterval(buscarStatus, 5 * 60 * 1000));
         estado.timers.push(setInterval(buscarClima, 15 * 60 * 1000));
         estado.timers.push(setInterval(buscarFilmes, 60 * 60 * 1000));
+        estado.timers.push(setInterval(buscarJellyfin, 10 * 60 * 1000));
     }
 
     function encerrar() {
+        // A Samsung pede: nunca fechar o app com vídeo tocando.
+        Tocador.fechar(false);
         for (var i = 0; i < estado.timers.length; i++) {
             clearInterval(estado.timers[i]);
         }

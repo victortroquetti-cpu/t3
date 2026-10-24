@@ -7,5 +7,13 @@
   "apps": [
     { "nome": "YouTube", "id": "111299001912", "cor": "#c4302b" },
     { "nome": "Netflix", "id": "11101200001", "cor": "#b20710" }
-  ]
+  ],
+  "canais": [],
+  "canais_listas": [],
+  "canais_pelo_pc": true,
+  "jellyfin": {
+    "endereco": "http://localhost:8096",
+    "usuario": "",
+    "senha": ""
+  }
 }

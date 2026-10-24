@@ -10,7 +10,7 @@
 	<BigListIcon itemtype="string">icon/icon_95x78.png</BigListIcon>
 	<category itemtype="string">lifestyle</category>
 	<autoUpdate itemtype="boolean">n</autoUpdate>
-	<ver itemtype="string">1.000</ver>
+	<ver itemtype="string">1.100</ver>
 	<mgrver itemtype="string"></mgrver>
 	<fullwidget itemtype="boolean">y</fullwidget>
 	<type itemtype="string">user</type>
@@ -22,7 +22,7 @@
 	<dcont itemtype="boolean">y</dcont>
 	<movie itemtype="boolean">n</movie>
 	<widgetname itemtype="string">Minha TV</widgetname>
-	<description itemtype="string">Tela inicial limpa: apps, clima e filmes em alta.</description>
+	<description itemtype="string">Tela inicial limpa: apps, canais, seus vídeos, clima e filmes em alta.</description>
 	<width itemtype="string">1280</width>
 	<height itemtype="string">720</height>
 	<mouse itemtype="boolean">n</mouse>
