@@ -9,3 +9,9 @@ trok-ui/tags/build/
 trok-ui/tags/test/out/
 trok-ui/veiculos/build/
 trok-ui/veiculos/test/out/
+
+# Minha TV (Samsung)
+tv-samsung/config.json
+tv-samsung/.cache/
+tv-samsung/dist/
+tv-samsung/**/__pycache__/

@@ -1,0 +1,439 @@
+/*
+ * Visual da tela inicial (1280x720 fixo).
+ * CSS2 + o básico do CSS3 que o WebKit de 2013 entende (rgba, border-radius com -webkit-).
+ * Sem flexbox, grid, transições nem sombras pesadas: posições absolutas, mais leves para a TV.
+ */
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    background-color: #0b0e13;
+    color: #f2f4f7;
+    font-family: "SamsungOne", "Samsung Sans", Arial, Helvetica, sans-serif;
+}
+
+#ancora {
+    position: absolute;
+    left: -10px;
+    top: -10px;
+    width: 1px;
+    height: 1px;
+    outline: none;
+}
+
+#tela {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+}
+
+/* ---------- fundo ---------- */
+
+#fundo {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+    background-color: #0b0e13;
+    background-position: center top;
+    background-repeat: no-repeat;
+    -webkit-background-size: cover;
+    background-size: cover;
+}
+
+#veu {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+    background-color: rgba(9, 11, 16, 0.80);
+    background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(9, 11, 16, 0.55)), color-stop(0.45, rgba(9, 11, 16, 0.82)), to(rgba(9, 11, 16, 0.96)));
+    background-image: linear-gradient(to bottom, rgba(9, 11, 16, 0.55), rgba(9, 11, 16, 0.82) 45%, rgba(9, 11, 16, 0.96));
+}
+
+/* ---------- topo: relógio e clima ---------- */
+
+#topo {
+    position: absolute;
+    left: 60px;
+    top: 0;
+    width: 1160px;
+    height: 180px;
+}
+
+#relogio {
+    position: absolute;
+    left: 0;
+    top: 34px;
+    font-size: 76px;
+    line-height: 80px;
+    font-weight: normal;
+    letter-spacing: 1px;
+}
+
+#data {
+    position: absolute;
+    left: 4px;
+    top: 120px;
+    font-size: 26px;
+    color: #b9c0cc;
+}
+
+#clima {
+    position: absolute;
+    right: 0;
+    top: 40px;
+    width: 520px;
+    height: 110px;
+}
+
+#clima-icone {
+    position: absolute;
+    right: 120px;
+    top: 4px;
+    width: 64px;
+    height: 64px;
+}
+
+#clima-temp {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 110px;
+    text-align: right;
+    font-size: 58px;
+    line-height: 70px;
+}
+
+#clima-texto {
+    position: absolute;
+    right: 0;
+    top: 76px;
+    width: 520px;
+    text-align: right;
+    font-size: 22px;
+    color: #dfe3ea;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#clima-extra {
+    position: absolute;
+    right: 0;
+    top: 106px;
+    width: 520px;
+    text-align: right;
+    font-size: 19px;
+    color: #9aa3b2;
+    white-space: nowrap;
+}
+
+#aviso-pc {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 6px;
+    padding: 4px 12px;
+    font-size: 17px;
+    color: #ffd27a;
+    background-color: rgba(120, 80, 0, 0.45);
+    -webkit-border-radius: 6px;
+    border-radius: 6px;
+}
+
+/* ---------- linhas ---------- */
+
+#janela {
+    position: absolute;
+    left: 0;
+    top: 182px;
+    width: 1280px;
+    height: 488px;
+    overflow: hidden;
+}
+
+#linhas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+}
+
+.linha {
+    position: absolute;
+    left: 0;
+    width: 1280px;
+}
+
+.linha-titulo {
+    position: absolute;
+    left: 60px;
+    top: 4px;
+    width: 1160px;
+    height: 34px;
+    font-size: 25px;
+    line-height: 34px;
+    color: #e8ebf0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.linha-sub {
+    color: #9aa3b2;
+}
+
+.trilho {
+    position: absolute;
+    left: 0;
+    top: 44px;
+    width: 6000px;
+    margin-left: 60px;
+}
+
+.item {
+    position: absolute;
+    top: 6px;
+    border: 4px solid transparent;
+    -webkit-border-radius: 14px;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.item.foco {
+    border-color: #ffffff;
+}
+
+/* apps */
+
+.app {
+    width: 212px;
+    height: 116px;
+}
+
+.app-nome {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 212px;
+    height: 116px;
+    line-height: 116px;
+    text-align: center;
+    font-size: 29px;
+    font-weight: bold;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.app.foco .app-nome {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+/* pôsteres */
+
+.poster {
+    width: 142px;
+    height: 217px;
+    background-color: #1b212b;
+}
+
+.poster-nome {
+    position: absolute;
+    left: 10px;
+    top: 14px;
+    width: 122px;
+    font-size: 17px;
+    line-height: 22px;
+    color: #9aa3b2;
+}
+
+.poster-img {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+/* previsão */
+
+.previsao {
+    width: 182px;
+    height: 142px;
+    background-color: rgba(255, 255, 255, 0.07);
+    text-align: center;
+}
+
+.previsao-dia {
+    margin-top: 10px;
+    font-size: 21px;
+    color: #dfe3ea;
+}
+
+.previsao .icone-clima {
+    margin-top: 4px;
+}
+
+.previsao-temp {
+    font-size: 22px;
+}
+
+.previsao-min {
+    color: #9aa3b2;
+}
+
+.previsao-chuva {
+    font-size: 16px;
+    color: #8fb6e8;
+}
+
+/* aviso dentro de uma linha */
+
+.aviso-card {
+    width: 696px;
+    height: 58px;
+    padding: 22px 28px;
+    background-color: rgba(255, 255, 255, 0.07);
+    font-size: 21px;
+    line-height: 29px;
+    color: #c9cfd9;
+}
+
+/* ---------- rodapé ---------- */
+
+#dicas {
+    position: absolute;
+    left: 60px;
+    top: 680px;
+    width: 1160px;
+    height: 30px;
+    font-size: 18px;
+    line-height: 30px;
+    color: #7f8898;
+}
+
+.tecla-vermelha {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    background-color: #d6342c;
+    -webkit-border-radius: 3px;
+    border-radius: 3px;
+}
+
+/* ---------- detalhe do filme/série ---------- */
+
+#detalhe {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+    background-color: #0b0e13;
+}
+
+#detalhe-fundo {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+    background-position: center top;
+    background-repeat: no-repeat;
+    -webkit-background-size: cover;
+    background-size: cover;
+}
+
+#detalhe-veu {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+    background-color: rgba(9, 11, 16, 0.78);
+    background-image: -webkit-gradient(linear, left top, right top, from(rgba(9, 11, 16, 0.97)), color-stop(0.6, rgba(9, 11, 16, 0.80)), to(rgba(9, 11, 16, 0.35)));
+    background-image: linear-gradient(to right, rgba(9, 11, 16, 0.97), rgba(9, 11, 16, 0.80) 60%, rgba(9, 11, 16, 0.35));
+}
+
+#detalhe-caixa {
+    position: absolute;
+    left: 80px;
+    top: 120px;
+    width: 760px;
+}
+
+#detalhe-titulo {
+    font-size: 50px;
+    line-height: 58px;
+    font-weight: bold;
+}
+
+#detalhe-info {
+    margin-top: 14px;
+    font-size: 22px;
+    color: #b9c0cc;
+}
+
+#detalhe-sinopse {
+    margin-top: 22px;
+    font-size: 23px;
+    line-height: 34px;
+    color: #e3e7ed;
+}
+
+#detalhe-onde {
+    margin-top: 22px;
+    font-size: 21px;
+    color: #8fb6e8;
+}
+
+#detalhe-botoes {
+    margin-top: 32px;
+}
+
+.botao {
+    display: inline-block;
+    margin-right: 18px;
+    padding: 0 30px;
+    height: 56px;
+    line-height: 56px;
+    font-size: 23px;
+    color: #e8ebf0;
+    background-color: rgba(255, 255, 255, 0.12);
+    border: 3px solid transparent;
+    -webkit-border-radius: 10px;
+    border-radius: 10px;
+}
+
+.botao.foco {
+    color: #0b0e13;
+    background-color: #ffffff;
+}
+
+/* ---------- aviso rápido ---------- */
+
+#aviso {
+    display: none;
+    position: absolute;
+    left: 340px;
+    top: 600px;
+    width: 600px;
+    padding: 14px 20px;
+    text-align: center;
+    font-size: 22px;
+    color: #ffffff;
+    background-color: rgba(30, 36, 48, 0.95);
+    -webkit-border-radius: 12px;
+    border-radius: 12px;
+}
