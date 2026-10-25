@@ -1,7 +1,8 @@
 // Trok DevTools (.asi) -- Victor_Trok
 // As contas do RenderWare (vetor-linha): um ponto vai p * direita/cima/frente + posicao; "a depois b" = Mul(a, b).
 // A pose de cada osso no espaco da pele: G = local * G(pai). A pele: vertice * skinToBone * G, somado pelos pesos.
-// A pose do modelo (de cada osso, em relacao ao pai) sai das skinToBone: o osso no espaco da pele e a inversa dela.
+// A pose do modelo: o osso raiz e o frame dele (rootLocal); cada osso fica onde skinToBone[i] * osso = skinToBone[0] *
+// raiz (a pele inteira parada, como o jogo a desenha). Sem o frame, a raiz e a inversa da skinToBone[0].
 
 #include "pose.h"
 
@@ -212,7 +213,11 @@ bool Apply(const mesh::Mesh& base, const ifp::Clip& clip, float time, bool inPla
     std::vector<M> S(n), bind(n), G(n), K(n);
     for (size_t i = 0; i < n; ++i) {
         S[i] = FromRw(skin.bones[i].skinToBone);
-        bind[i] = Inverse(S[i]);
+    }
+    M root = skin.framed ? FromVecs(skin.rootLocal) : Inverse(S[0]);
+    M rigid = Mul(S[0], root); // a pele parada no espaco acima da raiz
+    for (size_t i = 0; i < n; ++i) {
+        bind[i] = Mul(Inverse(S[i]), rigid);
     }
     for (size_t i = 0; i < n; ++i) {
         int parent = skin.bones[i].parent;

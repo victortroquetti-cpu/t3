@@ -277,6 +277,7 @@ bool Project(const Vec3& p, float* x, float* y) {
     return true;
 }
 
+bool MiddleMouseDown() { return false; }
 } // namespace gta
 
 namespace render {
@@ -388,6 +389,7 @@ void SetIgnoreFeet(bool) {}
 const std::deque<Played>& History() { return noHistory; }
 void Clear() {}
 bool BanksKnown() { return false; }
+Stats Counts() { return Stats(); }
 } // namespace audiospy
 
 // ---------------------------------------------------------------- dados, rasterizador e cenas

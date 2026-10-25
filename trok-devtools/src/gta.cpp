@@ -8,7 +8,7 @@
 //   SetMissionDoesntRequireModel 0x409C90.
 //   CTxdStore::ms_pTxdPool 0xC8800C (CPool de TxdDef: dicionario +0, pai +6, 0xC cada).
 //   CWorld::ProcessLineOfSight 0x56BA00, CSprite::CalcScreenCoors 0x70CE30, TheCamera 0xB6F028 (CMatrix* +0x14),
-//   CWorld::Players[0].m_pPed 0xB7CD98, CEntity: modelo +0x22, interior +0x2F, LOD +0x30, tipo +0x36 (& 7).
+//   CPad::NewMouseControllerState 0xB73418 (o botao do meio em +2), CWorld::Players[0].m_pPed 0xB7CD98, CEntity: modelo +0x22, interior +0x2F, LOD +0x30, tipo +0x36 (& 7).
 //   CAnimManager::ms_aAnimBlocks 0xB5D4A0 (0x20 cada: nome[16], carregado +0x10), ms_numAnimBlocks 0xB4EA30.
 //   CRunningScript::ProcessOneCommand 0x469EB0: o script de mentira roda um comando por vez (como o CLEO e o
 //   MoonLoader), com as variaveis locais em +0x3C e o resultado da condicao em +0xC5.
@@ -43,6 +43,7 @@ constexpr DWORD TXD_DEF_SIZE = 0xC, TXD_DICT = 0x0, TXD_PARENT = 0x6;
 
 constexpr DWORD FN_LINE_OF_SIGHT = 0x56BA00, FN_CALC_SCREEN = 0x70CE30;
 constexpr DWORD CAMERA = 0xB6F028, PLAYER_PED = 0xB7CD98;
+constexpr DWORD PAD_NEW_MOUSE = 0xB73418; // CPad::NewMouseControllerState
 constexpr DWORD ENT_PLACEMENT = 0x04, ENT_MATRIX = 0x14, ENT_MODEL = 0x22, ENT_AREA = 0x2F, ENT_LOD = 0x30, ENT_TYPE = 0x36;
 
 constexpr DWORD ANIM_BLOCKS = 0xB5D4A0, ANIM_BLOCK_COUNT = 0xB4EA30, ANIM_BLOCK_SIZE = 0x20;
@@ -311,6 +312,10 @@ int TxdParent(int txdIndex) {
         return -1;
     }
     return At<short>(At<DWORD>(pool, POOL_OBJECTS) + txdIndex * TXD_DEF_SIZE, TXD_PARENT);
+}
+
+bool MiddleMouseDown() {
+    return At<BYTE>(PAD_NEW_MOUSE, 2) != 0; // CMouseControllerState: esquerdo, direito, meio
 }
 
 DWORD PlayerPed() {

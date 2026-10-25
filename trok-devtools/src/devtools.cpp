@@ -37,7 +37,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v0.4";
+constexpr const char* VERSION_TAG = "v0.4.1";
 // As texturas ficam no card do modelo (clique numa textura): nao tem aba propria.
 const char* const TABS[] = {"Modelos", "Anima\xC3\xA7\xC3\xB5" "es", "\xC3\x81udios", "Arquivos", "Geral"};
 constexpr int TAB_COUNT = 5, TAB_MODELS = 0, TAB_GENERAL = 4;
@@ -79,6 +79,7 @@ struct State {
     bool audioShow = false, audioIgnoreFeet = true, audioRepeat = false;
     int audioDelay = 4;
     int audioRowSel = 1;
+    bool middleDown = false; // o botao do meio no quadro anterior (CPad)
     // Animacoes
     char animQuery[96] = "";
     ifp::Filter animFilter, animApplied;
@@ -1570,9 +1571,24 @@ void AudioPlayerBar(float x, float y, float w, float h) {
     Text(dl, fonts.desc, right - ts.x, barY - ts.y * 0.5f + 2 * u, col::column, time);
 }
 
+// O arquivo no fim da URL ("login.mp3")
+std::string UrlFile(const std::string& url) {
+    size_t q = url.find_first_of("?#"), end = q == std::string::npos ? url.size() : q;
+    size_t slash = url.rfind('/', end ? end - 1 : 0);
+    std::string file = slash == std::string::npos ? url.substr(0, end) : url.substr(slash + 1, end - slash - 1);
+    return file.empty() ? url : file;
+}
+
 std::vector<std::string> PlayedTitle(const audiospy::Played& p) {
     const sfx::Bank* b = sfx::FindBank(p.bank);
     char buf[32];
+    if (p.kind == audiospy::K_SAMP_SOUND) {
+        snprintf(buf, sizeof(buf), "som %d", p.sound);
+        return {"Servidor", "PlayerPlaySound", buf};
+    }
+    if (p.kind == audiospy::K_SAMP_STREAM) {
+        return {"Servidor", "stream", UrlFile(p.url)};
+    }
     if (b) {
         snprintf(buf, sizeof(buf), "sound_%03d", p.sound + 1);
         return {sfx::Packs()[b->pack].name, b->name, buf};
@@ -1586,6 +1602,14 @@ std::string PlayedSub(const audiospy::Played& p) {
     const sfx::Sound* s = sfx::FindSound(p.bank, p.sound);
     std::string out;
     char buf[96];
+    if (p.kind != audiospy::K_GAME) {
+        out = p.kind == audiospy::K_SAMP_STREAM ? p.url : "o id do PlayerPlaySound (o jogo toca o som dele em seguida)";
+        if (p.count > 1) {
+            snprintf(buf, sizeof(buf), "  \xC2\xB7  \xC3\x97%d", p.count);
+            out += buf;
+        }
+        return out;
+    }
     if (b) {
         snprintf(buf, sizeof(buf), "Bank_%03d", b->number);
         out = buf;
@@ -1638,6 +1662,15 @@ void AudioSide(float x, float y, float w, float h) {
     char title[64];
     snprintf(title, sizeof(title), "Hist\xC3\xB3rico (%d)", static_cast<int>(hist.size()));
     Text(dl, fonts.desc, x, listY, col::column, title);
+    audiospy::Stats stats = audiospy::Counts();
+    if (audiospy::BanksKnown() || hist.empty()) {
+        // Quantos sons o jogo pediu: com o historico vazio, diz se o gancho esta pegando alguma coisa
+        char seen[96];
+        snprintf(seen, sizeof(seen), "%s pedidos pelo jogo%s", Thousands(stats.seen).c_str(),
+                 stats.samp ? ("  \xC2\xB7  " + Thousands(stats.samp) + " do servidor").c_str() : "");
+        ImVec2 ss = TextSize(fonts.desc, seen);
+        Text(dl, fonts.desc, x + w - ss.x, listY, col::hint, seen);
+    }
     if (!audiospy::BanksKnown() && !hist.empty()) {
         const char* warn = "sem os nomes dos bancos";
         ImVec2 ws = TextSize(fonts.desc, warn);
@@ -1659,14 +1692,25 @@ void AudioSide(float x, float y, float w, float h) {
         char id[24];
         snprintf(id, sizeof(id), "##hist%d", static_cast<int>(i));
         ImGui::SetCursorScreenPos(ImVec2(o.x, ry));
-        if (ImGui::InvisibleButton(id, ImVec2(iw, rowH - 4 * u)) && p.bank >= 0) {
-            RevealSound(p.bank, p.sound);
-            PlayOrStop(p.bank, p.sound);
+        if (ImGui::InvisibleButton(id, ImVec2(iw, rowH - 4 * u))) {
+            if (p.kind == audiospy::K_SAMP_STREAM) {
+                ImGui::SetClipboardText(p.url.c_str());
+                Toast("URL copiada", p.url.c_str());
+            } else if (p.kind == audiospy::K_SAMP_SOUND) {
+                std::string text = std::to_string(p.sound);
+                ImGui::SetClipboardText(text.c_str());
+                Toast("Copiado", ("PlayerPlaySound " + text).c_str());
+            } else if (p.bank >= 0) {
+                RevealSound(p.bank, p.sound);
+                PlayOrStop(p.bank, p.sound);
+            }
         }
         bool hovered = ImGui::IsItemHovered();
-        if (hovered && p.bank >= 0) {
+        if (hovered && (p.bank >= 0 || p.kind != audiospy::K_GAME)) {
             Hand();
-            Tooltip("Clique: achar na lista e tocar");
+            Tooltip(p.kind == audiospy::K_SAMP_STREAM ? "Clique: copiar a URL"
+                    : p.kind == audiospy::K_SAMP_SOUND ? "Clique: copiar o id"
+                                                        : "Clique: achar na lista e tocar");
         }
         bool sel = p.bank >= 0 && p.bank == S.audioSelBank && p.sound == S.audioSelSound;
         Box(cdl, ImVec2(o.x, ry), ImVec2(o.x + iw, ry + rowH - 4 * u), col::White(sel ? 14 : hovered ? 9 : 4),
@@ -1916,6 +1960,12 @@ float Wrapped(ImDrawList* dl, ImFont* font, float x, float y, float w, ImU32 col
     return cy - y;
 }
 
+// Uma "animacao" curta demais para tocar (o abseil tem 0,03 s): e uma pose, mostrada parada no ultimo quadro.
+constexpr float POSE_SECONDS = 0.1f;
+bool AnimIsPose() {
+    return S.clipOk && S.clip.seconds < POSE_SECONDS;
+}
+
 bool AnimFilterActive() {
     const ifp::Filter& f = S.animFilter;
     return !f.query.empty() || f.file >= 0 || f.changed;
@@ -2128,7 +2178,9 @@ void AnimViewer(ImVec2 a, float side) {
     }
     const mesh::Mesh* m = skin >= 0 ? core::PreviewMesh() : nullptr;
     float dur = S.clipOk ? std::max(S.clip.seconds, 0.001f) : 0.0f;
-    if (S.clipOk && S.animPlaying && !S.animScrub) {
+    if (AnimIsPose()) {
+        S.animTime = S.clip.seconds;
+    } else if (S.clipOk && S.animPlaying && !S.animScrub) {
         S.animTime += io.DeltaTime * ANIM_SPEEDS[S.animSpeed];
         if (S.animTime >= dur) {
             if (S.animLoop) {
@@ -2267,9 +2319,10 @@ void AnimTimeline(float x, float y, float w, float h) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     Box(dl, ImVec2(x, y), ImVec2(x + w, y + h), col::White(5), col::White(12), 10 * u);
     float dur = S.clipOk ? std::max(S.clip.seconds, 0.001f) : 0.0f;
+    bool pose = AnimIsPose();
     float r = 18 * u;
     ImVec2 c(x + 12 * u + r, y + h * 0.5f);
-    if (RoundButton("##animTocar", c, r, 1, false, S.animPlaying ? IconPause : IconPlay, nullptr, S.clipOk)) {
+    if (RoundButton("##animTocar", c, r, 1, false, S.animPlaying && !pose ? IconPause : IconPlay, nullptr, S.clipOk && !pose)) {
         if (!S.animPlaying && S.animTime >= dur) {
             S.animTime = 0;
         }
@@ -2294,7 +2347,11 @@ void AnimTimeline(float x, float y, float w, float h) {
         Tooltip("Velocidade da pr\xC3\xA9via");
     }
     char time[48];
-    snprintf(time, sizeof(time), "%s / %s", Seconds(S.animTime).c_str(), Seconds(dur).c_str());
+    if (pose) {
+        snprintf(time, sizeof(time), "pose  \xC2\xB7  %s", Seconds(S.clip.seconds).c_str());
+    } else {
+        snprintf(time, sizeof(time), "%s / %s", Seconds(S.animTime).c_str(), Seconds(dur).c_str());
+    }
     ImVec2 ts = TextSize(fonts.desc, time);
     float timeX = sx - 14 * u - ts.x;
     Text(dl, fonts.desc, timeX, y + (h - ts.y) * 0.5f, col::column, time);
@@ -2302,14 +2359,17 @@ void AnimTimeline(float x, float y, float w, float h) {
     float bx0 = c.x + r + 16 * u, bx1 = timeX - 16 * u, by = y + h * 0.5f;
     ImGui::SetCursorScreenPos(ImVec2(bx0 - 6 * u, by - 10 * u));
     ImGui::InvisibleButton("##animLinha", ImVec2(std::max(1.0f, bx1 - bx0 + 12 * u), 20 * u));
-    bool active = ImGui::IsItemActive() && S.clipOk;
+    bool active = ImGui::IsItemActive() && S.clipOk && !pose;
     S.animScrub = active;
     if (active) {
         float f = std::max(0.0f, std::min(1.0f, (ImGui::GetIO().MousePos.x - bx0) / std::max(1.0f, bx1 - bx0)));
         S.animTime = f * dur;
     }
-    if (ImGui::IsItemHovered() && S.clipOk) {
+    if (ImGui::IsItemHovered() && S.clipOk && !pose) {
         Hand();
+    }
+    if (ImGui::IsItemHovered() && pose) {
+        Tooltip("Curta demais para tocar: \xC3\xA9 uma pose (o jogo segura o \xC3\xBAltimo quadro).");
     }
     dl->AddRectFilled(ImVec2(bx0, by - 2 * u), ImVec2(bx1, by + 2 * u), col::White(14), 2 * u);
     if (dur > 0) {
@@ -2554,7 +2614,7 @@ void TabAnims(float x, float y, float w, float h) {
             SelectAnim(order[i]);
             RevealAnim(order[i]);
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_Space, false) && S.clipOk) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Space, false) && S.clipOk && !AnimIsPose()) {
             if (!S.animPlaying && S.animTime >= S.clip.seconds) {
                 S.animTime = 0;
             }
@@ -2803,6 +2863,10 @@ const char* Version() {
 
 void Frame() {
     ImGuiIO& io = ImGui::GetIO();
+    // Botao do meio: o do jogo (CPad, o caminho com o menu fechado) ou o do Windows
+    bool middleDown = gta::MiddleMouseDown();
+    bool middleClick = (middleDown && !S.middleDown) || ImGui::IsMouseClicked(ImGuiMouseButton_Middle);
+    S.middleDown = middleDown;
     if (!S.open) {
         core::SetBrowsing(false);
         if (core::InspectOn()) {
@@ -2812,7 +2876,7 @@ void Frame() {
             ImGui::PopFont();
             PopStyle();
             const core::Look& look = core::Looking();
-            if (look.valid && ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
+            if (look.valid && middleClick) {
                 Toggle();
                 S.tab = TAB_MODELS;
                 OpenCard(look.model);

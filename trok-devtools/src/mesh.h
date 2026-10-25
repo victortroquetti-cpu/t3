@@ -49,14 +49,18 @@ struct Bone {
 };
 struct SkinBatch {
     int batch = -1;                     // em Mesh::batches (os vertices na mesma ordem)
-    std::vector<gta::Vec3> pos, normal; // no espaco da pele (antes do frame do atomico)
+    std::vector<gta::Vec3> pos, normal; // no espaco da pele
     std::vector<BYTE> index;            // 4 ossos por vertice
     std::vector<float> weight;          // 4 pesos por vertice
-    gta::Vec3 toModel[4];               // o frame do atomico: direita, cima, frente, posicao
+    gta::Vec3 toModel[4];               // do espaco da raiz do esqueleto ao do modelo: direita, cima, frente, posicao
 };
 struct Skin {
     std::vector<Bone> bones;
     std::vector<SkinBatch> batches;
+    // O frame raiz do esqueleto (o parentFrame do RpHAnimHierarchy), em relacao ao frame acima dele. Sem ele (framed =
+    // false), a pose do modelo sai so das skinToBone.
+    bool framed = false;
+    gta::Vec3 rootLocal[4] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, 0}};
 };
 
 struct Mesh {

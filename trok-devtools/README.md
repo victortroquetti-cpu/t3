@@ -4,13 +4,20 @@ Uma ferramenta para modders dentro do GTA San Andreas: ver todos os modelos que 
 
 As abas **Modelos**, **Animações**, **Áudios** e **Geral** funcionam. Arquivos está no menu como "Em breve". As texturas não têm aba: ficam no card do modelo.
 
-**Estado:** v0.4, `.asi` compilado e testado fora do jogo:
-- no Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide`, `.img`, pacotes de som, `.ifp` e um personagem com ossos (`test/smoke/run.sh`, 74 conferências e 25 capturas);
+**Estado:** v0.4.1, `.asi` compilado e testado fora do jogo:
+- no Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide`, `.img`, pacotes de som, `.ifp` e um personagem com ossos (`test/smoke/run.sh`, 76 conferências e 25 capturas);
 - no Linux, o leitor dos `.ifp` e a conta da pose (`test/anim/run.sh`).
 
 Falta o teste no jogo de verdade.
 
-**Novo na v0.4:** a aba **Animações** (abaixo).
+**Novo na v0.4.1:**
+- Os personagens não aparecem mais deitados (na grade, no card e na prévia das animações). A pele dos personagens do jogo vem deitada, e agora o mod usa o esqueleto para pôr de pé, como o jogo faz.
+- Animação curtíssima (o `abseil` tem 0,03 s) aparece como **pose**, parada, sem a linha do tempo pulando.
+- O **botão do meio** do Info ao apontar é lido do mouse do próprio jogo. Com o menu fechado, o jogo pega o mouse pelo DirectInput e o clique não chegava.
+- O histórico de áudio mostra também os sons do servidor (SA-MP 0.3.7 R1): o **PlayerPlaySound** (com o id) e os **streams** por URL (o mp3 que o servidor toca). Clique copia o id ou a URL.
+- O histórico diz quantos sons o jogo já pediu, e o log também (com 100 e com 1.000).
+
+**Na v0.4:** a aba **Animações** (abaixo).
 
 **Na v0.3:** a aba **Áudios**.
 
@@ -133,9 +140,11 @@ O lado direito da aba:
 - **Mostrar na tela (menu fechado):** com o menu fechado, os sons que o jogo toca aparecem em cartões no lado direito da tela: o pacote, o bank, o som, a duração e o nome. O jogo toca muitos sons, então a tela mostra só os 3 últimos; a lista toda fica no histórico. O mesmo som repetido em menos de 1,5 s soma no mesmo cartão (`×3`). O botão **Info do áudio**, no canto da aba, faz o mesmo.
 - **Tempo na tela:** quanto tempo cada cartão fica (1 a 15 s, padrão 4 s). Depois ele some aos poucos.
 - **Ignorar os passos:** sem os passos (FEET), que tocam o tempo todo.
-- **Histórico:** os últimos 100 sons, o mais novo em cima, com a hora. Clique num deles para achar o som na lista e tocar. Se o som está fora do filtro atual, o filtro é limpo. **Limpar o histórico** zera a lista.
+- **Histórico:** os últimos 100 sons, o mais novo em cima, com a hora. Clique num deles para achar o som na lista e tocar. Se o som está fora do filtro atual, o filtro é limpo. **Limpar o histórico** zera a lista. Em cima, quantos sons o jogo já pediu (com o histórico vazio, isso diz se o mod está pegando os sons).
+- **Sons do servidor (SA-MP 0.3.7 R1):** o PlayerPlaySound aparece como **Servidor › PlayerPlaySound › som N**, e logo depois vem o som do jogo que ele toca. Um stream (o servidor tocando um mp3 por URL) aparece como **Servidor › stream › arquivo.mp3**. O clique copia o id ou a URL.
+- Os sons tocados pelo player da aba não entram no histórico: eles tocam por fora do jogo.
 
-O rádio e as músicas (pasta `STREAMS`) não são do SFX e não aparecem.
+O rádio e as músicas (pasta `STREAMS`) não são do SFX e não aparecem. Um mod que toca sons por conta própria (com o BASS, por exemplo) também fica de fora: o mod só vê o que passa pelo áudio do jogo e pelo SA-MP.
 
 ## Info ao apontar
 
@@ -144,7 +153,7 @@ O botão **Info ao apontar** (no canto da aba Modelos, e no Geral) liga e deslig
 - um ponto no meio da tela;
 - a caixa da colisão em volta do que está no meio da tela (até 300 m, a partir do seu personagem, pela câmera). Em modelos grandes, que passam por trás da câmera, a caixa é cortada no plano da câmera. Com a câmera dentro da caixa (no meio de um bairro, por exemplo), só o cartão aparece;
 - um cartão ao lado dela com o id, o `.dff`, o tipo, o `.img`, a TXD, a posição, o interior, a distância e o LOD;
-- **botão do meio do mouse** abre o card desse modelo.
+- **botão do meio do mouse** abre o card desse modelo (o botão é lido do mouse do próprio jogo, o `CPad`).
 
 ## Aba Geral
 
@@ -229,8 +238,10 @@ Se algo não abrir ou travar, mande esse arquivo.
 - **Info ao apontar:** `CWorld::ProcessLineOfSight` (`0x56BA00`) pela câmera (`0xB6F028`), começando depois do personagem. A caixa vem do `CColModel`. Cada aresta é cortada a 1,5 m na frente da câmera e só então vai para a tela, com `CSprite::CalcScreenCoors` (`0x70CE30`).
 - **Quem usa uma textura:** a TXD que tem a textura sai da lista de texturas do dicionário (`RwTexDictionary`, +0x08), procurando na TXD do modelo e depois nas mães (`CTxdStore`, pai em +6). Os candidatos são as entradas do catálogo cuja TXD é essa ou descende dela. Para cada um, o mod olha os materiais de todos os atômicos (`RpGeometry` +0x20/+0x24, textura em `RpMaterial` +0, nome em `RwTexture` +0x10).
 - **Sons:** o `BankLkup.dat` (12 bytes por bank: pacote, deslocamento, tamanho) aponta para o bank dentro do pacote. O bank começa com um cabeçalho de `0x12C4` bytes: quantos sons e, para cada um dos 400, o início, o início do loop (`-1` = sem loop), a frequência e o headroom. Depois vem o PCM de 16 bits mono.
+- **Sons do servidor:** ganchos no `CAudio::Play` (`samp.dll+0x9D730`, o PlayerPlaySound) e no `CAudioStream::Play` (`samp.dll+0x62DA0`, a URL) do SA-MP 0.3.7 R1, pelos endereços do SAMP-API.
 - **Áudio tocando agora:** um gancho no `CAESoundManager::RequestNewSound` (`0x4EFB10`) lê, de cada `CAESound` pedido, o slot (+0), o som (+2) e o evento (+0xC). O bank que está naquele slot vem do `CAEMP3BankLoader` do `AEAudioHardware` (`0xB5F8B8`): o mod procura o ponteiro perto de `+0xD98` e só usa se o número de banks e de pacotes bater com os arquivos. O bank do slot fica em `CAEBankSlot` +0x10 (`0x12D4` bytes por slot).
 - **Animações:** o formato é o do `CAnimManager::LoadAnimFile` (gta-reversed). No ANP3, cada osso tem a etiqueta (`BONE_ROOT` = 0...) e os quadros (rotação em `int16 / 4096`, tempo em `int16 / 60`, translação em `int16 / 1024` nos comprimidos); o tempo é desde o começo. O ANPK (do GTA3/VC) vem com a rotação conjugada.
+- **Personagem de pé:** o jogo desenha a pele com `skinToBone` × a matriz de cada osso (dos frames do esqueleto), sem o frame do atômico. O espaço da pele dos personagens vem deitado, então o modelo parado usa `skinToBone[0]` × o frame raiz do esqueleto (o `parentFrame` do `RpHAnimHierarchy`, +0x14).
 - **Pose:** a pele do personagem sai do RenderWare (`RpSkinGeometryGetSkin` `0x7C7550`, pesos, índices e `skinToBone` de cada osso, e a hierarquia do `RpSkinAtomicGetHAnimHierarchy` `0x7C7540`). O osso com quadros-chave usa a rotação deles (a matriz do `CQuaternion::Get`) e a translação, se tiver. Os outros ficam na pose do modelo, e a raiz sem translação fica na origem, como o `BonePos` do jogo.
 - **No seu personagem:** o bloco vem de `CAnimManager::ms_aAnimBlocks` (`0xB5D4A0`) e carrega pelo streaming (recurso `25575` + o bloco). Depois, `GET_PLAYER_CHAR` (`01F5`), `IS_CHAR_IN_ANY_CAR` (`00DF`) e `TASK_PLAY_ANIM` (`0605`); para parar, `CLEAR_CHAR_TASKS_IMMEDIATELY` (`0792`).
 - **Reset do device (Alt+Tab):** os alvos de render saem antes e as miniaturas são refeitas depois.

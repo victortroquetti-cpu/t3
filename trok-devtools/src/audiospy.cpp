@@ -4,6 +4,8 @@
 // +0xC, quantos bancos +0xE, quantos pacotes +0x10. O ponteiro para ele fica no AEAudioHardware (0xB5F8B8); o deslocamento
 // e procurado (perto de +0xD98) e so vale se os numeros baterem com os arquivos do jogo.
 // O gancho roda na thread do jogo, a mesma do menu.
+// SA-MP 0.3.7 R1 (SAMP-API): CAudio::Play samp.dll+0x9D730 (__thiscall: id, CVector) e CAudioStream::Play
+// samp.dll+0x62DA0 (__thiscall: url, CVector, raio, 3d). Os dois chegam pelas RPCs, na thread do jogo.
 
 #include "audiospy.h"
 
@@ -11,6 +13,8 @@
 #include "sfx.h"
 
 #include "MinHook.h"
+
+#include <cstring>
 
 void DevToolsLog(const char* fmt, ...);
 
@@ -25,6 +29,12 @@ constexpr DWORD SAME_SOUND_MS = 1500;
 
 using RequestFn = void*(__fastcall*)(void* self, void* edx, BYTE* sound);
 RequestFn o_request = nullptr;
+constexpr DWORD SAMP_AUDIO_PLAY = 0x9D730, SAMP_STREAM_PLAY = 0x62DA0;
+using SampSoundFn = void(__fastcall*)(void* self, void* edx, int id, float x, float y, float z);
+using StreamFn = int(__fastcall*)(void* self, void* edx, const char* url, float x, float y, float z, float radius, int is3d);
+SampSoundFn o_sampSound = nullptr;
+StreamFn o_stream = nullptr;
+Stats g_stats;
 
 bool g_capture = true, g_ignoreFeet = true;
 std::deque<Played> g_history;
@@ -73,8 +83,35 @@ int BankInSlot(int slot) {
     return *reinterpret_cast<short*>(slots + slot * SLOT_SIZE + 0x10);
 }
 
+void Push(Played& p) {
+    DWORD now = GetTickCount();
+    for (Played& h : g_history) {
+        if (now - h.last > SAME_SOUND_MS) {
+            break;
+        }
+        if (h.kind == p.kind && h.bank == p.bank && h.sound == p.sound && h.slot == p.slot && h.url == p.url) {
+            h.last = now;
+            ++h.count;
+            ++g_serial;
+            return;
+        }
+    }
+    p.first = p.last = now;
+    GetLocalTime(&p.time);
+    g_history.push_front(p);
+    while (g_history.size() > HISTORY_MAX) {
+        g_history.pop_back();
+    }
+    ++g_serial;
+}
+
 void Record(BYTE* sound) {
     FindLoader();
+    ++g_stats.seen;
+    if (g_stats.seen == 100 || g_stats.seen == 1000) {
+        DevToolsLog("audio: %d sons pedidos pelo jogo (%d passos ignorados, %d no historico)", g_stats.seen,
+                    g_stats.ignored, static_cast<int>(g_history.size()));
+    }
     Played p;
     p.slot = *reinterpret_cast<short*>(sound);
     p.sound = *reinterpret_cast<short*>(sound + 2);
@@ -86,33 +123,46 @@ void Record(BYTE* sound) {
     p.bank = BankInSlot(p.slot);
     const sfx::Bank* b = sfx::FindBank(p.bank);
     if (g_ignoreFeet && b && b->kind == sfx::T_FEET) {
+        ++g_stats.ignored;
         return;
     }
-    DWORD now = GetTickCount();
-    for (Played& h : g_history) {
-        if (now - h.last > SAME_SOUND_MS) {
-            break;
-        }
-        if (h.bank == p.bank && h.sound == p.sound && h.slot == p.slot) {
-            h.last = now;
-            ++h.count;
-            ++g_serial;
-            return;
-        }
-    }
-    p.first = p.last = now;
-    GetLocalTime(&p.time);
     static bool logged = false;
     if (!logged) {
         logged = true; // a prova de que o gancho pega os sons (e de que o banco do slot bate)
         DevToolsLog("audio: primeiro som: %s %s sound_%03d (slot %d, evento %d)",
                     b ? sfx::Packs()[b->pack].name.c_str() : "?", b ? b->name.c_str() : "?", p.sound + 1, p.slot, p.event);
     }
-    g_history.push_front(p);
-    while (g_history.size() > HISTORY_MAX) {
-        g_history.pop_back();
+    Push(p);
+}
+
+void RecordServer(int kind, int id, const char* url, float x, float y, float z) {
+    Played p;
+    p.kind = kind;
+    p.sound = id;
+    p.x = x, p.y = y, p.z = z;
+    if (url && Readable(reinterpret_cast<DWORD>(url), 1)) {
+        p.url.assign(url, strnlen(url, 256));
     }
-    ++g_serial;
+    ++g_stats.samp;
+    if (g_stats.samp == 1) {
+        DevToolsLog("audio: primeiro som do servidor: %s %d %s", kind == K_SAMP_STREAM ? "stream" : "PlayerPlaySound", id,
+                    p.url.c_str());
+    }
+    Push(p);
+}
+
+void __fastcall HookSampSound(void* self, void* edx, int id, float x, float y, float z) {
+    if (g_capture && id != 0) {
+        RecordServer(K_SAMP_SOUND, id, nullptr, x, y, z);
+    }
+    o_sampSound(self, edx, id, x, y, z);
+}
+
+int __fastcall HookStream(void* self, void* edx, const char* url, float x, float y, float z, float radius, int is3d) {
+    if (g_capture && url) {
+        RecordServer(K_SAMP_STREAM, -1, url, x, y, z);
+    }
+    return o_stream(self, edx, url, x, y, z, radius, is3d);
 }
 
 void* __fastcall HookRequestNewSound(void* self, void* edx, BYTE* sound) {
@@ -135,6 +185,30 @@ bool Install() {
                            : "CAESoundManager::RequestNewSound recusado (%d) -- sem audio tocando agora",
                 static_cast<int>(s));
     return s == MH_OK;
+}
+
+bool InstallSamp(DWORD sampBase) {
+    struct {
+        DWORD offset;
+        void* hook;
+        void** original;
+        const char* name;
+    } hooks[] = {{SAMP_AUDIO_PLAY, reinterpret_cast<void*>(HookSampSound), reinterpret_cast<void**>(&o_sampSound),
+                  "CAudio::Play (PlayerPlaySound)"},
+                 {SAMP_STREAM_PLAY, reinterpret_cast<void*>(HookStream), reinterpret_cast<void**>(&o_stream),
+                  "CAudioStream::Play (stream)"}};
+    bool all = true;
+    for (const auto& h : hooks) {
+        void* target = reinterpret_cast<void*>(sampBase + h.offset);
+        MH_STATUS s = MH_CreateHook(target, h.hook, h.original);
+        if (s == MH_OK) {
+            s = MH_EnableHook(target);
+        }
+        DevToolsLog(s == MH_OK ? "SA-MP %s desviado (sons do servidor no historico)" : "SA-MP %s recusado (%d)", h.name,
+                    static_cast<int>(s));
+        all = all && s == MH_OK;
+    }
+    return all;
 }
 
 void SetCapture(bool on) {
@@ -160,6 +234,10 @@ void Clear() {
 
 bool BanksKnown() {
     return g_loaderState == 1;
+}
+
+Stats Counts() {
+    return g_stats;
 }
 
 } // namespace audiospy

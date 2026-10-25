@@ -441,7 +441,9 @@ const FakeBone PED_BONES[] = {{"Root", 0, {0, 0, 0}, 0},           {"Pelvis", 1,
                               {"L Thigh", 41, {-0.12f, 0, 0.05f}, 3}, {"R Thigh", 51, {0.12f, 0, 0.05f}, 1}};
 constexpr int PED_BONE_COUNT = 8;
 
-void AddSkin(Model& m, BYTE* atomic, BYTE* geom, const std::vector<int>& vertexBone) {
+// A pele vem deitada (x da pele = z do modelo, como nos personagens do jogo): a skinToBone de cada osso gira de volta
+// (Q) e tira a posicao dele; o frame raiz do esqueleto (o parentFrame da hierarquia) fica na origem.
+void AddSkin(Model& m, BYTE* atomic, BYTE* geom, const std::vector<int>& vertexBone, BYTE* clumpRoot) {
     int nv = static_cast<int>(vertexBone.size());
     FakeSkin* skin = reinterpret_cast<FakeSkin*>(Alloc(m, sizeof(FakeSkin)));
     skin->bones = PED_BONE_COUNT;
@@ -455,7 +457,10 @@ void AddSkin(Model& m, BYTE* atomic, BYTE* geom, const std::vector<int>& vertexB
     BYTE* nodes = Alloc(m, PED_BONE_COUNT * 16);
     for (int b = 0; b < PED_BONE_COUNT; ++b) {
         float* mat = skin->matrices + b * 16;
-        mat[0] = mat[5] = mat[10] = mat[15] = 1;
+        mat[2] = 1;  // direita: x -> z
+        mat[5] = 1;  // cima: y -> y
+        mat[8] = -1; // frente: z -> -x
+        mat[15] = 1;
         mat[12] = -PED_BONES[b].pos.x;
         mat[13] = -PED_BONES[b].pos.y;
         mat[14] = -PED_BONES[b].pos.z;
@@ -468,6 +473,9 @@ void AddSkin(Model& m, BYTE* atomic, BYTE* geom, const std::vector<int>& vertexB
     BYTE* hier = Alloc(m, 0x24);
     *reinterpret_cast<int*>(hier + 4) = PED_BONE_COUNT;
     *reinterpret_cast<BYTE**>(hier + 0x10) = nodes;
+    BYTE* skeletonRoot = MakeFrame(m, clumpRoot, {0, 0, 0}, "Root");
+    *reinterpret_cast<BYTE**>(hier + 0x14) = skeletonRoot;
+    *reinterpret_cast<BYTE**>(nodes + 0xC) = skeletonRoot;
     g_skins[geom] = skin;
     g_hierarchies[atomic] = hier;
 }
@@ -588,6 +596,12 @@ void Load(Model& m) {
             std::vector<Material> pedMats = {{"skin", Rgba(255, 255, 255)}, {nullptr, Rgba(60, 90, 160)},
                                              {nullptr, Rgba(40, 40, 50)}};
             BYTE* frame = MakeFrame(m, root, {0, 0, 0}, "normal");
+            for (Vec3& v : body.v) {
+                v = {v.z, v.y, -v.x}; // no espaco da pele (deitado)
+            }
+            for (Vec3& n : body.n) {
+                n = {n.z, n.y, -n.x};
+            }
             BYTE* geom = MakeGeometry(m, body, pedMats, false);
             BYTE* atomic = MakeAtomic(m, frame, geom, 0x05);
             add(atomic);
@@ -597,7 +611,7 @@ void Load(Model& m) {
             for (int box = 0; box < 6; ++box) {
                 vertexBone.insert(vertexBone.end(), 24, boxBone[box]);
             }
-            AddSkin(m, atomic, geom, vertexBone);
+            AddSkin(m, atomic, geom, vertexBone, root);
         }
     } else {
         BYTE* frame = MakeFrame(m, nullptr, {0, 0, 0}, m.name.c_str());
@@ -1357,6 +1371,36 @@ int FindButton() {
     return 0;
 }
 
+// De pe? A caixa dos pixels que nao sao do fundo (so as linhas e colunas com varios deles: as linhas da grade ficam de
+// fora): mais alta que larga.
+float Tallness(int x0, int y0, int x1, int y1, DWORD bg, int tolerance) {
+    std::vector<int> rows(y1 - y0, 0), cols(x1 - x0, 0);
+    for (int y = y0; y < y1; ++y) {
+        for (int x = x0; x < x1; ++x) {
+            DWORD p = Pixel(x, y);
+            int d = std::abs(static_cast<int>((p >> 16) & 0xFF) - static_cast<int>((bg >> 16) & 0xFF)) +
+                    std::abs(static_cast<int>((p >> 8) & 0xFF) - static_cast<int>((bg >> 8) & 0xFF)) +
+                    std::abs(static_cast<int>(p & 0xFF) - static_cast<int>(bg & 0xFF));
+            if (d > tolerance) {
+                ++rows[y - y0];
+                ++cols[x - x0];
+            }
+        }
+    }
+    auto span = [](const std::vector<int>& v, int min) {
+        int a = -1, b = -1;
+        for (int i = 0; i < static_cast<int>(v.size()); ++i) {
+            if (v[i] >= min) {
+                a = a < 0 ? i : a;
+                b = i;
+            }
+        }
+        return a < 0 ? 0 : b - a;
+    };
+    int h = span(rows, 6), w = span(cols, 6);
+    return w > 0 ? static_cast<float>(h) / static_cast<float>(w) : 0.0f;
+}
+
 const Command* LastCommand(int op) {
     for (auto it = g_commands.rbegin(); it != g_commands.rend(); ++it) {
         if (it->op == op) {
@@ -1578,7 +1622,11 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     }
 
     // 2) Botao do meio: abre o menu no card da lixeira.
-    Click(W / 2, H / 2, WM_MBUTTONDOWN, WM_MBUTTONUP);
+    // O botao do meio pelo CPad do jogo (com o menu fechado o jogo pega o mouse pelo DirectInput)
+    Mem<BYTE>(0xB73418 + 2) = 1;
+    Frames(3);
+    Mem<BYTE>(0xB73418 + 2) = 0;
+    Frames(2);
     Frames(30);
     g_losOn = false;
     Model& trash = *FindModel(1337);
@@ -1710,6 +1758,9 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
         thumbs += Variety(x - 40, y - 40, x + 40, y + 40) > 6;
     }
     CheckF(thumbs >= 9, "grade: miniaturas desenhadas na primeira linha (%.0f de 11)", thumbs);
+    CheckF(Tallness(201, 198, 322, 318, Pixel(201, 198), 45) > 1.4f,
+           "grade: o personagem 46 (pele deitada) de pe na miniatura (altura/largura %.2f)",
+           Tallness(201, 198, 322, 318, Pixel(201, 198), 45));
     int released = 0, loaded = 0;
     for (const Model& m : g_models) {
         loaded += m.loads > 0;
@@ -1835,6 +1886,9 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
           "animacoes: o .txt da referencia gerado da pasta das originais");
     CheckF(Variety(ANIM_VIEW_X0, ANIM_VIEW_Y0, ANIM_VIEW_X1, ANIM_VIEW_Y1) > 8, "animacoes: o personagem no visualizador (%.0f cores)",
            Variety(ANIM_VIEW_X0, ANIM_VIEW_Y0, ANIM_VIEW_X1, ANIM_VIEW_Y1));
+    float tall = Tallness(ANIM_VIEW_X0, ANIM_VIEW_Y0 + 50, ANIM_VIEW_X1, ANIM_VIEW_Y1 - 60,
+                          Pixel(ANIM_VIEW_X0 + 20, ANIM_VIEW_Y0 + 60), 180); // as linhas da grade ficam abaixo
+    CheckF(tall > 1.4f, "previa: o personagem de pe, sem animacao (altura/largura %.2f)", tall);
     Click(300, 154);
     Type("walk");
     Frames(10);

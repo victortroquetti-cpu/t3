@@ -267,11 +267,70 @@ void Pose() {
     Check(out.max.x > m.max.x && out.min.z == m.min.z, "pose: a caixa com folga, o chao no mesmo lugar");
 }
 
+// O espaco da pele deitado (como nos personagens do jogo): x da pele = z do modelo. A skinToBone[0] e o frame raiz
+// poem de pe; sem o frame (o jeito antigo), o modelo ficava deitado.
+void PoseLying() {
+    mesh::Mesh m;
+    m.ok = true;
+    m.id = 2;
+    m.min = {-1, -1, 0};
+    m.max = {1, 1, 2};
+    mesh::Batch b;
+    b.verts.push_back({2, 0, 0, 1, 0, 0, 0, 0});
+    m.batches.push_back(b);
+    m.vertices = 1;
+    // Q: x -> z, y -> y, z -> -x (linhas: direita, cima, frente, posicao)
+    float q[16] = {0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1};
+    mesh::Bone root, head;
+    memcpy(root.skinToBone, q, sizeof(q));
+    memcpy(head.skinToBone, q, sizeof(q));
+    head.skinToBone[14] = -1; // a cabeca em z = 1 no modelo
+    root.tag = 0;
+    head.tag = 5;
+    head.parent = 0;
+    m.skin.bones = {root, head};
+    m.skin.framed = true; // o frame raiz na origem, sem rotacao
+    mesh::SkinBatch sb;
+    sb.batch = 0;
+    sb.pos = {{2, 0, 0}};
+    sb.normal = {{1, 0, 0}};
+    sb.index = {1, 0, 0, 0};
+    sb.weight = {1, 0, 0, 0};
+    sb.toModel[0] = {1, 0, 0};
+    sb.toModel[1] = {0, 1, 0};
+    sb.toModel[2] = {0, 0, 1};
+    sb.toModel[3] = {0, 0, 0};
+    m.skin.batches.push_back(sb);
+    ifp::Clip none;
+    mesh::Mesh out;
+    pose::Apply(m, none, 0, true, &out);
+    const mesh::Vertex& v = out.batches[0].verts[0];
+    Check(std::fabs(v.x) < 1e-4f && std::fabs(v.z - 2) < 1e-4f && std::fabs(v.nz - 1) < 1e-4f,
+          "pele deitada: o modelo parado fica de pe (%.3f %.3f %.3f)", v.x, v.y, v.z);
+    // Uma animacao so na cabeca (a raiz sem quadros, como o abseil do jogo): continua de pe
+    ifp::Clip clip;
+    ifp::Track t;
+    t.bone = 5;
+    ifp::Key k = {0, {0, 0, 0, 1}, {0, 0, 0}};
+    ifpw::Axis(k.q, 1, 0, 0, 90);
+    t.keys.push_back(k);
+    clip.tracks.push_back(t);
+    clip.seconds = 0.03f;
+    pose::Apply(m, clip, 0, true, &out);
+    Check(std::fabs(v.x) < 1e-4f && std::fabs(v.y + 1) < 1e-4f && std::fabs(v.z - 1) < 1e-4f,
+          "pele deitada, raiz sem quadros: a cabeca gira em pe (%.3f %.3f %.3f)", v.x, v.y, v.z);
+    m.skin.framed = false;
+    out = mesh::Mesh();
+    pose::Apply(m, none, 0, true, &out);
+    Check(std::fabs(out.batches[0].verts[0].x - 2) < 1e-4f, "sem o frame raiz: o espaco da pele (o caso antigo)");
+}
+
 int main(int argc, char** argv) {
     std::string mode = argc > 1 ? argv[1] : "nomes", dir = argc > 2 ? argv[2] : "jogo";
     printf("== %s\n", mode.c_str());
     if (mode == "pose") {
         Pose();
+        PoseLying();
     } else {
         MakeGame(dir, mode == "pasta");
         if (mode == "txt") {

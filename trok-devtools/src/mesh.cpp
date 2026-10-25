@@ -13,7 +13,10 @@
 //   Pele (rpskin do gta-reversed): RpSkinGeometryGetSkin 0x7C7550, RpSkinGetNumBones 0x7C77E0, RpSkinGetVertexBoneWeights
 //   0x7C77F0 (4 floats por vertice), RpSkinGetVertexBoneIndices 0x7C7800 (4 bytes por vertice),
 //   RpSkinGetSkinToBoneMatrices 0x7C7810, RpSkinAtomicGetHAnimHierarchy 0x7C7540. RpHAnimHierarchy: quantos nos +4,
-//   nos +0x10 (16 bytes: id, indice, flags (1 = volta ao pai guardado, 2 = guarda o pai), frame).
+//   nos +0x10 (16 bytes: id, indice, flags (1 = volta ao pai guardado, 2 = guarda o pai), frame), o frame raiz do
+//   esqueleto +0x14.
+//   O jogo desenha a pele com skinToBone * a matriz de cada osso (dos frames do esqueleto), sem o frame do atomico; o
+//   espaco da pele dos personagens do jogo vem deitado, entao o modelo parado usa skinToBone[0] * o frame raiz.
 //   CColModel: caixa +0 (min, max), dados +0x2C. CCollisionData: esferas +0, caixas +2, triangulos +4 (quantidades);
 //   esferas +8 (0x14 cada), caixas +0xC (0x1C cada), vertices +0x14 (int16 x3 / 128), triangulos +0x18 (8 bytes).
 // Os veiculos: as pecas "_vlo" (a versao de longe) ficam de fora, as rodas da esquerda giram 180 graus (como o jogo faz)
@@ -174,8 +177,44 @@ DWORD Call(DWORD fn, DWORD arg) {
     return reinterpret_cast<PtrFn>(fn)(arg);
 }
 
+Xform FromRw(DWORD m) {
+    Xform x;
+    x.r = At<Vec3>(m, 0x00);
+    x.u = At<Vec3>(m, 0x10);
+    x.a = At<Vec3>(m, 0x20);
+    x.p = At<Vec3>(m, 0x30);
+    return x;
+}
+
+// O caminho da pele ate o modelo, pelos frames do esqueleto (como o jogo desenha): rigid = skinToBone[0] * o frame raiz
+// no modelo; parent = o frame acima da raiz no modelo (onde as animacoes poem a raiz); rootLocal = a raiz em relacao a ele.
+bool SkinFrames(DWORD atomic, DWORD geom, Xform* rigid, Xform* parent, Xform* rootLocal) {
+    DWORD skin = Call(FN_GEOMETRY_SKIN, geom);
+    if (!Ptr(skin)) {
+        return false;
+    }
+    DWORD matrices = Call(FN_SKIN_MATRICES, skin), hier = Call(FN_ATOMIC_HIERARCHY, atomic);
+    if (!Ptr(matrices) || !gta::Readable(reinterpret_cast<void*>(matrices), 64) || !Ptr(hier) ||
+        !gta::Readable(reinterpret_cast<void*>(hier), 0x18)) {
+        return false;
+    }
+    DWORD root = At<DWORD>(hier, 0x14);
+    if (!Ptr(root) || !gta::Readable(reinterpret_cast<void*>(root), 0x50)) {
+        return false;
+    }
+    Xform s0 = FromRw(matrices);
+    if (!Finite(s0.r) || !Finite(s0.u) || !Finite(s0.a) || !Finite(s0.p)) {
+        return false;
+    }
+    *rootLocal = FrameLocal(root);
+    *parent = FrameToModel(At<DWORD>(root, 0x04));
+    *rigid = Then(s0, FrameToModel(root));
+    return true;
+}
+
 // A pele do atomico (se tiver): os ossos (a primeira vez) e os pesos de cada vertice, na ordem da geometria.
-void ReadSkin(DWORD atomic, DWORD geom, int numVerts, const Vec3* pos, const Vec3* normal, const Xform& toModel, Mesh* out) {
+void ReadSkin(DWORD atomic, DWORD geom, int numVerts, const Vec3* pos, const Vec3* normal, const Xform& toModel,
+              const Xform* rootLocal, Mesh* out) {
     DWORD skin = Call(FN_GEOMETRY_SKIN, geom);
     if (!Ptr(skin)) {
         return;
@@ -215,6 +254,13 @@ void ReadSkin(DWORD atomic, DWORD geom, int numVerts, const Vec3* pos, const Vec
             current = (flags & 1) ? (top > 0 ? stack[--top] : -1) : i;
         }
         s.bones = bones;
+        s.framed = rootLocal != nullptr;
+        if (rootLocal) {
+            s.rootLocal[0] = rootLocal->r;
+            s.rootLocal[1] = rootLocal->u;
+            s.rootLocal[2] = rootLocal->a;
+            s.rootLocal[3] = rootLocal->p;
+        }
     } else if (static_cast<int>(s.bones.size()) != numBones) {
         return; // outro esqueleto no mesmo modelo: so o primeiro anima
     }
@@ -285,6 +331,9 @@ bool ReadAtomic(DWORD atomic, const Xform& toModel, bool flipWheel, bool vehicle
             faceNormals[k].z += n.z;
         }
     }
+    // Com pele: o caminho do esqueleto, nao o frame do atomico
+    Xform vertexXform = toModel, skinParent, rootLocal;
+    bool framed = !vehicle && SkinFrames(atomic, geom, &vertexXform, &skinParent, &rootLocal);
     for (int i = 0; i < numVerts; ++i) {
         Vec3 p = src[i];
         Vec3 n = nsrc ? nsrc[i] : faceNormals[i];
@@ -292,7 +341,7 @@ bool ReadAtomic(DWORD atomic, const Xform& toModel, bool flipWheel, bool vehicle
             p = {-p.x, -p.y, p.z};
             n = {-n.x, -n.y, n.z};
         }
-        Vec3 wp = toModel.Point(p), wn = toModel.Dir(n);
+        Vec3 wp = vertexXform.Point(p), wn = vertexXform.Dir(n);
         float len = std::sqrt(wn.x * wn.x + wn.y * wn.y + wn.z * wn.z);
         if (len > 1e-6f) {
             wn = {wn.x / len, wn.y / len, wn.z / len};
@@ -349,7 +398,8 @@ bool ReadAtomic(DWORD atomic, const Xform& toModel, bool flipWheel, bool vehicle
         for (int i = 0; i < numVerts; ++i) {
             rawNormals[i] = nsrc ? nsrc[i] : faceNormals[i];
         }
-        ReadSkin(atomic, geom, numVerts, src, rawNormals.data(), toModel, out);
+        ReadSkin(atomic, geom, numVerts, src, rawNormals.data(), framed ? skinParent : toModel, framed ? &rootLocal : nullptr,
+                 out);
     }
     out->vertices += numVerts;
     out->triangles += numTris;

@@ -689,6 +689,7 @@ void RegisterCommand() {
         Log("samp.dll nao e o 0.3.7 R1 -- sem /trokdevtools, o menu abre no F10");
         return;
     }
+    audiospy::InstallSamp(g_samp);
     for (int i = 0; i < 1200; ++i) {
         void* input = *reinterpret_cast<void**>(g_samp + SAMP_INPUT);
         void* info = *reinterpret_cast<void**>(g_samp + SAMP_INFO);

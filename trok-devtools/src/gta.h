@@ -67,6 +67,9 @@ int TxdParent(int txdIndex);       // -1 = sem pai
 // ---------------------------------------------------------------- mundo
 
 DWORD PlayerPed();
+// O botao do meio pelo estado do mouse do proprio jogo (CPad): com o menu fechado o jogo le o mouse pelo DirectInput,
+// e o clique nem sempre chega como mensagem do Windows.
+bool MiddleMouseDown();
 bool EntityMatrix(DWORD entity, Vec3* right, Vec3* forward, Vec3* up, Vec3* pos);
 int EntityModel(DWORD entity);
 int EntityType(DWORD entity); // 1 predio, 2 veiculo, 3 personagem, 4 objeto, 5 dummy
