@@ -51,6 +51,7 @@ int ImgSlots();                 // 8
 std::string ImgPath(int index); // "MODELS\GTA3.IMG" (vazio = slot livre)
 
 // Segura um modelo carregado: pede com a marca de missao (o streaming nao tira) e, no Release, devolve como estava.
+// Com varias travas no mesmo modelo, a marca so sai na ultima.
 struct Hold {
     int id = -1;
     bool added = false; // a marca foi o mod que pos
@@ -80,11 +81,21 @@ bool CameraNow(Camera* out);
 DWORD LineOfSight(const Vec3& from, const Vec3& to, Vec3* hit);
 bool Project(const Vec3& world, float* x, float* y); // na tela; false = atras da camera
 
+// ---------------------------------------------------------------- animacoes
+
+constexpr int IFP_FIRST = 25575; // no streaming, o bloco de animacoes N e o recurso 25575 + N
+int AnimBlockIndex(const std::string& name); // CAnimManager::ms_aAnimBlocks (-1 = nao registrado)
+bool AnimBlockLoaded(int index);
+bool LoadResource(int resource, Hold* hold); // como o Load, para recursos sem modelo (os .ifp)
+
 // ---------------------------------------------------------------- comandos de script
 
 enum SpawnKind { SPAWN_OBJECT, SPAWN_VEHICLE, SPAWN_PED };
 // O modelo tem que estar carregado. heading em graus.
 bool Spawn(SpawnKind kind, int model, const Vec3& pos, float heading, int* handle);
 void Despawn(SpawnKind kind, int handle);
+// TASK_PLAY_ANIM no personagem do jogador (o bloco ja carregado); move = a animacao leva o personagem (lockX/lockY).
+bool PlayAnim(const std::string& block, const std::string& anim, bool loop, bool move, std::string* why);
+void StopAnim(); // CLEAR_CHAR_TASKS_IMMEDIATELY
 
 } // namespace gta

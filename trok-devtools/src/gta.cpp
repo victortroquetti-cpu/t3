@@ -9,13 +9,17 @@
 //   CTxdStore::ms_pTxdPool 0xC8800C (CPool de TxdDef: dicionario +0, pai +6, 0xC cada).
 //   CWorld::ProcessLineOfSight 0x56BA00, CSprite::CalcScreenCoors 0x70CE30, TheCamera 0xB6F028 (CMatrix* +0x14),
 //   CWorld::Players[0].m_pPed 0xB7CD98, CEntity: modelo +0x22, interior +0x2F, LOD +0x30, tipo +0x36 (& 7).
+//   CAnimManager::ms_aAnimBlocks 0xB5D4A0 (0x20 cada: nome[16], carregado +0x10), ms_numAnimBlocks 0xB4EA30.
 //   CRunningScript::ProcessOneCommand 0x469EB0: o script de mentira roda um comando por vez (como o CLEO e o
 //   MoonLoader), com as variaveis locais em +0x3C e o resultado da condicao em +0xC5.
 
 #include "gta.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <unordered_map>
+#include <unordered_set>
 
 void DevToolsLog(const char* fmt, ...);
 
@@ -40,6 +44,9 @@ constexpr DWORD TXD_DEF_SIZE = 0xC, TXD_DICT = 0x0, TXD_PARENT = 0x6;
 constexpr DWORD FN_LINE_OF_SIGHT = 0x56BA00, FN_CALC_SCREEN = 0x70CE30;
 constexpr DWORD CAMERA = 0xB6F028, PLAYER_PED = 0xB7CD98;
 constexpr DWORD ENT_PLACEMENT = 0x04, ENT_MATRIX = 0x14, ENT_MODEL = 0x22, ENT_AREA = 0x2F, ENT_LOD = 0x30, ENT_TYPE = 0x36;
+
+constexpr DWORD ANIM_BLOCKS = 0xB5D4A0, ANIM_BLOCK_COUNT = 0xB4EA30, ANIM_BLOCK_SIZE = 0x20;
+constexpr int ANIM_BLOCKS_MAX = 180;
 
 constexpr DWORD FN_PROCESS_ONE_COMMAND = 0x469EB0;
 constexpr DWORD SCRIPT_SIZE = 0xE0, SC_NAME = 0x08, SC_BASE_IP = 0x10, SC_CURRENT_IP = 0x14, SC_LOCALS = 0x3C,
@@ -74,6 +81,12 @@ public:
         BYTE t = 0x06;
         Put(&t, 1);
         Put(&v, 4);
+    }
+    void Text(const std::string& v) { // texto de tamanho variavel (1 byte com o tamanho)
+        BYTE t = 0x0E, n = static_cast<BYTE>(std::min<size_t>(v.size(), 120));
+        Put(&t, 1);
+        Put(&n, 1);
+        Put(v.data(), n);
     }
     void Local(WORD index) { // variavel local (para a saida)
         BYTE t = 0x03;
@@ -209,32 +222,74 @@ std::string ImgPath(int index) {
     return std::string(name, strnlen(name, 40));
 }
 
-bool Load(int id, Hold* hold) {
+// Varias travas no mesmo recurso (a previa, o card, uma miniatura): a marca de missao so sai quando a ultima solta.
+std::unordered_map<int, int> g_holds;
+std::unordered_set<int> g_added;
+
+bool Acquire(int resource, Hold* hold) {
     StreamInfo si;
-    if (!ModelInfo(id) || !Streaming(id, &si)) {
+    if (!Streaming(resource, &si)) {
         return false;
     }
-    if (hold->id != id) {
+    if (hold->id != resource) {
         Release(hold);
-        hold->id = id;
-        hold->added = !(si.flags & STREAMING_MISSION_REQUIRED);
+        hold->id = resource;
+        if (g_holds[resource]++ == 0 && !(si.flags & STREAMING_MISSION_REQUIRED)) {
+            g_added.insert(resource);
+        }
+        hold->added = g_added.count(resource) > 0;
         if (si.size == 0 && si.loadState != 1) {
             return false; // sem arquivo no .img (os SPECIAL das cutscenes)
         }
-        reinterpret_cast<RequestFn>(FN_REQUEST_MODEL)(id, STREAMING_MISSION_REQUIRED);
+        reinterpret_cast<RequestFn>(FN_REQUEST_MODEL)(resource, STREAMING_MISSION_REQUIRED);
     }
-    if (Streaming(id, &si) && si.loadState != 1) {
+    if (Streaming(resource, &si) && si.loadState != 1) {
         reinterpret_cast<LoadAllFn>(FN_LOAD_ALL)(false);
     }
-    return Streaming(id, &si) && si.loadState == 1 && RwObjectOf(ModelInfo(id));
+    return Streaming(resource, &si) && si.loadState == 1;
+}
+
+bool Load(int id, Hold* hold) {
+    if (!ModelInfo(id)) {
+        return false;
+    }
+    return Acquire(id, hold) && RwObjectOf(ModelInfo(id));
 }
 
 void Release(Hold* hold) {
-    if (hold->id >= 0 && hold->added) {
-        reinterpret_cast<ModelFn>(FN_MISSION_DOESNT_REQUIRE)(hold->id);
+    if (hold->id >= 0) {
+        auto it = g_holds.find(hold->id);
+        if (it != g_holds.end() && --it->second <= 0) {
+            g_holds.erase(it);
+            if (g_added.erase(hold->id)) {
+                reinterpret_cast<ModelFn>(FN_MISSION_DOESNT_REQUIRE)(hold->id);
+            }
+        }
     }
     hold->id = -1;
     hold->added = false;
+}
+
+bool LoadResource(int resource, Hold* hold) {
+    return Acquire(resource, hold);
+}
+
+int AnimBlockIndex(const std::string& name) {
+    int count = At<int>(ANIM_BLOCK_COUNT, 0);
+    if (count <= 0 || count > ANIM_BLOCKS_MAX || !Readable(reinterpret_cast<void*>(ANIM_BLOCKS), count * ANIM_BLOCK_SIZE)) {
+        return -1;
+    }
+    for (int i = 0; i < count; ++i) {
+        const char* n = reinterpret_cast<const char*>(ANIM_BLOCKS + i * ANIM_BLOCK_SIZE);
+        if (strnlen(n, 16) == name.size() && _strnicmp(n, name.c_str(), name.size()) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+bool AnimBlockLoaded(int index) {
+    return index >= 0 && index < ANIM_BLOCKS_MAX && At<BYTE>(ANIM_BLOCKS + index * ANIM_BLOCK_SIZE, 0x10) != 0;
 }
 
 DWORD TxdDictionary(int txdIndex) {
@@ -406,6 +461,51 @@ void Despawn(SpawnKind kind, int handle) {
     s.Op(kind == SPAWN_OBJECT ? 0x0108 : kind == SPAWN_VEHICLE ? 0x00A6 : 0x009B); // DELETE_*
     s.Int(handle);
     s.Run(1);
+}
+
+int PlayerHandle() {
+    Script& s = g_script;
+    s.Op(0x01F5); // GET_PLAYER_CHAR
+    s.Int(0);
+    s.Local(0);
+    return LocalVar(s.Run(1), 0);
+}
+
+bool PlayAnim(const std::string& block, const std::string& anim, bool loop, bool move, std::string* why) {
+    Script& s = g_script;
+    int ped = PlayerHandle();
+    if (ped <= 0) {
+        *why = "personagem n\xC3\xA3o encontrado";
+        return false;
+    }
+    s.Op(0x00DF); // IS_CHAR_IN_ANY_CAR
+    s.Int(ped);
+    if (s.Run(1)[SC_COND]) {
+        *why = "saia do ve\xC3\xAD" "culo primeiro";
+        return false;
+    }
+    s.Op(0x0605); // TASK_PLAY_ANIM: personagem, animacao, bloco, transicao, repetir, lockX, lockY, lockF, tempo
+    s.Int(ped);
+    s.Text(anim);
+    s.Text(block);
+    s.Float(4.0f);
+    s.Int(loop ? 1 : 0);
+    s.Int(move ? 1 : 0);
+    s.Int(move ? 1 : 0);
+    s.Int(0);
+    s.Int(-1);
+    s.Run(1);
+    return true;
+}
+
+void StopAnim() {
+    int ped = PlayerHandle();
+    if (ped > 0) {
+        Script& s = g_script;
+        s.Op(0x0792); // CLEAR_CHAR_TASKS_IMMEDIATELY
+        s.Int(ped);
+        s.Run(1);
+    }
 }
 
 } // namespace gta

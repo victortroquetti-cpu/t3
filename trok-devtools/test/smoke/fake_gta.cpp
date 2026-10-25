@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 
+#include "../ifp_writer.h"
+
 namespace {
 
 template <typename T> T& Mem(DWORD address) {
@@ -391,6 +393,85 @@ BYTE* MakeAtomic(Model& m, BYTE* frame, BYTE* geom, BYTE flags) {
     return a;
 }
 
+// ---------------------------------------------------------------- pele dos personagens (RpSkin, RpHAnimHierarchy)
+
+struct FakeSkin {
+    int bones;
+    float* weights;     // 4 por vertice
+    DWORD* indices;     // 4 bytes por vertice
+    float* matrices;    // skinToBone, 16 floats cada
+};
+std::map<BYTE*, FakeSkin*> g_skins;      // geometria -> pele
+std::map<BYTE*, BYTE*> g_hierarchies;    // atomico -> hierarquia
+int g_skinCalls = 0;
+
+DWORD __cdecl FakeGeometryGetSkin(BYTE* geom) {
+    ++g_skinCalls;
+    auto it = g_skins.find(geom);
+    return it == g_skins.end() ? 0 : reinterpret_cast<DWORD>(it->second);
+}
+DWORD __cdecl FakeSkinBones(FakeSkin* s) {
+    return s->bones;
+}
+DWORD __cdecl FakeSkinWeights(FakeSkin* s) {
+    return reinterpret_cast<DWORD>(s->weights);
+}
+DWORD __cdecl FakeSkinIndices(FakeSkin* s) {
+    return reinterpret_cast<DWORD>(s->indices);
+}
+DWORD __cdecl FakeSkinMatrices(FakeSkin* s) {
+    return reinterpret_cast<DWORD>(s->matrices);
+}
+DWORD __cdecl FakeAtomicHierarchy(BYTE* atomic) {
+    auto it = g_hierarchies.find(atomic);
+    return it == g_hierarchies.end() ? 0 : reinterpret_cast<DWORD>(it->second);
+}
+
+// O esqueleto do personagem de mentira: os ossos com as etiquetas do jogo, na ordem do RpHAnim (2 = guarda o pai,
+// 1 = volta ao pai guardado) e cada caixa do corpo presa a um osso.
+struct FakeBone {
+    const char* name;
+    int tag;
+    Vec3 pos;
+    int flags;
+};
+const FakeBone PED_BONES[] = {{"Root", 0, {0, 0, 0}, 0},           {"Pelvis", 1, {0, 0, 0}, 0},
+                              {"Spine", 2, {0, 0, 0.1f}, 2},        {"Head", 5, {0, 0, 0.65f}, 3},
+                              {"L UpperArm", 32, {-0.32f, 0, 0.6f}, 3}, {"R UpperArm", 22, {0.32f, 0, 0.6f}, 1},
+                              {"L Thigh", 41, {-0.12f, 0, 0.05f}, 3}, {"R Thigh", 51, {0.12f, 0, 0.05f}, 1}};
+constexpr int PED_BONE_COUNT = 8;
+
+void AddSkin(Model& m, BYTE* atomic, BYTE* geom, const std::vector<int>& vertexBone) {
+    int nv = static_cast<int>(vertexBone.size());
+    FakeSkin* skin = reinterpret_cast<FakeSkin*>(Alloc(m, sizeof(FakeSkin)));
+    skin->bones = PED_BONE_COUNT;
+    skin->weights = reinterpret_cast<float*>(Alloc(m, nv * 16));
+    skin->indices = reinterpret_cast<DWORD*>(Alloc(m, nv * 4));
+    skin->matrices = reinterpret_cast<float*>(Alloc(m, PED_BONE_COUNT * 64));
+    for (int i = 0; i < nv; ++i) {
+        skin->weights[i * 4] = 1.0f;
+        skin->indices[i] = static_cast<DWORD>(vertexBone[i]);
+    }
+    BYTE* nodes = Alloc(m, PED_BONE_COUNT * 16);
+    for (int b = 0; b < PED_BONE_COUNT; ++b) {
+        float* mat = skin->matrices + b * 16;
+        mat[0] = mat[5] = mat[10] = mat[15] = 1;
+        mat[12] = -PED_BONES[b].pos.x;
+        mat[13] = -PED_BONES[b].pos.y;
+        mat[14] = -PED_BONES[b].pos.z;
+        int* node = reinterpret_cast<int*>(nodes + b * 16);
+        node[0] = PED_BONES[b].tag;
+        node[1] = b;
+        node[2] = PED_BONES[b].flags;
+        *reinterpret_cast<BYTE**>(node + 3) = MakeFrame(m, nullptr, PED_BONES[b].pos, PED_BONES[b].name);
+    }
+    BYTE* hier = Alloc(m, 0x24);
+    *reinterpret_cast<int*>(hier + 4) = PED_BONE_COUNT;
+    *reinterpret_cast<BYTE**>(hier + 0x10) = nodes;
+    g_skins[geom] = skin;
+    g_hierarchies[atomic] = hier;
+}
+
 void Load(Model& m) {
     BYTE* rw = nullptr;
     Geo g;
@@ -507,7 +588,16 @@ void Load(Model& m) {
             std::vector<Material> pedMats = {{"skin", Rgba(255, 255, 255)}, {nullptr, Rgba(60, 90, 160)},
                                              {nullptr, Rgba(40, 40, 50)}};
             BYTE* frame = MakeFrame(m, root, {0, 0, 0}, "normal");
-            add(MakeAtomic(m, frame, MakeGeometry(m, body, pedMats, false), 0x05));
+            BYTE* geom = MakeGeometry(m, body, pedMats, false);
+            BYTE* atomic = MakeAtomic(m, frame, geom, 0x05);
+            add(atomic);
+            // As caixas na ordem acima: tronco (Spine), cabeca, perna esquerda e direita, braco esquerdo e direito
+            const int boxBone[] = {2, 3, 6, 7, 4, 5};
+            std::vector<int> vertexBone;
+            for (int box = 0; box < 6; ++box) {
+                vertexBone.insert(vertexBone.end(), 24, boxBone[box]);
+            }
+            AddSkin(m, atomic, geom, vertexBone);
         }
     } else {
         BYTE* frame = MakeFrame(m, nullptr, {0, 0, 0}, m.name.c_str());
@@ -532,8 +622,20 @@ void Unload(Model& m) {
 
 int g_requests = 0, g_loadAlls = 0, g_releases = 0, g_gameFrames = 0;
 
+constexpr int IFP_FIRST = 25575, IFP_BLOCKS = 3;
+constexpr DWORD ANIM_BLOCKS = 0xB5D4A0, ANIM_BLOCK_COUNT = 0xB4EA30;
+int g_ifpRequests = 0, g_ifpReleases = 0;
+
 void __cdecl FakeRequestModel(int id, int flags) {
     ++g_requests;
+    if (id >= IFP_FIRST && id < IFP_FIRST + IFP_BLOCKS) {
+        ++g_ifpRequests;
+        Mem<BYTE>(STREAM_INFO + id * 0x14 + 6) |= static_cast<BYTE>(flags);
+        if (Mem<BYTE>(STREAM_INFO + id * 0x14 + 0x10) != 1) {
+            Mem<BYTE>(STREAM_INFO + id * 0x14 + 0x10) = 2;
+        }
+        return;
+    }
     Model* m = FindModel(id);
     if (!m) {
         return;
@@ -547,6 +649,12 @@ void __cdecl FakeRequestModel(int id, int flags) {
 
 void __cdecl FakeLoadAll(bool) {
     ++g_loadAlls;
+    for (int b = 0; b < IFP_BLOCKS; ++b) {
+        if (Mem<BYTE>(STREAM_INFO + (IFP_FIRST + b) * 0x14 + 0x10) == 2) {
+            Mem<BYTE>(STREAM_INFO + (IFP_FIRST + b) * 0x14 + 0x10) = 1;
+            Mem<BYTE>(ANIM_BLOCKS + b * 0x20 + 0x10) = 1; // o CAnimBlock carregado
+        }
+    }
     for (Model& m : g_models) {
         if (Mem<BYTE>(STREAM_INFO + m.id * 0x14 + 0x10) == 2) {
             if (Mem<DWORD>(STREAM_INFO + m.id * 0x14 + 0xC) == 0) {
@@ -560,6 +668,16 @@ void __cdecl FakeLoadAll(bool) {
 
 void __cdecl FakeMissionDoesntRequire(int id) {
     ++g_releases;
+    if (id >= IFP_FIRST && id < IFP_FIRST + IFP_BLOCKS) {
+        ++g_ifpReleases;
+        BYTE& flags = Mem<BYTE>(STREAM_INFO + id * 0x14 + 6);
+        flags &= ~4;
+        if (flags == 0) {
+            Mem<BYTE>(STREAM_INFO + id * 0x14 + 0x10) = 0;
+            Mem<BYTE>(ANIM_BLOCKS + (id - IFP_FIRST) * 0x20 + 0x10) = 0;
+        }
+        return;
+    }
     Model* m = FindModel(id);
     if (!m) {
         return;
@@ -615,6 +733,7 @@ struct Command {
     int op;
     std::vector<float> f;
     std::vector<int> i;
+    std::vector<std::string> s;
 };
 std::vector<Command> g_commands;
 std::map<int, int> g_entities; // handle -> opcode que criou
@@ -633,6 +752,9 @@ char __fastcall FakeProcessOneCommand(BYTE* script, void*) {
     case 0x0177: case 0x0175: case 0x0173: params = 2; break;
     case 0x0550: case 0x020A: params = 2; break;
     case 0x03CA: case 0x056E: case 0x056D: case 0x0108: case 0x00A6: case 0x009B: params = 1; break;
+    case 0x01F5: params = 2; break; // jogador, saida
+    case 0x00DF: case 0x0792: params = 1; break;
+    case 0x0605: params = 9; break; // personagem, animacao, bloco, transicao, repetir, lockX, lockY, lockF, tempo
     default:
         printf("FALHA: opcode inesperado 0x%04X\n", c.op);
         ++g_failures;
@@ -651,6 +773,10 @@ char __fastcall FakeProcessOneCommand(BYTE* script, void*) {
         } else if (type == 0x03) {
             outIndex = *reinterpret_cast<WORD*>(ip);
             ip += 2;
+        } else if (type == 0x0E) {
+            BYTE len = *ip++;
+            c.s.push_back(std::string(reinterpret_cast<char*>(ip), len));
+            ip += len;
         } else {
             printf("FALHA: tipo de parametro inesperado 0x%02X\n", type);
             ++g_failures;
@@ -677,6 +803,14 @@ char __fastcall FakeProcessOneCommand(BYTE* script, void*) {
     case 0x00A6:
     case 0x009B:
         g_entities.erase(c.i[0]);
+        break;
+    case 0x01F5:
+        if (outIndex >= 0) {
+            locals[outIndex] = 1; // o handle do personagem do jogador
+        }
+        break;
+    case 0x00DF:
+        script[0xC5] = 0; // a pe
         break;
     default:
         break;
@@ -782,6 +916,9 @@ BYTE g_soundManager[0x100];
 int g_soundRequests = 0;
 // Posicoes na aba Audios (1920x1080), conferidas nas capturas
 constexpr int AUDIO_ROW_Y = 281, AUDIO_WAV_X = 1120, AUDIO_HIST_X = 1170, AUDIO_HIST_Y = 362;
+// Na aba Animacoes: a linha da animacao (com um .ifp no filtro), o visualizador e a coluna da direita
+constexpr int ANIM_ROW_Y = 244, ANIM_VIEW_X0 = 720, ANIM_VIEW_Y0 = 200, ANIM_VIEW_X1 = 1400, ANIM_VIEW_Y1 = 870, ANIM_INFO_X = 1430,
+              ANIM_STOP_DY = 30, ANIM_CLEAR_X = 429;
 
 int FakeSoundsInBank(int bank) {
     if (bank == audio_data::WEAPONS_BANK) {
@@ -822,6 +959,58 @@ void WriteAudioFiles() {
     }
     WriteText("audio\\CONFIG\\PakFiles.dat", pakFiles);
     WriteText("audio\\CONFIG\\BankLkup.dat", lookup);
+}
+
+// ---------------------------------------------------------------- animacoes
+
+ifpw::Key AnimKey(float time, float ax, float ay, float az, float deg, float ty = 0) {
+    ifpw::Key k = {time, {0, 0, 0, 1}, {0, ty, 0}};
+    ifpw::Axis(k.q, ax, ay, az, deg);
+    return k;
+}
+
+// Andar: os bracos e as pernas balancam (bem marcado, para a previa mexer) e a raiz anda 1,2 m.
+ifpw::Anim WalkAnim(bool original) {
+    ifpw::Anim a;
+    a.name = "WALK_civi";
+    a.seqs.push_back({"Root", 0, true, {AnimKey(0, 0, 0, 1, 0), AnimKey(1.2f, 0, 0, 1, 0, original ? 1.0f : 1.2f)}});
+    a.seqs.push_back({"L UpperArm", 32, false, {AnimKey(0, 1, 0, 0, 70), AnimKey(0.6f, 1, 0, 0, -70), AnimKey(1.2f, 1, 0, 0, 70)}});
+    a.seqs.push_back({"R UpperArm", 22, false, {AnimKey(0, 1, 0, 0, -70), AnimKey(0.6f, 1, 0, 0, 70), AnimKey(1.2f, 1, 0, 0, -70)}});
+    a.seqs.push_back({"L Thigh", 41, false, {AnimKey(0, 1, 0, 0, -40), AnimKey(0.6f, 1, 0, 0, 40), AnimKey(1.2f, 1, 0, 0, -40)}});
+    a.seqs.push_back({"R Thigh", 51, false, {AnimKey(0, 1, 0, 0, 40), AnimKey(0.6f, 1, 0, 0, -40), AnimKey(1.2f, 1, 0, 0, 40)}});
+    return a;
+}
+
+ifpw::Anim ArmsUp(const char* name) {
+    ifpw::Anim a;
+    a.name = name;
+    a.seqs.push_back({"L UpperArm", 32, false, {AnimKey(0, 0, 1, 0, -150), AnimKey(2, 0, 1, 0, -120)}});
+    a.seqs.push_back({"R UpperArm", 22, false, {AnimKey(0, 0, 1, 0, 150), AnimKey(2, 0, 1, 0, 120)}});
+    return a;
+}
+
+// anim\ped.ifp e anim\anim.img (bar.ifp e dancing.ifp, este com outro nome interno), e a pasta das originais (o
+// WALK_civi original anda menos, e la nao tem o TROK_NOVA nem o dancing.ifp).
+void WriteAnimFiles() {
+    CreateDirectoryA("anim", nullptr);
+    WriteText("anim\\ped.ifp", ifpw::Anp3("ped", {WalkAnim(false), ArmsUp("IDLE_stance"), ArmsUp("TROK_NOVA")}));
+    WriteText("anim\\anim.img", ifpw::Img({{"bar.ifp", ifpw::Anp3("bar", {ArmsUp("BARMAN_IDLE")})},
+                                            {"dancing.ifp", ifpw::Anp3("dance", {ArmsUp("DANCE_LOOP")})}}));
+    CreateDirectoryA("Trok DevTools", nullptr);
+    CreateDirectoryA("Trok DevTools\\originais", nullptr);
+    WriteText("Trok DevTools\\originais\\ped.ifp", ifpw::Anp3("ped", {WalkAnim(true), ArmsUp("IDLE_stance")}));
+    WriteText("Trok DevTools\\originais\\anim.img", ifpw::Img({{"bar.ifp", ifpw::Anp3("bar", {ArmsUp("BARMAN_IDLE")})}}));
+}
+
+// CAnimManager::ms_aAnimBlocks: o ped (carregado) e os do anim.img (no streaming, 25575 + o bloco).
+void BuildAnimMemory() {
+    const char* names[IFP_BLOCKS] = {"ped", "bar", "dancing"};
+    for (int b = 0; b < IFP_BLOCKS; ++b) {
+        strcpy(reinterpret_cast<char*>(ANIM_BLOCKS + b * 0x20), names[b]);
+        Mem<BYTE>(ANIM_BLOCKS + b * 0x20 + 0x10) = b == 0;
+        Mem<DWORD>(STREAM_INFO + (IFP_FIRST + b) * 0x14 + 0xC) = b == 0 ? 0 : 1; // o ped.ifp nao e do streaming
+    }
+    Mem<int>(ANIM_BLOCK_COUNT) = IFP_BLOCKS;
 }
 
 // O carregador de bancos no AEAudioHardware (+0xD98): o slot 3 tem o 90S_P, o 4 um banco de passos, o 5 o WEAPONS.
@@ -987,6 +1176,8 @@ void BuildWorld() {
     WriteGameFiles();
     WriteAudioFiles();
     BuildAudioMemory();
+    WriteAnimFiles();
+    BuildAnimMemory();
 }
 
 // ---------------------------------------------------------------- quadros, entrada e capturas
@@ -1251,6 +1442,12 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     Redirect(FN_CALC_SCREEN, reinterpret_cast<void*>(FakeCalcScreenCoors));
     Redirect(FN_PROCESS_ONE, reinterpret_cast<void*>(FakeProcessOneCommand));
     Redirect(0x4EFB10, reinterpret_cast<void*>(FakeRequestNewSound)); // CAESoundManager::RequestNewSound
+    Redirect(0x7C7550, reinterpret_cast<void*>(FakeGeometryGetSkin)); // RpSkinGeometryGetSkin
+    Redirect(0x7C77E0, reinterpret_cast<void*>(FakeSkinBones));
+    Redirect(0x7C77F0, reinterpret_cast<void*>(FakeSkinWeights));
+    Redirect(0x7C7800, reinterpret_cast<void*>(FakeSkinIndices));
+    Redirect(0x7C7810, reinterpret_cast<void*>(FakeSkinMatrices));
+    Redirect(0x7C7540, reinterpret_cast<void*>(FakeAtomicHierarchy)); // RpSkinAtomicGetHAnimHierarchy
 
     // Camera em (0, -6, 1.8) olhando para +Y; o personagem em (0, 0, 1) olhando para +Y.
     static float camera[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -6, 1.8f, 1};
@@ -1258,6 +1455,7 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     static BYTE ped[0x800] = {};
     static float pedMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1};
     *reinterpret_cast<float**>(ped + 0x14) = pedMatrix;
+    *reinterpret_cast<short*>(ped + 0x22) = 46; // o skin do jogador
     Mem<BYTE*>(PLAYER_PED) = ped;
     // O que a mira acha: a lixeira 1337, em (0.5, 8, 0).
     memset(g_losEntity, 0, sizeof(g_losEntity));
@@ -1622,6 +1820,82 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     Click(AUDIO_HIST_X + 100, AUDIO_HIST_Y + 20);
     Frames(10);
     Capture("16-historico-clicado.bmp");
+    // 6c) A aba Animacoes: os .ifp com as marcas, a previa no personagem com ossos, tocar no personagem do jogador e parar.
+    Click(849, 120);
+    for (int i = 0; i < 100 && !(LogHas("ifp: ") && LogHas("previa: personagem")); ++i) {
+        Frames(3);
+    }
+    Frames(10);
+    Capture("17-animacoes.bmp");
+    Check(LogHas("ifp: 3 arquivos, 5 animacoes (1 modificadas, 2 novas; referencia: a pasta Trok DevTools\\originais)"),
+          "animacoes: 3 .ifp, o WALK_civi modificado e 2 novas pela pasta das originais");
+    Check(LogHas("ifp: dancing.ifp tem o nome interno \"dance\""), "animacoes: o dancing.ifp com outro nome interno");
+    Check(LogHas("previa: personagem 46 com 8 ossos"), "animacoes: a previa no skin do jogador (46), com os 8 ossos");
+    Check(GetFileAttributesA((g_out + "\\Trok DevTools\\animacoes_originais.txt").c_str()) != INVALID_FILE_ATTRIBUTES,
+          "animacoes: o .txt da referencia gerado da pasta das originais");
+    CheckF(Variety(ANIM_VIEW_X0, ANIM_VIEW_Y0, ANIM_VIEW_X1, ANIM_VIEW_Y1) > 8, "animacoes: o personagem no visualizador (%.0f cores)",
+           Variety(ANIM_VIEW_X0, ANIM_VIEW_Y0, ANIM_VIEW_X1, ANIM_VIEW_Y1));
+    Click(300, 154);
+    Type("walk");
+    Frames(10);
+    Click(300, ANIM_ROW_Y);
+    Frames(8);
+    Capture("18-animacao.bmp");
+    std::vector<DWORD> shotBefore(g_shot, g_shot + W * H);
+    Frames(18);
+    Capture("18b-animacao.bmp");
+    int moved = 0;
+    for (int y = ANIM_VIEW_Y0; y < ANIM_VIEW_Y1; y += 2) {
+        for (int x = ANIM_VIEW_X0; x < ANIM_VIEW_X1; x += 2) {
+            moved += (shotBefore[y * W + x] & 0xFFFFFF) != Pixel(x, y);
+        }
+    }
+    CheckF(moved > 150, "previa: o personagem mexe com a animacao (%.0f pixels mudaram)", moved);
+    int playY = 0;
+    for (int y = ANIM_VIEW_Y0; y < ANIM_VIEW_Y1 && !playY; ++y) {
+        bool run = true;
+        for (int k = 0; k < 14 && run; ++k) {
+            DWORD p = Pixel(ANIM_INFO_X, y + k);
+            run = ((p >> 16) & 0xFF) > 200 && ((p >> 8) & 0xFF) > 200 && (p & 0xFF) > 200;
+        }
+        playY = run ? y + 10 : 0;
+    }
+    CheckF(playY > 0, "animacao: o botao Tocar no meu personagem (claro) na altura %.0f", playY);
+    if (playY) {
+        Click(ANIM_INFO_X, playY);
+        Frames(5);
+    }
+    const Command* play = LastCommand(0x0605);
+    Check(play && play->s.size() == 2 && play->s[0] == "WALK_civi" && play->s[1] == "PED" && play->i.size() == 7 &&
+              play->i[0] == 1 && play->f[1] == 4.0f && play->i[2] == 1 && play->i[3] == 0 && play->i[6] == -1,
+          "tocar no personagem: TASK_PLAY_ANIM (0605) no handle do jogador, \"WALK_civi\" do \"PED\", repetindo, no lugar");
+    Check(g_ifpRequests == 0, "tocar no personagem: o PED ja esta carregado (nada pedido ao streaming)");
+    Check(LogHas("animacao: PED WALK_civi no personagem"), "log: a animacao no personagem");
+    // Outra, de um .ifp do anim.img: o bloco e carregado pelo streaming e preso ate parar
+    Click(ANIM_CLEAR_X, 154); // o x da busca
+    Frames(3);
+    Click(300, 154);
+    Type("barman");
+    Frames(10);
+    Click(300, ANIM_ROW_Y);
+    Frames(5);
+    Capture("19-animacao-bar.bmp");
+    Click(ANIM_INFO_X, playY);
+    Frames(5);
+    play = LastCommand(0x0605);
+    Check(play && play->s.size() == 2 && play->s[0] == "BARMAN_IDLE" && play->s[1] == "BAR",
+          "tocar no personagem: BARMAN_IDLE do \"BAR\"");
+    Check(g_ifpRequests == 1 && Mem<BYTE>(STREAM_INFO + (IFP_FIRST + 1) * 0x14 + 0x10) == 1,
+          "o bar.ifp pedido ao streaming e carregado (25576)");
+    Click(ANIM_INFO_X, playY + ANIM_STOP_DY);
+    Frames(5);
+    Check(LastCommand(0x0792) && LastCommand(0x0792)->i[0] == 1, "parar: CLEAR_CHAR_TASKS_IMMEDIATELY (0792) no jogador");
+    Check(g_ifpReleases == 1 && Mem<BYTE>(STREAM_INFO + (IFP_FIRST + 1) * 0x14 + 0x10) == 0, "parar: o bar.ifp solto");
+    Capture("20-animacao-parada.bmp");
+    Click(ANIM_CLEAR_X, 154);
+    Frames(5);
+    Capture("21-animacoes-todas.bmp");
+
     Click(200, 120); // de volta para Modelos
 
     // 7) Fechar o menu.

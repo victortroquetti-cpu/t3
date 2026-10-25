@@ -10,6 +10,10 @@
 //   RpMaterial: textura +0, cor RGBA +4. RwTexture: raster +0, nome +0x10, mascara +0x30, link na TXD +0x08.
 //   RwRaster: largura +0xC, altura +0x10, profundidade +0x14; a extensao do D3D9 fica no deslocamento guardado em
 //   0xB4E9E0 (textura do Direct3D +0, alfa +8). RwTexDictionary: lista de texturas +0x08.
+//   Pele (rpskin do gta-reversed): RpSkinGeometryGetSkin 0x7C7550, RpSkinGetNumBones 0x7C77E0, RpSkinGetVertexBoneWeights
+//   0x7C77F0 (4 floats por vertice), RpSkinGetVertexBoneIndices 0x7C7800 (4 bytes por vertice),
+//   RpSkinGetSkinToBoneMatrices 0x7C7810, RpSkinAtomicGetHAnimHierarchy 0x7C7540. RpHAnimHierarchy: quantos nos +4,
+//   nos +0x10 (16 bytes: id, indice, flags (1 = volta ao pai guardado, 2 = guarda o pai), frame).
 //   CColModel: caixa +0 (min, max), dados +0x2C. CCollisionData: esferas +0, caixas +2, triangulos +4 (quantidades);
 //   esferas +8 (0x14 cada), caixas +0xC (0x1C cada), vertices +0x14 (int16 x3 / 128), triangulos +0x18 (8 bytes).
 // Os veiculos: as pecas "_vlo" (a versao de longe) ficam de fora, as rodas da esquerda giram 180 graus (como o jogo faz)
@@ -33,6 +37,10 @@ using gta::Vec3;
 constexpr DWORD NODE_NAME_OFFSET = 0xC87C5C, RASTER_EXT_OFFSET = 0xB4E9E0;
 constexpr BYTE RW_ATOMIC = 1, RW_CLUMP = 2, ATOMIC_RENDER = 0x04;
 constexpr int MAX_VERTS = 65535, MAX_TRIS = 400000, MAX_ATOMICS = 512, MAX_COL_TRIS = 40000;
+constexpr DWORD FN_GEOMETRY_SKIN = 0x7C7550, FN_SKIN_BONES = 0x7C77E0, FN_SKIN_WEIGHTS = 0x7C77F0,
+                FN_SKIN_INDICES = 0x7C7800, FN_SKIN_MATRICES = 0x7C7810, FN_ATOMIC_HIERARCHY = 0x7C7540;
+constexpr int MAX_BONES = 64;
+typedef DWORD(__cdecl* PtrFn)(DWORD);
 
 struct Xform {
     Vec3 r = {1, 0, 0}, u = {0, 1, 0}, a = {0, 0, 1}, p = {0, 0, 0};
@@ -162,6 +170,75 @@ TexRef ReadTexture(DWORD tex, Mesh* out, bool used) {
     return ref;
 }
 
+DWORD Call(DWORD fn, DWORD arg) {
+    return reinterpret_cast<PtrFn>(fn)(arg);
+}
+
+// A pele do atomico (se tiver): os ossos (a primeira vez) e os pesos de cada vertice, na ordem da geometria.
+void ReadSkin(DWORD atomic, DWORD geom, int numVerts, const Vec3* pos, const Vec3* normal, const Xform& toModel, Mesh* out) {
+    DWORD skin = Call(FN_GEOMETRY_SKIN, geom);
+    if (!Ptr(skin)) {
+        return;
+    }
+    int numBones = static_cast<int>(Call(FN_SKIN_BONES, skin));
+    DWORD weights = Call(FN_SKIN_WEIGHTS, skin), indices = Call(FN_SKIN_INDICES, skin), matrices = Call(FN_SKIN_MATRICES, skin);
+    if (numBones < 1 || numBones > MAX_BONES || !Ptr(weights) || !Ptr(indices) || !Ptr(matrices) ||
+        !gta::Readable(reinterpret_cast<void*>(weights), numVerts * 16) ||
+        !gta::Readable(reinterpret_cast<void*>(indices), numVerts * 4) ||
+        !gta::Readable(reinterpret_cast<void*>(matrices), numBones * 64)) {
+        return;
+    }
+    Skin& s = out->skin;
+    if (s.bones.empty()) {
+        DWORD hier = Call(FN_ATOMIC_HIERARCHY, atomic);
+        if (!Ptr(hier) || !gta::Readable(reinterpret_cast<void*>(hier), 0x14)) {
+            return;
+        }
+        int numNodes = At<int>(hier, 0x04);
+        DWORD nodes = At<DWORD>(hier, 0x10);
+        if (numNodes != numBones || !Ptr(nodes) || !gta::Readable(reinterpret_cast<void*>(nodes), numNodes * 16)) {
+            return;
+        }
+        // O pai de cada no pela pilha do RpHAnim: guarda o pai (2) antes de um filho com irmaos, volta (1) depois de uma folha
+        std::vector<Bone> bones(numBones);
+        int stack[MAX_BONES + 1], top = 0, current = -1;
+        for (int i = 0; i < numBones; ++i) {
+            DWORD node = nodes + i * 16;
+            int flags = At<int>(node, 8);
+            bones[i].tag = At<int>(node, 0);
+            bones[i].parent = current;
+            bones[i].name = FrameName(At<DWORD>(node, 0xC));
+            memcpy(bones[i].skinToBone, reinterpret_cast<const void*>(matrices + i * 64), 64);
+            if ((flags & 2) && top < MAX_BONES) {
+                stack[top++] = current;
+            }
+            current = (flags & 1) ? (top > 0 ? stack[--top] : -1) : i;
+        }
+        s.bones = bones;
+    } else if (static_cast<int>(s.bones.size()) != numBones) {
+        return; // outro esqueleto no mesmo modelo: so o primeiro anima
+    }
+    SkinBatch b;
+    b.batch = static_cast<int>(out->batches.size());
+    b.pos.assign(pos, pos + numVerts);
+    b.normal.assign(normal, normal + numVerts);
+    b.index.resize(numVerts * 4);
+    b.weight.resize(numVerts * 4);
+    for (int i = 0; i < numVerts; ++i) {
+        DWORD packed = At<DWORD>(indices, i * 4);
+        for (int k = 0; k < 4; ++k) {
+            BYTE bone = static_cast<BYTE>(packed >> (8 * k));
+            b.index[i * 4 + k] = bone < numBones ? bone : 0;
+            b.weight[i * 4 + k] = At<float>(weights, i * 16 + k * 4);
+        }
+    }
+    b.toModel[0] = toModel.r;
+    b.toModel[1] = toModel.u;
+    b.toModel[2] = toModel.a;
+    b.toModel[3] = toModel.p;
+    s.batches.push_back(std::move(b));
+}
+
 bool ReadAtomic(DWORD atomic, const Xform& toModel, bool flipWheel, bool vehicle, Mesh* out) {
     DWORD geom = At<DWORD>(atomic, 0x18);
     if (!Ptr(geom) || !gta::Readable(reinterpret_cast<void*>(geom), 0x60)) {
@@ -266,6 +343,13 @@ bool ReadAtomic(DWORD atomic, const Xform& toModel, bool flipWheel, bool vehicle
         if (part.count > 0) {
             b.parts.push_back(part);
         }
+    }
+    if (!vehicle) {
+        std::vector<Vec3> rawNormals(numVerts);
+        for (int i = 0; i < numVerts; ++i) {
+            rawNormals[i] = nsrc ? nsrc[i] : faceNormals[i];
+        }
+        ReadSkin(atomic, geom, numVerts, src, rawNormals.data(), toModel, out);
     }
     out->vertices += numVerts;
     out->triangles += numTris;

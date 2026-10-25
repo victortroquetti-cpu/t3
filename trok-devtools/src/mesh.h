@@ -40,6 +40,25 @@ struct Texture {
     bool used = false; // usada pelo modelo (false = so esta na TXD)
 };
 
+// O esqueleto de um personagem (o RpSkin e o RpHAnimHierarchy do atomico com pele), para a previa das animacoes.
+struct Bone {
+    int tag = -1;    // a etiqueta do osso (nodeID): e por ela que as animacoes acham o osso
+    int parent = -1; // indice do pai (-1 = raiz)
+    std::string name;
+    float skinToBone[16]; // RwMatrix: direita, cima, frente, posicao (4 floats cada)
+};
+struct SkinBatch {
+    int batch = -1;                     // em Mesh::batches (os vertices na mesma ordem)
+    std::vector<gta::Vec3> pos, normal; // no espaco da pele (antes do frame do atomico)
+    std::vector<BYTE> index;            // 4 ossos por vertice
+    std::vector<float> weight;          // 4 pesos por vertice
+    gta::Vec3 toModel[4];               // o frame do atomico: direita, cima, frente, posicao
+};
+struct Skin {
+    std::vector<Bone> bones;
+    std::vector<SkinBatch> batches;
+};
+
 struct Mesh {
     bool ok = false;
     std::string error;
@@ -53,6 +72,7 @@ struct Mesh {
     gta::Vec3 colMin = {0, 0, 0}, colMax = {0, 0, 0};
     int colSpheres = 0, colBoxes = 0, colTriangles = 0;
     std::vector<gta::Vec3> colLines; // pares de pontos
+    Skin skin; // so personagens
 };
 
 // O modelo tem que estar carregado (gta::Load).

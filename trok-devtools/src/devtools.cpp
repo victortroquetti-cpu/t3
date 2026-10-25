@@ -9,6 +9,8 @@
 #include "audiospy.h"
 #include "catalog.h"
 #include "core.h"
+#include "ifp.h"
+#include "pose.h"
 #include "player.h"
 #include "render.h"
 #include "sfx.h"
@@ -35,7 +37,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v0.3";
+constexpr const char* VERSION_TAG = "v0.4";
 // As texturas ficam no card do modelo (clique numa textura): nao tem aba propria.
 const char* const TABS[] = {"Modelos", "Anima\xC3\xA7\xC3\xB5" "es", "\xC3\x81udios", "Arquivos", "Geral"};
 constexpr int TAB_COUNT = 5, TAB_MODELS = 0, TAB_GENERAL = 4;
@@ -77,6 +79,22 @@ struct State {
     bool audioShow = false, audioIgnoreFeet = true, audioRepeat = false;
     int audioDelay = 4;
     int audioRowSel = 1;
+    // Animacoes
+    char animQuery[96] = "";
+    ifp::Filter animFilter, animApplied;
+    ifp::Result animResult;
+    bool animHasResult = false;
+    std::vector<bool> animOpen;
+    int animSel = -1;
+    bool animReveal = false;
+    ifp::Clip clip;
+    bool clipOk = false;
+    float animTime = 0;
+    bool animPlaying = true, animScrub = false;
+    bool animLoop = true, animInPlace = true, animSpin = false;
+    int animSpeed = 2, animSkin = -1; // velocidade: indice em ANIM_SPEEDS; personagem: -1 = o do jogador
+    render::View animView;
+    mesh::Mesh posed; // a malha do personagem na pose do instante
     char ini[MAX_PATH] = "";
     char gameDir[MAX_PATH] = "";
 } S;
@@ -205,7 +223,8 @@ std::vector<IniFlag> IniFlags() {
             {"visual_arame", &S.view.wire},       {"visual_colisao", &S.view.collision},
             {"visual_grade", &S.view.grid},       {"visual_girar", &S.spin},
             {"audio_mostrar", &S.audioShow},      {"audio_ignorar_passos", &S.audioIgnoreFeet},
-            {"audio_repetir", &S.audioRepeat}};
+            {"audio_repetir", &S.audioRepeat},    {"anim_repetir", &S.animLoop},
+            {"anim_no_lugar", &S.animInPlace},    {"anim_girar", &S.animSpin}};
 }
 
 void SaveIni() {
@@ -220,6 +239,10 @@ void SaveIni() {
     WritePrivateProfileStringA("devtools", "miniaturas_por_quadro", buf, S.ini);
     snprintf(buf, sizeof(buf), "%d", S.audioDelay);
     WritePrivateProfileStringA("devtools", "audio_tempo", buf, S.ini);
+    snprintf(buf, sizeof(buf), "%d", S.animSkin);
+    WritePrivateProfileStringA("devtools", "anim_personagem", buf, S.ini);
+    snprintf(buf, sizeof(buf), "%d", S.animSpeed);
+    WritePrivateProfileStringA("devtools", "anim_velocidade", buf, S.ini);
     snprintf(buf, sizeof(buf), "%02X%02X%02X", static_cast<unsigned>(S.background & 0xFF),
              static_cast<unsigned>((S.background >> 8) & 0xFF), static_cast<unsigned>((S.background >> 16) & 0xFF));
     WritePrivateProfileStringA("devtools", "visual_fundo", buf, S.ini);
@@ -573,6 +596,33 @@ std::vector<InfoRow> CardInfo(const catalog::Entry& e, const mesh::Mesh* m) {
     return rows;
 }
 
+// Fundo: um quadradinho com a cor; o clique abre o seletor de cor da casa (o mesmo do Geral), para cima. Devolve onde
+// terminou.
+float BackgroundSwatch(ImDrawList* dl, float ox, float oy) {
+    float sw = 30 * u, sh = 20 * u, sy = oy + 3 * u;
+    ImGui::SetCursorScreenPos(ImVec2(ox, oy));
+    if (ImGui::InvisibleButton("##fundo", ImVec2(sw + 52 * u, 26 * u))) {
+        ImGui::OpenPopup("##fundoPop");
+    }
+    bool bgHovered = ImGui::IsItemHovered();
+    if (bgHovered) {
+        Hand();
+        Tooltip("Cor do fundo do visualizador");
+    }
+    dl->AddRectFilled(ImVec2(ox, sy), ImVec2(ox + sw, sy + sh), S.background | IM_COL32_A_MASK, 5 * u);
+    dl->AddRect(ImVec2(ox - 0.5f, sy - 0.5f), ImVec2(ox + sw + 0.5f, sy + sh + 0.5f), col::White(bgHovered ? 110 : 60), 5 * u,
+                0, 1.0f);
+    Text(dl, fonts.desc, ox + sw + 8 * u, oy + (26 * u - fonts.desc->FontSize) * 0.5f - 0.5f * u,
+         bgHovered ? col::text : col::column, "Fundo");
+    ImGui::SetNextWindowPos(ImVec2(ox, oy - 8 * u), ImGuiCond_Appearing, ImVec2(0.0f, 1.0f));
+    ImU32 bg = S.background;
+    if (ColorPopup("##fundoPop", &bg, BACKGROUND_DEFAULT)) {
+        SetBackground(bg);
+        SaveIni();
+    }
+    return ox + sw + 8 * u + TextSize(fonts.desc, "Fundo").x;
+}
+
 void Viewer(const catalog::Entry& e, const mesh::Mesh* m, ImVec2 a, float side) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 b(a.x + side, a.y + side);
@@ -672,30 +722,7 @@ void Viewer(const catalog::Entry& e, const mesh::Mesh* m, ImVec2 a, float side) 
         }
         ox += pw + 6 * u;
     }
-    // Fundo: um quadradinho com a cor; o clique abre o seletor de cor da casa (o mesmo do Geral), para cima.
-    ox += 4 * u;
-    float sw = 30 * u, sh = 20 * u, sy = oy + 3 * u;
-    ImGui::SetCursorScreenPos(ImVec2(ox, oy));
-    if (ImGui::InvisibleButton("##fundo", ImVec2(sw + 52 * u, 26 * u))) {
-        ImGui::OpenPopup("##fundoPop");
-    }
-    bool bgHovered = ImGui::IsItemHovered();
-    if (bgHovered) {
-        Hand();
-        Tooltip("Cor do fundo do visualizador");
-    }
-    dl->AddRectFilled(ImVec2(ox, sy), ImVec2(ox + sw, sy + sh), S.background | IM_COL32_A_MASK, 5 * u);
-    dl->AddRect(ImVec2(ox - 0.5f, sy - 0.5f), ImVec2(ox + sw + 0.5f, sy + sh + 0.5f), col::White(bgHovered ? 110 : 60), 5 * u,
-                0, 1.0f);
-    Text(dl, fonts.desc, ox + sw + 8 * u, oy + (26 * u - fonts.desc->FontSize) * 0.5f - 0.5f * u,
-         bgHovered ? col::text : col::column, "Fundo");
-    ImGui::SetNextWindowPos(ImVec2(ox, oy - 8 * u), ImGuiCond_Appearing, ImVec2(0.0f, 1.0f));
-    ImU32 bg = S.background;
-    if (ColorPopup("##fundoPop", &bg, BACKGROUND_DEFAULT)) {
-        SetBackground(bg);
-        SaveIni();
-    }
-    ox += sw + 8 * u + TextSize(fonts.desc, "Fundo").x + 12 * u;
+    ox = BackgroundSwatch(dl, ox + 4 * u, oy) + 12 * u;
     dl->ChannelsSetCurrent(0);
     dl->AddRectFilled(ImVec2(a.x + 4 * u, oy - 6 * u), ImVec2(ox, oy + 32 * u), IM_COL32(0, 0, 0, 120), 19 * u);
     dl->ChannelsMerge();
@@ -1837,6 +1864,706 @@ void AudioOverlay() {
     }
 }
 
+// ---------------------------------------------------------------- aba Animacoes
+
+constexpr float ANIM_SPEEDS[] = {0.25f, 0.5f, 1.0f, 2.0f};
+constexpr int ANIM_SPEED_COUNT = 4;
+
+// O selo de uma animacao (ou de um .ifp, com quantas): MOD cheio, NOVA so com a borda. Devolve a largura.
+float TagBadge(ImDrawList* dl, float x, float y, int tag, int count, bool draw) {
+    char label[24];
+    snprintf(label, sizeof(label), count > 0 ? "%s %d" : "%s", tag == ifp::TAG_MOD ? "MOD" : "NOVA", count);
+    ImVec2 ts = TextSize(fonts.desc, label);
+    float w = ts.x + 12 * u, h = ts.y + 6 * u;
+    if (!draw) {
+        return w;
+    }
+    if (tag == ifp::TAG_MOD) {
+        dl->AddRectFilled(ImVec2(x, y), ImVec2(x + w, y + h), col::strong, 5 * u);
+        Text(dl, fonts.desc, x + 6 * u, y + 3 * u - 0.5f * u, col::ink, label);
+    } else {
+        Box(dl, ImVec2(x, y), ImVec2(x + w, y + h), 0, col::White(90), 5 * u);
+        Text(dl, fonts.desc, x + 6 * u, y + 3 * u - 0.5f * u, col::text, label);
+    }
+    return w;
+}
+
+// Texto com quebra de linha nas palavras. Devolve a altura.
+float Wrapped(ImDrawList* dl, ImFont* font, float x, float y, float w, ImU32 color, const std::string& text) {
+    float lineH = font->FontSize + 4 * u, cy = y;
+    std::string line;
+    size_t i = 0;
+    while (i <= text.size()) {
+        size_t j = text.find(' ', i);
+        if (j == std::string::npos) {
+            j = text.size();
+        }
+        std::string word = text.substr(i, j - i);
+        std::string next = line.empty() ? word : line + " " + word;
+        if (!line.empty() && TextSize(font, next.c_str()).x > w) {
+            Text(dl, font, x, cy, color, line.c_str());
+            cy += lineH;
+            line = word;
+        } else {
+            line = next;
+        }
+        i = j + 1;
+    }
+    if (!line.empty()) {
+        Text(dl, font, x, cy, color, line.c_str());
+        cy += lineH;
+    }
+    return cy - y;
+}
+
+bool AnimFilterActive() {
+    const ifp::Filter& f = S.animFilter;
+    return !f.query.empty() || f.file >= 0 || f.changed;
+}
+
+// O personagem da previa: o escolhido ou o do jogador (o CJ e montado pelo jogo com as roupas: no lugar dele, o
+// primeiro personagem comum do catalogo).
+int AnimSkin() {
+    if (S.animSkin >= 0) {
+        return S.animSkin;
+    }
+    int skin = core::PlayerSkin();
+    if (skin > 0) {
+        return skin;
+    }
+    for (const catalog::Entry& e : catalog::All()) {
+        if (e.kind == catalog::K_PED && e.id > 0 && !e.noFile) {
+            return e.id;
+        }
+    }
+    return -1;
+}
+
+void SelectAnim(int anim) {
+    S.animSel = anim;
+    S.animTime = 0;
+    S.animPlaying = true;
+    S.clipOk = ifp::LoadClip(anim, &S.clip);
+}
+
+void RevealAnim(int anim) {
+    const ifp::Anim* a = ifp::FindAnim(anim);
+    if (!a) {
+        return;
+    }
+    S.animOpen.resize(ifp::Files().size(), false);
+    S.animOpen[a->file] = true;
+    S.animReveal = true;
+}
+
+std::string Kilobytes(DWORD bytes) {
+    return bytes >= 1024 * 1024 ? Decimal(bytes / 1048576.0f, 1) + " MB" : Thousands(static_cast<int>((bytes + 1023) / 1024)) + " KB";
+}
+
+struct AnimRow {
+    int type; // 0 .ifp, 1 animacao
+    int file, anim;
+    float y, h;
+};
+
+// A lista: .ifp > animacoes. order = as animacoes na ordem da tela (para as setas).
+void AnimTree(float x, float y, float w, float h, std::vector<int>* order) {
+    const std::vector<ifp::File>& files = ifp::Files();
+    const std::vector<ifp::Anim>& anims = ifp::Anims();
+    S.animOpen.resize(files.size(), false);
+    bool filtered = AnimFilterActive();
+    const ifp::Result& r = S.animResult;
+    std::vector<AnimRow> rows;
+    float total = 0, revealY = -1;
+    for (int f = 0; f < static_cast<int>(files.size()); ++f) {
+        if (filtered && (f >= static_cast<int>(r.anims.size()) || r.anims[f].empty())) {
+            continue;
+        }
+        rows.push_back({0, f, -1, total, 58 * u});
+        total += 58 * u;
+        if (!S.animOpen[f]) {
+            continue;
+        }
+        const std::vector<int>& list = filtered ? r.anims[f] : files[f].anims;
+        for (int a : list) {
+            if (S.animReveal && a == S.animSel) {
+                revealY = total;
+            }
+            rows.push_back({1, f, a, total, 34 * u});
+            order->push_back(a);
+            total += 34 * u;
+        }
+        total += 6 * u;
+    }
+
+    ImGui::SetCursorScreenPos(ImVec2(x, y));
+    ImGui::BeginChild("##animArvore", ImVec2(w, h), false, ImGuiWindowFlags_NoBackground);
+    if (S.animReveal) {
+        if (revealY >= 0) {
+            float scroll = ImGui::GetScrollY();
+            if (revealY < scroll || revealY + 34 * u > scroll + h) {
+                ImGui::SetScrollY(std::max(0.0f, revealY - h * 0.4f));
+            }
+        }
+        S.animReveal = false;
+    }
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 origin = ImGui::GetCursorScreenPos();
+    float scroll = ImGui::GetScrollY();
+    float rw = w - 14 * u;
+    int playing = core::PlayingAnim();
+    for (const AnimRow& row : rows) {
+        if (row.y + row.h < scroll - 40 * u || row.y > scroll + h + 40 * u) {
+            continue;
+        }
+        float rx = origin.x, ry = origin.y + row.y;
+        char id[32];
+        if (row.type == 0) {
+            const ifp::File& file = files[row.file];
+            snprintf(id, sizeof(id), "##ifp%d", row.file);
+            ImGui::SetCursorScreenPos(ImVec2(rx, ry));
+            if (ImGui::InvisibleButton(id, ImVec2(rw, row.h - 4 * u))) {
+                S.animOpen[row.file] = !S.animOpen[row.file];
+            }
+            bool hovered = ImGui::IsItemHovered();
+            if (hovered) {
+                Hand();
+            }
+            Box(dl, ImVec2(rx, ry), ImVec2(rx + rw, ry + row.h - 4 * u), col::White(hovered ? 9 : 5), col::White(10), 8 * u);
+            DrawIcon(dl, S.animOpen[row.file] ? Icon::ChevronDown : Icon::ChevronRight, ImVec2(rx + 16 * u, ry + 18 * u),
+                     col::column, true);
+            Text(dl, fonts.title, rx + 30 * u, ry + 8 * u, col::text, file.lib.c_str());
+            char count[64];
+            int n = filtered ? static_cast<int>(r.anims[row.file].size()) : static_cast<int>(file.anims.size());
+            snprintf(count, sizeof(count), n == 1 ? "%s anima\xC3\xA7\xC3\xA3o" : "%s anima\xC3\xA7\xC3\xB5" "es",
+                     Thousands(n).c_str());
+            ImVec2 cs = TextSize(fonts.desc, count);
+            float right = rx + rw - 14 * u - cs.x;
+            Text(dl, fonts.desc, right, ry + 11 * u, col::hint, count);
+            float ty = ry + 9 * u;
+            if (file.news > 0) {
+                right -= TagBadge(dl, 0, 0, ifp::TAG_NEW, file.news, false) + 8 * u;
+                TagBadge(dl, right, ty, ifp::TAG_NEW, file.news, true);
+            }
+            if (file.mods > 0) {
+                right -= TagBadge(dl, 0, 0, ifp::TAG_MOD, file.mods, false) + 8 * u;
+                TagBadge(dl, right, ty, ifp::TAG_MOD, file.mods, true);
+            }
+            std::vector<std::string> path = {file.source.substr(file.source.find('\\') + 1)};
+            if (path[0] != file.entry) {
+                path.push_back(file.entry);
+            }
+            float subY = ry + 8 * u + fonts.title->FontSize + 5 * u;
+            Crumbs(dl, fonts.desc, rx + 30 * u, subY, col::column, col::hint, path, rw * 0.5f);
+            std::string extra = Kilobytes(file.bytes);
+            ImU32 extraColor = col::hint;
+            if (file.broken) {
+                extra = "n\xC3\xA3o deu para ler at\xC3\xA9 o fim";
+                extraColor = col::Rgba(255, 196, 120);
+            } else if (file.renamed) {
+                extra = "nome interno: " + file.block;
+                extraColor = col::Rgba(255, 196, 120);
+            }
+            ImVec2 es = TextSize(fonts.desc, extra.c_str());
+            Text(dl, fonts.desc, rx + rw - 14 * u - es.x, subY, extraColor, extra.c_str());
+        } else {
+            const ifp::Anim& a = anims[row.anim];
+            snprintf(id, sizeof(id), "##anim%d", row.anim);
+            float bx = rx + 18 * u, bw = rw - 18 * u, bh = row.h - 2 * u;
+            ImGui::SetCursorScreenPos(ImVec2(bx, ry));
+            if (ImGui::InvisibleButton(id, ImVec2(bw, bh))) {
+                SelectAnim(row.anim);
+            }
+            bool hovered = ImGui::IsItemHovered();
+            bool selected = row.anim == S.animSel;
+            if (hovered) {
+                Hand();
+            }
+            if (selected || hovered) {
+                Box(dl, ImVec2(bx, ry), ImVec2(bx + bw, ry + bh), col::White(selected ? 14 : 6), selected ? col::White(50) : 0,
+                    7 * u);
+            }
+            float tx = bx + 12 * u;
+            if (row.anim == playing) {
+                // No personagem agora
+                dl->AddCircleFilled(ImVec2(tx + 3 * u, ry + bh * 0.5f), 3.5f * u, col::strong, 12);
+                tx += 14 * u;
+            }
+            std::string dur = Seconds(a.seconds);
+            ImVec2 ds = TextSize(fonts.desc, dur.c_str());
+            float right = bx + bw - 12 * u - ds.x;
+            Text(dl, fonts.desc, right, ry + (bh - ds.y) * 0.5f, col::column, dur.c_str());
+            if (a.tag != ifp::TAG_NONE) {
+                right -= TagBadge(dl, 0, 0, a.tag, 0, false) + 10 * u;
+                TagBadge(dl, right, ry + (bh - fonts.desc->FontSize - 6 * u) * 0.5f, a.tag, 0, true);
+            }
+            Text(dl, fonts.body, tx, ry + (bh - fonts.body->FontSize) * 0.5f, selected ? col::text : col::column,
+                 Ellipsize(fonts.body, a.name, right - tx - 12 * u).c_str());
+        }
+    }
+    if (rows.empty()) {
+        const char* none = "Nenhuma anima\xC3\xA7\xC3\xA3o com esse filtro.";
+        ImVec2 ts = TextSize(fonts.desc, none);
+        Text(dl, fonts.desc, origin.x + (w - ts.x) * 0.5f, origin.y + 40 * u, col::hint, none);
+    }
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::Dummy(ImVec2(rw, std::max(1.0f, total)));
+    ImGui::EndChild();
+}
+
+void IconPause(ImDrawList* dl, ImVec2 c, float s, ImU32 color) {
+    float bw = s * 0.2f, bh = s * 0.36f, gap = s * 0.12f;
+    dl->AddRectFilled(ImVec2(c.x - gap - bw, c.y - bh), ImVec2(c.x - gap, c.y + bh), color, 1.0f);
+    dl->AddRectFilled(ImVec2(c.x + gap, c.y - bh), ImVec2(c.x + gap + bw, c.y + bh), color, 1.0f);
+}
+
+// O personagem da previa, na pose do instante, com as opcoes embaixo (como o visualizador do card).
+void AnimViewer(ImVec2 a, float side) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 b(a.x + side, a.y + side);
+    ImGuiIO& io = ImGui::GetIO();
+    int skin = AnimSkin();
+    if (skin >= 0) {
+        core::PreviewPed(skin);
+    }
+    const mesh::Mesh* m = skin >= 0 ? core::PreviewMesh() : nullptr;
+    float dur = S.clipOk ? std::max(S.clip.seconds, 0.001f) : 0.0f;
+    if (S.clipOk && S.animPlaying && !S.animScrub) {
+        S.animTime += io.DeltaTime * ANIM_SPEEDS[S.animSpeed];
+        if (S.animTime >= dur) {
+            if (S.animLoop) {
+                S.animTime = std::fmod(S.animTime, dur);
+            } else {
+                S.animTime = dur;
+                S.animPlaying = false;
+            }
+        }
+    }
+    if (!m) {
+        dl->AddRectFilled(a, b, col::Rgba(20, 20, 20), 8 * u);
+        ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+        std::string why;
+        if (skin < 0 || core::PreviewFailed(&why)) {
+            std::string text = skin < 0 ? "Nenhum personagem para a pr\xC3\xA9via" : "Sem pr\xC3\xA9via: " + why;
+            ImVec2 ts = TextSize(fonts.desc, text.c_str());
+            Text(dl, fonts.desc, c.x - ts.x * 0.5f, c.y - ts.y * 0.5f, col::hint, text.c_str());
+        } else {
+            Spinner(dl, c, 12 * u, static_cast<float>(ImGui::GetTime()));
+        }
+    } else {
+        static const ifp::Clip none;
+        pose::Apply(*m, S.clipOk ? S.clip : none, S.animTime, S.animInPlace, &S.posed);
+        ImGui::SetCursorScreenPos(a);
+        ImGui::InvisibleButton("##animVisual", ImVec2(side, side - 46 * u));
+        bool hovered = ImGui::IsItemHovered();
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 1.0f)) {
+            S.animView.yaw -= io.MouseDelta.x * 0.4f;
+            S.animView.pitch = std::max(-85.0f, std::min(85.0f, S.animView.pitch + io.MouseDelta.y * 0.4f));
+            S.animSpin = false;
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        }
+        if (hovered && io.MouseWheel != 0.0f) {
+            S.animView.zoom = std::max(0.3f, std::min(12.0f, S.animView.zoom * (io.MouseWheel > 0 ? 1.12f : 1 / 1.12f)));
+        }
+        if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+            S.animView.yaw = render::View().yaw;
+            S.animView.pitch = render::View().pitch;
+            S.animView.zoom = 1.0f;
+        }
+        if (S.animSpin) {
+            S.animView.yaw = std::fmod(S.animView.yaw - io.DeltaTime * 18.0f, 360.0f);
+        }
+        // Texturas, arame, grade e fundo sao os mesmos do visualizador do card
+        S.animView.textures = S.view.textures;
+        S.animView.wire = S.view.wire;
+        S.animView.grid = S.view.grid;
+        S.animView.collision = false;
+        S.animView.background = S.view.background;
+        int target = side * 1.5f > 1024 ? 2048 : 1024;
+        ImTextureID tex = render::DrawViewer(S.posed, S.animView, target);
+        if (tex) {
+            dl->AddImageRounded(tex, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, 8 * u);
+        } else {
+            dl->AddRectFilled(a, b, col::Rgba(20, 20, 20), 8 * u);
+        }
+        if (S.clipOk && pose::Matched(*m, S.clip) == 0) {
+            const char* warn = "Esta anima\xC3\xA7\xC3\xA3o n\xC3\xA3o mexe nos ossos de um personagem";
+            ImVec2 ts = TextSize(fonts.desc, warn);
+            Text(dl, fonts.desc, (a.x + b.x - ts.x) * 0.5f, a.y + 54 * u, col::Rgba(255, 196, 120), warn);
+        }
+    }
+    dl->AddRect(a, b, col::White(14), 8 * u);
+
+    // O personagem, no canto de cima
+    std::string skinLabel = "Personagem: ";
+    const catalog::Entry* e = skin >= 0 ? catalog::Find(skin) : nullptr;
+    char num[16];
+    snprintf(num, sizeof(num), "%d", skin);
+    skinLabel += skin < 0 ? "nenhum" : std::string(num) + (e && !e->dff.empty() ? "  " + e->dff : "");
+    if (S.animSkin < 0) {
+        skinLabel += "  (o seu)";
+    }
+    float pillW = 0;
+    dl->ChannelsSplit(2);
+    dl->ChannelsSetCurrent(1);
+    if (Pill("##animSkin", skinLabel.c_str(), false, a.x + 10 * u, a.y + 10 * u, 26 * u, &pillW)) {
+        ImGui::OpenPopup("##skinPop");
+    }
+    if (ImGui::IsItemHovered()) {
+        Tooltip("Trocar o personagem da pr\xC3\xA9via");
+    }
+    dl->ChannelsSetCurrent(0); // a faixa escura atras, como a das opcoes: legivel em qualquer fundo
+    dl->AddRectFilled(ImVec2(a.x + 4 * u, a.y + 4 * u), ImVec2(a.x + 16 * u + pillW, a.y + 42 * u), IM_COL32(0, 0, 0, 120), 19 * u);
+    dl->ChannelsMerge();
+    {
+        std::vector<std::string> labels = {"O do seu personagem"};
+        std::vector<int> values = {-1};
+        for (const catalog::Entry& p : catalog::All()) {
+            if (p.kind == catalog::K_PED && p.id > 0 && !p.noFile) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%d  %s", p.id, p.dff.c_str());
+                labels.push_back(buf);
+                values.push_back(p.id);
+            }
+        }
+        int before = S.animSkin;
+        ChoicePopup("##skinPop", labels, values, &S.animSkin, a.x + 10 * u, a.y + 40 * u);
+        if (S.animSkin != before) {
+            SaveIni();
+        }
+    }
+
+    // Opcoes, no canto de baixo
+    struct Opt {
+        const char* id;
+        const char* label;
+        bool* value;
+    } opts[] = {{"##aTex", "Texturas", &S.view.textures},
+                {"##aWire", "Arame", &S.view.wire},
+                {"##aGrid", "Grade", &S.view.grid},
+                {"##aSpin", "Girar", &S.animSpin},
+                {"##aLugar", "No lugar", &S.animInPlace}};
+    float ox = a.x + 10 * u, oy = b.y - 36 * u, pw = 0;
+    dl->ChannelsSplit(2);
+    dl->ChannelsSetCurrent(1);
+    for (Opt& o : opts) {
+        if (Pill(o.id, o.label, *o.value, ox, oy, 26 * u, &pw)) {
+            *o.value = !*o.value;
+            SaveIni();
+        }
+        if (o.value == &S.animInPlace && ImGui::IsItemHovered()) {
+            Tooltip("Andar e correr sem sair do lugar (a raiz n\xC3\xA3o anda no ch\xC3\xA3o)");
+        }
+        ox += pw + 6 * u;
+    }
+    ox = BackgroundSwatch(dl, ox + 4 * u, oy) + 12 * u;
+    dl->ChannelsSetCurrent(0);
+    dl->AddRectFilled(ImVec2(a.x + 4 * u, oy - 6 * u), ImVec2(ox, oy + 32 * u), IM_COL32(0, 0, 0, 120), 19 * u);
+    dl->ChannelsMerge();
+}
+
+// Embaixo do visualizador: tocar/pausar, a linha do tempo (arrastar = ir para o instante), o tempo, a velocidade e repetir.
+void AnimTimeline(float x, float y, float w, float h) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    Box(dl, ImVec2(x, y), ImVec2(x + w, y + h), col::White(5), col::White(12), 10 * u);
+    float dur = S.clipOk ? std::max(S.clip.seconds, 0.001f) : 0.0f;
+    float r = 18 * u;
+    ImVec2 c(x + 12 * u + r, y + h * 0.5f);
+    if (RoundButton("##animTocar", c, r, 1, false, S.animPlaying ? IconPause : IconPlay, nullptr, S.clipOk)) {
+        if (!S.animPlaying && S.animTime >= dur) {
+            S.animTime = 0;
+        }
+        S.animPlaying = !S.animPlaying;
+    }
+    float right = x + w - 12 * u;
+    float br = 15 * u;
+    ImVec2 repC(right - br, y + h * 0.5f);
+    if (RoundButton("##animRepetir", repC, br, 0, S.animLoop, IconRepeat, S.animLoop ? "Repetir: ligado" : "Repetir: desligado")) {
+        S.animLoop = !S.animLoop;
+        SaveIni();
+    }
+    char speed[16];
+    snprintf(speed, sizeof(speed), "%s\xC3\x97", Decimal(ANIM_SPEEDS[S.animSpeed], S.animSpeed < 1 ? 2 : S.animSpeed < 2 ? 1 : 0).c_str());
+    float sw = TextSize(fonts.desc, speed).x + 24 * u;
+    float sx = repC.x - br - 10 * u - sw;
+    if (Pill("##animVelocidade", speed, S.animSpeed != 2, sx, y + (h - 26 * u) * 0.5f, 26 * u, nullptr)) {
+        S.animSpeed = (S.animSpeed + 1) % ANIM_SPEED_COUNT;
+        SaveIni();
+    }
+    if (ImGui::IsItemHovered()) {
+        Tooltip("Velocidade da pr\xC3\xA9via");
+    }
+    char time[48];
+    snprintf(time, sizeof(time), "%s / %s", Seconds(S.animTime).c_str(), Seconds(dur).c_str());
+    ImVec2 ts = TextSize(fonts.desc, time);
+    float timeX = sx - 14 * u - ts.x;
+    Text(dl, fonts.desc, timeX, y + (h - ts.y) * 0.5f, col::column, time);
+    // A linha do tempo
+    float bx0 = c.x + r + 16 * u, bx1 = timeX - 16 * u, by = y + h * 0.5f;
+    ImGui::SetCursorScreenPos(ImVec2(bx0 - 6 * u, by - 10 * u));
+    ImGui::InvisibleButton("##animLinha", ImVec2(std::max(1.0f, bx1 - bx0 + 12 * u), 20 * u));
+    bool active = ImGui::IsItemActive() && S.clipOk;
+    S.animScrub = active;
+    if (active) {
+        float f = std::max(0.0f, std::min(1.0f, (ImGui::GetIO().MousePos.x - bx0) / std::max(1.0f, bx1 - bx0)));
+        S.animTime = f * dur;
+    }
+    if (ImGui::IsItemHovered() && S.clipOk) {
+        Hand();
+    }
+    dl->AddRectFilled(ImVec2(bx0, by - 2 * u), ImVec2(bx1, by + 2 * u), col::White(14), 2 * u);
+    if (dur > 0) {
+        float f = std::min(1.0f, S.animTime / dur);
+        float kx = bx0 + (bx1 - bx0) * f;
+        dl->AddRectFilled(ImVec2(bx0, by - 2 * u), ImVec2(kx, by + 2 * u), col::strong, 2 * u);
+        dl->AddCircleFilled(ImVec2(kx, by), (active ? 7.0f : 6.0f) * u, col::strong, 20);
+    }
+}
+
+// O lado direito: a animacao escolhida, de onde vem, as marcas e o que fazer com ela.
+void AnimInfo(float x, float y, float w, float h) {
+    ImGui::SetCursorScreenPos(ImVec2(x, y));
+    ImGui::BeginChild("##animInfo", ImVec2(w, h), false, ImGuiWindowFlags_NoBackground);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    float cy = y;
+    const ifp::Anim* a = ifp::FindAnim(S.animSel);
+    const ifp::File* f = a ? ifp::FindFile(a->file) : nullptr;
+    if (!a || !f) {
+        Text(dl, fonts.title, x, cy, col::text, "Escolha uma anima\xC3\xA7\xC3\xA3o");
+        cy += fonts.title->FontSize + 6 * u;
+        cy += Wrapped(dl, fonts.desc, x, cy, w, col::hint,
+                      "Ela toca no personagem do visualizador. D\xC3\xA1 para tocar no seu personagem tamb\xC3\xA9m, e "
+                      "copiar o nome para um script.");
+    } else {
+        Text(dl, fonts.title, x, cy, col::text, Ellipsize(fonts.title, a->name, w).c_str());
+        cy += fonts.title->FontSize + 6 * u;
+        Crumbs(dl, fonts.desc, x, cy, col::column, col::hint, {f->source.substr(f->source.find('\\') + 1), f->entry}, w);
+        cy += fonts.desc->FontSize + 12 * u;
+        // A marca, explicada
+        const char* tagText = nullptr;
+        bool hasRef = ifp::Reference()[0] != 0;
+        if (a->tag == ifp::TAG_MOD) {
+            tagText = "Diferente da original: algum mod mexeu nesta anima\xC3\xA7\xC3\xA3o.";
+        } else if (a->tag == ifp::TAG_NEW) {
+            tagText = f->known ? "N\xC3\xA3o existe no jogo original: um mod adicionou." : "Este .ifp n\xC3\xA3o \xC3\xA9 do jogo original.";
+        } else if (hasRef) {
+            tagText = "Igual \xC3\xA0 original.";
+        }
+        if (tagText) {
+            float tx = x;
+            if (a->tag != ifp::TAG_NONE) {
+                tx += TagBadge(dl, x, cy - 1 * u, a->tag, 0, true) + 8 * u;
+            }
+            cy += Wrapped(dl, fonts.desc, tx, cy + 1 * u, x + w - tx, a->tag == ifp::TAG_NONE ? col::column : col::text,
+                          tagText) + 8 * u;
+        }
+        // Os dados
+        struct Row {
+            const char* label;
+            std::string value;
+        };
+        char buf[96];
+        std::vector<Row> rows;
+        rows.push_back({"Dura\xC3\xA7\xC3\xA3o", Seconds(a->seconds)});
+        snprintf(buf, sizeof(buf), "%d", a->tracks);
+        std::string bones = buf;
+        if (const mesh::Mesh* m = core::PreviewMesh()) {
+            if (S.clipOk && S.clip.anim == a->index) {
+                snprintf(buf, sizeof(buf), "  (%d no personagem)", pose::Matched(*m, S.clip));
+                bones += buf;
+            }
+        }
+        rows.push_back({"Ossos", bones});
+        snprintf(buf, sizeof(buf), "%d", a->frames);
+        rows.push_back({"Quadros-chave", buf});
+        rows.push_back({"Formato", f->format + (a->compressed ? " comprimida" : "")});
+        rows.push_back({"Tamanho", Thousands(static_cast<int>(a->size)) + " bytes"});
+        rows.push_back({"Anda", a->moves ? "sim (a raiz sai do lugar)" : "n\xC3\xA3o"});
+        if (a->sampId > 0) {
+            snprintf(buf, sizeof(buf), "%d", a->sampId);
+            rows.push_back({"\xC3\x8Dndice no SA-MP", buf});
+        }
+        if (f->renamed) {
+            rows.push_back({"Nome interno", f->block});
+        }
+        float labelW = 0;
+        for (const Row& r : rows) {
+            labelW = std::max(labelW, TextSize(fonts.desc, r.label).x);
+        }
+        for (const Row& r : rows) {
+            Text(dl, fonts.desc, x, cy, col::hint, r.label);
+            Text(dl, fonts.desc, x + labelW + 16 * u, cy, col::text, Ellipsize(fonts.desc, r.value, w - labelW - 16 * u).c_str());
+            cy += fonts.desc->FontSize + 8 * u;
+        }
+        cy += 8 * u;
+        // Acoes
+        float bh = 34 * u;
+        if (Button("##animNoPersonagem", "Tocar no meu personagem", x, cy, w, bh, true)) {
+            core::PlayAnim(a->index, S.animLoop, !S.animInPlace);
+        }
+        if (ImGui::IsItemHovered()) {
+            Tooltip(S.animLoop ? "Repetindo, como na pr\xC3\xA9via. Parar: o bot\xC3\xA3o abaixo."
+                               : "Uma vez, como na pr\xC3\xA9via (repetir: o bot\xC3\xA3o da linha do tempo).");
+        }
+        cy += bh + 8 * u;
+        float half = (w - 8 * u) * 0.5f;
+        bool playing = core::PlayingAnim() >= 0;
+        if (Button("##animParar", "Parar no personagem", x, cy, w, bh, false, playing)) {
+            core::StopAnim();
+        }
+        cy += bh + 8 * u;
+        if (Button("##animCopiarNome", "Copiar nome", x, cy, half, bh, false)) {
+            std::string text = "\"" + f->lib + "\", \"" + a->name + "\"";
+            ImGui::SetClipboardText(text.c_str());
+            Toast("Copiado", text.c_str());
+        }
+        if (Button("##animCopiarSamp", "Copiar ApplyAnimation", x + half + 8 * u, cy, half, bh, false)) {
+            bool move = !S.animInPlace;
+            snprintf(buf, sizeof(buf), "ApplyAnimation(playerid, \"%s\", \"%s\", 4.1, %d, %d, %d, 0, 0, 1);", f->lib.c_str(),
+                     a->name.c_str(), S.animLoop ? 1 : 0, move ? 1 : 0, move ? 1 : 0);
+            ImGui::SetClipboardText(buf);
+            Toast("Copiado", buf);
+        }
+        cy += bh + 16 * u;
+        // Avisos do .ifp
+        if (f->renamed) {
+            snprintf(buf, sizeof(buf), "O nome interno deste .ifp \xC3\xA9 \"%s\": o jogo guarda as anima\xC3\xA7\xC3\xB5" "es com esse "
+                                       "nome, e os scripts que usam \"%s\" n\xC3\xA3o acham.",
+                     f->block.c_str(), f->lib.c_str());
+            cy += Wrapped(dl, fonts.desc, x, cy, w, col::Rgba(255, 196, 120), buf) + 6 * u;
+        }
+        if (!f->missing.empty()) {
+            std::string text = "Faltam " + Thousands(static_cast<int>(f->missing.size())) + " originais neste .ifp: ";
+            for (size_t i = 0; i < f->missing.size() && i < 6; ++i) {
+                text += (i ? ", " : "") + f->missing[i];
+            }
+            if (f->missing.size() > 6) {
+                text += "...";
+            }
+            cy += Wrapped(dl, fonts.desc, x, cy, w, col::Rgba(255, 196, 120), text) + 6 * u;
+        }
+    }
+    // A referencia das originais
+    if (!ifp::Reference()[0]) {
+        cy += 6 * u;
+        cy += Wrapped(dl, fonts.desc, x, cy, w, col::hint,
+                      "Sem refer\xC3\xAAncia das originais: s\xC3\xB3 as novas s\xC3\xA3o marcadas (pelo nome). Para "
+                      "marcar tamb\xC3\xA9m as modificadas, copie o anim.img e o ped.ifp de um jogo sem mods para a pasta "
+                      "Trok DevTools\\originais.");
+    }
+    ImGui::SetCursorScreenPos(ImVec2(x, y));
+    ImGui::Dummy(ImVec2(w, std::max(1.0f, cy - y + 8 * u)));
+    ImGui::EndChild();
+}
+
+void TabAnims(float x, float y, float w, float h) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    if (!ifp::Ready()) {
+        ImVec2 c(x + w * 0.5f, y + h * 0.45f);
+        Spinner(dl, c, 12 * u, static_cast<float>(ImGui::GetTime()));
+        char text[128];
+        snprintf(text, sizeof(text), "Lendo as anima\xC3\xA7\xC3\xB5" "es: %s", ifp::Status());
+        ImVec2 ts = TextSize(fonts.desc, text);
+        Text(dl, fonts.desc, c.x - ts.x * 0.5f, c.y + 22 * u, col::hint, text);
+        return;
+    }
+    std::string message;
+    bool ok = false;
+    if (core::TakeAnimMessage(&message, &ok)) {
+        Toast(ok ? "No seu personagem" : "Trok DevTools", message.c_str());
+    }
+    // Barra: busca, o .ifp e so as modificadas
+    float barH = 32 * u, searchW = std::min(340 * u, w * 0.3f);
+    SearchField("##buscaAnim", S.animQuery, sizeof(S.animQuery), "Buscar: walk, dance, sprint, ped", x, y, searchW, barH);
+    S.animFilter.query = S.animQuery;
+    float px = x + searchW + 14 * u, pw = 0, pillH = 28 * u, pillY = y + (barH - pillH) * 0.5f;
+    const std::vector<ifp::File>& files = ifp::Files();
+    const ifp::File* chosen = ifp::FindFile(S.animFilter.file);
+    std::string fileLabel = chosen ? chosen->entry : "Todos os .ifp";
+    if (Pill("##animIfp", fileLabel.c_str(), chosen != nullptr, px, pillY, pillH, &pw)) {
+        ImGui::OpenPopup("##animIfpPop");
+    }
+    float popupX = px;
+    px += pw + 6 * u;
+    if (Pill("##animMudadas", "S\xC3\xB3 modificadas e novas", S.animFilter.changed, px, pillY, pillH, &pw)) {
+        S.animFilter.changed = !S.animFilter.changed;
+    }
+    {
+        std::vector<std::string> labels = {"Todos os .ifp"};
+        std::vector<int> values = {-1};
+        for (size_t i = 0; i < files.size(); ++i) {
+            std::string label = files[i].entry;
+            if (files[i].mods + files[i].news > 0) {
+                label += "  \xC2\xB7  " + Thousands(files[i].mods + files[i].news) + " marcadas";
+            }
+            labels.push_back(label);
+            values.push_back(static_cast<int>(i));
+        }
+        ChoicePopup("##animIfpPop", labels, values, &S.animFilter.file, popupX, pillY + pillH + 4 * u);
+    }
+
+    // Filtro (so quando muda)
+    if (!(S.animApplied == S.animFilter) || !S.animHasResult) {
+        S.animResult = ifp::Apply(S.animFilter);
+        S.animHasResult = true;
+        S.animApplied = S.animFilter;
+        S.animOpen.assign(files.size(), false);
+        if (AnimFilterActive()) {
+            for (size_t f = 0; f < files.size(); ++f) {
+                S.animOpen[f] = !S.animResult.anims[f].empty() && (S.animResult.files <= 6 || S.animResult.total <= 200);
+            }
+        }
+        if (S.animSel >= 0) {
+            RevealAnim(S.animSel);
+        }
+    }
+
+    float statusY = y + barH + 10 * u;
+    char status[256];
+    snprintf(status, sizeof(status), "%d .ifp  \xC2\xB7  %s anima\xC3\xA7\xC3\xB5" "es  \xC2\xB7  %s modificadas  \xC2\xB7  %s novas",
+             static_cast<int>(files.size()), Thousands(static_cast<int>(ifp::Anims().size())).c_str(),
+             Thousands(ifp::ModCount()).c_str(), Thousands(ifp::NewCount()).c_str());
+    std::string line = status;
+    if (AnimFilterActive()) {
+        line += "  \xC2\xB7  " + Thousands(S.animResult.total) + " no filtro";
+    }
+    line += ifp::Reference()[0] ? std::string("  \xC2\xB7  refer\xC3\xAAncia: ") + ifp::Reference()
+                                : "  \xC2\xB7  sem refer\xC3\xAAncia das originais";
+    Text(dl, fonts.desc, x + 2 * u, statusY, col::hint, Ellipsize(fonts.desc, line, w).c_str());
+
+    float bodyY = statusY + fonts.desc->FontSize + 10 * u, bodyH = y + h - bodyY;
+    float listW = std::floor(std::max(360 * u, w * 0.33f)), gap = 18 * u;
+    float infoW = std::floor(std::max(260 * u, w * 0.2f));
+    float timelineH = 52 * u;
+    float viewX = x + listW + gap;
+    float side = std::floor(std::min(w - listW - infoW - 2 * gap, bodyH - timelineH - 10 * u));
+    std::vector<int> order;
+    AnimTree(x, bodyY, listW, bodyH, &order);
+    AnimViewer(ImVec2(viewX, bodyY), side);
+    AnimTimeline(viewX, bodyY + side + 10 * u, side, timelineH);
+    float infoX = viewX + side + gap;
+    AnimInfo(infoX, bodyY, x + w - infoX, bodyH);
+
+    // Setas: a animacao de cima/de baixo na lista; espaco: tocar/pausar
+    if (!ImGui::GetIO().WantTextInput && ImGui::GetCurrentContext()->OpenPopupStack.Size == 0 && !order.empty()) {
+        bool up = ImGui::IsKeyPressed(ImGuiKey_UpArrow, true), down = ImGui::IsKeyPressed(ImGuiKey_DownArrow, true);
+        if (up || down) {
+            auto it = std::find(order.begin(), order.end(), S.animSel);
+            int i = it == order.end() ? (down ? -1 : static_cast<int>(order.size())) : static_cast<int>(it - order.begin());
+            i = std::max(0, std::min(static_cast<int>(order.size()) - 1, i + (down ? 1 : -1)));
+            SelectAnim(order[i]);
+            RevealAnim(order[i]);
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Space, false) && S.clipOk) {
+            if (!S.animPlaying && S.animTime >= S.clip.seconds) {
+                S.animTime = 0;
+            }
+            S.animPlaying = !S.animPlaying;
+        }
+    }
+    dl->AddLine(ImVec2(x + listW + gap * 0.5f, bodyY), ImVec2(x + listW + gap * 0.5f, bodyY + bodyH), col::separator);
+}
+
 // ---------------------------------------------------------------- outras abas
 
 void Placeholder(float x, float y, float w, float h, const char* title, const char* const* lines, int count) {
@@ -2037,6 +2764,8 @@ void Init(const char* iniPath, const char* gameDir) {
             SetBackground(IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, 255));
         }
         S.audioDelay = std::max(1, std::min(15, static_cast<int>(GetPrivateProfileIntA("devtools", "audio_tempo", 4, S.ini))));
+        S.animSkin = std::max(-1, std::min(19999, static_cast<int>(GetPrivateProfileIntA("devtools", "anim_personagem", -1, S.ini))));
+        S.animSpeed = std::max(0, std::min(3, static_cast<int>(GetPrivateProfileIntA("devtools", "anim_velocidade", 2, S.ini))));
         S.perFrame = std::max(1, std::min(8, static_cast<int>(GetPrivateProfileIntA("devtools", "miniaturas_por_quadro", 3,
                                                                                      S.ini))));
     }
@@ -2121,12 +2850,7 @@ void Frame() {
     }
     switch (S.tab) {
     case TAB_MODELS: TabModels(x, top, w, bodyH); break;
-    case 1: {
-        const char* lines[] = {"Os .ifp e as anima\xC3\xA7\xC3\xB5" "es de cada um.",
-                               "Pr\xC3\xA9via no personagem, com velocidade e repeti\xC3\xA7\xC3\xA3o."};
-        Placeholder(x, top, w, bodyH, "Anima\xC3\xA7\xC3\xB5" "es", lines, 2);
-        break;
-    }
+    case 1: TabAnims(x, top, w, bodyH); break;
     case 2: TabAudio(x, top, w, bodyH); break;
     case 3: {
         const char* lines[] = {"Localizar qualquer arquivo dos .img e da pasta do jogo.",
@@ -2165,7 +2889,9 @@ void Frame() {
                                             {"Esc", "Fechar", true}};
     static const std::vector<Hint> audioHints = {{"Clique", "Tocar ou parar", false}, {"/trokdevtools", "Abrir e fechar", false},
                                                  {"Esc", "Fechar", true}};
-    int clicked = EndShell(S.tab == 2 ? audioHints : hints);
+    static const std::vector<Hint> animHints = {{"Clique", "Ver a anima\xC3\xA7\xC3\xA3o", false}, {"Setas", "Trocar", false},
+                                                {"Esc", "Fechar", true}};
+    int clicked = EndShell(S.tab == 2 ? audioHints : S.tab == 1 ? animHints : hints);
     PopStyle();
     if (!keep || clicked == 2 || (escape && !cardWasOpen && popups == 0)) {
         Toggle();

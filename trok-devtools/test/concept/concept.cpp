@@ -249,6 +249,16 @@ const Look& Looking() {
     return inspect ? concept::target : none;
 }
 
+// A aba Animacoes fica de fora do conceito (o .ifp "ainda lendo")
+void PreviewPed(int) {}
+const mesh::Mesh* PreviewMesh() { return nullptr; }
+bool PreviewFailed(std::string*) { return false; }
+int PlayerSkin() { return -1; }
+void PlayAnim(int, bool, bool) {}
+void StopAnim() {}
+int PlayingAnim() { return -1; }
+bool TakeAnimMessage(std::string*, bool*) { return false; }
+
 } // namespace core
 
 namespace gta {
@@ -333,6 +343,29 @@ int SoundCount() { return 0; }
 Result Apply(const Filter&) { return Result(); }
 bool ExportWav(int, int, std::string*) { return false; }
 } // namespace sfx
+
+namespace ifp {
+namespace {
+std::vector<File> noFiles;
+std::vector<Anim> noAnims;
+} // namespace
+bool Ready() { return false; }
+const char* Status() { return "conceito"; }
+const std::vector<File>& Files() { return noFiles; }
+const std::vector<Anim>& Anims() { return noAnims; }
+const File* FindFile(int) { return nullptr; }
+const Anim* FindAnim(int) { return nullptr; }
+int ModCount() { return 0; }
+int NewCount() { return 0; }
+const char* Reference() { return ""; }
+Result Apply(const Filter&) { return Result(); }
+bool LoadClip(int, Clip*) { return false; }
+} // namespace ifp
+
+namespace pose {
+int Matched(const mesh::Mesh&, const ifp::Clip&) { return 0; }
+bool Apply(const mesh::Mesh&, const ifp::Clip&, float, bool, mesh::Mesh*) { return false; }
+} // namespace pose
 
 namespace player {
 bool Play(int, int) { return false; }

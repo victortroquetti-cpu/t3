@@ -8,12 +8,15 @@
 // Criar no mundo: 1:1, de frente para o personagem, a uma distancia que cabe o modelo inteiro. Objetos nascem com o meio
 // na altura dos olhos (os altos, com a base no chao) e ficam parados; veiculos e personagens nascem no chao, e os
 // veiculos trancados (no SA-MP o servidor nao sabe deles).
+// Animacoes: o personagem da previa fica preso enquanto a aba pede (um quadro sem pedir e ele e solto). Tocar no
+// personagem: o .ifp e carregado e preso ate parar ou tocar outra; o TASK_PLAY_ANIM e do proprio jogo.
 // Quem usa a textura: os candidatos sao os modelos do catalogo cuja TXD e a que tem a textura ou descende dela (txdp);
 // cada um e carregado (se ja nao estava) e os materiais dizem se a textura e usada.
 
 #include "core.h"
 
 #include "catalog.h"
+#include "ifp.h"
 #include "render.h"
 #include "sfx.h"
 
@@ -71,6 +74,22 @@ TextureUsers g_users;
 std::vector<int> g_usersQueue;
 size_t g_usersNext = 0;
 bool g_usersSetup = false;
+
+int g_previewWant = -1, g_previewWantFrame = -100, g_previewId = -1;
+gta::Hold g_previewHold;
+mesh::Mesh g_previewMesh;
+bool g_previewReady = false, g_previewFailed = false;
+std::string g_previewWhy;
+
+struct AnimRequest {
+    int anim;
+    bool loop, move, stop;
+};
+std::deque<AnimRequest> g_animQueue;
+gta::Hold g_animHold;
+int g_playing = -1;
+std::string g_animMessage;
+bool g_animOk = false, g_animNews = false;
 
 bool g_inspect = false;
 Look g_look;
@@ -156,6 +175,85 @@ void LoadOpen() {
         return;
     }
     g_openReady = true;
+}
+
+void LoadPreview() {
+    int want = g_frame - g_previewWantFrame <= THUMB_WANT_LIFE ? g_previewWant : -1;
+    if (want != g_previewId) {
+        gta::Release(&g_previewHold);
+        g_previewMesh = mesh::Mesh();
+        g_previewId = want;
+        g_previewReady = g_previewFailed = false;
+        g_previewWhy.clear();
+    }
+    if (g_previewId < 0 || g_previewReady || g_previewFailed) {
+        return;
+    }
+    if (!gta::Load(g_previewId, &g_previewHold)) {
+        g_previewFailed = true;
+        g_previewWhy = "o jogo n\xC3\xA3o carregou o modelo";
+        return;
+    }
+    if (!mesh::Extract(g_previewId, false, &g_previewMesh)) {
+        g_previewFailed = true;
+        g_previewWhy = g_previewMesh.error;
+        return;
+    }
+    if (g_previewMesh.skin.bones.empty()) {
+        g_previewFailed = true;
+        g_previewWhy = "o modelo n\xC3\xA3o tem ossos";
+        return;
+    }
+    g_previewReady = true;
+    DevToolsLog("previa: personagem %d com %d ossos", g_previewId, static_cast<int>(g_previewMesh.skin.bones.size()));
+}
+
+void DoAnim(const AnimRequest& r) {
+    g_animNews = true;
+    g_animOk = false;
+    if (r.stop) {
+        gta::StopAnim();
+        gta::Release(&g_animHold);
+        g_playing = -1;
+        g_animOk = true;
+        g_animMessage = "Anima\xC3\xA7\xC3\xA3o parada.";
+        return;
+    }
+    const ifp::Anim* a = ifp::FindAnim(r.anim);
+    const ifp::File* f = a ? ifp::FindFile(a->file) : nullptr;
+    if (!a || !f) {
+        g_animMessage = "Anima\xC3\xA7\xC3\xA3o n\xC3\xA3o encontrada.";
+        return;
+    }
+    // O bloco do jogo tem o nome do arquivo (o anim.img registra assim); o ped.ifp e o "ped", sempre carregado
+    int block = gta::AnimBlockIndex(f->lib);
+    if (block < 0) {
+        g_animMessage = "O jogo n\xC3\xA3o conhece o bloco " + f->lib + ".";
+        DevToolsLog("animacao: bloco %s nao registrado no jogo", f->lib.c_str());
+        return;
+    }
+    if (!gta::AnimBlockLoaded(block)) {
+        gta::Hold hold;
+        if (!gta::LoadResource(gta::IFP_FIRST + block, &hold) || !gta::AnimBlockLoaded(block)) {
+            gta::Release(&hold);
+            g_animMessage = "O jogo n\xC3\xA3o carregou o " + f->entry + ".";
+            DevToolsLog("animacao: %s nao carregou (bloco %d)", f->entry.c_str(), block);
+            return;
+        }
+        gta::Release(&g_animHold);
+        g_animHold = hold;
+    } else if (g_animHold.id >= 0 && g_animHold.id != gta::IFP_FIRST + block) {
+        gta::Release(&g_animHold); // a anterior era de outro .ifp
+    }
+    std::string why;
+    if (!gta::PlayAnim(f->lib, a->name, r.loop, r.move, &why)) {
+        g_animMessage = "N\xC3\xA3o deu para tocar: " + why + ".";
+        return;
+    }
+    g_playing = r.anim;
+    g_animOk = true;
+    g_animMessage = f->lib + " \xC2\xB7 " + a->name + (r.loop ? " (repetindo)" : "");
+    DevToolsLog("animacao: %s %s no personagem (repetir %d, andar %d)", f->lib.c_str(), a->name.c_str(), r.loop, r.move);
 }
 
 gta::Vec3 Normalized2D(gta::Vec3 v) {
@@ -396,6 +494,7 @@ void GameTick() {
         g_catalogStarted = true; // o streaming ja montou a lista dos .img
         catalog::Start(g_gameDir.c_str());
         sfx::Start(g_gameDir.c_str());
+        ifp::Start(g_gameDir.c_str());
     }
     catalog::Update();
     sfx::Update();
@@ -404,6 +503,12 @@ void GameTick() {
         return;
     }
     LoadOpen();
+    LoadPreview();
+    while (!g_animQueue.empty()) {
+        AnimRequest r = g_animQueue.front();
+        g_animQueue.pop_front();
+        DoAnim(r);
+    }
     LoadThumbs();
     // A busca comeca com o modelo do card carregado (a TXD dele precisa estar na memoria) e segue enquanto o card estiver
     // aberto, mesmo trocando de modelo pela lista.
@@ -527,6 +632,50 @@ bool InspectOn() {
 
 const Look& Looking() {
     return g_look;
+}
+
+void PreviewPed(int id) {
+    g_previewWant = id;
+    g_previewWantFrame = g_frame;
+}
+
+const mesh::Mesh* PreviewMesh() {
+    return g_previewReady && g_previewId == g_previewWant ? &g_previewMesh : nullptr;
+}
+
+bool PreviewFailed(std::string* why) {
+    if (g_previewFailed && g_previewId == g_previewWant) {
+        *why = g_previewWhy;
+        return true;
+    }
+    return false;
+}
+
+int PlayerSkin() {
+    DWORD ped = gta::PlayerPed();
+    return ped ? gta::EntityModel(ped) : -1;
+}
+
+void PlayAnim(int anim, bool loop, bool move) {
+    g_animQueue.push_back({anim, loop, move, false});
+}
+
+void StopAnim() {
+    g_animQueue.push_back({-1, false, false, true});
+}
+
+int PlayingAnim() {
+    return g_playing;
+}
+
+bool TakeAnimMessage(std::string* text, bool* ok) {
+    if (!g_animNews) {
+        return false;
+    }
+    g_animNews = false;
+    *text = g_animMessage;
+    *ok = g_animOk;
+    return true;
 }
 
 } // namespace core

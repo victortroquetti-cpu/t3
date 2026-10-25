@@ -55,6 +55,16 @@ struct TextureUsers {
 void FindTextureUsers(int model, const std::string& texture);
 const TextureUsers& TextureUsersNow();
 
+// Animacoes: o personagem da previa (preso enquanto a aba pede, todo quadro) e tocar no personagem do jogador.
+void PreviewPed(int id);          // chamar todo quadro com a aba na tela
+const mesh::Mesh* PreviewMesh(); // nullptr enquanto carrega
+bool PreviewFailed(std::string* why);
+int PlayerSkin();                 // o modelo do personagem do jogador (-1 = sem personagem)
+void PlayAnim(int anim, bool loop, bool move); // indice em ifp::Anims()
+void StopAnim();
+int PlayingAnim(); // a ultima pedida (-1 = parado)
+bool TakeAnimMessage(std::string* text, bool* ok);
+
 // Informacoes ao apontar
 struct Look {
     bool valid = false;
