@@ -91,10 +91,10 @@ Os efeitos sonoros do jogo (`audio\SFX`), na ordem do jogo: **pacote › bank �
 
 O lado direito da aba:
 
-- **Mostrar na tela (menu fechado):** com o menu fechado, cada som que o jogo toca aparece num cartão no lado direito da tela: o pacote, o bank, o som, a duração e o nome. O mesmo som repetido em menos de 1,5 s soma no mesmo cartão (`×3`). O botão **Info do áudio**, no canto da aba, faz o mesmo.
+- **Mostrar na tela (menu fechado):** com o menu fechado, os sons que o jogo toca aparecem em cartões no lado direito da tela: o pacote, o bank, o som, a duração e o nome. O jogo toca muitos sons, então a tela mostra só os 3 últimos; a lista toda fica no histórico. O mesmo som repetido em menos de 1,5 s soma no mesmo cartão (`×3`). O botão **Info do áudio**, no canto da aba, faz o mesmo.
 - **Tempo na tela:** quanto tempo cada cartão fica (1 a 15 s, padrão 4 s). Depois ele some aos poucos.
 - **Ignorar os passos:** sem os passos (FEET), que tocam o tempo todo.
-- **Histórico:** os últimos 300 sons, o mais novo em cima, com a hora. Clique num deles para achar o som na lista e tocar. Se o som está fora do filtro atual, o filtro é limpo. **Limpar o histórico** zera a lista.
+- **Histórico:** os últimos 100 sons, o mais novo em cima, com a hora. Clique num deles para achar o som na lista e tocar. Se o som está fora do filtro atual, o filtro é limpo. **Limpar o histórico** zera a lista.
 
 O rádio e as músicas (pasta `STREAMS`) não são do SFX e não aparecem.
 

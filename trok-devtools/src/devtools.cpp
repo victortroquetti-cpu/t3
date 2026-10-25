@@ -1464,6 +1464,28 @@ void AudioTree(float x, float y, float w, float h) {
     ImGui::EndChild();
 }
 
+// "GENRL > 90S_P > sound_001" com o chevron do lucide entre as partes (a fonte nao tem a seta); a parte que nao cabe
+// encurta e as seguintes ficam de fora.
+void Crumbs(ImDrawList* dl, ImFont* font, float x, float y, ImU32 color, ImU32 arrow, const std::vector<std::string>& parts,
+            float maxW) {
+    float end = x + maxW, iw = IconWidth(Icon::ChevronRight, true), gap = 6 * u;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) {
+            if (x + gap + iw + gap >= end) {
+                return;
+            }
+            DrawIcon(dl, Icon::ChevronRight, ImVec2(x + gap + iw * 0.5f, y + font->FontSize * 0.5f), arrow, true);
+            x += gap + iw + gap;
+        }
+        std::string text = Ellipsize(font, parts[i], end - x);
+        Text(dl, font, x, y, color, text.c_str());
+        if (text != parts[i]) {
+            return;
+        }
+        x += TextSize(font, text.c_str()).x;
+    }
+}
+
 // O player embaixo da arvore: o som escolhido, tocar/parar, repetir, salvar e o progresso.
 void AudioPlayerBar(float x, float y, float w, float h) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1493,7 +1515,7 @@ void AudioPlayerBar(float x, float y, float w, float h) {
     float textW = repC.x - br - 14 * u - tx;
     char title[128], sub[160];
     if (s && b) {
-        snprintf(title, sizeof(title), "%s  \xE2\x80\xBA  sound_%03d", b->name.c_str(), sound + 1);
+        snprintf(title, sizeof(title), "sound_%03d", sound + 1);
         snprintf(sub, sizeof(sub), "%s  \xC2\xB7  Bank_%03d  \xC2\xB7  %s Hz%s%s%s", sfx::Packs()[b->pack].name.c_str(), b->number,
                  Thousands(s->rate).c_str(), s->loop ? "  \xC2\xB7  loop" : "", s->name.empty() ? "" : "  \xC2\xB7  ",
                  s->name.c_str());
@@ -1501,7 +1523,11 @@ void AudioPlayerBar(float x, float y, float w, float h) {
         snprintf(title, sizeof(title), "Escolha um som na lista");
         snprintf(sub, sizeof(sub), "ele toca aqui; d\xC3\xA1 para repetir e salvar em .wav");
     }
-    Text(dl, fonts.body, tx, y + 12 * u, s ? col::text : col::column, Ellipsize(fonts.body, title, textW).c_str());
+    if (s && b) {
+        Crumbs(dl, fonts.body, tx, y + 12 * u, col::text, col::hint, {b->name, title}, textW);
+    } else {
+        Text(dl, fonts.body, tx, y + 12 * u, col::column, Ellipsize(fonts.body, title, textW).c_str());
+    }
     Text(dl, fonts.desc, tx, y + 12 * u + fonts.body->FontSize + 3 * u, col::hint, Ellipsize(fonts.desc, sub, textW).c_str());
     // progresso
     float pos = playing ? player::Position() : 0.0f, len = s ? s->seconds : 0.0f;
@@ -1517,16 +1543,15 @@ void AudioPlayerBar(float x, float y, float w, float h) {
     Text(dl, fonts.desc, right - ts.x, barY - ts.y * 0.5f + 2 * u, col::column, time);
 }
 
-std::string PlayedTitle(const audiospy::Played& p) {
+std::vector<std::string> PlayedTitle(const audiospy::Played& p) {
     const sfx::Bank* b = sfx::FindBank(p.bank);
-    char buf[160];
+    char buf[32];
     if (b) {
-        snprintf(buf, sizeof(buf), "%s  \xE2\x80\xBA  %s  \xE2\x80\xBA  sound_%03d", sfx::Packs()[b->pack].name.c_str(),
-                 b->name.c_str(), p.sound + 1);
-    } else {
-        snprintf(buf, sizeof(buf), "slot %d  \xE2\x80\xBA  som %d", p.slot, p.sound);
+        snprintf(buf, sizeof(buf), "sound_%03d", p.sound + 1);
+        return {sfx::Packs()[b->pack].name, b->name, buf};
     }
-    return buf;
+    snprintf(buf, sizeof(buf), "som %d", p.sound);
+    return {"slot " + std::to_string(p.slot), buf};
 }
 
 std::string PlayedSub(const audiospy::Played& p) {
@@ -1623,8 +1648,7 @@ void AudioSide(float x, float y, float w, float h) {
         snprintf(clock, sizeof(clock), "%02d:%02d:%02d", p.time.wHour, p.time.wMinute, p.time.wSecond);
         ImVec2 cs = TextSize(fonts.desc, clock);
         Text(cdl, fonts.desc, o.x + iw - 10 * u - cs.x, ry + 7 * u, col::hint, clock);
-        Text(cdl, fonts.body, o.x + 10 * u, ry + 6 * u, col::text,
-             Ellipsize(fonts.body, PlayedTitle(p), iw - cs.x - 30 * u).c_str());
+        Crumbs(cdl, fonts.body, o.x + 10 * u, ry + 6 * u, col::text, col::hint, PlayedTitle(p), iw - cs.x - 30 * u);
         Text(cdl, fonts.desc, o.x + 10 * u, ry + 6 * u + fonts.body->FontSize + 3 * u, col::hint,
              Ellipsize(fonts.desc, PlayedSub(p), iw - 20 * u).c_str());
     }
@@ -1776,6 +1800,8 @@ void TabAudio(float x, float y, float w, float h) {
 }
 
 // Com o menu fechado: os ultimos sons, um cartao cada, a direita da tela; somem depois do tempo escolhido.
+constexpr int OVERLAY_CARDS = 3; // so os ultimos na tela: o jogo toca muitos sons, e a lista toda fica no historico
+
 bool AudioOverlayActive() {
     if (!S.audioShow || audiospy::History().empty()) {
         return false;
@@ -1795,7 +1821,7 @@ void AudioOverlay() {
     int shown = 0;
     for (const audiospy::Played& p : audiospy::History()) {
         DWORD age = now - p.last;
-        if (shown >= 6 || age > life + 500) {
+        if (shown >= OVERLAY_CARDS || age > life + 500) {
             break;
         }
         float alpha = age <= life ? 1.0f : 1.0f - (age - life) / 500.0f;
@@ -1803,7 +1829,7 @@ void AudioOverlay() {
         dl->AddRectFilled(ImVec2(x, y), ImVec2(x + cardW, y + cardH), IM_COL32(12, 12, 12, a), 9 * u);
         dl->AddRect(ImVec2(x, y), ImVec2(x + cardW, y + cardH), col::White(static_cast<int>(16 * alpha)), 9 * u);
         auto fade = [&](ImU32 c) { return (c & 0x00FFFFFF) | (static_cast<ImU32>(((c >> 24) & 0xFF) * alpha) << 24); };
-        Text(dl, fonts.body, x + 12 * u, y + 7 * u, fade(col::text), Ellipsize(fonts.body, PlayedTitle(p), cardW - 24 * u).c_str());
+        Crumbs(dl, fonts.body, x + 12 * u, y + 7 * u, fade(col::text), fade(col::hint), PlayedTitle(p), cardW - 24 * u);
         Text(dl, fonts.desc, x + 12 * u, y + 7 * u + fonts.body->FontSize + 3 * u, fade(col::hint),
              Ellipsize(fonts.desc, PlayedSub(p), cardW - 24 * u).c_str());
         y += cardH + gap;

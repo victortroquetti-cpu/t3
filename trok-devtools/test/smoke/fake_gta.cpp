@@ -1603,11 +1603,13 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     Frames(3);
     GameSound(3, 0, 63);
     GameSound(4, 0, 0); // passos: ignorados
+    GameSound(3, 1, 0);
+    GameSound(5, 32, 0); // 4 sons diferentes: a tela mostra so os 3 ultimos
     GameSound(5, 31, 0);
     GameSound(5, 31, 0); // o mesmo de novo: soma no anterior
     Frames(10);
     Capture("14-audio-na-tela.bmp");
-    Check(g_soundRequests == 4, "gancho do RequestNewSound: o original chamado para todos os sons");
+    Check(g_soundRequests == 6, "gancho do RequestNewSound: o original chamado para todos os sons");
     Check(LogHas("audio: carregador de bancos em AEAudioHardware+0xD98 (45 slots, 710 bancos)"),
           "audio: o carregador de bancos achado no AEAudioHardware");
     Check(LogHas("audio: primeiro som: GENRL 90S_P sound_001 (slot 3, evento 63)"), "audio: o primeiro som com pacote e banco");

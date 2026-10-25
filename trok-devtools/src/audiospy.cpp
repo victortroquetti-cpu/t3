@@ -20,7 +20,7 @@ namespace {
 constexpr DWORD FN_REQUEST_NEW_SOUND = 0x4EFB10;
 constexpr DWORD AE_AUDIO_HARDWARE = 0xB5F8B8;
 constexpr DWORD SLOT_SIZE = 0x12D4;
-constexpr size_t HISTORY_MAX = 300;
+constexpr size_t HISTORY_MAX = 100;
 constexpr DWORD SAME_SOUND_MS = 1500;
 
 using RequestFn = void*(__fastcall*)(void* self, void* edx, BYTE* sound);
