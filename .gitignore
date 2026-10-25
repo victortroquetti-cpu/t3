@@ -34,3 +34,4 @@ trok-headmove/test/out/
 # Trok DevTools
 trok-devtools/build/
 trok-devtools/test/out/
+trok-devtools/test/concept/__pycache__/
