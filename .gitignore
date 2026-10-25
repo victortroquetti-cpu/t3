@@ -30,3 +30,7 @@ trok-hit/test/out/
 # Trok Headmove
 trok-headmove/build/
 trok-headmove/test/out/
+
+# Trok Studio
+trok-studio/build/
+trok-studio/test/out/

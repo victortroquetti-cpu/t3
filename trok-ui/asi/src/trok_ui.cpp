@@ -1515,6 +1515,19 @@ bool Field(ImDrawList* dl, const char* id, char* buffer, size_t size, const char
 
 } // namespace
 
+bool SearchField(const char* id, char* buffer, size_t size, const char* placeholder, float x, float y, float w, float h,
+                 bool focus) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->ChannelsSplit(3);
+    dl->ChannelsSetCurrent(2);
+    bool active = false;
+    ImGui::PushID(id);
+    bool changed = Field(dl, "##busca", buffer, size, placeholder, 2, x, y, w, h, focus, false, &active);
+    ImGui::PopID();
+    dl->ChannelsMerge();
+    return changed;
+}
+
 bool TextField(const char* id, char* buffer, size_t size, const char* placeholder, bool password, float x, float y,
                float w, float h, bool focus) {
     ImDrawList* dl = ImGui::GetWindowDrawList();

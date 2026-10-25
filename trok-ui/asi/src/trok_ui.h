@@ -185,6 +185,9 @@ private:
 // Campo de texto solto (dialogos): moldura da casa, olho na senha e menu do botao direito.
 bool TextField(const char* id, char* buffer, size_t size, const char* placeholder, bool password, float x, float y,
                float w, float h, bool focus);
+// Campo de busca solto: a lupa a esquerda e o X para limpar (o mesmo do Rows::Search, fora de uma linha).
+bool SearchField(const char* id, char* buffer, size_t size, const char* placeholder, float x, float y, float w, float h,
+                 bool focus = false);
 
 // ---------------------------------------------------------------- avisos
 
