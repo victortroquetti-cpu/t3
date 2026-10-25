@@ -2,9 +2,16 @@
 
 Uma ferramenta para modders dentro do GTA San Andreas: ver todos os modelos que o jogo conhece, achar o `.dff`, o `.txd` e o `.img` de cada um, girar o modelo em 3D, ver as texturas e criar o modelo no mundo, do tamanho real, na sua frente. Com o menu fechado, o **Info ao apontar** mostra o id e os arquivos do que está no meio da tela.
 
-Por enquanto só a aba **Modelos** funciona. As outras (Texturas, Animações, Áudios, Arquivos) estão no menu como "Em breve".
+Por enquanto só a aba **Modelos** funciona. As outras (Animações, Áudios, Arquivos) estão no menu como "Em breve". As texturas não têm aba: ficam no card do modelo.
 
-**Estado:** v0.1, `.asi` compilado e testado fora do jogo (Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide` e `.img` de verdade: `test/smoke/run.sh`, 36 conferências e 7 capturas). Falta o teste no jogo de verdade.
+**Estado:** v0.2, `.asi` compilado e testado fora do jogo (Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide` e `.img` de verdade: `test/smoke/run.sh`, 50 conferências e 12 capturas). Falta o teste no jogo de verdade.
+
+**Novo na v0.2:**
+- A textura clicada no card mostra quem mais usa a mesma textura.
+- O visualizador ganhou a cor do fundo, com verde e azul para chroma key.
+- Os botões do visualizador (Grade, Colisão...) agora recebem o clique. Antes o clique virava arrasto do modelo.
+- Os objetos nascem na altura dos olhos.
+- O Info ao apontar ficou certo com modelos grandes (bairros, terrenos).
 
 ## Instalar
 
@@ -20,7 +27,7 @@ A fonte é a da casa (`moonloader\resource\trok\font.ttf`) se ela estiver na pas
 - **F10**, sempre (no single player é o único jeito);
 - **`/trokdevtools`** no SA-MP 0.3.7 R1.
 
-Esc fecha o card aberto e, com nenhum card aberto, o menu.
+Esc volta da textura para o modelo, depois fecha o card e, com nenhum card aberto, fecha o menu.
 
 ## Aba Modelos
 
@@ -36,11 +43,30 @@ Uma grade com um card por modelo: a miniatura 3D, o id e o nome do `.dff`.
 
 Clique num card e abre o popup do modelo:
 
-- **Visualizador 3D:** arraste para girar, roda para zoom, duplo clique para centralizar. As opções embaixo ficam salvas: **Texturas**, **Arame**, **Colisão** (as caixas, esferas e triângulos da colisão, em cima do modelo), **Grade** (o chão, 1 m por quadrado) e **Girar** (gira sozinho).
+- **Visualizador 3D:**
+  - Arraste para girar, roda para zoom, duplo clique para centralizar.
+  - As opções embaixo ficam salvas: **Texturas**, **Arame**, **Colisão** (as caixas, esferas e triângulos da colisão, em cima do modelo), **Grade** (o chão, 1 m por quadrado; clique para tirar) e **Girar** (gira sozinho).
+  - As bolinhas ao lado trocam a **cor do fundo**: escuro, cinza, claro, branco, verde e azul. O verde e o azul servem de chroma key para vídeo. No Geral dá para escolher qualquer cor.
 - **Informações:** ID, tipo, DFF, TXD (com o pai, se houver), o `.img` e o tamanho do arquivo, se é substituído, o `.ide` que define, distância de desenho, flags decodificadas, tamanho em metros, vértices, triângulos, materiais, atômicos e a colisão.
-- **Texturas:** as usadas pelo modelo e, separadas, as outras da mesma TXD. Cada uma mostra o tamanho e o formato. Clique numa textura para vê-la grande no visualizador, sobre um xadrez (para ver o alfa), com o formato e os mipmaps.
-- **Criar no mundo (1:1):** cria o modelo na sua frente, virado para você e com a base no chão. A distância cresce com o tamanho do modelo, para ele não nascer em cima de você. Objetos nascem parados, carros nascem trancados. **Apagar criados** apaga todos os que você criou.
+- **Texturas:** as usadas pelo modelo e, separadas, as outras da mesma TXD. Cada uma mostra o tamanho e o formato. Clique numa textura para abrir a textura (abaixo).
+- **Criar no mundo (1:1):** cria o modelo na sua frente, virado para você. A distância cresce com o tamanho do modelo, para ele não nascer em cima de você.
+  - Objetos nascem com o meio na altura dos olhos do personagem e ficam parados no ar. Os que não cabem (mais altos que ~3 m) nascem com a base no chão.
+  - Carros e personagens nascem no chão. Carros nascem trancados.
+  - **Apagar criados** apaga todos os que você criou.
 - **Copiar ID / DFF / TXD:** para a área de transferência.
+
+### A textura aberta
+
+Clique numa textura do card:
+
+- **O visualizador** mostra a textura grande, sobre um xadrez (para ver o alfa), com o formato e os mipmaps.
+- **O lado direito** troca as informações do modelo pelas da textura: a TXD onde ela está (e se é a TXD mãe, pelo `txdp`), tamanho, formato (DXT1, DXT3...), mipmaps, alfa e máscara. Embaixo ficam **Voltar ao modelo** e **Copiar nome**.
+- **Modelos com esta textura:** a lista começa pelo modelo do card, marcado como "aberto", e segue com os outros que usam a mesma textura.
+  - **Como acha:** só modelos da TXD onde a textura está, ou de TXDs filhas dela, podem usar a textura. O mod carrega cada um desses aos poucos (como as miniaturas), olha os materiais e solta em seguida.
+  - **TXD grande:** numa TXD genérica com muitos modelos, ele vê só os 600 primeiros.
+  - **Textura que o modelo não usa:** se você clicou numa do "Também na TXD", o modelo do card aparece com o aviso "está na TXD, mas este modelo não usa".
+- **Clique num modelo da lista:** ele vira o modelo do card, e a mesma textura continua aberta. Para ver o modelo em 3D, use **Voltar ao modelo**.
+- Embaixo, as texturas do modelo, para trocar de textura sem voltar.
 
 ### Modelo modificado
 
@@ -53,13 +79,17 @@ O selo **MOD** e o filtro **Só substituídos** pegam o caso que dá para provar
 O botão **Info ao apontar** (no canto da aba Modelos, e no Geral) liga e desliga. Com o menu fechado:
 
 - um ponto no meio da tela;
-- a caixa da colisão em volta do que está no meio da tela (até 300 m, a partir do seu personagem, pela câmera);
+- a caixa da colisão em volta do que está no meio da tela (até 300 m, a partir do seu personagem, pela câmera). Em modelos grandes, que passam por trás da câmera, a caixa é cortada no plano da câmera. Com a câmera dentro da caixa (no meio de um bairro, por exemplo), só o cartão aparece;
 - um cartão ao lado dela com o id, o `.dff`, o tipo, o `.img`, a TXD, a posição, o interior, a distância e o LOD;
 - **botão do meio do mouse** abre o card desse modelo.
 
 ## Aba Geral
 
-Info ao apontar, miniaturas por quadro (1 a 8), refazer as miniaturas, quantos você criou (e apagar), o atalho e a versão.
+- Info ao apontar.
+- Visualizador: a cor do fundo (qualquer cor, com o código hex) e a grade.
+- Miniaturas por quadro (1 a 8) e refazer as miniaturas.
+- Quantos modelos você criou, e apagar.
+- O atalho e a versão.
 
 ## Trok DevTools.ini
 
@@ -73,6 +103,7 @@ Uma seção `[devtools]`, salva pelo próprio menu:
 | `visual_colisao` | `0` | colisão por cima do modelo |
 | `visual_grade` | `1` | o chão em grade |
 | `visual_girar` | `1` | o modelo gira sozinho |
+| `visual_fundo` | `141414` | a cor do fundo do visualizador, em hex `RRGGBB` (verde chroma: `00B140`) |
 | `miniaturas_por_quadro` | `3` | 1 a 8: mais = a grade enche mais rápido, mas pesa mais por quadro |
 
 ## Limites
@@ -89,7 +120,8 @@ Ao lado do `.asi`, um por sessão de jogo:
 
 - versão conferida e ganchos instalados;
 - o catálogo: quantos `.ide`, modelos, `.img` e substituídos;
-- cada modelo criado (id, onde, handle) e cada pedido recusado, com o motivo.
+- cada modelo criado (id, onde, handle) e cada pedido recusado, com o motivo;
+- cada textura aberta: a TXD, quantos candidatos e quantos usam.
 
 Se algo não abrir ou travar, mande esse arquivo.
 
@@ -99,8 +131,8 @@ Se algo não abrir ou travar, mande esse arquivo.
 |---|---|
 | `src/main.cpp` | o `.asi`: confere o 1.0 US, desvia Present/Reset do D3D9 e o `CGame::Process` (`0x53BEE0`), registra `/trokdevtools` no SA-MP R1 e o F10 |
 | `src/catalog.cpp` | numa thread: lê os `.ide` e os diretórios dos `.img` (VER2); no jogo: cruza com a tabela de modelos e o streaming |
-| `src/core.cpp` | na thread do jogo: carrega e solta modelos (miniaturas e card), cria e apaga no mundo, a linha de visão do Info ao apontar |
-| `src/mesh.cpp` | copia a malha do RenderWare (vértices, normais, UV, materiais, texturas) e a colisão para um formato próprio |
+| `src/core.cpp` | na thread do jogo: carrega e solta modelos (miniaturas e card), procura quem usa uma textura, cria e apaga no mundo, a linha de visão do Info ao apontar |
+| `src/mesh.cpp` | copia a malha do RenderWare (vértices, normais, UV, materiais, texturas) e a colisão para um formato próprio; diz se uma TXD tem uma textura e se um modelo usa |
 | `src/render.cpp` | desenha com o D3D9 fixo: o atlas das miniaturas (2048 px, células de 128) e o visualizador |
 | `src/devtools.cpp` | o menu, com o kit da casa (`trok-ui/asi`) |
 
@@ -108,7 +140,8 @@ Se algo não abrir ou travar, mande esse arquivo.
 - **Tabela de modelos:** o ponteiro vem de `0x40CD67` (para pegar o limit adjuster), 20.000 ids. Streaming: `ms_aInfoForModel` (`0x8E4CC0`) e `ms_files` (`0x8E48D8`). TXDs: o pool do `CTxdStore` (`0xC8800C`).
 - **Veículos:** os atômicos `_vlo` (de longe) e os amassados (sem a flag de render) ficam de fora; as rodas da esquerda giram 180°, e as cores de marcação do material (verde, magenta, faróis) viram cores neutras.
 - **Criar e apagar:** pelos comandos de script do próprio jogo (`CRunningScript::ProcessOneCommand`, `0x469EB0`): `0107`/`00A5`/`009A` criam, `0177`/`0175`/`0173` viram, `0550` congela o objeto, `020A` tranca o carro; para apagar, `03CA`/`056E`/`056D` conferem se ainda existe e `0108`/`00A6`/`009B` apagam.
-- **Info ao apontar:** `CWorld::ProcessLineOfSight` (`0x56BA00`) pela câmera (`0xB6F028`), começando depois do personagem; a caixa vem do `CColModel` e vai para a tela com `CSprite::CalcScreenCoors` (`0x70CE30`).
+- **Info ao apontar:** `CWorld::ProcessLineOfSight` (`0x56BA00`) pela câmera (`0xB6F028`), começando depois do personagem. A caixa vem do `CColModel`. Cada aresta é cortada a 1,5 m na frente da câmera e só então vai para a tela, com `CSprite::CalcScreenCoors` (`0x70CE30`).
+- **Quem usa uma textura:** a TXD que tem a textura sai da lista de texturas do dicionário (`RwTexDictionary`, +0x08), procurando na TXD do modelo e depois nas mães (`CTxdStore`, pai em +6). Os candidatos são as entradas do catálogo cuja TXD é essa ou descende dela. Para cada um, o mod olha os materiais de todos os atômicos (`RpGeometry` +0x20/+0x24, textura em `RpMaterial` +0, nome em `RwTexture` +0x10).
 - **Reset do device (Alt+Tab):** os alvos de render saem antes e as miniaturas são refeitas depois.
 
 ### Compilar e testar

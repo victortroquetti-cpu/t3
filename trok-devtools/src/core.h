@@ -7,6 +7,7 @@
 #include <d3d9.h>
 
 #include <string>
+#include <vector>
 
 #include "gta.h"
 #include "mesh.h"
@@ -37,6 +38,23 @@ int SpawnedCount();
 void DespawnAll();
 bool TakeSpawnMessage(std::string* text, bool* ok); // o resultado do ultimo pedido (uma vez)
 
+// Quem usa uma textura: os modelos da TXD onde ela esta (e das TXDs filhas dela) que tem um material com ela. A busca
+// carrega os candidatos aos poucos, como as miniaturas, e solta cada um logo depois.
+struct TextureUsers {
+    int model = -1;         // o modelo do card quando a busca comecou
+    std::string texture;    // o nome da textura
+    int txd = -1;           // a TXD que tem a textura (-1 = nao achou nas TXDs do modelo)
+    std::string txdName;    // o nome dela, pelo catalogo
+    std::vector<int> users; // em ordem de id
+    int checked = 0, total = 0;
+    bool capped = false; // mais candidatos do que o limite (so os primeiros foram vistos)
+    bool done = false;
+};
+// Chamada todo quadro enquanto o painel da textura esta na tela; so recomeca se a textura mudar ou se o modelo do card
+// nao estiver entre os que ja usam a textura.
+void FindTextureUsers(int model, const std::string& texture);
+const TextureUsers& TextureUsersNow();
+
 // Informacoes ao apontar
 struct Look {
     bool valid = false;
@@ -48,6 +66,7 @@ struct Look {
     float distance = 0;
     bool hasBox = false;
     gta::Vec3 box[8];
+    gta::Vec3 camPos = {0, 0, 0}, camForward = {0, 1, 0}; // para cortar a caixa no plano da camera
 };
 void SetInspect(bool on);
 bool InspectOn();

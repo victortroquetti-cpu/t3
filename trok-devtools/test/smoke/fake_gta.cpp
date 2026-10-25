@@ -814,6 +814,7 @@ void BuildWorld() {
     AddModel(411, 6, S_CAR, "infernus", tCar, 0, "cars", "DATA\\VEHICLES.IDE");
     AddModel(1337, 1, S_TRASHCAN, "trashcan01", tTrash, 0, "objs", "DATA\\MAPS\\TROK\\TROK.IDE");
     AddModel(1338, 3, S_FENCE, "fence01", tFence, 0, "tobj", "DATA\\MAPS\\TROK\\TROK.IDE");
+    AddModel(1339, 1, S_TRASHCAN, "trashcan02", tTrash, 0, "objs", "DATA\\MAPS\\TROK\\TROK.IDE"); // a mesma TXD
     AddModel(1500, 1, S_NATIVE, "native01", tFill, 0, "objs", "DATA\\MAPS\\TROK\\TROK.IDE"); // sem vertices na memoria
     AddModel(2000, 1, S_CHAIR, "chair01", tFill, 0, "objs", "DATA\\MAPS\\TROK\\TROK.IDE");   // substituido
     AddModel(3000, 1, S_HOUSE, "lahouse01", tHouse, 1, "objs", "DATA\\MAPS\\TROK\\TROK.IDE");
@@ -1228,9 +1229,9 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     for (int i = 0; i < 300 && !LogHas("catalogo pronto"); ++i) {
         Frame();
     }
-    Check(LogHas("catalogo: 5 .ide (190 modelos), 1 txdp"), "catalogo: 5 .ide lidos (o do SA-MP junto, 190 modelos) e 1 txdp");
-    Check(LogHas("catalogo pronto: 190 modelos, 3 .img, 1 substituidos"),
-          "catalogo: 190 modelos, 3 .img e 1 substituido, ja com o menu fechado");
+    Check(LogHas("catalogo: 5 .ide (191 modelos), 1 txdp"), "catalogo: 5 .ide lidos (o do SA-MP junto, 191 modelos) e 1 txdp");
+    Check(LogHas("catalogo pronto: 191 modelos, 3 .img, 1 substituidos"),
+          "catalogo: 191 modelos, 3 .img e 1 substituido, ja com o menu fechado");
 
     // 1) Informacoes ao apontar (ligado pelo .ini), menu fechado.
     g_losOn = true;
@@ -1249,6 +1250,46 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
         Check(lit > 0, "inspetor: a caixa do objeto desenhada em volta dele");
         CheckF(Variety(1000, 580, 1400, 760) > 6, "inspetor: o cartao com as informacoes ao lado do centro (%.0f cores)",
                Variety(1000, 580, 1400, 760));
+    }
+    {
+        // Modelo grande (a casa de 11 x 9 x 7 m) passando por tras da camera: a caixa e cortada no plano da camera.
+        *reinterpret_cast<short*>(g_losEntity + 0x22) = 3000;
+        g_losMatrix[12] = 8.0f, g_losMatrix[13] = -3.0f, g_losMatrix[14] = 0.0f;
+        Frames(5);
+        Capture("08-apontar-grande.bmp");
+        int lines = 0, mirrored = 0;
+        for (int y = 0; y < H; y += 2) {
+            for (int x = 1300; x < W; x += 2) {
+                DWORD p = Pixel(x, y);
+                lines += ((p >> 16) & 0xFF) > 120 && ((p >> 8) & 0xFF) > 120 && (p & 0xFF) > 120;
+            }
+            for (int x = 0; x < 300; x += 2) {
+                DWORD p = Pixel(x, y);
+                mirrored += ((p >> 16) & 0xFF) > 120 && ((p >> 8) & 0xFF) > 120 && (p & 0xFF) > 120;
+            }
+        }
+        CheckF(lines > 40 && mirrored == 0, "inspetor, modelo grande: a caixa cortada na camera (%.0f pixels), nada espelhado",
+               lines);
+        // Com a camera dentro da caixa: so o cartao.
+        g_losMatrix[12] = 0.0f;
+        Frames(5);
+        Capture("08b-apontar-dentro.bmp");
+        int inside = 0;
+        for (int y = 0; y < H; y += 2) {
+            for (int x = 0; x < W; x += 2) {
+                if (x > 900 && x < 1500 && y > 480 && y < 760) {
+                    continue; // o cartao
+                }
+                DWORD p = Pixel(x, y);
+                inside += ((p >> 16) & 0xFF) > 120 && ((p >> 8) & 0xFF) > 120 && (p & 0xFF) > 120;
+            }
+        }
+        CheckF(inside < 10, "inspetor, camera dentro da caixa: nenhuma linha (%.0f pixels)", inside);
+        CheckF(Variety(960, 480, 1500, 760) > 6, "inspetor, camera dentro da caixa: o cartao continua (%.0f cores)",
+               Variety(960, 480, 1500, 760));
+        *reinterpret_cast<short*>(g_losEntity + 0x22) = 1337;
+        g_losMatrix[12] = 0.5f, g_losMatrix[13] = 8.0f;
+        Frames(5);
     }
 
     // 2) Botao do meio: abre o menu no card da lixeira.
@@ -1269,8 +1310,8 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     const Command* create = LastCommand(0x0107);
     Check(create && create->i[0] == 1337, "criar: CREATE_OBJECT (0107) com o modelo 1337");
     if (create) {
-        CheckF(std::fabs(create->f[1]) < 0.01f && std::fabs(create->f[2] - 2.5f) < 0.05f && std::fabs(create->f[3]) < 0.05f,
-               "criar: a 2,5 m na frente do personagem, com a base no chao (%.2f %.2f %.2f)", create->f[1],
+        CheckF(std::fabs(create->f[1]) < 0.01f && std::fabs(create->f[2] - 2.5f) < 0.05f && std::fabs(create->f[3] - 1.1f) < 0.05f,
+               "criar: a 2,5 m na frente do personagem, com o meio na altura dos olhos (%.2f %.2f %.2f)", create->f[1],
                create->f[2], create->f[3]);
     }
     const Command* heading = LastCommand(0x0177);
@@ -1278,8 +1319,84 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     const Command* freeze = LastCommand(0x0550);
     Check(freeze && freeze->i[1] == 1, "criar: parado onde nasceu (0550)");
     Check(LogHas("criado 1337 (objeto)"), "log: criado 1337");
+
+    // Fundo do visualizador: a bolinha "Claro" ao lado das opcoes deixa o fundo claro.
+    int lightX = 0, run = 0;
+    for (int x = 400; x < 1010 && !lightX; ++x) {
+        DWORD p = Pixel(x, 916);
+        int r = (p >> 16) & 0xFF, g = (p >> 8) & 0xFF, b = p & 0xFF;
+        run = std::abs(r - 217) < 4 && std::abs(g - 217) < 4 && std::abs(b - 217) < 4 ? run + 1 : 0;
+        lightX = run >= 6 ? x - 2 : 0; // 6 pixels seguidos da cor: o meio da bolinha (texto nao faz isso)
+    }
+    CheckF(lightX > 0, "visualizador: as bolinhas de fundo ao lado das opcoes (Claro em x %.0f)", lightX);
+    if (lightX) {
+        Click(lightX, 916);
+        Frames(5);
+        Capture("09-fundo-claro.bmp");
+        DWORD bg = Pixel(300, 200);
+        CheckF(((bg >> 16) & 0xFF) > 180, "visualizador: fundo claro depois do clique (%.0f)", (bg >> 16) & 0xFF);
+        Click(lightX - 39, 916); // Escuro, duas bolinhas antes
+        Frames(5);
+        Capture("09b-fundo-escuro.bmp");
+        bg = Pixel(300, 200);
+        CheckF(((bg >> 16) & 0xFF) < 40, "visualizador: de volta ao fundo escuro (%.0f)", (bg >> 16) & 0xFF);
+        // A pilula Grade (antes das bolinhas) agora recebe o clique: o .ini guarda visual_grade=0 e volta a 1.
+        char ini[MAX_PATH];
+        GetFullPathNameA("Trok DevTools.ini", MAX_PATH, ini, nullptr);
+        Click(lightX - 112, 916);
+        Frames(5);
+        int gridOff = static_cast<int>(GetPrivateProfileIntA("devtools", "visual_grade", 1, ini));
+        Click(lightX - 112, 916);
+        Frames(5);
+        int gridOn = static_cast<int>(GetPrivateProfileIntA("devtools", "visual_grade", 0, ini));
+        CheckF(gridOff == 0 && gridOn == 1, "visualizador: a pilula Grade liga e desliga (%.0f)", gridOff * 10 + gridOn);
+    }
+
+    // Textura em destaque: o painel da direita lista quem mais usa a mesma textura (a 1339 tem a mesma TXD).
+    Model& trash2 = *FindModel(1339);
+    int tileY = 0;
+    for (int y = createY + 75; y < 700 && !tileY; ++y) {
+        if (Variety(1032, y, 1080, y + 2) > 2) {
+            tileY = y + 40;
+        }
+    }
+    if (tileY) {
+        Click(1056, tileY);
+    }
+    for (int i = 0; i < 60 && !LogHas("textura trashcan: 2 modelos usam"); ++i) {
+        Frames(1);
+    }
+    Frames(10);
+    Check(LogHas("textura trashcan: TXD 0 (trashcan), 2 candidatos"), "textura: os candidatos sao os modelos da mesma TXD");
+    Check(LogHas("textura trashcan: 2 modelos usam (2 vistos)"), "textura: a lixeira 1337 e a 1339 usam a textura");
+    CheckF(trash2.loads > 0 && trash2.releases > 0, "textura: a 1339 foi carregada para conferir e solta (%.0f)",
+           trash2.releases);
+    Capture("04-textura.bmp");
+    // A linha da 1339: logo abaixo da do card (a marcada "aberto", clara, na direita do painel).
+    int tagY = 0, tagRun = 0;
+    for (int y = 300; y < 900 && !tagY; ++y) {
+        DWORD p = Pixel(1650, y);
+        int r = (p >> 16) & 0xFF, g = (p >> 8) & 0xFF;
+        tagRun = r > 220 && r < 232 && g > 220 && g < 232 ? tagRun + 1 : 0;
+        tagY = tagRun >= 3 ? y - 2 : 0;
+    }
+    CheckF(tagY > 0, "textura: o modelo do card marcado na lista (y %.0f)", tagY);
+    int before = trash2.requests;
+    if (tagY) {
+        Click(1200, tagY + 46);
+        Frames(10);
+    }
+    CheckF(trash2.requests > before, "textura: clicar na 1339 abre ela no card, com a mesma textura (%.0f pedidos)",
+           trash2.requests);
+    Capture("10-textura-outro-modelo.bmp");
+    Key(VK_ESCAPE); // da textura para o modelo
+    Frames(5);
+    int releasedBefore = trash2.releases;
+    CheckF(Variety(232, 150, 1016, 934) > 20, "Esc na textura: volta ao modelo, com o card aberto (%.0f cores)",
+           Variety(232, 150, 1016, 934));
     Key(VK_ESCAPE);
     Frames(5);
+    CheckF(trash2.releases > releasedBefore, "o segundo Esc fecha o card e solta o modelo (%.0f)", trash2.releases);
     CheckF(trash.releases > 0, "fechar o card solta o modelo (%.0f)", trash.releases);
 
     // 3) A grade com as miniaturas.
@@ -1330,19 +1447,6 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     }
     const Command* lock = LastCommand(0x020A);
     Check(lock && lock->i[1] == 2, "criar veiculo: trancado (020A, 2)");
-    // Uma textura em destaque: o titulo "Texturas usadas" e a primeira linha com texto abaixo dos botoes; o primeiro
-    // quadrinho fica logo embaixo dele.
-    int texY = 0;
-    for (int y = createY + 75; y < 700 && !texY; ++y) {
-        if (Variety(1032, y, 1080, y + 2) > 2) {
-            texY = y + 40;
-        }
-    }
-    if (texY) {
-        Click(1056, texY);
-        Frames(10);
-    }
-    Capture("04-textura.bmp");
     Key(VK_ESCAPE);
     Frames(5);
     CheckF(car.releases > 0, "fechar o card do veiculo solta o modelo (%.0f)", car.releases);

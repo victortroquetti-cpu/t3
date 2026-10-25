@@ -58,4 +58,9 @@ struct Mesh {
 // O modelo tem que estar carregado (gta::Load).
 bool Extract(int id, bool vehicle, Mesh* out);
 
+// A TXD (carregada) tem uma textura com esse nome? (sem diferenciar maiusculas, como o jogo)
+bool TxdHas(int txdIndex, const std::string& name);
+// Algum material do modelo (carregado) usa essa textura? Conta todos os atomicos, ate os escondidos.
+bool UsesTexture(int id, const std::string& name);
+
 } // namespace mesh

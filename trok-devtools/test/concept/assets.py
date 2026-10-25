@@ -140,6 +140,21 @@ for mid, texs in VIEW_TEX.items():
     if hasattr(m, 'col_spheres'):
         lines.append('colisao|%d|%d|%d|%d' % (mid, len(m.col_boxes), len(m.col_spheres), 0))
 
+# o Infernus com o fundo verde (chroma key), como fica ao escolher a bolinha verde
+m = built[411]
+lo, hi = m.bounds()
+cam = raster.fit_camera(lo, hi, fov=34, yaw=40, pitch=18)
+tg = raster.Target(1024, 1024, (0, 177, 64), ssaa=2)
+segs = raster.grid_segments(lo, hi, cam.radius)
+tg.lines(cam, [s for s, strong in segs if not strong], (255, 255, 255, 0x16), 1.0)
+tg.lines(cam, [s for s, strong in segs if strong], (255, 255, 255, 0x30), 1.0)
+tg.draw(m, cam, T)
+save_rgba(os.path.join(OUT, 'viewer_411_verde.rgba'), tg.image())
+
+# quem usa a textura dos farois: os carros que tem o decal dela (no jogo, a vehicle.txd e de todos os veiculos)
+users = [mid for mid, dff, txd, kind, build in models.MODELS if 'vehiclelights128' in built[mid].t]
+lines.append('usuarios|411|vehiclelights128|vehicle|' + '|'.join(str(u) for u in users))
+
 # ---------------------------------------------------------------- a rua (fundo e "Info ao apontar")
 W, H = 1920, 1080
 scene = Mesh()

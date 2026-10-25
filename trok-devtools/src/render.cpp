@@ -320,8 +320,13 @@ void DrawMesh(const mesh::Mesh& m, const View& v, float aspect, bool viewer) {
         std::vector<LineVertex> grid;
         float z = mn.z;
         float cx = std::round(center.x / step) * step, cy = std::round(center.y / step) * step;
+        // Linhas claras no fundo escuro e escuras no fundo claro.
+        DWORD bg = v.background;
+        float lum = (0.299f * ((bg >> 16) & 0xFF) + 0.587f * ((bg >> 8) & 0xFF) + 0.114f * (bg & 0xFF)) / 255.0f;
+        DWORD ink = lum > 0.55f ? 0x000000 : 0xFFFFFF;
+        DWORD strong = (lum > 0.55f ? 0x48000000 : 0x30000000) | ink, weak = (lum > 0.55f ? 0x22000000 : 0x16000000) | ink;
         for (int i = -n; i <= n; ++i) {
-            DWORD c = i == 0 ? 0x30FFFFFF : 0x16FFFFFF;
+            DWORD c = i == 0 ? strong : weak;
             grid.push_back({cx + i * step, cy - n * step, z, c});
             grid.push_back({cx + i * step, cy + n * step, z, c});
             grid.push_back({cx - n * step, cy + i * step, z, c});

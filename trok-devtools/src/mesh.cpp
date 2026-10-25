@@ -361,7 +361,81 @@ void ReadCollision(DWORD info, Mesh* out) {
     }
 }
 
+bool SameName(DWORD tex, const std::string& name) {
+    if (!Ptr(tex) || !gta::Readable(reinterpret_cast<void*>(tex), 0x30)) {
+        return false;
+    }
+    const char* n = reinterpret_cast<const char*>(tex + 0x10);
+    size_t len = strnlen(n, 32);
+    return len == name.size() && _strnicmp(n, name.c_str(), len) == 0;
+}
+
+bool AtomicUses(DWORD atomic, const std::string& name) {
+    DWORD geom = At<DWORD>(atomic, 0x18);
+    if (!Ptr(geom) || !gta::Readable(reinterpret_cast<void*>(geom), 0x28)) {
+        return false;
+    }
+    DWORD mats = At<DWORD>(geom, 0x20);
+    int numMats = At<int>(geom, 0x24);
+    if (numMats <= 0 || numMats > 4096 || !Ptr(mats) || !gta::Readable(reinterpret_cast<void*>(mats), numMats * 4)) {
+        return false;
+    }
+    for (int m = 0; m < numMats; ++m) {
+        DWORD mat = At<DWORD>(mats, m * 4);
+        if (Ptr(mat) && gta::Readable(reinterpret_cast<void*>(mat), 4) && SameName(At<DWORD>(mat, 0), name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
+
+bool TxdHas(int txdIndex, const std::string& name) {
+    DWORD dict = gta::TxdDictionary(txdIndex);
+    if (!dict || !gta::Readable(reinterpret_cast<void*>(dict), 0x18)) {
+        return false;
+    }
+    DWORD head = dict + 0x08;
+    DWORD link = At<DWORD>(head, 0);
+    for (int i = 0; Ptr(link) && link != head && i < 4096; ++i) {
+        if (SameName(link - 0x08, name)) {
+            return true;
+        }
+        if (!gta::Readable(reinterpret_cast<void*>(link), 4)) {
+            break;
+        }
+        link = At<DWORD>(link, 0);
+    }
+    return false;
+}
+
+bool UsesTexture(int id, const std::string& name) {
+    DWORD obj = gta::RwObjectOf(gta::ModelInfo(id));
+    if (!obj || !gta::Readable(reinterpret_cast<void*>(obj), 0x30)) {
+        return false;
+    }
+    BYTE type = At<BYTE>(obj, 0);
+    if (type == RW_ATOMIC) {
+        return AtomicUses(obj, name);
+    }
+    if (type != RW_CLUMP) {
+        return false;
+    }
+    DWORD head = obj + 0x08;
+    DWORD link = At<DWORD>(head, 0);
+    for (int i = 0; Ptr(link) && link != head && i < MAX_ATOMICS; ++i) {
+        DWORD atomic = link - 0x40;
+        if (!gta::Readable(reinterpret_cast<void*>(atomic), 0x70)) {
+            break;
+        }
+        if (AtomicUses(atomic, name)) {
+            return true;
+        }
+        link = At<DWORD>(link, 0);
+    }
+    return false;
+}
 
 bool Extract(int id, bool vehicle, Mesh* out) {
     *out = Mesh();

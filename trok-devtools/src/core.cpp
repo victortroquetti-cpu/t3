@@ -5,8 +5,11 @@
 // Card aberto: o modelo fica preso enquanto o card estiver aberto (o visualizador e a lista de texturas usam as texturas
 // dele) e e solto quando o card fecha. Soltar = tirar a marca de missao que o mod pos; se o jogo ja segurava o modelo,
 // nada muda.
-// Criar no mundo: 1:1, de frente para o personagem, a uma distancia que cabe o modelo inteiro, com a parte de baixo no
-// chao do personagem. Objetos ficam parados onde nascem; veiculos trancados (no SA-MP o servidor nao sabe deles).
+// Criar no mundo: 1:1, de frente para o personagem, a uma distancia que cabe o modelo inteiro. Objetos nascem com o meio
+// na altura dos olhos (os altos, com a base no chao) e ficam parados; veiculos e personagens nascem no chao, e os
+// veiculos trancados (no SA-MP o servidor nao sabe deles).
+// Quem usa a textura: os candidatos sao os modelos do catalogo cuja TXD e a que tem a textura ou descende dela (txdp);
+// cada um e carregado (se ja nao estava) e os materiais dizem se a textura e usada.
 
 #include "core.h"
 
@@ -27,6 +30,9 @@ namespace {
 
 constexpr double THUMB_BUDGET_MS = 6.0;
 constexpr int THUMB_WANT_LIFE = 3; // quadros: um card que saiu da tela deixa de pedir
+constexpr double USERS_BUDGET_MS = 4.0;
+constexpr int USERS_MAX = 600; // candidatos vistos por busca (uma TXD generica pode ter milhares)
+constexpr float EYE_HEIGHT = 1.6f; // acima do pe
 
 struct Ready {
     mesh::Mesh mesh;
@@ -59,6 +65,11 @@ std::deque<int> g_spawnQueue;
 bool g_despawnAll = false;
 std::string g_spawnMessage;
 bool g_spawnOk = false, g_spawnNews = false;
+
+TextureUsers g_users;
+std::vector<int> g_usersQueue;
+size_t g_usersNext = 0;
+bool g_usersSetup = false;
 
 bool g_inspect = false;
 Look g_look;
@@ -197,7 +208,14 @@ void DoSpawn(int id) {
     float dist = std::max(2.5f, radius + 1.5f);
     float feet = p.z - 1.0f; // a posicao do personagem fica ~1 m acima do pe
     gta::Vec3 at = {p.x + fwd.x * dist, p.y + fwd.y * dist, 0};
-    at.z = sk == gta::SPAWN_PED ? feet + 1.0f : feet - mn.z + (sk == gta::SPAWN_VEHICLE ? 0.1f : 0.0f);
+    if (sk == gta::SPAWN_PED) {
+        at.z = feet + 1.0f;
+    } else if (sk == gta::SPAWN_VEHICLE) {
+        at.z = feet - mn.z + 0.1f;
+    } else {
+        // O meio do modelo na altura dos olhos, sem a parte de baixo entrar no chao.
+        at.z = std::max(feet + EYE_HEIGHT - (mn.z + mx.z) * 0.5f, feet - mn.z);
+    }
     float playerHeading = std::atan2(-fwd.x, fwd.y) * 57.29578f;
     float heading = std::fmod(playerHeading + 180.0f + 360.0f, 360.0f); // de frente para voce
     int handle = 0;
@@ -229,6 +247,8 @@ void UpdateLook() {
     if (!gta::CameraNow(&cam)) {
         return;
     }
+    g_look.camPos = cam.pos;
+    g_look.camForward = cam.forward;
     // Comeca depois do personagem (a camera fica atras dele).
     float skip = 0.5f;
     DWORD player = gta::PlayerPed();
@@ -271,7 +291,95 @@ void UpdateLook() {
     }
 }
 
+bool UnderTxd(int txd, int base) {
+    for (int depth = 0; txd >= 0 && depth < 8; ++depth) {
+        if (txd == base) {
+            return true;
+        }
+        txd = gta::TxdParent(txd);
+    }
+    return false;
+}
+
+void SetupTextureUsers() {
+    TextureUsers& u = g_users;
+    g_usersSetup = true;
+    int own = gta::TxdIndex(gta::ModelInfo(u.model));
+    for (int t = own, depth = 0; t >= 0 && depth < 8; t = gta::TxdParent(t), ++depth) {
+        if (mesh::TxdHas(t, u.texture)) {
+            u.txd = t;
+            break;
+        }
+    }
+    int base = u.txd >= 0 ? u.txd : own;
+    for (const catalog::Entry& e : catalog::All()) {
+        if (e.txdIndex >= 0 && e.txdIndex == base && !e.txd.empty() && u.txdName.empty()) {
+            u.txdName = e.txd;
+        }
+        if (!e.noFile && e.id != u.model && UnderTxd(e.txdIndex, base)) {
+            g_usersQueue.push_back(e.id);
+        }
+    }
+    if (static_cast<int>(g_usersQueue.size()) > USERS_MAX - 1) {
+        g_usersQueue.resize(USERS_MAX - 1);
+        u.capped = true;
+    }
+    g_usersQueue.insert(g_usersQueue.begin(), u.model); // o do card primeiro (ja esta carregado)
+    u.total = static_cast<int>(g_usersQueue.size());
+    DevToolsLog("textura %s: TXD %d (%s), %d candidatos%s", u.texture.c_str(), u.txd, u.txdName.c_str(), u.total,
+                u.capped ? " (limite)" : "");
+}
+
+void RunTextureUsers() {
+    TextureUsers& u = g_users;
+    if (u.model < 0 || u.done) {
+        return;
+    }
+    if (!g_usersSetup) {
+        SetupTextureUsers();
+    }
+    double start = NowMs();
+    int loads = 0;
+    while (g_usersNext < g_usersQueue.size() && loads < g_perFrame * 2 && NowMs() - start < USERS_BUDGET_MS) {
+        int id = g_usersQueue[g_usersNext++];
+        gta::Hold hold;
+        bool loaded = gta::RwObjectOf(gta::ModelInfo(id)) != 0;
+        if (!loaded) {
+            ++loads;
+            loaded = gta::Load(id, &hold);
+        }
+        if (loaded && mesh::UsesTexture(id, u.texture)) {
+            u.users.push_back(id);
+        }
+        g_toRelease.push_back(hold); // solta no proximo quadro
+        ++u.checked;
+    }
+    if (g_usersNext >= g_usersQueue.size()) {
+        std::sort(u.users.begin(), u.users.end());
+        u.done = true;
+        DevToolsLog("textura %s: %d modelos usam (%d vistos)", u.texture.c_str(), static_cast<int>(u.users.size()),
+                    u.checked);
+    }
+}
+
 } // namespace
+
+void FindTextureUsers(int model, const std::string& texture) {
+    if (texture == g_users.texture &&
+        (model == g_users.model || std::find(g_users.users.begin(), g_users.users.end(), model) != g_users.users.end())) {
+        return;
+    }
+    g_users = TextureUsers();
+    g_users.model = model;
+    g_users.texture = texture;
+    g_usersQueue.clear();
+    g_usersNext = 0;
+    g_usersSetup = false;
+}
+
+const TextureUsers& TextureUsersNow() {
+    return g_users;
+}
 
 void SetGameDir(const char* dir) {
     g_gameDir = dir ? dir : "";
@@ -294,6 +402,11 @@ void GameTick() {
     }
     LoadOpen();
     LoadThumbs();
+    // A busca comeca com o modelo do card carregado (a TXD dele precisa estar na memoria) e segue enquanto o card estiver
+    // aberto, mesmo trocando de modelo pela lista.
+    if (g_wantOpen >= 0 && (g_usersSetup || (g_openReady && g_openId == g_users.model))) {
+        RunTextureUsers();
+    }
     if (g_despawnAll) {
         g_despawnAll = false;
         for (const Spawned& s : g_spawned) {
@@ -354,6 +467,10 @@ void Open(int id) {
 void Close() {
     g_wantOpen = -1;
     g_closeRequested = true;
+    g_users = TextureUsers(); // a busca da textura para junto
+    g_usersQueue.clear();
+    g_usersNext = 0;
+    g_usersSetup = false;
 }
 
 int OpenId() {

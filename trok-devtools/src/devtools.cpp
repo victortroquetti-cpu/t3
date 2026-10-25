@@ -18,8 +18,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 void DevToolsLog(const char* fmt, ...);
@@ -29,9 +31,20 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v0.1";
-const char* const TABS[] = {"Modelos", "Texturas", "Anima\xC3\xA7\xC3\xB5" "es", "\xC3\x81udios", "Arquivos", "Geral"};
-constexpr int TAB_COUNT = 6, TAB_MODELS = 0, TAB_GENERAL = 5;
+constexpr const char* VERSION_TAG = "v0.2";
+// As texturas ficam no card do modelo (clique numa textura): nao tem aba propria.
+const char* const TABS[] = {"Modelos", "Anima\xC3\xA7\xC3\xB5" "es", "\xC3\x81udios", "Arquivos", "Geral"};
+constexpr int TAB_COUNT = 5, TAB_MODELS = 0, TAB_GENERAL = 4;
+
+// Fundos do visualizador: os atalhos do card (o Geral aceita qualquer cor). Verde e azul servem de chroma key.
+struct Swatch {
+    ImU32 color;
+    const char* name;
+};
+const Swatch BACKGROUNDS[] = {{IM_COL32(20, 20, 20, 255), "Escuro"},          {IM_COL32(60, 63, 68, 255), "Cinza"},
+                              {IM_COL32(217, 217, 217, 255), "Claro"},       {IM_COL32(255, 255, 255, 255), "Branco"},
+                              {IM_COL32(0, 177, 64, 255), "Verde (chroma)"}, {IM_COL32(0, 71, 187, 255), "Azul (chroma)"}};
+constexpr ImU32 BACKGROUND_DEFAULT = IM_COL32(20, 20, 20, 255);
 
 struct State {
     bool open = false;
@@ -50,7 +63,8 @@ struct State {
     int cardId = -1;
     render::View view;
     bool spin = true;
-    int texView = -1; // textura em destaque no visualizador (-1 = o modelo)
+    std::string texName;              // textura em destaque no visualizador (vazio = o modelo)
+    ImU32 background = BACKGROUND_DEFAULT; // fundo do visualizador
     // Geral
     int selected = 1, rowCount = 1;
     bool inspect = false;
@@ -194,6 +208,19 @@ void SaveIni() {
     }
     snprintf(buf, sizeof(buf), "%d", S.perFrame);
     WritePrivateProfileStringA("devtools", "miniaturas_por_quadro", buf, S.ini);
+    snprintf(buf, sizeof(buf), "%02X%02X%02X", static_cast<unsigned>(S.background & 0xFF),
+             static_cast<unsigned>((S.background >> 8) & 0xFF), static_cast<unsigned>((S.background >> 16) & 0xFF));
+    WritePrivateProfileStringA("devtools", "visual_fundo", buf, S.ini);
+}
+
+// ImU32 do ImGui (ABGR) para a cor do Direct3D (ARGB).
+DWORD D3dColor(ImU32 c) {
+    return 0xFF000000 | ((c & 0xFF) << 16) | (c & 0xFF00) | ((c >> 16) & 0xFF);
+}
+
+void SetBackground(ImU32 c) {
+    S.background = c | IM_COL32_A_MASK;
+    S.view.background = D3dColor(S.background);
 }
 
 Keys ReadKeys(bool allowed) {
@@ -217,8 +244,26 @@ void OpenCard(int id) {
     S.view.yaw = fresh.yaw;
     S.view.pitch = fresh.pitch;
     S.view.zoom = fresh.zoom;
-    S.texView = -1;
+    S.texName.clear();
     core::Open(id);
+}
+
+// Trocar o modelo do card pela lista da textura: a textura continua em destaque.
+void SelectTextureUser(int id) {
+    S.cardId = id;
+    core::Open(id);
+}
+
+int TexIndex(const mesh::Mesh* m) {
+    if (!m || S.texName.empty()) {
+        return -1;
+    }
+    for (int i = 0; i < static_cast<int>(m->textures.size()); ++i) {
+        if (m->textures[i].name == S.texName) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 // ---------------------------------------------------------------- aba Modelos
@@ -521,9 +566,13 @@ void Viewer(const catalog::Entry& e, const mesh::Mesh* m, ImVec2 a, float side) 
     ImVec2 b(a.x + side, a.y + side);
     ImGuiIO& io = ImGui::GetIO();
     std::string why;
-    if (S.texView >= 0 && m && S.texView < static_cast<int>(m->textures.size())) {
+    int ti = TexIndex(m);
+    if (m && !S.texName.empty() && ti < 0) {
+        S.texName.clear(); // o modelo novo nao tem essa textura
+    }
+    if (ti >= 0) {
         // Uma textura em destaque, sobre o xadrez (para ver o alfa).
-        const mesh::Texture& t = m->textures[S.texView];
+        const mesh::Texture& t = m->textures[ti];
         Checker(dl, a, b, 12 * u);
         render::TexInfo info;
         bool described = render::Describe(t.d3d, &info);
@@ -542,7 +591,7 @@ void Viewer(const catalog::Entry& e, const mesh::Mesh* m, ImVec2 a, float side) 
         ImVec2 ts = TextSize(fonts.desc, label);
         Text(dl, fonts.desc, (a.x + b.x - ts.x) * 0.5f, b.y - 26 * u, col::column, label);
         if (Pill("##voltar", "Voltar ao modelo", false, a.x + 10 * u, a.y + 10 * u, 26 * u, nullptr)) {
-            S.texView = -1;
+            S.texName.clear();
         }
         return;
     }
@@ -558,10 +607,10 @@ void Viewer(const catalog::Entry& e, const mesh::Mesh* m, ImVec2 a, float side) 
         }
         return;
     }
-    // Interacao: arrastar gira, roda aproxima, duplo clique centraliza.
+    // Interacao: arrastar gira, roda aproxima, duplo clique centraliza. A faixa de baixo fica de fora: com ela dentro, o
+    // clique nas opcoes (Grade, fundo...) virava arrasto do visualizador e nao chegava nelas.
     ImGui::SetCursorScreenPos(a);
-    ImGui::InvisibleButton("##visual", ImVec2(side, side));
-    ImGui::SetItemAllowOverlap();
+    ImGui::InvisibleButton("##visual", ImVec2(side, side - 46 * u));
     bool hovered = ImGui::IsItemHovered();
     if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 1.0f)) {
         S.view.yaw -= io.MouseDelta.x * 0.4f;
@@ -600,6 +649,10 @@ void Viewer(const catalog::Entry& e, const mesh::Mesh* m, ImVec2 a, float side) 
                 {"##vGrid", "Grade", &S.view.grid},
                 {"##vSpin", "Girar", &S.spin}};
     float ox = a.x + 10 * u, oy = b.y - 36 * u, pw = 0;
+    // Uma faixa escura atras das opcoes (canal 0, desenhada no fim, quando a largura e conhecida): elas continuam
+    // legiveis em qualquer fundo (claro, branco, verde).
+    dl->ChannelsSplit(2);
+    dl->ChannelsSetCurrent(1);
     for (Opt& o : opts) {
         if (Pill(o.id, o.label, *o.value, ox, oy, 26 * u, &pw)) {
             *o.value = !*o.value;
@@ -607,6 +660,34 @@ void Viewer(const catalog::Entry& e, const mesh::Mesh* m, ImVec2 a, float side) 
         }
         ox += pw + 6 * u;
     }
+    // Fundo: bolinhas de cor ao lado das opcoes
+    ox += 8 * u;
+    float r = 9 * u, cy = oy + 13 * u;
+    for (int i = 0; i < static_cast<int>(sizeof(BACKGROUNDS) / sizeof(BACKGROUNDS[0])); ++i) {
+        ImVec2 c(ox + r, cy);
+        char id[16];
+        snprintf(id, sizeof(id), "##fundo%d", i);
+        ImGui::SetCursorScreenPos(ImVec2(c.x - r - 2 * u, c.y - r - 2 * u));
+        if (ImGui::InvisibleButton(id, ImVec2(2 * r + 4 * u, 2 * r + 4 * u))) {
+            SetBackground(BACKGROUNDS[i].color);
+            SaveIni();
+        }
+        bool hovered = ImGui::IsItemHovered();
+        bool chosen = (S.background | IM_COL32_A_MASK) == BACKGROUNDS[i].color;
+        if (hovered) {
+            Hand();
+            Tooltip((std::string("Fundo: ") + BACKGROUNDS[i].name).c_str());
+        }
+        dl->AddCircleFilled(c, r, BACKGROUNDS[i].color, 24);
+        dl->AddCircle(c, r, col::White(hovered ? 120 : 60), 24, 1.0f);
+        if (chosen) {
+            dl->AddCircle(c, r + 3 * u, col::strong, 24, 1.6f * u);
+        }
+        ox += 2 * r + 8 * u;
+    }
+    dl->ChannelsSetCurrent(0);
+    dl->AddRectFilled(ImVec2(a.x + 4 * u, oy - 6 * u), ImVec2(ox, oy + 32 * u), IM_COL32(0, 0, 0, 120), 19 * u);
+    dl->ChannelsMerge();
 }
 
 void TextureTiles(const mesh::Mesh& m, float x, float* y, float w) {
@@ -637,7 +718,7 @@ void TextureTiles(const mesh::Mesh& m, float x, float* y, float w) {
             snprintf(id, sizeof(id), "##tex%d", list[k]);
             ImGui::SetCursorScreenPos(ImVec2(tx, ty));
             if (ImGui::InvisibleButton(id, ImVec2(tile, tileH))) {
-                S.texView = list[k];
+                S.texName = t.name;
             }
             bool hovered = ImGui::IsItemHovered();
             if (hovered) {
@@ -647,8 +728,9 @@ void TextureTiles(const mesh::Mesh& m, float x, float* y, float w) {
             if (t.d3d) {
                 dl->AddImage(static_cast<ImTextureID>(t.d3d), ImVec2(tx, ty), ImVec2(tx + tile, ty + tile));
             }
-            dl->AddRect(ImVec2(tx, ty), ImVec2(tx + tile, ty + tile), col::White(hovered || S.texView == list[k] ? 60 : 14),
-                        4 * u);
+            bool focused = S.texName == t.name;
+            dl->AddRect(ImVec2(tx, ty), ImVec2(tx + tile, ty + tile), focused ? col::strong : col::White(hovered ? 60 : 14), 4 * u,
+                        0, focused ? 2.0f * u : 1.0f);
             std::string name = Ellipsize(fonts.desc, t.name, tile);
             Text(dl, fonts.desc, tx, ty + tile + 4 * u, section == 0 ? col::text : col::column, name.c_str());
             render::TexInfo info;
@@ -666,6 +748,154 @@ void TextureTiles(const mesh::Mesh& m, float x, float* y, float w) {
         int rows = (static_cast<int>(list.size()) + cols - 1) / cols;
         *y += rows * (tileH + gap) + 8 * u;
     }
+}
+
+// Um modelo da lista "quem usa esta textura": miniatura, id e nome; o do card fica marcado.
+bool UserRow(int id, float x, float y, float w, float h, bool current, const char* note) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    char bid[24];
+    snprintf(bid, sizeof(bid), "##uso%d", id);
+    ImGui::SetCursorScreenPos(ImVec2(x, y));
+    bool clicked = ImGui::InvisibleButton(bid, ImVec2(w, h)) && !current;
+    bool hovered = ImGui::IsItemHovered() && !current;
+    if (hovered) {
+        Hand();
+    }
+    Box(dl, ImVec2(x, y), ImVec2(x + w, y + h), current ? col::White(16) : col::White(hovered ? 9 : 3),
+        current ? col::White(70) : col::White(hovered ? 26 : 8), 7 * u);
+    float pad = 4 * u, side = h - 2 * pad;
+    ImVec2 t0(x + pad, y + pad), t1(t0.x + side, t0.y + side);
+    ImTextureID tex = nullptr;
+    ImVec2 uv0, uv1;
+    if (render::Thumb(id, &tex, &uv0, &uv1)) {
+        dl->AddImageRounded(tex, t0, t1, uv0, uv1, IM_COL32_WHITE, 5 * u);
+    } else {
+        dl->AddRectFilled(t0, t1, col::Rgba(20, 20, 20), 5 * u);
+        if (!core::ThumbFailed(id)) {
+            core::WantThumb(id);
+            core::SetBrowsing(true);
+            Spinner(dl, ImVec2((t0.x + t1.x) * 0.5f, (t0.y + t1.y) * 0.5f), 6 * u, static_cast<float>(ImGui::GetTime()));
+        }
+    }
+    const catalog::Entry* e = catalog::Find(id);
+    char line1[96], line2[128];
+    snprintf(line1, sizeof(line1), "%d  \xC2\xB7  %s", id, e && !e->dff.empty() ? e->dff.c_str() : "?");
+    if (note) {
+        snprintf(line2, sizeof(line2), "%s", note);
+    } else {
+        snprintf(line2, sizeof(line2), "%s  \xC2\xB7  %s", e ? catalog::TypeName(*e) : "", e ? e->imgName.c_str() : "");
+    }
+    float tx = t1.x + 10 * u, ty = y + (h - fonts.body->FontSize - fonts.desc->FontSize - 2 * u) * 0.5f;
+    float tagW = 0;
+    if (current) {
+        const char* tag = "aberto";
+        ImVec2 ts = TextSize(fonts.desc, tag);
+        tagW = ts.x + 16 * u;
+        ImVec2 p0(x + w - tagW - 8 * u, y + (h - ts.y - 6 * u) * 0.5f);
+        dl->AddRectFilled(p0, ImVec2(p0.x + tagW, p0.y + ts.y + 6 * u), col::strong, (ts.y + 6 * u) * 0.5f);
+        Text(dl, fonts.desc, p0.x + 8 * u, p0.y + 3 * u - 0.5f * u, col::ink, tag);
+        tagW += 12 * u;
+    }
+    float textW = x + w - tx - tagW - 6 * u;
+    Text(dl, fonts.body, tx, ty, col::text, Ellipsize(fonts.body, line1, textW).c_str());
+    Text(dl, fonts.desc, tx, ty + fonts.body->FontSize + 2 * u, note ? col::Rgba(255, 196, 120) : col::hint,
+         Ellipsize(fonts.desc, line2, textW).c_str());
+    return clicked;
+}
+
+// O lado direito com uma textura em destaque: os dados dela, quem mais usa e as outras texturas do modelo.
+void TexturePanel(const catalog::Entry& e, const mesh::Mesh& m, int ti, float x, float* y, float w) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const mesh::Texture& t = m.textures[ti];
+    core::FindTextureUsers(S.cardId, t.name);
+    const core::TextureUsers& tu = core::TextureUsersNow();
+
+    Text(dl, fonts.title, x, *y, col::text, t.name.c_str());
+    *y += fonts.title->FontSize + 12 * u;
+    std::vector<InfoRow> rows;
+    std::string txd = (tu.txdName.empty() ? e.txd : tu.txdName) + ".txd";
+    if (tu.txd >= 0 && tu.txd != e.txdIndex) {
+        txd += "  (m\xC3\xA3" "e da " + e.txd + ".txd)";
+    }
+    rows.push_back({"TXD", txd});
+    render::TexInfo info;
+    bool described = render::Describe(t.d3d, &info);
+    char buf[96];
+    snprintf(buf, sizeof(buf), "%d \xC3\x97 %d", described ? info.width : t.width, described ? info.height : t.height);
+    rows.push_back({"Tamanho", buf});
+    if (described) {
+        rows.push_back({"Formato", info.format});
+        snprintf(buf, sizeof(buf), "%d", info.levels);
+        rows.push_back({"Mipmaps", buf});
+    }
+    rows.push_back({"Alfa", t.alpha ? "sim" : "n\xC3\xA3o"});
+    if (!t.mask.empty()) {
+        rows.push_back({"M\xC3\xA1scara", t.mask});
+    }
+    float labelW = 0;
+    for (const InfoRow& r : rows) {
+        labelW = std::max(labelW, TextSize(fonts.desc, r.label.c_str()).x);
+    }
+    labelW += 16 * u;
+    float lineH = fonts.desc->FontSize + 9 * u;
+    for (const InfoRow& r : rows) {
+        Text(dl, fonts.desc, x, *y, col::hint, r.label.c_str());
+        Text(dl, fonts.desc, x + labelW, *y, col::text, Ellipsize(fonts.desc, r.value, w - labelW).c_str());
+        *y += lineH;
+    }
+    *y += 8 * u;
+    float bh = 32 * u, gap = 8 * u, half = std::floor((w - gap) * 0.5f);
+    if (Button("##voltarModelo", "Voltar ao modelo", x, *y, half, bh, false)) {
+        S.texName.clear();
+    }
+    if (Button("##copiarTex", "Copiar nome", x + half + gap, *y, w - half - gap, bh, false)) {
+        ImGui::SetClipboardText(t.name.c_str());
+        Toast("Trok DevTools", "Nome da textura copiado.");
+    }
+    *y += bh + 20 * u;
+
+    // Quem usa: o do card primeiro, depois os outros em ordem de id
+    bool searching = tu.texture == t.name && !tu.done;
+    int others = 0;
+    bool currentUses = false;
+    for (int id : tu.users) {
+        currentUses = currentUses || id == S.cardId;
+        others += id != S.cardId;
+    }
+    char title[96];
+    snprintf(title, sizeof(title), "Modelos com esta textura (%d)", static_cast<int>(tu.users.size()));
+    Text(dl, fonts.desc, x, *y, col::column, title);
+    *y += fonts.desc->FontSize + 6 * u;
+    char status[160];
+    if (searching) {
+        snprintf(status, sizeof(status), "procurando nos modelos da TXD: %d de %d", tu.checked, tu.total);
+        Spinner(dl, ImVec2(x + 6 * u, *y + fonts.desc->FontSize * 0.5f), 5 * u, static_cast<float>(ImGui::GetTime()));
+        Text(dl, fonts.desc, x + 18 * u, *y, col::hint, status);
+    } else {
+        if (tu.users.empty() || (others == 0 && currentUses)) {
+            snprintf(status, sizeof(status), "S\xC3\xB3 este modelo usa (%d modelos da TXD vistos)", tu.checked);
+        } else {
+            snprintf(status, sizeof(status), "%d modelos da TXD vistos%s", tu.checked,
+                     tu.capped ? ", s\xC3\xB3 os primeiros (TXD muito grande)" : "");
+        }
+        Text(dl, fonts.desc, x, *y, col::hint, status);
+    }
+    *y += fonts.desc->FontSize + 10 * u;
+    float rowH = 52 * u;
+    const char* note = !currentUses && tu.done ? "est\xC3\xA1 na TXD, mas este modelo n\xC3\xA3o usa" : nullptr;
+    UserRow(S.cardId, x, *y, w, rowH, true, note);
+    *y += rowH + 6 * u;
+    for (int id : tu.users) {
+        if (id == S.cardId) {
+            continue;
+        }
+        if (UserRow(id, x, *y, w, rowH, false, nullptr)) {
+            SelectTextureUser(id);
+        }
+        *y += rowH + 6 * u;
+    }
+    *y += 14 * u;
+    TextureTiles(m, x, y, w);
 }
 
 void CardPopup(ImVec2 shellPos, ImVec2 shellSize, bool escape) {
@@ -699,6 +929,10 @@ void CardPopup(ImVec2 shellPos, ImVec2 shellSize, bool escape) {
     ImVec2 pos = ImGui::GetWindowPos();
     float padX = 18 * u, headerH = HeaderHeight();
     bool close = escape;
+    if (escape && !S.texName.empty()) {
+        S.texName.clear(); // o Esc volta da textura para o modelo; o proximo fecha o card
+        close = false;
+    }
 
     // Cabecalho: o id e o nome no meio, o X a direita.
     char title[160];
@@ -741,7 +975,10 @@ void CardPopup(ImVec2 shellPos, ImVec2 shellSize, bool escape) {
     ImVec2 c0 = ImGui::GetCursorScreenPos();
     float y = c0.y;
     float innerW = rw - 8 * u;
-    if (e) {
+    int ti = TexIndex(m);
+    if (e && ti >= 0) {
+        TexturePanel(*e, *m, ti, c0.x, &y, innerW);
+    } else if (e) {
         std::vector<InfoRow> rows = CardInfo(*e, m);
         float labelW = 0;
         for (const InfoRow& r : rows) {
@@ -802,13 +1039,24 @@ void CardPopup(ImVec2 shellPos, ImVec2 shellSize, bool escape) {
                       ImDrawFlags_RoundCornersBottom);
     dl->AddLine(ImVec2(pos.x + 1, footerY + 0.5f), ImVec2(pos.x + pw - 1, footerY + 0.5f), col::separator);
     dl->PopClipRect();
-    const char* hints[][2] = {{"Arraste", "Girar"}, {"Roda", "Zoom"}, {"Duplo clique", "Centralizar"}, {"Esc", "Fechar"}};
+    const char* modelHints[][2] = {{"Arraste", "Girar"}, {"Roda", "Zoom"}, {"Duplo clique", "Centralizar"}, {"Esc", "Fechar"}};
+    const char* texHints[][2] = {{"Clique num modelo", "Abrir com a textura"}, {"Esc", "Voltar ao modelo"}};
+    std::vector<std::pair<const char*, const char*>> hints;
+    if (TexIndex(m) >= 0) {
+        for (const auto& h : texHints) {
+            hints.push_back({h[0], h[1]});
+        }
+    } else {
+        for (const auto& h : modelHints) {
+            hints.push_back({h[0], h[1]});
+        }
+    }
     float hx = pos.x + padX, hy = footerY + (footerH - fonts.desc->FontSize) * 0.5f;
     for (const auto& h : hints) {
-        float kw = TextSize(fonts.desc, h[0]).x;
-        Text(dl, fonts.desc, hx, hy, col::column, h[0]);
-        Text(dl, fonts.desc, hx + kw + 6 * u, hy, col::hint, h[1]);
-        hx += kw + 6 * u + TextSize(fonts.desc, h[1]).x + 22 * u;
+        float kw = TextSize(fonts.desc, h.first).x;
+        Text(dl, fonts.desc, hx, hy, col::column, h.first);
+        Text(dl, fonts.desc, hx + kw + 6 * u, hy, col::hint, h.second);
+        hx += kw + 6 * u + TextSize(fonts.desc, h.second).x + 22 * u;
     }
 
     std::string message;
@@ -854,6 +1102,15 @@ void TabGeneral(Rows& rows) {
     }
     rows.Info("Como funciona", "Com o menu fechado: id, nome, TXD, posi\xC3\xA7\xC3\xA3o e interior do que est\xC3\xA1 no "
                                "centro da tela, com a caixa dele.\nBot\xC3\xA3o do meio do mouse: abre o card.");
+    rows.Section("Visualizador");
+    ImU32 bg = S.background;
+    if (rows.Color("Cor do fundo", &bg, BACKGROUND_DEFAULT)) {
+        SetBackground(bg);
+        SaveIni();
+    }
+    if (rows.Toggle("Grade no ch\xC3\xA3o", &S.view.grid)) {
+        SaveIni();
+    }
     rows.Section("Miniaturas");
     if (rows.Stepper("Modelos carregados por quadro", &S.perFrame, 1, 8, 1, "%d", 3)) {
         core::SetThumbsPerFrame(S.perFrame);
@@ -889,24 +1146,44 @@ void Inspector() {
     if (!look.valid) {
         return;
     }
-    // A caixa na tela (para o cartao ficar ao lado dela, sem cobrir o objeto)
+    // A caixa na tela (para o cartao ficar ao lado dela, sem cobrir o objeto). Modelos grandes (bairros, terrenos)
+    // passam por tras da camera: cada aresta e cortada no plano a kNear m da camera antes de ir para a tela, e com a camera
+    // dentro da caixa ela nao e desenhada.
     bool boxOn = false;
     ImVec2 bmin(screen.x, screen.y), bmax(0, 0);
     if (look.hasBox) {
-        ImVec2 p[8];
-        bool all = true;
-        for (int i = 0; i < 8 && all; ++i) {
-            all = gta::Project(look.box[i], &p[i].x, &p[i].y);
+        const gta::Vec3* b = look.box;
+        auto sub = [](const gta::Vec3& p, const gta::Vec3& q) { return gta::Vec3{p.x - q.x, p.y - q.y, p.z - q.z}; };
+        auto dot = [](const gta::Vec3& p, const gta::Vec3& q) { return p.x * q.x + p.y * q.y + p.z * q.z; };
+        gta::Vec3 rel = sub(look.camPos, b[0]), ax[3] = {sub(b[1], b[0]), sub(b[2], b[0]), sub(b[4], b[0])};
+        bool inside = true;
+        for (const gta::Vec3& a : ax) {
+            float len2 = dot(a, a), t = len2 > 1e-6f ? dot(rel, a) / len2 : 0.0f;
+            inside = inside && t > -0.02f && t < 1.02f;
         }
-        if (all) {
-            static const int E[12][2] = {{0, 1}, {1, 3}, {3, 2}, {2, 0}, {4, 5}, {5, 7},
-                                         {7, 6}, {6, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
-            for (const auto& e : E) {
-                dl->AddLine(p[e[0]], p[e[1]], IM_COL32(255, 255, 255, 150), 1.2f);
+        const float kNear = 1.5f;
+        static const int E[12][2] = {{0, 1}, {1, 3}, {3, 2}, {2, 0}, {4, 5}, {5, 7},
+                                     {7, 6}, {6, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
+        for (int k = 0; k < 12 && !inside; ++k) {
+            gta::Vec3 p = b[E[k][0]], q = b[E[k][1]];
+            float dp = dot(sub(p, look.camPos), look.camForward), dq = dot(sub(q, look.camPos), look.camForward);
+            if (dp < kNear && dq < kNear) {
+                continue;
             }
-            for (const ImVec2& q : p) {
-                bmin = ImVec2(std::min(bmin.x, q.x), std::min(bmin.y, q.y));
-                bmax = ImVec2(std::max(bmax.x, q.x), std::max(bmax.y, q.y));
+            if (dp < kNear || dq < kNear) {
+                float t = (kNear - dp) / (dq - dp);
+                gta::Vec3 c = {p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t, p.z + (q.z - p.z) * t};
+                (dp < kNear ? p : q) = c;
+            }
+            ImVec2 sp, sq;
+            if (!gta::Project(p, &sp.x, &sp.y) || !gta::Project(q, &sq.x, &sq.y)) {
+                continue;
+            }
+            dl->AddLine(sp, sq, IM_COL32(255, 255, 255, 150), 1.2f);
+            for (const ImVec2& v : {sp, sq}) {
+                ImVec2 cv(std::max(0.0f, std::min(screen.x, v.x)), std::max(0.0f, std::min(screen.y, v.y)));
+                bmin = ImVec2(std::min(bmin.x, cv.x), std::min(bmin.y, cv.y));
+                bmax = ImVec2(std::max(bmax.x, cv.x), std::max(bmax.y, cv.y));
             }
             boxOn = true;
         }
@@ -980,6 +1257,12 @@ void Init(const char* iniPath, const char* gameDir) {
     if (S.ini[0]) {
         for (const IniFlag& f : IniFlags()) {
             *f.value = GetPrivateProfileIntA("devtools", f.key, *f.value ? 1 : 0, S.ini) != 0;
+        }
+        char hex[16] = "";
+        GetPrivateProfileStringA("devtools", "visual_fundo", "", hex, sizeof(hex), S.ini);
+        if (strlen(hex) == 6) {
+            unsigned long rgb = strtoul(hex, nullptr, 16);
+            SetBackground(IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, 255));
         }
         S.perFrame = std::max(1, std::min(8, static_cast<int>(GetPrivateProfileIntA("devtools", "miniaturas_por_quadro", 3,
                                                                                      S.ini))));
@@ -1055,24 +1338,18 @@ void Frame() {
     switch (S.tab) {
     case TAB_MODELS: TabModels(x, top, w, bodyH); break;
     case 1: {
-        const char* lines[] = {"Todas as TXDs do jogo e dos mods, com busca e pr\xC3\xA9via.",
-                               "Ver de onde cada textura vem e quem usa.", "Exportar para PNG."};
-        Placeholder(x, top, w, bodyH, "Texturas", lines, 3);
-        break;
-    }
-    case 2: {
         const char* lines[] = {"Os .ifp e as anima\xC3\xA7\xC3\xB5" "es de cada um.",
                                "Pr\xC3\xA9via no personagem, com velocidade e repeti\xC3\xA7\xC3\xA3o."};
         Placeholder(x, top, w, bodyH, "Anima\xC3\xA7\xC3\xB5" "es", lines, 2);
         break;
     }
-    case 3: {
+    case 2: {
         const char* lines[] = {"Os bancos de som e as r\xC3\xA1" "dios, com player e busca.",
                                "Tocar um som pelo id do banco e do slot."};
         Placeholder(x, top, w, bodyH, "\xC3\x81udios", lines, 2);
         break;
     }
-    case 4: {
+    case 3: {
         const char* lines[] = {"Localizar qualquer arquivo dos .img e da pasta do jogo.",
                                "Ver de onde o jogo est\xC3\xA1 lendo cada coisa (original, outro .img ou mod)."};
         Placeholder(x, top, w, bodyH, "Arquivos", lines, 2);

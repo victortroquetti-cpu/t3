@@ -15,7 +15,7 @@ void DevToolsLog(const char*, ...) {}
 namespace concept {
 
 constexpr int W = 1920, H = 1080;
-constexpr intptr_t FONT = 1, THUMB = 100000, VIEWER = 300000, VIEWER_COL = 400000, TEX = 500000;
+constexpr intptr_t FONT = 1, THUMB = 100000, VIEWER = 300000, VIEWER_COL = 400000, TEX = 500000, VIEWER_GREEN = 600000;
 
 struct Image {
     std::vector<unsigned char> rgba;
@@ -44,6 +44,7 @@ struct ColData {
 std::map<int, ColData> cols;
 float cam[16];
 core::Look target;
+core::TextureUsers users; // o que a busca acharia para a textura dos farois do Infernus
 float spawnDist = 4.0f;
 int failures = 0;
 
@@ -238,6 +239,9 @@ bool TakeSpawnMessage(std::string* text, bool* ok) {
     return true;
 }
 
+void FindTextureUsers(int, const std::string&) {}
+const TextureUsers& TextureUsersNow() { return concept::users; }
+
 void SetInspect(bool on) { inspect = on; }
 bool InspectOn() { return inspect; }
 const Look& Looking() {
@@ -288,6 +292,9 @@ int ThumbCount() {
     return n;
 }
 ImTextureID DrawViewer(const mesh::Mesh& m, const View& v, int) {
+    if ((v.background & 0xFFFFFF) == 0x00B140 && concept::images.count(concept::VIEWER_GREEN + m.id)) {
+        return reinterpret_cast<ImTextureID>(concept::VIEWER_GREEN + m.id);
+    }
     intptr_t id = (v.collision ? concept::VIEWER_COL : concept::VIEWER) + m.id;
     if (!concept::images.count(id)) {
         id = concept::VIEWER + m.id;
@@ -351,6 +358,7 @@ void LoadData(const std::string& dir) {
             LoadImage(dir + "/thumb_" + f[1] + ".rgba", THUMB + id);
             LoadImage(dir + "/viewer_" + f[1] + ".rgba", VIEWER + id);
             LoadImage(dir + "/viewer_" + f[1] + "_col.rgba", VIEWER_COL + id);
+            LoadImage(dir + "/viewer_" + f[1] + "_verde.rgba", VIEWER_GREEN + id);
         } else if (f[0] == "textura" && f.size() >= 9) {
             TexData t;
             t.model = std::stoi(f[1]);
@@ -362,6 +370,16 @@ void LoadData(const std::string& dir) {
             t.id = TEX + nextTex++;
             LoadImage(dir + "/tex_" + t.name + ".rgba", t.id);
             texs.push_back(t);
+        } else if (f[0] == "usuarios" && f.size() >= 5) {
+            users.model = std::stoi(f[1]);
+            users.texture = f[2];
+            users.txd = 1; // a vehicle.txd, mae da TXD de cada carro
+            users.txdName = f[3];
+            for (size_t k = 4; k < f.size(); ++k) {
+                users.users.push_back(std::stoi(f[k]));
+            }
+            users.checked = users.total = static_cast<int>(users.users.size());
+            users.done = true;
         } else if (f[0] == "colisao" && f.size() >= 5) {
             cols[std::stoi(f[1])] = {std::stoi(f[2]), std::stoi(f[3]), std::stoi(f[4])};
         } else if (f[0] == "camera" && f.size() >= 17) {
@@ -620,6 +638,19 @@ int main(int argc, char** argv) {
     Shot(out + "/03-card-infernus.ppm", scene);
     Check(devtools::S.cardOpen && core::OpenMesh() != nullptr, "card do Infernus aberto");
 
+    // 3b. A textura dos farois em destaque: quem mais usa (os carros, pela vehicle.txd)
+    devtools::S.texName = "vehiclelights128";
+    Frames(10);
+    Shot(out + "/10-textura-quem-usa.ppm", scene);
+    Check(devtools::TexIndex(core::OpenMesh()) >= 0 && users.users.size() > 10, "textura dos farois: a lista dos carros");
+
+    // 3c. Fundo verde (chroma key) no visualizador
+    devtools::S.texName.clear();
+    devtools::SetBackground(IM_COL32(0, 177, 64, 255));
+    Frames(5);
+    Shot(out + "/11-fundo-verde.ppm", scene);
+    devtools::SetBackground(devtools::BACKGROUND_DEFAULT);
+
     // 4. Criar no mundo: o aviso e o carro na frente do CJ, com o menu fechado
     core::Spawn(411);
     Frames(3);
@@ -640,7 +671,7 @@ int main(int argc, char** argv) {
     Shot(out + "/05-card-palmeira-colisao.ppm", scene);
 
     // 6. A folha da palmeira em destaque (o alfa sobre o xadrez)
-    devtools::S.texView = 0;
+    devtools::S.texName = "palm_leaves";
     Frames(5);
     Shot(out + "/06-textura.ppm", scene);
     Check(!core::openMesh.textures.empty() && core::openMesh.textures[0].alpha, "a folha da palmeira tem alfa");
@@ -660,14 +691,11 @@ int main(int argc, char** argv) {
     core::SetInspect(false);
     devtools::S.inspect = false;
 
-    // 8. Aba Geral e uma das abas que ainda vem
+    // 8. Aba Geral
     devtools::Toggle();
     devtools::S.tab = devtools::TAB_GENERAL;
     Frames(10);
     Shot(out + "/08-geral.ppm", scene);
-    devtools::S.tab = 1;
-    Frames(10);
-    Shot(out + "/09-texturas-em-breve.ppm", scene);
 
     ImGui::DestroyContext();
     printf(failures ? "FALHOU\n" : "PASSOU\n");
