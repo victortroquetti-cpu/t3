@@ -4,13 +4,15 @@ Uma ferramenta para modders dentro do GTA San Andreas: ver todos os modelos que 
 
 As abas **Modelos**, **Animações**, **Áudios** e **Geral** funcionam. Arquivos está no menu como "Em breve". As texturas não têm aba: ficam no card do modelo.
 
-**Estado:** v0.4.1, `.asi` compilado e testado fora do jogo:
-- no Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide`, `.img`, pacotes de som, `.ifp` e um personagem com ossos (`test/smoke/run.sh`, 76 conferências e 25 capturas);
+**Estado:** v0.4.2, `.asi` compilado e testado fora do jogo:
+- no Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide`, `.img`, pacotes de som, `.ifp` e um personagem com ossos (`test/smoke/run.sh`, 79 conferências e 25 capturas);
 - no Linux, o leitor dos `.ifp` e a conta da pose (`test/anim/run.sh`).
 
 Falta o teste no jogo de verdade.
 
-**Novo na v0.4.1:**
+**Novo na v0.4.2:** a aba Áudios lê os sons trocados pelo **modloader** (`.wav` em `modloader\<mod>\<PACOTE>\Bank_<N>\sound_<N>.wav`). Eles ganham o selo **MOD**, e o player e o "Salvar em .wav" usam o `.wav` do modloader, que é o som que o jogo toca.
+
+**Na v0.4.1:**
 - Os personagens não aparecem mais deitados (na grade, no card e na prévia das animações). A pele dos personagens do jogo vem deitada, e agora o mod usa o esqueleto para pôr de pé, como o jogo faz.
 - Animação curtíssima (o `abseil` tem 0,03 s) aparece como **pose**, parada, sem a linha do tempo pulando.
 - O **botão do meio** do Info ao apontar é lido do mouse do próprio jogo. Com o menu fechado, o jogo pega o mouse pelo DirectInput e o clique não chegava.
@@ -131,6 +133,7 @@ Os efeitos sonoros do jogo (`audio\SFX`), na ordem do jogo: **pacote › bank �
 - **Os sons:** `sound_001`, a duração, a marca **loop** (o som tem ponto de repetição), o nome do jogo quando existe (`AK_A`) e as armas que usam o som.
 - **Busca:** todas as palavras precisam bater. Vale o pacote, o banco (`90s_p`, `137`), o nome do som, o veículo (`sultan`), a arma (`m4`, `ak`) e o que o banco tem (`ricochete`, `porta`).
 - **Filtros:** **Tipo** (motor no tráfego, motor com você dirigindo, armas, passos, dor, missões, falas, outros), **Veículo**, **Arma** e **Loop** (todos, só com loop, sem loop). Com filtro, os pacotes com resultado abrem sozinhos.
+- **Modloader:** os sons trocados por `.wav` no modloader (do jeito que o `std.bank` dele lê: `modloader\<mod>\...\<PACOTE>\Bank_<N>\sound_<N>.wav`, mono PCM 16) aparecem com o selo **MOD**, no som, no bank e no pacote (com quantos). O filtro **Só do modloader** mostra só esses, e a dica do selo diz o caminho do `.wav`. O player e o `.wav` salvo usam o som do modloader. Se dois mods trocam o mesmo som, vale o primeiro em ordem alfabética, e as pastas que começam com ponto ficam de fora.
 - **O player** (embaixo da lista): clique num som para tocar, e de novo para parar. Tem **repetir** e **salvar em .wav**. O ícone de download na linha também salva. Os `.wav` vão para `<pasta do jogo>\Trok DevTools\sons\`, com o nome `GENRL_Bank_002_90S_P_sound_001.wav`.
 
 ### Áudio tocando agora
@@ -194,7 +197,8 @@ Uma seção `[devtools]`, salva pelo próprio menu:
 - **No single player** não existe o travamento de câmera do SA-MP: com o menu aberto, o jogo não pausa e o mouse ainda mexe a câmera. Pare o personagem antes de abrir.
 - A colisão só aparece no card quando o jogo já a carregou, o que acontece perto dela no mapa. Longe, o card diz "não carregada".
 - Trens e o id 0 não são criados.
-- **O player da aba Áudios** toca o som cru do pacote, pelo Windows (`waveOut`), por fora do áudio do jogo: sem o volume do menu do jogo, sem efeito de distância e sem o tom que o jogo muda (um motor em rotação alta, por exemplo).
+- **Modloader nos áudios:** só os `.wav`. Um pacote do SFX inteiro ou um `BankLkup.dat` trocado dentro do modloader não é lido (a aba mostra o pacote da pasta `audio`).
+- **O player da aba Áudios** toca o som cru (do pacote ou do `.wav` do modloader), pelo Windows (`waveOut`), por fora do áudio do jogo: sem o volume do menu do jogo, sem efeito de distância e sem o tom que o jogo muda (um motor em rotação alta, por exemplo).
 - **A prévia das animações** faz a conta dos ossos como o jogo, mas sem a mistura de animações e sem as partes que o jogo calcula na hora (olhar para os lados, segurar a arma). A animação no seu personagem é a do próprio jogo.
 - **MOD nas animações** precisa da referência das originais (ver "MOD e NOVA"). Sem ela, só as novas são marcadas.
 - **Nomes:** os sons do SFX não têm nome nos arquivos. Os nomes dos banks e de uns 360 sons, a tabela de bancos de cada veículo e os sons de cada arma vêm do gta-reversed (o código do jogo reconstruído, em `github.com/gta-reversed/gta-reversed`). O resto aparece só como `sound_NNN`.

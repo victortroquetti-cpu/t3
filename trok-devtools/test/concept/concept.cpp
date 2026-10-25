@@ -341,6 +341,7 @@ const Sound* FindSound(int, int) { return nullptr; }
 const char* KindName(int) { return ""; }
 int BankCount() { return 0; }
 int SoundCount() { return 0; }
+int ModCount() { return 0; }
 Result Apply(const Filter&) { return Result(); }
 bool ExportWav(int, int, std::string*) { return false; }
 } // namespace sfx

@@ -929,7 +929,7 @@ constexpr int FAKE_RATE = 22050, FAKE_SAMPLES = 1102; // 0,05 s por som
 BYTE g_soundManager[0x100];
 int g_soundRequests = 0;
 // Posicoes na aba Audios (1920x1080), conferidas nas capturas
-constexpr int AUDIO_ROW_Y = 281, AUDIO_WAV_X = 1120, AUDIO_HIST_X = 1170, AUDIO_HIST_Y = 362;
+constexpr int AUDIO_ROW_Y = 281, AUDIO_ROW_DY = 28, AUDIO_WAV_X = 1120, AUDIO_HIST_X = 1170, AUDIO_HIST_Y = 362;
 // Na aba Animacoes: a linha da animacao (com um .ifp no filtro), o visualizador e a coluna da direita
 constexpr int ANIM_ROW_Y = 244, ANIM_VIEW_X0 = 720, ANIM_VIEW_Y0 = 200, ANIM_VIEW_X1 = 1400, ANIM_VIEW_Y1 = 870, ANIM_INFO_X = 1430,
               ANIM_STOP_DY = 30, ANIM_CLEAR_X = 429;
@@ -1025,6 +1025,51 @@ void BuildAnimMemory() {
         Mem<DWORD>(STREAM_INFO + (IFP_FIRST + b) * 0x14 + 0xC) = b == 0 ? 0 : 1; // o ped.ifp nao e do streaming
     }
     Mem<int>(ANIM_BLOCK_COUNT) = IFP_BLOCKS;
+}
+
+// Cria as pastas de um caminho (a\\b\\c\\arquivo)
+void MakeDirs(const std::string& path) {
+    for (size_t i = path.find('\\'); i != std::string::npos; i = path.find('\\', i + 1)) {
+        CreateDirectoryA(path.substr(0, i).c_str(), nullptr);
+    }
+}
+
+void WriteWav(const std::string& path, int channels, int rate, int samples) {
+    MakeDirs(path);
+    std::string pcm;
+    for (int k = 0; k < samples * channels; ++k) {
+        short v = static_cast<short>(6000 * std::sin(k * 0.11f));
+        pcm.append(reinterpret_cast<const char*>(&v), 2);
+    }
+    std::string w = "RIFF";
+    DWORD riff = 36 + static_cast<DWORD>(pcm.size()), fmtSize = 16, sampleRate = rate, byteRate = rate * 2 * channels,
+          data = static_cast<DWORD>(pcm.size());
+    WORD format = 1, ch = static_cast<WORD>(channels), align = static_cast<WORD>(2 * channels), bits = 16;
+    w.append(reinterpret_cast<const char*>(&riff), 4);
+    w += "WAVEfmt ";
+    w.append(reinterpret_cast<const char*>(&fmtSize), 4);
+    w.append(reinterpret_cast<const char*>(&format), 2);
+    w.append(reinterpret_cast<const char*>(&ch), 2);
+    w.append(reinterpret_cast<const char*>(&sampleRate), 4);
+    w.append(reinterpret_cast<const char*>(&byteRate), 4);
+    w.append(reinterpret_cast<const char*>(&align), 2);
+    w.append(reinterpret_cast<const char*>(&bits), 2);
+    w += "data";
+    w.append(reinterpret_cast<const char*>(&data), 4);
+    WriteText(path.c_str(), w + pcm);
+}
+
+// Sons trocados pelo modloader (o std.bank dele): um tiro do WEAPONS e o sound_002 do 90S_P valem; um estereo e uma pasta
+// desligada (com ponto) ficam de fora.
+constexpr int MOD_SAMPLES = 2205, MOD_RATE = 11025;
+void WriteModloaderSounds() {
+    char weapons[96];
+    snprintf(weapons, sizeof(weapons), "modloader\\Armas Trok\\GENRL\\Bank_%03d\\sound_032.wav",
+             audio_data::WEAPONS_BANK - PAK_FIRST_BANK[1] + 1);
+    WriteWav(weapons, 1, MOD_RATE, MOD_SAMPLES);
+    WriteWav("modloader\\Carros\\GENRL\\Bank_002\\sound_002.wav", 1, MOD_RATE, MOD_SAMPLES);
+    WriteWav("modloader\\Ruim\\GENRL\\Bank_002\\sound_003.wav", 2, MOD_RATE, MOD_SAMPLES);
+    WriteWav("modloader\\.desligado\\GENRL\\Bank_002\\sound_001.wav", 1, MOD_RATE, MOD_SAMPLES);
 }
 
 // O carregador de bancos no AEAudioHardware (+0xD98): o slot 3 tem o 90S_P, o 4 um banco de passos, o 5 o WEAPONS.
@@ -1189,6 +1234,7 @@ void BuildWorld() {
     BuildTxds();
     WriteGameFiles();
     WriteAudioFiles();
+    WriteModloaderSounds();
     BuildAudioMemory();
     WriteAnimFiles();
     BuildAnimMemory();
@@ -1845,6 +1891,15 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     bool saved = GetFileAttributesExA(wav.c_str(), GetFileExInfoStandard, &fa) != 0;
     CheckF(saved && fa.nFileSizeLow == 44 + FAKE_SAMPLES * 2, "salvar em .wav: o som do pacote com cabecalho RIFF (%.0f bytes)",
            saved ? fa.nFileSizeLow : 0);
+    Check(LogHas("sfx: 2 sons trocados pelo modloader"), "modloader: 2 sons trocados por .wav (o estereo e a pasta com ponto fora)");
+    Check(LogHas("sfx: modloader\\Ruim\\GENRL\\Bank_002\\sound_003.wav nao e mono PCM 16"), "modloader: o .wav estereo ignorado");
+    std::string modWav = g_out + "\\Trok DevTools\\sons\\GENRL_Bank_002_90S_P_sound_002.wav";
+    Click(AUDIO_WAV_X, AUDIO_ROW_Y + AUDIO_ROW_DY);
+    Frames(5);
+    WIN32_FILE_ATTRIBUTE_DATA ma = {};
+    bool modSaved = GetFileAttributesExA(modWav.c_str(), GetFileExInfoStandard, &ma) != 0;
+    CheckF(modSaved && ma.nFileSizeLow == 44 + MOD_SAMPLES * 2, "salvar em .wav: o sound_002 vem do .wav do modloader (%.0f bytes)",
+           modSaved ? ma.nFileSizeLow : 0);
     Click(400, AUDIO_ROW_Y);
     Frames(10);
     Capture("13-tocando.bmp");

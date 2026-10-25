@@ -3,6 +3,9 @@
 // banco {pacote (1 byte), 3 de folga, inicio no pacote, tamanho}; no pacote, cada banco comeca com o cabecalho de 0x12C4
 // bytes {int16 numero de sons, 2 de folga, 400 x {inicio, inicio do loop (-1 = sem), frequencia (uint16), headroom}} e
 // depois o PCM 16 bits mono de todos os sons em sequencia.
+// modloader (o std.bank dele, github.com/thelink2012/modloader): um .wav mono PCM 16 em
+// modloader\<mod>\...\<PACOTE>\Bank_<N>\sound_<N>.wav (ou Bank_<N>\sound_<N>.wav, entao no GENRL) troca o som N (desde 1)
+// do banco N (desde 1, dentro do pacote). As pastas que comecam com ponto ficam de fora.
 
 #include "sfx.h"
 
@@ -30,7 +33,7 @@ std::string g_gameDir;
 std::vector<std::string> g_pakNames;
 std::vector<Pack> g_packs;
 std::vector<Bank> g_banks;
-int g_failed = 0, g_soundTotal = 0;
+int g_failed = 0, g_soundTotal = 0, g_mods = 0;
 
 std::string Lower(std::string s) {
     for (char& c : s) {
@@ -147,6 +150,127 @@ void Classify(Bank& b, const std::string& pack, const std::vector<bool>& playerB
         } else if (b.text.empty()) {
             b.kind = T_OTHER;
         }
+    }
+}
+
+// O PCM de um .wav (mono, 16 bits): a frequencia e onde fica o bloco "data".
+bool WaveInfo(const std::string& path, DWORD* offset, DWORD* size, int* rate) {
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) {
+        return false;
+    }
+    BYTE head[12];
+    bool ok = fread(head, 1, 12, f) == 12 && memcmp(head, "RIFF", 4) == 0 && memcmp(head + 8, "WAVE", 4) == 0;
+    bool fmtOk = false;
+    DWORD pos = 12;
+    *size = 0;
+    for (int guard = 0; ok && guard < 64; ++guard) {
+        BYTE chunk[8];
+        if (fseek(f, static_cast<long>(pos), SEEK_SET) != 0 || fread(chunk, 1, 8, f) != 8) {
+            break;
+        }
+        DWORD len = *reinterpret_cast<DWORD*>(chunk + 4);
+        if (memcmp(chunk, "fmt ", 4) == 0 && len >= 16) {
+            BYTE fmt[16];
+            ok = fread(fmt, 1, 16, f) == 16;
+            WORD format = *reinterpret_cast<WORD*>(fmt), channels = *reinterpret_cast<WORD*>(fmt + 2),
+                 bits = *reinterpret_cast<WORD*>(fmt + 14);
+            *rate = static_cast<int>(*reinterpret_cast<DWORD*>(fmt + 4));
+            fmtOk = format == 1 && channels == 1 && bits == 16 && *rate >= 1000 && *rate <= 96000;
+        } else if (memcmp(chunk, "data", 4) == 0) {
+            *offset = pos + 8;
+            *size = len & ~1u;
+            break;
+        }
+        pos += 8 + len + (len & 1);
+    }
+    fclose(f);
+    return ok && fmtOk && *size > 0;
+}
+
+bool EndsWith(const std::string& s, const char* tail) {
+    size_t n = strlen(tail);
+    return s.size() >= n && s.compare(s.size() - n, n, tail) == 0;
+}
+
+// Os .wav do modloader que trocam sons do SFX. A primeira pasta (em ordem alfabetica) que troca um som vale.
+void ScanModloader(const std::string& dir, const std::string& relative, int depth, int* files) {
+    if (depth > 12 || *files > 200000) {
+        return;
+    }
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA((dir + "*").c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    std::vector<std::string> subdirs, waves;
+    do {
+        if (fd.cFileName[0] == '.') {
+            continue; // ".", ".." e as pastas desligadas
+        }
+        ++*files;
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            subdirs.push_back(fd.cFileName);
+        } else if (EndsWith(Lower(fd.cFileName), ".wav")) {
+            waves.push_back(fd.cFileName);
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    std::sort(subdirs.begin(), subdirs.end(), [](const std::string& a, const std::string& b) { return Lower(a) < Lower(b); });
+    std::sort(waves.begin(), waves.end());
+    for (const std::string& w : waves) {
+        // ...\<pacote>\bank_<n>\sound_<n>.wav
+        std::vector<std::string> parts;
+        std::string path = Lower(relative + w);
+        for (size_t i = 0; i <= path.size();) {
+            size_t j = path.find('\\', i);
+            if (j == std::string::npos) {
+                j = path.size();
+            }
+            parts.push_back(path.substr(i, j - i));
+            i = j + 1;
+        }
+        unsigned bankNo = 0, soundNo = 0;
+        if (parts.size() < 2 || sscanf(parts[parts.size() - 2].c_str(), "bank_%u", &bankNo) != 1 ||
+            sscanf(parts.back().c_str(), "sound_%u.wav", &soundNo) != 1) {
+            continue;
+        }
+        // O pacote e a pasta acima do Bank_<N>; se nao for um pacote, o modloader usa o GENRL
+        std::string pak = parts.size() >= 3 ? parts[parts.size() - 3] : "genrl";
+        int packIndex = -1, genrl = -1;
+        for (size_t p = 0; p < g_packs.size(); ++p) {
+            std::string name = Lower(g_packs[p].name);
+            packIndex = name == pak ? static_cast<int>(p) : packIndex;
+            genrl = name == "genrl" ? static_cast<int>(p) : genrl;
+        }
+        if (packIndex < 0) {
+            packIndex = genrl;
+        }
+        if (packIndex < 0 || bankNo < 1 || bankNo > g_packs[packIndex].banks.size()) {
+            continue;
+        }
+        Bank& bank = g_banks[g_packs[packIndex].banks[bankNo - 1]];
+        if (soundNo < 1 || soundNo > bank.sounds.size() || !bank.sounds[soundNo - 1].mod.empty()) {
+            continue;
+        }
+        DWORD offset = 0, size = 0;
+        int rate = 0;
+        if (!WaveInfo(dir + w, &offset, &size, &rate)) {
+            DevToolsLog("sfx: modloader\\%s nao e mono PCM 16 (o modloader ignora)", (relative + w).c_str());
+            continue;
+        }
+        Sound& snd = bank.sounds[soundNo - 1];
+        snd.mod = "modloader\\" + relative + w;
+        snd.modOffset = offset;
+        snd.modSize = size;
+        snd.rate = rate;
+        snd.seconds = size / 2.0f / rate;
+        ++bank.mods;
+        ++g_packs[bank.pack].mods;
+        ++g_mods;
+    }
+    for (const std::string& d : subdirs) {
+        ScanModloader(dir + d + "\\", relative + d + "\\", depth + 1, files);
     }
 }
 
@@ -269,6 +393,12 @@ DWORD WINAPI Worker(void*) {
             }
         }
     }
+    if (GetFileAttributesA((g_gameDir + "modloader").c_str()) != INVALID_FILE_ATTRIBUTES) {
+        g_status = "lendo os sons do modloader";
+        int files = 0;
+        ScanModloader(g_gameDir + "modloader\\", "", 0, &files);
+        DevToolsLog("sfx: %d sons trocados pelo modloader (%d arquivos e pastas vistos)", g_mods, files);
+    }
     DevToolsLog("sfx: %d pacotes, %d bancos, %d sons (%d bancos sem cabecalho)", static_cast<int>(g_packs.size()), count,
                 g_soundTotal, g_failed);
     g_status = "pronto";
@@ -304,11 +434,13 @@ void Finish() {
         }
         char number[32];
         snprintf(number, sizeof(number), "bank_%03d %d ", b.number, b.number);
-        b.search = Lower(g_packs[b.pack].name + " " + number + b.name + " " + b.text + " " + KindName(b.kind)) + names;
+        b.search = Lower(g_packs[b.pack].name + " " + number + b.name + " " + b.text + " " + KindName(b.kind)) + names +
+                   (b.mods ? " mod modloader" : "");
         for (Sound& s : b.sounds) {
             char label[32];
             snprintf(label, sizeof(label), "sound_%03d", s.index + 1);
-            s.search = Lower(std::string(label) + " " + s.name + " " + s.weapons) + s.search + (s.loop ? " loop" : "");
+            s.search = Lower(std::string(label) + " " + s.name + " " + s.weapons) + s.search + (s.loop ? " loop" : "") +
+                       (s.mod.empty() ? "" : " mod modloader");
         }
     }
 }
@@ -381,6 +513,10 @@ int SoundCount() {
     return g_soundTotal;
 }
 
+int ModCount() {
+    return g_mods;
+}
+
 Result Apply(const Filter& f) {
     Result r;
     r.sounds.resize(g_banks.size());
@@ -423,7 +559,7 @@ Result Apply(const Filter& f) {
         }
         std::vector<int>& list = r.sounds[b.id];
         for (const Sound& s : b.sounds) {
-            if ((f.loop == 1 && !s.loop) || (f.loop == 2 && s.loop)) {
+            if ((f.loop == 1 && !s.loop) || (f.loop == 2 && s.loop) || (f.modded && s.mod.empty())) {
                 continue;
             }
             if (!weaponSound.empty() && !weaponSound[s.index]) {
@@ -450,15 +586,16 @@ Result Apply(const Filter& f) {
 bool ReadPcm(int bank, int sound, std::vector<short>* out, int* rate) {
     const Bank* b = FindBank(bank);
     const Sound* s = FindSound(bank, sound);
-    if (!b || !s || !b->ok || b->pakFile >= static_cast<int>(g_pakNames.size()) || s->size < 2) {
+    if (!b || !s || !b->ok || b->pakFile >= static_cast<int>(g_pakNames.size()) || (s->size < 2 && s->mod.empty())) {
         return false;
     }
-    FILE* f = fopen((g_gameDir + "audio\\SFX\\" + g_pakNames[b->pakFile]).c_str(), "rb");
+    bool mod = !s->mod.empty();
+    FILE* f = fopen((g_gameDir + (mod ? s->mod : "audio\\SFX\\" + g_pakNames[b->pakFile])).c_str(), "rb");
     if (!f) {
         return false;
     }
-    out->resize(s->size / 2);
-    bool ok = ReadAt(f, b->fileOffset + HEADER + s->offset, out->data(), out->size() * 2);
+    out->resize((mod ? s->modSize : s->size) / 2);
+    bool ok = ReadAt(f, mod ? s->modOffset : b->fileOffset + HEADER + s->offset, out->data(), out->size() * 2);
     fclose(f);
     *rate = s->rate;
     return ok;

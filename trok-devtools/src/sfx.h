@@ -24,6 +24,10 @@ struct Sound {
     std::string name;   // nome do jogo, quando tem ("EAGLE_SHOT_L")
     std::string weapons; // armas que usam ("M4, AK-47")
     std::string search;  // minusculas
+    // Trocado pelo modloader (um .wav em modloader\<mod>\<PACOTE>\Bank_<N>\sound_<N>.wav, como o std.bank dele le):
+    // o caminho, e onde o PCM fica dentro do .wav. O jogo toca este, entao o player e o .wav salvo tambem.
+    std::string mod;
+    DWORD modOffset = 0, modSize = 0;
 };
 
 struct Bank {
@@ -40,12 +44,14 @@ struct Bank {
     std::string vehicleText;   // "Bravura, Previon, Solair e mais 9"
     std::vector<Sound> sounds;
     std::string search;
+    int mods = 0; // sons trocados pelo modloader
 };
 
 struct Pack {
     std::string name, description;
     std::vector<int> banks; // ids
     int sounds = 0;
+    int mods = 0;
 };
 
 void Start(const char* gameDir); // thread
@@ -61,14 +67,17 @@ const Sound* FindSound(int bank, int sound);
 const char* KindName(int kind);
 int BankCount();
 int SoundCount();
+int ModCount(); // sons trocados pelo modloader
 
 // Filtro da aba: busca (todas as palavras), tipo, veiculo (modelo), arma (indice em audio_data::WEAPONS) e loop
 // (0 todos, 1 so com loop, 2 sem loop). Devolve, por banco, os sons que passam.
 struct Filter {
     std::string query;
     int kind = -1, vehicle = -1, weapon = -1, loop = 0;
+    bool modded = false; // so os trocados pelo modloader
     bool operator==(const Filter& o) const {
-        return query == o.query && kind == o.kind && vehicle == o.vehicle && weapon == o.weapon && loop == o.loop;
+        return query == o.query && kind == o.kind && vehicle == o.vehicle && weapon == o.weapon && loop == o.loop &&
+               modded == o.modded;
     }
 };
 struct Result {

@@ -37,7 +37,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v0.4.1";
+constexpr const char* VERSION_TAG = "v0.4.2";
 // As texturas ficam no card do modelo (clique numa textura): nao tem aba propria.
 const char* const TABS[] = {"Modelos", "Anima\xC3\xA7\xC3\xB5" "es", "\xC3\x81udios", "Arquivos", "Geral"};
 constexpr int TAB_COUNT = 5, TAB_MODELS = 0, TAB_GENERAL = 4;
@@ -1180,9 +1180,38 @@ std::string Seconds(float s) {
     return Decimal(s, 2) + " s";
 }
 
+// Selo pequeno (MOD, NOVA): cheio ou so com a borda. Devolve a largura (draw = false: so mede).
+float Badge(ImDrawList* dl, float x, float y, const char* label, bool filled, bool draw) {
+    ImVec2 ts = TextSize(fonts.desc, label);
+    float w = ts.x + 12 * u, h = ts.y + 6 * u;
+    if (!draw) {
+        return w;
+    }
+    if (filled) {
+        dl->AddRectFilled(ImVec2(x, y), ImVec2(x + w, y + h), col::strong, 5 * u);
+        Text(dl, fonts.desc, x + 6 * u, y + 3 * u - 0.5f * u, col::ink, label);
+    } else {
+        Box(dl, ImVec2(x, y), ImVec2(x + w, y + h), 0, col::White(90), 5 * u);
+        Text(dl, fonts.desc, x + 6 * u, y + 3 * u - 0.5f * u, col::text, label);
+    }
+    return w;
+}
+
+// "MOD 3": os sons trocados pelo modloader num banco ou pacote (0 = nada)
+float ModBadge(ImDrawList* dl, float rightX, float y, int count) {
+    if (count <= 0) {
+        return 0;
+    }
+    char label[24];
+    snprintf(label, sizeof(label), "MOD %d", count);
+    float w = Badge(dl, 0, 0, label, true, false);
+    Badge(dl, rightX - w, y, label, true, true);
+    return w;
+}
+
 bool AudioFilterActive() {
     const sfx::Filter& f = S.audioFilter;
-    return !f.query.empty() || f.kind >= 0 || f.vehicle >= 0 || f.weapon >= 0 || f.loop != 0;
+    return !f.query.empty() || f.kind >= 0 || f.vehicle >= 0 || f.weapon >= 0 || f.loop != 0 || f.modded;
 }
 
 // Os veiculos que tem banco de motor, em ordem de nome (para a lista do filtro).
@@ -1387,6 +1416,7 @@ void AudioTree(float x, float y, float w, float h) {
             }
             ImVec2 cs = TextSize(fonts.desc, counts);
             Text(dl, fonts.desc, rx + rw - 14 * u - cs.x, ry + 11 * u, col::hint, counts);
+            ModBadge(dl, rx + rw - 22 * u - cs.x, ry + 9 * u, p.mods);
             Text(dl, fonts.desc, rx + 30 * u, ry + 8 * u + fonts.title->FontSize + 5 * u, col::column,
                  Ellipsize(fonts.desc, p.description, rw - 44 * u).c_str());
         } else if (row.type == 1) {
@@ -1412,6 +1442,7 @@ void AudioTree(float x, float y, float w, float h) {
             snprintf(count, sizeof(count), b.ok ? "%d sons" : "sem cabe\xC3\xA7" "alho", n);
             ImVec2 cs = TextSize(fonts.desc, count);
             Text(dl, fonts.desc, bx + bw - 14 * u - cs.x, ry + 8 * u, col::hint, count);
+            ModBadge(dl, bx + bw - 22 * u - cs.x, ry + 6 * u, b.mods);
             std::string sub = b.text;
             if (!b.vehicleText.empty()) {
                 sub += (sub.empty() ? "" : "  \xC2\xB7  ") + b.vehicleText;
@@ -1475,11 +1506,19 @@ void AudioTree(float x, float y, float w, float h) {
             std::string dur = Seconds(s.seconds);
             ImVec2 ds = TextSize(fonts.desc, dur.c_str());
             float durX = dlX - 22 * u - ds.x;
+            float extraEnd = durX - 12 * u - (s.mod.empty() ? 0 : Badge(dl, 0, 0, "MOD", true, false) + 10 * u);
             if (!extra.empty()) {
                 Text(dl, fonts.desc, tx, ry + (rh - fonts.desc->FontSize) * 0.5f, col::hint,
-                     Ellipsize(fonts.desc, extra, durX - tx - 12 * u).c_str());
+                     Ellipsize(fonts.desc, extra, extraEnd - tx).c_str());
             }
             Text(dl, fonts.desc, durX, ry + (rh - ds.y) * 0.5f, col::column, dur.c_str());
+            if (!s.mod.empty()) {
+                float bw2 = Badge(dl, 0, 0, "MOD", true, false), by = ry + (rh - fonts.desc->FontSize - 6 * u) * 0.5f;
+                Badge(dl, durX - 10 * u - bw2, by, "MOD", true, true);
+                if (ImGui::IsMouseHoveringRect(ImVec2(durX - 10 * u - bw2, by), ImVec2(durX - 10 * u, by + 20 * u))) {
+                    Tooltip(("Trocado pelo modloader: " + s.mod).c_str());
+                }
+            }
         }
     }
     if (rows.empty()) {
@@ -1544,9 +1583,9 @@ void AudioPlayerBar(float x, float y, float w, float h) {
     char title[128], sub[160];
     if (s && b) {
         snprintf(title, sizeof(title), "sound_%03d", sound + 1);
-        snprintf(sub, sizeof(sub), "%s  \xC2\xB7  Bank_%03d  \xC2\xB7  %s Hz%s%s%s", sfx::Packs()[b->pack].name.c_str(), b->number,
+        snprintf(sub, sizeof(sub), "%s  \xC2\xB7  Bank_%03d  \xC2\xB7  %s Hz%s%s%s%s", sfx::Packs()[b->pack].name.c_str(), b->number,
                  Thousands(s->rate).c_str(), s->loop ? "  \xC2\xB7  loop" : "", s->name.empty() ? "" : "  \xC2\xB7  ",
-                 s->name.c_str());
+                 s->name.c_str(), s->mod.empty() ? "" : "  \xC2\xB7  do modloader");
     } else {
         snprintf(title, sizeof(title), "Escolha um som na lista");
         snprintf(sub, sizeof(sub), "ele toca aqui; d\xC3\xA1 para repetir e salvar em .wav");
@@ -1617,7 +1656,8 @@ std::string PlayedSub(const audiospy::Played& p) {
         out = "banco n\xC3\xA3o identificado";
     }
     if (s) {
-        out += "  \xC2\xB7  " + Seconds(s->seconds) + (s->loop ? "  \xC2\xB7  loop" : "");
+        out += "  \xC2\xB7  " + Seconds(s->seconds) + (s->loop ? "  \xC2\xB7  loop" : "") +
+               (s->mod.empty() ? "" : "  \xC2\xB7  MOD");
         if (!s->name.empty()) {
             out += "  \xC2\xB7  " + s->name;
         }
@@ -1782,6 +1822,15 @@ void TabAudio(float x, float y, float w, float h) {
         }
         px += pw + 6 * u;
     }
+    if (sfx::ModCount() > 0 || S.audioFilter.modded) {
+        if (Pill("##modAudio", "S\xC3\xB3 do modloader", S.audioFilter.modded, px, pillY, pillH, &pw)) {
+            S.audioFilter.modded = !S.audioFilter.modded;
+        }
+        if (ImGui::IsItemHovered()) {
+            Tooltip("Os sons trocados por .wav no modloader (o jogo toca esses)");
+        }
+        px += pw + 6 * u;
+    }
     float popupY = pillY + pillH + 4 * u;
     {
         std::vector<std::string> labels = {"Todos os tipos"};
@@ -1855,6 +1904,10 @@ void TabAudio(float x, float y, float w, float h) {
         snprintf(status, sizeof(status), "  \xC2\xB7  %s no filtro", Thousands(S.audioResult.total).c_str());
         line += status;
     }
+    if (sfx::ModCount() > 0) {
+        snprintf(status, sizeof(status), "  \xC2\xB7  %s trocados pelo modloader", Thousands(sfx::ModCount()).c_str());
+        line += status;
+    }
     if (sfx::Failed() > 0) {
         snprintf(status, sizeof(status), "  \xC2\xB7  %d bancos sem cabe\xC3\xA7" "alho", sfx::Failed());
         line += status;
@@ -1917,19 +1970,7 @@ constexpr int ANIM_SPEED_COUNT = 4;
 float TagBadge(ImDrawList* dl, float x, float y, int tag, int count, bool draw) {
     char label[24];
     snprintf(label, sizeof(label), count > 0 ? "%s %d" : "%s", tag == ifp::TAG_MOD ? "MOD" : "NOVA", count);
-    ImVec2 ts = TextSize(fonts.desc, label);
-    float w = ts.x + 12 * u, h = ts.y + 6 * u;
-    if (!draw) {
-        return w;
-    }
-    if (tag == ifp::TAG_MOD) {
-        dl->AddRectFilled(ImVec2(x, y), ImVec2(x + w, y + h), col::strong, 5 * u);
-        Text(dl, fonts.desc, x + 6 * u, y + 3 * u - 0.5f * u, col::ink, label);
-    } else {
-        Box(dl, ImVec2(x, y), ImVec2(x + w, y + h), 0, col::White(90), 5 * u);
-        Text(dl, fonts.desc, x + 6 * u, y + 3 * u - 0.5f * u, col::text, label);
-    }
-    return w;
+    return Badge(dl, x, y, label, tag == ifp::TAG_MOD, draw);
 }
 
 // Texto com quebra de linha nas palavras. Devolve a altura.
