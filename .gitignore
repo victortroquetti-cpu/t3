@@ -31,6 +31,6 @@ trok-hit/test/out/
 trok-headmove/build/
 trok-headmove/test/out/
 
-# Trok Studio
-trok-studio/build/
-trok-studio/test/out/
+# Trok DevTools
+trok-devtools/build/
+trok-devtools/test/out/

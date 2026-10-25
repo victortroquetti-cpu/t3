@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // O lado do gta_sa.exe 1.0 US: tabela de modelos, streaming (carregar e soltar um modelo), TXDs, camera, linha de
 // visao, projecao na tela e os comandos de script que criam e apagam coisas no mundo. Tudo roda na thread do jogo.
 #pragma once

@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // Os arquivos do jogo sao lidos numa thread (so leitura de disco): o DATA\DEFAULT.DAT e o DATA\GTA.DAT dizem quais
 // .ide carregar; cada .ide da o id, o nome do DFF e do TXD de cada modelo (secoes objs, tobj, anim, peds, cars, weap e
 // hier) e os pais dos TXDs (txdp). Os .ide do SA-MP (SAMP\SAMP.IDE e SAMP\CUSTOM.IDE) entram se existirem. Os .img
@@ -18,7 +18,7 @@
 #include <map>
 #include <unordered_map>
 
-void StudioLog(const char* fmt, ...);
+void DevToolsLog(const char* fmt, ...);
 
 namespace catalog {
 namespace {
@@ -180,7 +180,7 @@ void ParseIde(Files& f, const std::string& relPath) {
 void ParseDat(Files& f, const char* relPath, std::vector<std::string>* ides) {
     std::string text;
     if (!ReadFile(f.gameDir + relPath, &text)) {
-        StudioLog("catalogo: %s nao abriu", relPath);
+        DevToolsLog("catalogo: %s nao abriu", relPath);
         return;
     }
     for (const std::string& raw : Lines(text)) {
@@ -199,7 +199,7 @@ void ReadImg(Files& f, int slot) {
     bool absolute = rel.size() > 1 && rel[1] == ':';
     FILE* file = fopen((absolute ? rel : f.gameDir + rel).c_str(), "rb");
     if (!file) {
-        StudioLog("catalogo: %s nao abriu", rel.c_str());
+        DevToolsLog("catalogo: %s nao abriu", rel.c_str());
         return;
     }
     char magic[4];
@@ -218,7 +218,7 @@ void ReadImg(Files& f, int slot) {
             }
         }
     } else {
-        StudioLog("catalogo: %s nao e um .img VER2", rel.c_str());
+        DevToolsLog("catalogo: %s nao e um .img VER2", rel.c_str());
     }
     fclose(file);
 }
@@ -239,7 +239,7 @@ DWORD WINAPI Worker(LPVOID) {
     for (int i = 0; i < 8; ++i) {
         ReadImg(f, i);
     }
-    StudioLog("catalogo: %d .ide (%d modelos), %d txdp", f.ideFiles, f.ideModels, static_cast<int>(f.txdParent.size()));
+    DevToolsLog("catalogo: %d .ide (%d modelos), %d txdp", f.ideFiles, f.ideModels, static_cast<int>(f.txdParent.size()));
     g_stage = 2;
     return 0;
 }
@@ -344,7 +344,7 @@ void Build() {
     for (const Entry& e : g_entries) {
         replaced += e.replaced;
     }
-    StudioLog("catalogo pronto: %d modelos, %d .img, %d substituidos", static_cast<int>(g_entries.size()),
+    DevToolsLog("catalogo pronto: %d modelos, %d .img, %d substituidos", static_cast<int>(g_entries.size()),
               static_cast<int>(g_archives.size()), replaced);
 }
 

@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // Enderecos do gta_sa.exe 1.0 US (plugin-sdk e gta-reversed):
 //   CModelInfo::ms_modelInfoPtrs: o endereco fica em 0x40CD67 (os limit adjusters mudam a tabela de lugar), padrao
 //   0xA9B0C8; CBaseModelInfo: TXD +0xA, flags +0x12, colisao +0x14, distancia +0x18, RwObject +0x1C, GetModelType e a
@@ -17,7 +17,7 @@
 #include <cmath>
 #include <cstring>
 
-void StudioLog(const char* fmt, ...);
+void DevToolsLog(const char* fmt, ...);
 
 namespace gta {
 namespace {
@@ -362,7 +362,7 @@ bool Spawn(SpawnKind kind, int model, const Vec3& pos, float heading, int* handl
     s.Local(0);
     int h = LocalVar(s.Run(1), 0);
     if (h <= 0) {
-        StudioLog("criar %d: o jogo nao devolveu o handle", model);
+        DevToolsLog("criar %d: o jogo nao devolveu o handle", model);
         return false;
     }
     switch (kind) {

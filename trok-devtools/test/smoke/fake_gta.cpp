@@ -1,4 +1,4 @@
-// Smoke test do Trok Studio fora do jogo (Wine 32 bits + Xvfb): um "GTA de mentira" que
+// Smoke test do Trok DevTools fora do jogo (Wine 32 bits + Xvfb): um "GTA de mentira" que
 //  - usa a memoria do gta_sa.exe 1.0 US que o fake_gta.exe (host.c) deixa em 0x405000..0xD65000, com a marca de versao, a
 //    tabela de modelos, o streaming (ms_files e ms_aInfoForModel), o pool de TXDs, a camera, o personagem e funcoes de
 //    mentira nos enderecos do jogo: RequestModel, LoadAllRequestedModels, SetMissionDoesntRequireModel, CGame::Process,
@@ -1047,7 +1047,7 @@ int Count(int x0, int y0, int x1, int y1, bool blue) {
 }
 
 int LogCount(const char* text) {
-    FILE* f = fopen("Trok Studio.log", "r");
+    FILE* f = fopen("Trok DevTools.log", "r");
     if (!f) {
         return 0;
     }
@@ -1360,9 +1360,9 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     Key(VK_ESCAPE);
     Frames(5);
 
-    // 6) Reset do device (Alt+Tab): os alvos do Trok Studio saem antes e voltam depois.
+    // 6) Reset do device (Alt+Tab): os alvos do Trok DevTools saem antes e voltam depois.
     hr = g_dev->Reset(&g_pp);
-    CheckF(SUCCEEDED(hr), "Reset do device aceito (0x%08X): nada do Trok Studio ficou no pool padrao",
+    CheckF(SUCCEEDED(hr), "Reset do device aceito (0x%08X): nada do Trok DevTools ficou no pool padrao",
            static_cast<double>(static_cast<unsigned>(hr)));
     Frames(120);
     Capture("07-depois-do-reset.bmp");
@@ -1375,7 +1375,7 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     for (const Model& m : g_models) {
         stillHeld += (Mem<BYTE>(STREAM_INFO + m.id * 0x14 + 6) & 4) != 0;
     }
-    CheckF(stillHeld == 0, "menu fechado: nenhum modelo ficou preso pelo Trok Studio (%.0f)", stillHeld);
+    CheckF(stillHeld == 0, "menu fechado: nenhum modelo ficou preso pelo Trok DevTools (%.0f)", stillHeld);
     Check(!LogHas("recusad"), "log: nada recusado");
 
     printf(g_failures ? "FALHOU (%d)\n" : "PASSOU\n", g_failures);

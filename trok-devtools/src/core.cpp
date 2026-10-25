@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // Miniaturas: a cada quadro do jogo, os cards que pediram (os da tela, os mais recentes primeiro) carregam ate o
 // limite do quadro (e ate ~6 ms); a malha e copiada e a miniatura e desenhada no Present seguinte. So depois disso o
 // modelo e solto (a textura do Direct3D e do RenderWare e precisa ate a miniatura sair).
@@ -20,7 +20,7 @@
 #include <unordered_set>
 #include <vector>
 
-void StudioLog(const char* fmt, ...);
+void DevToolsLog(const char* fmt, ...);
 
 namespace core {
 namespace {
@@ -207,7 +207,7 @@ void DoSpawn(int id) {
         char text[160];
         snprintf(text, sizeof(text), "%d criado %.1f m \xC3\xA0 sua frente.", id, dist);
         g_spawnMessage = text;
-        StudioLog("criado %d (%s) em %.1f %.1f %.1f, handle %d", id, sk == gta::SPAWN_OBJECT ? "objeto"
+        DevToolsLog("criado %d (%s) em %.1f %.1f %.1f, handle %d", id, sk == gta::SPAWN_OBJECT ? "objeto"
                   : sk == gta::SPAWN_VEHICLE ? "veiculo" : "personagem", at.x, at.y, at.z, handle);
     } else {
         g_spawnMessage = "O jogo n\xC3\xA3o criou o modelo.";
@@ -294,7 +294,7 @@ void GameTick() {
         for (const Spawned& s : g_spawned) {
             gta::Despawn(s.kind, s.handle);
         }
-        StudioLog("%d criados apagados", static_cast<int>(g_spawned.size()));
+        DevToolsLog("%d criados apagados", static_cast<int>(g_spawned.size()));
         g_spawned.clear();
     }
     while (!g_spawnQueue.empty()) {

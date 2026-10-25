@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // A malha de um modelo carregado, copiada do RenderWare do jogo (o que o jogo carregou: o original ou o modificado):
 // vertices ja no espaco do modelo (cada atomico na posicao do frame dele), uma parte por material com a textura do
 // Direct3D do RenderWare, as texturas usadas e as do resto da TXD, e as linhas da colisao.

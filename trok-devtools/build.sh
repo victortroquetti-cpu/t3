@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila o Trok Studio.asi com MinGW (i686, 32 bits como o gta_sa.exe).
+# Compila o Trok DevTools.asi com MinGW (i686, 32 bits como o gta_sa.exe).
 # Requer: i686-w64-mingw32-g++ / -gcc e git. Usa o kit da casa (../trok-ui/asi/src/trok_ui.cpp) e o mesmo Dear ImGui e
 # MinHook da vitrine do Trok UI.
 set -euo pipefail
@@ -30,13 +30,13 @@ for f in buffer.c hook.c trampoline.c hde/hde32.c; do
     MINHOOK_OBJECTS="$MINHOOK_OBJECTS $obj"
 done
 
-SOURCES="src/main.cpp src/studio.cpp src/core.cpp src/catalog.cpp src/mesh.cpp src/render.cpp src/gta.cpp \
+SOURCES="src/main.cpp src/devtools.cpp src/core.cpp src/catalog.cpp src/mesh.cpp src/render.cpp src/gta.cpp \
  $KIT/src/trok_ui.cpp $IMGUI/imgui.cpp $IMGUI/imgui_draw.cpp $IMGUI/imgui_tables.cpp $IMGUI/imgui_widgets.cpp \
  $IMGUI/backends/imgui_impl_dx9.cpp $IMGUI/backends/imgui_impl_win32.cpp"
 
 # O .asi sem simbolos vai para dist/; a copia com simbolos (build/) serve para os testes.
-$CXX $FLAGS -Wall -shared -o "build/Trok Studio.asi" $SOURCES $MINHOOK_OBJECTS \
+$CXX $FLAGS -Wall -shared -o "build/Trok DevTools.asi" $SOURCES $MINHOOK_OBJECTS \
     -static -static-libgcc -static-libstdc++ -ld3d9 -limm32 -ldwmapi -lgdi32 -luser32
-i686-w64-mingw32-strip -o "dist/Trok Studio.asi" "build/Trok Studio.asi"
+i686-w64-mingw32-strip -o "dist/Trok DevTools.asi" "build/Trok DevTools.asi"
 
-echo "ok: dist/Trok Studio.asi ($(stat -c %s "dist/Trok Studio.asi") bytes)"
+echo "ok: dist/Trok DevTools.asi ($(stat -c %s "dist/Trok DevTools.asi") bytes)"

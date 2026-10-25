@@ -1,9 +1,9 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // A grade e virtual: so os cards da tela sao desenhados e so eles pedem miniatura. O card aberto e um popup modal da
 // casa, com o visualizador a esquerda (arraste para girar, roda para zoom, duplo clique para centralizar) e as
 // informacoes e texturas a direita.
 
-#include "studio.h"
+#include "devtools.h"
 
 #include "catalog.h"
 #include "core.h"
@@ -22,9 +22,9 @@
 #include <string>
 #include <vector>
 
-void StudioLog(const char* fmt, ...);
+void DevToolsLog(const char* fmt, ...);
 
-namespace studio {
+namespace devtools {
 namespace {
 
 using namespace tui;
@@ -190,10 +190,10 @@ void SaveIni() {
     }
     char buf[16];
     for (const IniFlag& f : IniFlags()) {
-        WritePrivateProfileStringA("studio", f.key, *f.value ? "1" : "0", S.ini);
+        WritePrivateProfileStringA("devtools", f.key, *f.value ? "1" : "0", S.ini);
     }
     snprintf(buf, sizeof(buf), "%d", S.perFrame);
-    WritePrivateProfileStringA("studio", "miniaturas_por_quadro", buf, S.ini);
+    WritePrivateProfileStringA("devtools", "miniaturas_por_quadro", buf, S.ini);
 }
 
 Keys ReadKeys(bool allowed) {
@@ -375,7 +375,7 @@ void TabModels(float x, float y, float w, float h) {
         S.inspect = !S.inspect;
         core::SetInspect(S.inspect);
         SaveIni();
-        Toast("Trok Studio", S.inspect ? "Info ao apontar ligada: feche o menu e mire em algo."
+        Toast("Trok DevTools", S.inspect ? "Info ao apontar ligada: feche o menu e mire em algo."
                                         : "Info ao apontar desligada.");
     }
     if (ImGui::IsItemHovered()) {
@@ -769,22 +769,22 @@ void CardPopup(ImVec2 shellPos, ImVec2 shellSize, bool escape) {
         snprintf(del, sizeof(del), "Apagar criados (%d)", core::SpawnedCount());
         if (Button("##apagar", del, c0.x, y, half, bh, false, core::SpawnedCount() > 0)) {
             core::DespawnAll();
-            Toast("Trok Studio", "Os modelos criados foram apagados.");
+            Toast("Trok DevTools", "Os modelos criados foram apagados.");
         }
         if (Button("##copiarId", "Copiar ID", c0.x + half + gap, y, innerW - half - gap, bh, false)) {
             char text[16];
             snprintf(text, sizeof(text), "%d", e->id);
             ImGui::SetClipboardText(text);
-            Toast("Trok Studio", "ID copiado.");
+            Toast("Trok DevTools", "ID copiado.");
         }
         y += bh + gap;
         if (Button("##copiarDff", "Copiar DFF", c0.x, y, half, bh, false, !e->dff.empty())) {
             ImGui::SetClipboardText((e->dff + ".dff").c_str());
-            Toast("Trok Studio", "Nome do DFF copiado.");
+            Toast("Trok DevTools", "Nome do DFF copiado.");
         }
         if (Button("##copiarTxd", "Copiar TXD", c0.x + half + gap, y, innerW - half - gap, bh, false, !e->txd.empty())) {
             ImGui::SetClipboardText((e->txd + ".txd").c_str());
-            Toast("Trok Studio", "Nome da TXD copiado.");
+            Toast("Trok DevTools", "Nome da TXD copiado.");
         }
         y += bh + 18 * u;
         if (m) {
@@ -864,7 +864,7 @@ void TabGeneral(Rows& rows) {
     rows.Value("Miniaturas prontas", count);
     if (rows.Action("Refazer as miniaturas", "Refazer")) {
         render::ForgetThumbs();
-        Toast("Trok Studio", "As miniaturas v\xC3\xA3o ser desenhadas de novo.");
+        Toast("Trok DevTools", "As miniaturas v\xC3\xA3o ser desenhadas de novo.");
     }
     rows.Section("Mundo");
     snprintf(count, sizeof(count), "%d", core::SpawnedCount());
@@ -873,7 +873,7 @@ void TabGeneral(Rows& rows) {
         core::DespawnAll();
     }
     rows.Section("Sobre");
-    rows.Value("Atalho", "/trokstudio ou F10");
+    rows.Value("Atalho", "/trokdevtools ou F10");
     rows.Value("Vers\xC3\xA3o", VERSION_TAG);
 }
 
@@ -979,9 +979,9 @@ void Init(const char* iniPath, const char* gameDir) {
     snprintf(S.gameDir, sizeof(S.gameDir), "%s", gameDir ? gameDir : "");
     if (S.ini[0]) {
         for (const IniFlag& f : IniFlags()) {
-            *f.value = GetPrivateProfileIntA("studio", f.key, *f.value ? 1 : 0, S.ini) != 0;
+            *f.value = GetPrivateProfileIntA("devtools", f.key, *f.value ? 1 : 0, S.ini) != 0;
         }
-        S.perFrame = std::max(1, std::min(8, static_cast<int>(GetPrivateProfileIntA("studio", "miniaturas_por_quadro", 3,
+        S.perFrame = std::max(1, std::min(8, static_cast<int>(GetPrivateProfileIntA("devtools", "miniaturas_por_quadro", 3,
                                                                                      S.ini))));
     }
     core::SetGameDir(S.gameDir);
@@ -1040,7 +1040,7 @@ void Frame() {
     float width = std::floor(std::max(760.0f, std::min(io.DisplaySize.x * 0.84f, 1560.0f)));
     float height = std::floor(std::max(520.0f, std::min(io.DisplaySize.y * 0.86f, 1000.0f)));
     PushStyle();
-    bool keep = BeginShell("##trokStudio", "Trok Studio", VERSION_TAG, width, height, S.shell);
+    bool keep = BeginShell("##trokDevTools", "Trok DevTools", VERSION_TAG, width, height, S.shell);
     ImVec2 pos = ImGui::GetWindowPos();
     float padX = 18 * u;
     float tabsW = std::min(width - 2 * padX, 760 * u);
@@ -1105,7 +1105,7 @@ void Frame() {
     bool cardWasOpen = S.cardOpen;
     CardPopup(pos, ImVec2(width, height), escape && S.cardOpen);
 
-    static const std::vector<Hint> hints = {{"Clique", "Abrir o card", false}, {"/trokstudio", "Abrir e fechar", false},
+    static const std::vector<Hint> hints = {{"Clique", "Abrir o card", false}, {"/trokdevtools", "Abrir e fechar", false},
                                             {"Esc", "Fechar", true}};
     int clicked = EndShell(hints);
     PopStyle();
@@ -1115,4 +1115,4 @@ void Frame() {
     DrawToasts();
 }
 
-} // namespace studio
+} // namespace devtools

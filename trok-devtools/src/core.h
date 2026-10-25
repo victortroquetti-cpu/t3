@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // O que roda na thread do jogo: carregar os modelos das miniaturas (alguns por quadro, so os cards na tela), segurar o
 // modelo do card aberto, criar e apagar no mundo, e o "informacoes ao apontar". GameTick vem do CGame::Process;
 // BeforeUi vem do Present, antes do menu.

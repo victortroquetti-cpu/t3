@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // O catalogo de modelos: todo id que o jogo conhece (a tabela de modelos, inclusive os do samp.img e de mods), com o
 // nome do DFF e do TXD (dos .ide do gta.dat/default.dat e dos diretorios dos .img), o .ide que define, o .img de onde
 // o jogo le e se esse arquivo e outro que nao a entrada com o mesmo nome no .img (modelo substituido).

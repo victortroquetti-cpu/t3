@@ -1,7 +1,7 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // Ferramenta para modders: ve todos os modelos do jogo (o que o jogo carregou, com os mods), com busca, miniaturas,
 // visualizador 3D, texturas, criar no mundo e as informacoes do que esta na mira. Liga o ImGui no device do GTA SA
-// (Present/Reset), registra /trokstudio no SA-MP 0.3.7 R1 e abre tambem no F10 (no single player, so no F10). O
+// (Present/Reset), registra /trokdevtools no SA-MP 0.3.7 R1 e abre tambem no F10 (no single player, so no F10). O
 // trabalho que mexe no jogo (carregar modelos, criar no mundo, linha de visao) roda no CGame::Process (0x53BEE0).
 //
 // Gancho: o Trok Dialogs e o Trok Radar encadeiam no slot do Present da vtable do device real e, se
@@ -25,7 +25,7 @@
 #include "core.h"
 #include "gta.h"
 #include "render.h"
-#include "studio.h"
+#include "devtools.h"
 #include "trok_ui.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
@@ -183,17 +183,17 @@ void SampCursor(bool on) {
     }
 }
 
-void __cdecl CmdTrokStudio(const char*) {
+void __cdecl CmdTrokDevTools(const char*) {
     InterlockedExchange(&g_togglePending, 1);
-    Log("/trokstudio digitado (imgui %s, %ld quadros, ultimo ha %lu ms, gancho: %s)", g_ready ? "pronto" : "NAO pronto",
+    Log("/trokdevtools digitado (imgui %s, %ld quadros, ultimo ha %lu ms, gancho: %s)", g_ready ? "pronto" : "NAO pronto",
         g_presentCalls, GetTickCount() - g_lastPresent, g_hookMode);
     if (!g_ready || GetTickCount() - g_lastPresent > 2000) {
-        Chat("{FF8A8A}[Trok Studio]{FFFFFF} o desenho ainda nao esta ativo. Me envie o arquivo "
-             "{FFD27A}Trok Studio.log{FFFFFF} (mesma pasta do .asi).");
+        Chat("{FF8A8A}[Trok DevTools]{FFFFFF} o desenho ainda nao esta ativo. Me envie o arquivo "
+             "{FFD27A}Trok DevTools.log{FFFFFF} (mesma pasta do .asi).");
     }
 }
 
-// A thread do jogo: depois do CGame::Process, o trabalho do Trok Studio (carregar modelos, criar, linha de visao).
+// A thread do jogo: depois do CGame::Process, o trabalho do Trok DevTools (carregar modelos, criar, linha de visao).
 void __cdecl HookGameProcess() {
     o_gameProcess();
     if (g_ready) {
@@ -256,7 +256,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         bool typing = ImGui::GetIO().WantTextInput || tui::CapturingKey();
         bool chatKey = (msg == WM_KEYDOWN && (wParam == 'T' || wParam == VK_F6)) ||
                        (msg == WM_CHAR && (wParam == 't' || wParam == 'T'));
-        if (studio::CapturesInput() && !PauseMenuOpen() && !sampKeys && !tabKey && !(chatKey && !typing)) {
+        if (devtools::CapturesInput() && !PauseMenuOpen() && !sampKeys && !tabKey && !(chatKey && !typing)) {
             switch (msg) {
             case WM_KEYDOWN:
             case WM_CHAR:
@@ -389,10 +389,10 @@ void RenderOverlay(IDirect3DDevice9* device) {
 
     if (InterlockedExchange(&g_togglePending, 0)) {
         if (PauseMenuOpen()) {
-            Log("/trokstudio ignorado: menu de pausa aberto");
+            Log("/trokdevtools ignorado: menu de pausa aberto");
         } else {
-            studio::Toggle();
-            Log("menu %s", studio::CapturesInput() ? "aberto" : "fechado");
+            devtools::Toggle();
+            Log("menu %s", devtools::CapturesInput() ? "aberto" : "fechado");
         }
     }
 
@@ -406,7 +406,7 @@ void RenderOverlay(IDirect3DDevice9* device) {
     }
 
     bool paused = PauseMenuOpen();
-    bool wantCursor = studio::CapturesInput() && !paused;
+    bool wantCursor = devtools::CapturesInput() && !paused;
     if (wantCursor) {
         SampCursor(true); // todo quadro: chat e outros mods tentam devolver o cursor
     } else if (g_cursorOn) {
@@ -417,13 +417,13 @@ void RenderOverlay(IDirect3DDevice9* device) {
 
     // O ImGui roda todo quadro (mesmo sem nada na tela) para a fila de entrada nao acumular
     // e o estado das teclas ficar em dia; so desenha quando ha algo a mostrar.
-    bool draw = studio::WantsFrame() && !paused;
+    bool draw = devtools::WantsFrame() && !paused;
     core::BeforeUi(device); // as miniaturas que ficaram prontas
     ImGui_ImplDX9_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
     if (draw) {
-        studio::Frame();
+        devtools::Frame();
     }
     ImGuiMouseCursor cursor = ImGui::GetMouseCursor();
     ImGui::EndFrame();
@@ -567,7 +567,7 @@ bool SlotsFromDummy(HMODULE d3d9, void** present, void** reset) {
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = DefWindowProcA;
     wc.hInstance = g_module;
-    wc.lpszClassName = "TrokStudioD3D";
+    wc.lpszClassName = "TrokDevToolsD3D";
     RegisterClassExA(&wc);
     HWND hwnd = CreateWindowExA(0, wc.lpszClassName, "", WS_OVERLAPPEDWINDOW, 0, 0, 64, 64, nullptr, nullptr,
                                 g_module, nullptr);
@@ -685,21 +685,21 @@ void RegisterCommand() {
         return;
     }
     if (!IsSampR1(g_samp)) {
-        Log("samp.dll nao e o 0.3.7 R1 -- sem /trokstudio, o menu abre no F10");
+        Log("samp.dll nao e o 0.3.7 R1 -- sem /trokdevtools, o menu abre no F10");
         return;
     }
     for (int i = 0; i < 1200; ++i) {
         void* input = *reinterpret_cast<void**>(g_samp + SAMP_INPUT);
         void* info = *reinterpret_cast<void**>(g_samp + SAMP_INFO);
         if (input && info) {
-            reinterpret_cast<AddCommandFn>(g_samp + SAMP_ADD_COMMAND)(input, "trokstudio", CmdTrokStudio);
+            reinterpret_cast<AddCommandFn>(g_samp + SAMP_ADD_COMMAND)(input, "trokdevtools", CmdTrokDevTools);
             g_sampR1 = true;
-            Log("/trokstudio registrado (CInput 0x%08X)", reinterpret_cast<DWORD>(input));
+            Log("/trokdevtools registrado (CInput 0x%08X)", reinterpret_cast<DWORD>(input));
             return;
         }
         Sleep(100);
     }
-    Log("CInput do SA-MP nao apareceu -- sem /trokstudio, o menu abre no F10");
+    Log("CInput do SA-MP nao apareceu -- sem /trokdevtools, o menu abre no F10");
 }
 
 bool GameInForeground() {
@@ -779,7 +779,7 @@ DWORD WINAPI Boot(LPVOID) {
 
 } // namespace
 
-void StudioLog(const char* fmt, ...) {
+void DevToolsLog(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     LogV(fmt, args);
@@ -796,8 +796,8 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     char* slash = strrchr(g_logPath, '\\');
     if (slash) {
         slash[1] = 0;
-        snprintf(g_iniPath, sizeof(g_iniPath), "%sTrok Studio.ini", g_logPath);
-        strcat(g_logPath, "Trok Studio.log");
+        snprintf(g_iniPath, sizeof(g_iniPath), "%sTrok DevTools.ini", g_logPath);
+        strcat(g_logPath, "Trok DevTools.log");
     } else {
         g_logPath[0] = 0;
     }
@@ -814,19 +814,19 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
             fclose(fresh);
         }
     }
-    Log("Trok Studio .asi %s -- esperando o render", studio::Version());
+    Log("Trok DevTools .asi %s -- esperando o render", devtools::Version());
     char marker[8];
-    if (GetEnvironmentVariableA("TROK_STUDIO_LOADED", marker, sizeof(marker))) {
-        Log("outra copia do Trok Studio ja esta carregada -- esta ficou desligada");
+    if (GetEnvironmentVariableA("TROK_DEVTOOLS_LOADED", marker, sizeof(marker))) {
+        Log("outra copia do Trok DevTools ja esta carregada -- esta ficou desligada");
         return TRUE;
     }
-    SetEnvironmentVariableA("TROK_STUDIO_LOADED", "1");
+    SetEnvironmentVariableA("TROK_DEVTOOLS_LOADED", "1");
     if (!gta::VersionOk()) {
-        Log("o gta_sa.exe nao e o 1.0 US -- o Trok Studio ficou desligado (nada foi alterado)");
+        Log("o gta_sa.exe nao e o 1.0 US -- o Trok DevTools ficou desligado (nada foi alterado)");
         return TRUE;
     }
     Log("gta_sa.exe 1.0 US confirmado");
-    studio::Init(g_iniPath, g_gameDir);
+    devtools::Init(g_iniPath, g_gameDir);
     MH_STATUS init = MH_Initialize();
     if (init != MH_OK && init != MH_ERROR_ALREADY_INITIALIZED) {
         Log("MinHook nao iniciou (%d) -- desistindo", init);

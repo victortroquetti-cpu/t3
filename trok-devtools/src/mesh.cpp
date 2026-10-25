@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // Leitura das estruturas do RenderWare 3.6 do GTA SA (rpworld.h / rwcore.h do gta-reversed):
 //   RwObject: tipo +0 (1 atomico, 2 clump), flags +2 (0x04 = desenhar), pai +4 (o RwFrame).
 //   RpClump: lista de atomicos +0x08 (o link do atomico fica em +0x40 dele).
@@ -21,7 +21,7 @@
 #include <cmath>
 #include <cstring>
 
-void StudioLog(const char* fmt, ...);
+void DevToolsLog(const char* fmt, ...);
 
 namespace mesh {
 namespace {

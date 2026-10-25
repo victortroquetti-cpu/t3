@@ -1,4 +1,4 @@
-# Trok Studio
+# Trok DevTools
 
 Uma ferramenta para modders dentro do GTA San Andreas: ver todos os modelos que o jogo conhece, achar o `.dff`, o `.txd` e o `.img` de cada um, girar o modelo em 3D, ver as texturas e criar o modelo no mundo, do tamanho real, na sua frente. Com o menu fechado, o **Info ao apontar** mostra o id e os arquivos do que está no meio da tela.
 
@@ -8,17 +8,17 @@ Por enquanto só a aba **Modelos** funciona. As outras (Texturas, Animações, �
 
 ## Instalar
 
-1. Copie `dist/Trok Studio.asi` para a pasta do GTA (a mesma dos outros `.asi`; precisa do ASI Loader).
-2. Abra o jogo. O `Trok Studio.ini` nasce sozinho na primeira mudança de opção.
+1. Copie `dist/Trok DevTools.asi` para a pasta do GTA (a mesma dos outros `.asi`; precisa do ASI Loader).
+2. Abra o jogo. O `Trok DevTools.ini` nasce sozinho na primeira mudança de opção.
 
-Precisa do `gta_sa.exe` 1.0 US. Em outra versão o mod fica desligado sem mexer em nada, e o `Trok Studio.log` diz o motivo. Funciona no single player e no SA-MP.
+Precisa do `gta_sa.exe` 1.0 US. Em outra versão o mod fica desligado sem mexer em nada, e o `Trok DevTools.log` diz o motivo. Funciona no single player e no SA-MP.
 
 A fonte é a da casa (`moonloader\resource\trok\font.ttf`) se ela estiver na pasta do jogo; se não, a Arial do Windows.
 
 ## Abrir
 
 - **F10**, sempre (no single player é o único jeito);
-- **`/trokstudio`** no SA-MP 0.3.7 R1.
+- **`/trokdevtools`** no SA-MP 0.3.7 R1.
 
 Esc fecha o card aberto e, com nenhum card aberto, o menu.
 
@@ -61,9 +61,9 @@ O botão **Info ao apontar** (no canto da aba Modelos, e no Geral) liga e deslig
 
 Info ao apontar, miniaturas por quadro (1 a 8), refazer as miniaturas, quantos você criou (e apagar), o atalho e a versão.
 
-## Trok Studio.ini
+## Trok DevTools.ini
 
-Uma seção `[studio]`, salva pelo próprio menu:
+Uma seção `[devtools]`, salva pelo próprio menu:
 
 | Chave | Padrão | O que faz |
 |---|---|---|
@@ -83,7 +83,7 @@ Uma seção `[studio]`, salva pelo próprio menu:
 - Trens e o id 0 não são criados.
 - O catálogo lê os `.ide` do `default.dat`, do `gta.dat` e do SA-MP (`SAMP\SAMP.IDE` e `SAMP\CUSTOM.IDE`). Todo id que o jogo carregou aparece na grade, mas um modelo de um `.ide` fora desses (de um modloader, por exemplo) aparece só com o id e o nome do arquivo no `.img`, sem o `.ide` e às vezes sem a TXD.
 
-## Trok Studio.log
+## Trok DevTools.log
 
 Ao lado do `.asi`, um por sessão de jogo:
 
@@ -97,12 +97,12 @@ Se algo não abrir ou travar, mande esse arquivo.
 
 | Arquivo | O que faz |
 |---|---|
-| `src/main.cpp` | o `.asi`: confere o 1.0 US, desvia Present/Reset do D3D9 e o `CGame::Process` (`0x53BEE0`), registra `/trokstudio` no SA-MP R1 e o F10 |
+| `src/main.cpp` | o `.asi`: confere o 1.0 US, desvia Present/Reset do D3D9 e o `CGame::Process` (`0x53BEE0`), registra `/trokdevtools` no SA-MP R1 e o F10 |
 | `src/catalog.cpp` | numa thread: lê os `.ide` e os diretórios dos `.img` (VER2); no jogo: cruza com a tabela de modelos e o streaming |
 | `src/core.cpp` | na thread do jogo: carrega e solta modelos (miniaturas e card), cria e apaga no mundo, a linha de visão do Info ao apontar |
 | `src/mesh.cpp` | copia a malha do RenderWare (vértices, normais, UV, materiais, texturas) e a colisão para um formato próprio |
 | `src/render.cpp` | desenha com o D3D9 fixo: o atlas das miniaturas (2048 px, células de 128) e o visualizador |
-| `src/studio.cpp` | o menu, com o kit da casa (`trok-ui/asi`) |
+| `src/devtools.cpp` | o menu, com o kit da casa (`trok-ui/asi`) |
 
 - **Carregar:** `CStreaming::RequestModel` (`0x4087E0`) com a flag de missão + `LoadAllRequestedModels` (`0x40EA10`); soltar: `SetMissionDoesntRequireModel` (`0x409C90`), só se fomos nós que pusemos a flag. Depois disso o jogo descarrega quando quiser, como faz com qualquer modelo; um que está no mapa continua carregado.
 - **Tabela de modelos:** o ponteiro vem de `0x40CD67` (para pegar o limit adjuster), 20.000 ids. Streaming: `ms_aInfoForModel` (`0x8E4CC0`) e `ms_files` (`0x8E48D8`). TXDs: o pool do `CTxdStore` (`0xC8800C`).
@@ -113,5 +113,5 @@ Se algo não abrir ou travar, mande esse arquivo.
 
 ### Compilar e testar
 
-- `build.sh`: MinGW i686 + ImGui 1.89.9 + MinHook + o kit da casa → `build/` e `dist/Trok Studio.asi`.
-- `test/smoke/run.sh`: roda o `build/Trok Studio.asi` (rode o `build.sh` antes) no Wine 32 bits com Xvfb. O `host.c` é um `.exe` mínimo cuja `.bss` cobre os endereços do GTA, e o `fake_gta.cpp` monta ali o jogo de mentira: modelos, TXDs, colisões, `.ide`, `.img`, streaming, linha de visão e comandos de script. As capturas ficam em `test/out/smoke/`.
+- `build.sh`: MinGW i686 + ImGui 1.89.9 + MinHook + o kit da casa → `build/` e `dist/Trok DevTools.asi`.
+- `test/smoke/run.sh`: roda o `build/Trok DevTools.asi` (rode o `build.sh` antes) no Wine 32 bits com Xvfb. O `host.c` é um `.exe` mínimo cuja `.bss` cobre os endereços do GTA, e o `fake_gta.cpp` monta ali o jogo de mentira: modelos, TXDs, colisões, `.ide`, `.img`, streaming, linha de visão e comandos de script. As capturas ficam em `test/out/smoke/`.

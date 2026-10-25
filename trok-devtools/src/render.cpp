@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // Pipeline fixo do Direct3D 9 (sem shader): uma luz direcional de cima e da esquerda da camera, a cor do material como
 // difusa e ambiente, a textura do RenderWare modulando. Sem descarte de faces (os modelos do GTA tem faces dos dois
 // lados). Coordenadas do GTA (Z para cima, mao direita): visao e projecao "RH", como o D3DX faria.
@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-void StudioLog(const char* fmt, ...);
+void DevToolsLog(const char* fmt, ...);
 
 namespace render {
 namespace {
@@ -130,7 +130,7 @@ bool CreateTarget(int size, IDirect3DTexture9** tex, IDirect3DSurface9** depth) 
     HRESULT hr = g_dev->CreateTexture(size, size, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, tex,
                                       nullptr);
     if (FAILED(hr)) {
-        StudioLog("render: alvo de %d px recusado (0x%08X)", size, static_cast<unsigned>(hr));
+        DevToolsLog("render: alvo de %d px recusado (0x%08X)", size, static_cast<unsigned>(hr));
         return false;
     }
     if (depth) {
@@ -139,7 +139,7 @@ bool CreateTarget(int size, IDirect3DTexture9** tex, IDirect3DSurface9** depth) 
             hr = g_dev->CreateDepthStencilSurface(size, size, D3DFMT_D16, D3DMULTISAMPLE_NONE, 0, TRUE, depth, nullptr);
         }
         if (FAILED(hr)) {
-            StudioLog("render: profundidade de %d px recusada (0x%08X)", size, static_cast<unsigned>(hr));
+            DevToolsLog("render: profundidade de %d px recusada (0x%08X)", size, static_cast<unsigned>(hr));
             SafeRelease(*tex);
             return false;
         }

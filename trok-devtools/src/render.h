@@ -1,4 +1,4 @@
-// Trok Studio (.asi) -- Victor_Trok
+// Trok DevTools (.asi) -- Victor_Trok
 // O desenho dos modelos com o proprio Direct3D 9 do jogo, fora da cena do GTA (no Present): as miniaturas dos cards
 // (num atlas de 2048x2048, 128 px cada, desenhadas a 256 px e reduzidas) e o visualizador 3D do card aberto. Salva e
 // devolve todo o estado do device; os alvos de render somem no Reset do device e voltam sozinhos.
