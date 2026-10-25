@@ -30,13 +30,13 @@ for f in buffer.c hook.c trampoline.c hde/hde32.c; do
     MINHOOK_OBJECTS="$MINHOOK_OBJECTS $obj"
 done
 
-SOURCES="src/main.cpp src/devtools.cpp src/core.cpp src/catalog.cpp src/mesh.cpp src/render.cpp src/gta.cpp \
+SOURCES="src/main.cpp src/devtools.cpp src/core.cpp src/catalog.cpp src/mesh.cpp src/render.cpp src/gta.cpp src/sfx.cpp src/player.cpp src/audiospy.cpp \
  $KIT/src/trok_ui.cpp $IMGUI/imgui.cpp $IMGUI/imgui_draw.cpp $IMGUI/imgui_tables.cpp $IMGUI/imgui_widgets.cpp \
  $IMGUI/backends/imgui_impl_dx9.cpp $IMGUI/backends/imgui_impl_win32.cpp"
 
 # O .asi sem simbolos vai para dist/; a copia com simbolos (build/) serve para os testes.
 $CXX $FLAGS -Wall -shared -o "build/Trok DevTools.asi" $SOURCES $MINHOOK_OBJECTS \
-    -static -static-libgcc -static-libstdc++ -ld3d9 -limm32 -ldwmapi -lgdi32 -luser32
+    -static -static-libgcc -static-libstdc++ -ld3d9 -limm32 -ldwmapi -lgdi32 -luser32 -lwinmm
 i686-w64-mingw32-strip -o "dist/Trok DevTools.asi" "build/Trok DevTools.asi"
 
 echo "ok: dist/Trok DevTools.asi ($(stat -c %s "dist/Trok DevTools.asi") bytes)"

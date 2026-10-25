@@ -31,7 +31,7 @@ fi
 if [ -n "$FONT" ]; then cp "$FONT" "$OUT/moonloader/resource/trok/font.ttf"; fi
 if [ -n "${TROK_ICONS:-}" ]; then cp "$TROK_ICONS" "$OUT/moonloader/resource/trok/lucide.ttf"; fi
 # O inspetor e a colisao ligados, como se o usuario ja tivesse escolhido.
-printf '[devtools]\r\ninspecionar=1\r\nvisual_colisao=1\r\n' >"$OUT/Trok DevTools.ini"
+printf '[devtools]\r\ninspecionar=1\r\nvisual_colisao=1\r\naudio_mostrar=1\r\n' >"$OUT/Trok DevTools.ini"
 
 status=0
 (cd "$OUT" && timeout 300 xvfb-run -a -s "-screen 0 1920x1080x24" wine fake_gta.exe "Trok DevTools.asi" .) 2>/dev/null \

@@ -314,6 +314,49 @@ bool Describe(void* d3d, TexInfo* out) {
 
 } // namespace render
 
+// A aba Audios fica de fora do conceito: o SFX "ainda lendo" e nada tocando.
+namespace sfx {
+namespace {
+std::vector<Pack> noPacks;
+std::vector<Bank> noBanks;
+} // namespace
+bool Ready() { return false; }
+const char* Status() { return "conceito"; }
+int Failed() { return 0; }
+const std::vector<Pack>& Packs() { return noPacks; }
+const std::vector<Bank>& Banks() { return noBanks; }
+const Bank* FindBank(int) { return nullptr; }
+const Sound* FindSound(int, int) { return nullptr; }
+const char* KindName(int) { return ""; }
+int BankCount() { return 0; }
+int SoundCount() { return 0; }
+Result Apply(const Filter&) { return Result(); }
+bool ExportWav(int, int, std::string*) { return false; }
+} // namespace sfx
+
+namespace player {
+bool Play(int, int) { return false; }
+void Stop() {}
+void Update() {}
+void SetRepeat(bool) {}
+bool Repeat() { return false; }
+bool Playing() { return false; }
+int Bank() { return -1; }
+int Sound() { return -1; }
+float Position() { return 0; }
+const char* Error() { return ""; }
+} // namespace player
+
+namespace audiospy {
+namespace {
+std::deque<Played> noHistory;
+} // namespace
+void SetIgnoreFeet(bool) {}
+const std::deque<Played>& History() { return noHistory; }
+void Clear() {}
+bool BanksKnown() { return false; }
+} // namespace audiospy
+
 // ---------------------------------------------------------------- dados, rasterizador e cenas
 
 namespace concept {

@@ -17,3 +17,7 @@ inline DWORD GetPrivateProfileStringA(const char*, const char*, const char* def,
     strncpy(out, def ? def : "", size);
     return static_cast<DWORD>(strlen(out));
 }
+struct SYSTEMTIME {
+    WORD wYear, wMonth, wDayOfWeek, wDay, wHour, wMinute, wSecond, wMilliseconds;
+};
+inline DWORD GetTickCount() { return 0; }

@@ -15,6 +15,7 @@
 
 #include "catalog.h"
 #include "render.h"
+#include "sfx.h"
 
 #include <algorithm>
 #include <cmath>
@@ -394,8 +395,10 @@ void GameTick() {
     if (!g_catalogStarted) {
         g_catalogStarted = true; // o streaming ja montou a lista dos .img
         catalog::Start(g_gameDir.c_str());
+        sfx::Start(g_gameDir.c_str());
     }
     catalog::Update();
+    sfx::Update();
     UpdateLook(); // so precisa dos ids; os nomes aparecem quando o catalogo fica pronto
     if (!catalog::Ready()) {
         return;

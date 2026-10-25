@@ -22,6 +22,7 @@
 #include "imgui.h"
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
+#include "audiospy.h"
 #include "core.h"
 #include "gta.h"
 #include "render.h"
@@ -745,6 +746,7 @@ DWORD WINAPI Boot(LPVOID) {
     } else {
         Log("CGame::Process recusado (%d) -- sem carregar modelos", hp);
     }
+    audiospy::Install();
 
     RegisterCommand();
 

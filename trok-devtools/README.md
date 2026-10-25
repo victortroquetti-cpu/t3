@@ -1,12 +1,14 @@
 # Trok DevTools
 
-Uma ferramenta para modders dentro do GTA San Andreas: ver todos os modelos que o jogo conhece, achar o `.dff`, o `.txd` e o `.img` de cada um, girar o modelo em 3D, ver as texturas e criar o modelo no mundo, do tamanho real, na sua frente. Com o menu fechado, o **Info ao apontar** mostra o id e os arquivos do que está no meio da tela.
+Uma ferramenta para modders dentro do GTA San Andreas: ver todos os modelos que o jogo conhece, achar o `.dff`, o `.txd` e o `.img` de cada um, girar o modelo em 3D, ver as texturas e criar o modelo no mundo, do tamanho real, na sua frente. A aba **Áudios** lista e toca todos os efeitos sonoros do jogo e mostra o que o jogo está tocando agora. Com o menu fechado, o **Info ao apontar** mostra o id e os arquivos do que está no meio da tela.
 
-Por enquanto só a aba **Modelos** funciona. As outras (Animações, Áudios, Arquivos) estão no menu como "Em breve". As texturas não têm aba: ficam no card do modelo.
+As abas **Modelos**, **Áudios** e **Geral** funcionam. Animações e Arquivos estão no menu como "Em breve". As texturas não têm aba: ficam no card do modelo.
 
-**Estado:** v0.2.1, `.asi` compilado e testado fora do jogo (Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide` e `.img` de verdade: `test/smoke/run.sh`, 52 conferências e 13 capturas). Falta o teste no jogo de verdade.
+**Estado:** v0.3, `.asi` compilado e testado fora do jogo (Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide`, `.img` e pacotes de som de verdade: `test/smoke/run.sh`, 60 conferências e 19 capturas). Falta o teste no jogo de verdade.
 
-**Novo na v0.2:**
+**Novo na v0.3:** a aba **Áudios** (abaixo).
+
+**Na v0.2:**
 - A textura clicada no card mostra quem mais usa a mesma textura.
 - O visualizador ganhou a cor do fundo, no seletor de cor da casa.
 - Os botões do visualizador (Grade, Colisão...) agora recebem o clique. Antes o clique virava arrasto do modelo.
@@ -74,6 +76,28 @@ A miniatura e o visualizador desenham **o modelo que o jogo carregou**, e não o
 
 O selo **MOD** e o filtro **Só substituídos** pegam o caso que dá para provar sem o arquivo original: o jogo lê o modelo de uma entrada do `.img` com outro nome (por exemplo, `chair` lido de `chair02.dff`). Um arquivo trocado com o mesmo nome dentro do `.img` não tem como ser diferenciado sem o original.
 
+## Aba Áudios
+
+Os efeitos sonoros do jogo (`audio\SFX`), na ordem do jogo: **pacote › bank › som**.
+
+- **Os pacotes:** FEET, GENRL, PAIN_A, SCRIPT e as falas (SPC_EA, SPC_FA, SPC_GA, SPC_NA, SPC_PA). Cada um mostra quantos banks e sons tem, e o que tem dentro.
+- **Os banks:** `Bank_002  90S_P`, quantos sons e, quando se sabe, o que é: "motor, com você dirigindo", com os veículos que usam esse banco ("Bravura, Previon, Solair e mais 9").
+- **Os sons:** `sound_001`, a duração, a marca **loop** (o som tem ponto de repetição), o nome do jogo quando existe (`AK_A`) e as armas que usam o som.
+- **Busca:** todas as palavras precisam bater. Vale o pacote, o banco (`90s_p`, `137`), o nome do som, o veículo (`sultan`), a arma (`m4`, `ak`) e o que o banco tem (`ricochete`, `porta`).
+- **Filtros:** **Tipo** (motor no tráfego, motor com você dirigindo, armas, passos, dor, missões, falas, outros), **Veículo**, **Arma** e **Loop** (todos, só com loop, sem loop). Com filtro, os pacotes com resultado abrem sozinhos.
+- **O player** (embaixo da lista): clique num som para tocar, e de novo para parar. Tem **repetir** e **salvar em .wav**. O ícone de download na linha também salva. Os `.wav` vão para `<pasta do jogo>\Trok DevTools\sons\`, com o nome `GENRL_Bank_002_90S_P_sound_001.wav`.
+
+### Áudio tocando agora
+
+O lado direito da aba:
+
+- **Mostrar na tela (menu fechado):** com o menu fechado, cada som que o jogo toca aparece num cartão no lado direito da tela: o pacote, o bank, o som, a duração e o nome. O mesmo som repetido em menos de 1,5 s soma no mesmo cartão (`×3`). O botão **Info do áudio**, no canto da aba, faz o mesmo.
+- **Tempo na tela:** quanto tempo cada cartão fica (1 a 15 s, padrão 4 s). Depois ele some aos poucos.
+- **Ignorar os passos:** sem os passos (FEET), que tocam o tempo todo.
+- **Histórico:** os últimos 300 sons, o mais novo em cima, com a hora. Clique num deles para achar o som na lista e tocar. Se o som está fora do filtro atual, o filtro é limpo. **Limpar o histórico** zera a lista.
+
+O rádio e as músicas (pasta `STREAMS`) não são do SFX e não aparecem.
+
 ## Info ao apontar
 
 O botão **Info ao apontar** (no canto da aba Modelos, e no Geral) liga e desliga. Com o menu fechado:
@@ -86,6 +110,7 @@ O botão **Info ao apontar** (no canto da aba Modelos, e no Geral) liga e deslig
 ## Aba Geral
 
 - Info ao apontar.
+- Áudio: mostrar o áudio tocando agora e o tempo na tela.
 - Visualizador: a cor do fundo (qualquer cor, com o código hex) e a grade.
 - Miniaturas por quadro (1 a 8) e refazer as miniaturas.
 - Quantos modelos você criou, e apagar.
@@ -105,6 +130,10 @@ Uma seção `[devtools]`, salva pelo próprio menu:
 | `visual_girar` | `1` | o modelo gira sozinho |
 | `visual_fundo` | `141414` | a cor do fundo do visualizador, em hex `RRGGBB` (verde chroma: `00B140`) |
 | `miniaturas_por_quadro` | `3` | 1 a 8: mais = a grade enche mais rápido, mas pesa mais por quadro |
+| `audio_mostrar` | `0` | o áudio tocando agora na tela, com o menu fechado |
+| `audio_tempo` | `4` | segundos de cada cartão na tela (1 a 15) |
+| `audio_ignorar_passos` | `1` | os passos ficam fora da tela e do histórico |
+| `audio_repetir` | `0` | o player da aba repete o som |
 
 ## Limites
 
@@ -112,6 +141,8 @@ Uma seção `[devtools]`, salva pelo próprio menu:
 - **No single player** não existe o travamento de câmera do SA-MP: com o menu aberto, o jogo não pausa e o mouse ainda mexe a câmera. Pare o personagem antes de abrir.
 - A colisão só aparece no card quando o jogo já a carregou, o que acontece perto dela no mapa. Longe, o card diz "não carregada".
 - Trens e o id 0 não são criados.
+- **O player da aba Áudios** toca o som cru do pacote, pelo Windows (`waveOut`), por fora do áudio do jogo: sem o volume do menu do jogo, sem efeito de distância e sem o tom que o jogo muda (um motor em rotação alta, por exemplo).
+- **Nomes:** os sons do SFX não têm nome nos arquivos. Os nomes dos banks e de uns 360 sons, a tabela de bancos de cada veículo e os sons de cada arma vêm do gta-reversed (o código do jogo reconstruído, em `github.com/gta-reversed/gta-reversed`). O resto aparece só como `sound_NNN`.
 - O catálogo lê os `.ide` do `default.dat`, do `gta.dat` e do SA-MP (`SAMP\SAMP.IDE` e `SAMP\CUSTOM.IDE`). Todo id que o jogo carregou aparece na grade, mas um modelo de um `.ide` fora desses (de um modloader, por exemplo) aparece só com o id e o nome do arquivo no `.img`, sem o `.ide` e às vezes sem a TXD.
 
 ## Trok DevTools.log
@@ -122,6 +153,7 @@ Ao lado do `.asi`, um por sessão de jogo:
 - o catálogo: quantos `.ide`, modelos, `.img` e substituídos;
 - cada modelo criado (id, onde, handle) e cada pedido recusado, com o motivo;
 - cada textura aberta: a TXD, quantos candidatos e quantos usam.
+- os sons: `sfx: 9 pacotes, 710 bancos, ... sons`, `audio: carregador de bancos em AEAudioHardware+0x...` e `audio: primeiro som: ...` (a prova de que o áudio tocando agora pega os sons do jogo com o bank certo).
 
 Se algo não abrir ou travar, mande esse arquivo.
 
@@ -134,6 +166,10 @@ Se algo não abrir ou travar, mande esse arquivo.
 | `src/core.cpp` | na thread do jogo: carrega e solta modelos (miniaturas e card), procura quem usa uma textura, cria e apaga no mundo, a linha de visão do Info ao apontar |
 | `src/mesh.cpp` | copia a malha do RenderWare (vértices, normais, UV, materiais, texturas) e a colisão para um formato próprio; diz se uma TXD tem uma textura e se um modelo usa |
 | `src/render.cpp` | desenha com o D3D9 fixo: o atlas das miniaturas (2048 px, células de 128) e o visualizador |
+| `src/sfx.cpp` | numa thread: lê o `PakFiles.dat`, o `BankLkup.dat` e o cabeçalho de cada bank nos pacotes; o PCM de um som e o `.wav` |
+| `src/player.cpp` | toca um som pelo `waveOut` (repetir, posição) |
+| `src/audiospy.cpp` | o áudio tocando agora: o gancho no `CAESoundManager::RequestNewSound` e o histórico |
+| `src/audio_data.h` | gerado por `tools/gen_audio_data.py` a partir do gta-reversed: os nomes dos banks e dos sons, os bancos de cada veículo e os sons de cada arma |
 | `src/devtools.cpp` | o menu, com o kit da casa (`trok-ui/asi`) |
 
 - **Carregar:** `CStreaming::RequestModel` (`0x4087E0`) com a flag de missão + `LoadAllRequestedModels` (`0x40EA10`); soltar: `SetMissionDoesntRequireModel` (`0x409C90`), só se fomos nós que pusemos a flag. Depois disso o jogo descarrega quando quiser, como faz com qualquer modelo; um que está no mapa continua carregado.
@@ -142,10 +178,13 @@ Se algo não abrir ou travar, mande esse arquivo.
 - **Criar e apagar:** pelos comandos de script do próprio jogo (`CRunningScript::ProcessOneCommand`, `0x469EB0`): `0107`/`00A5`/`009A` criam, `0177`/`0175`/`0173` viram, `0550` congela o objeto, `020A` tranca o carro; para apagar, `03CA`/`056E`/`056D` conferem se ainda existe e `0108`/`00A6`/`009B` apagam.
 - **Info ao apontar:** `CWorld::ProcessLineOfSight` (`0x56BA00`) pela câmera (`0xB6F028`), começando depois do personagem. A caixa vem do `CColModel`. Cada aresta é cortada a 1,5 m na frente da câmera e só então vai para a tela, com `CSprite::CalcScreenCoors` (`0x70CE30`).
 - **Quem usa uma textura:** a TXD que tem a textura sai da lista de texturas do dicionário (`RwTexDictionary`, +0x08), procurando na TXD do modelo e depois nas mães (`CTxdStore`, pai em +6). Os candidatos são as entradas do catálogo cuja TXD é essa ou descende dela. Para cada um, o mod olha os materiais de todos os atômicos (`RpGeometry` +0x20/+0x24, textura em `RpMaterial` +0, nome em `RwTexture` +0x10).
+- **Sons:** o `BankLkup.dat` (12 bytes por bank: pacote, deslocamento, tamanho) aponta para o bank dentro do pacote. O bank começa com um cabeçalho de `0x12C4` bytes: quantos sons e, para cada um dos 400, o início, o início do loop (`-1` = sem loop), a frequência e o headroom. Depois vem o PCM de 16 bits mono.
+- **Áudio tocando agora:** um gancho no `CAESoundManager::RequestNewSound` (`0x4EFB10`) lê, de cada `CAESound` pedido, o slot (+0), o som (+2) e o evento (+0xC). O bank que está naquele slot vem do `CAEMP3BankLoader` do `AEAudioHardware` (`0xB5F8B8`): o mod procura o ponteiro perto de `+0xD98` e só usa se o número de banks e de pacotes bater com os arquivos. O bank do slot fica em `CAEBankSlot` +0x10 (`0x12D4` bytes por slot).
 - **Reset do device (Alt+Tab):** os alvos de render saem antes e as miniaturas são refeitas depois.
 
 ### Compilar e testar
 
+- `tools/gen_audio_data.py`: gera o `src/audio_data.h` a partir de `eSoundBank.h`, `SoundIDs.h`, `AEVehicleAudioEntity.VehicleAudioSettings.h` e `AEWeaponAudioEntity.cpp` do gta-reversed (`python3 -I tools/gen_audio_data.py <pasta> > src/audio_data.h`).
 - `build.sh`: MinGW i686 + ImGui 1.89.9 + MinHook + o kit da casa → `build/` e `dist/Trok DevTools.asi`.
 - `test/concept/concept.sh`: as imagens de conceito em `test/out/concept/`, no Linux e sem o jogo. O menu de verdade (`devtools.cpp` e o kit) é desenhado sobre uma rua de mentira. Os modelos são desenhos low-poly feitos em Python (`models.py`), com os ids e nomes do jogo. O catálogo, o carregamento e o desenho 3D do `.asi` são trocados por versões que leem o que o `assets.py` gerou.
-- `test/smoke/run.sh`: roda o `build/Trok DevTools.asi` (rode o `build.sh` antes) no Wine 32 bits com Xvfb. O `host.c` é um `.exe` mínimo cuja `.bss` cobre os endereços do GTA, e o `fake_gta.cpp` monta ali o jogo de mentira: modelos, TXDs, colisões, `.ide`, `.img`, streaming, linha de visão e comandos de script. As capturas ficam em `test/out/smoke/`.
+- `test/smoke/run.sh`: roda o `build/Trok DevTools.asi` (rode o `build.sh` antes) no Wine 32 bits com Xvfb. O `host.c` é um `.exe` mínimo cuja `.bss` cobre os endereços do GTA, e o `fake_gta.cpp` monta ali o jogo de mentira: modelos, TXDs, colisões, `.ide`, `.img`, streaming, linha de visão, comandos de script, os pacotes de som e o carregador de bancos, com sons pedidos pelo `RequestNewSound`. As capturas ficam em `test/out/smoke/`.

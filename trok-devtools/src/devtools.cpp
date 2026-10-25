@@ -5,9 +5,13 @@
 
 #include "devtools.h"
 
+#include "audio_data.h"
+#include "audiospy.h"
 #include "catalog.h"
 #include "core.h"
+#include "player.h"
 #include "render.h"
+#include "sfx.h"
 #include "trok_ui.h"
 
 #include "imgui.h"
@@ -31,7 +35,7 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v0.2.1";
+constexpr const char* VERSION_TAG = "v0.3";
 // As texturas ficam no card do modelo (clique numa textura): nao tem aba propria.
 const char* const TABS[] = {"Modelos", "Anima\xC3\xA7\xC3\xB5" "es", "\xC3\x81udios", "Arquivos", "Geral"};
 constexpr int TAB_COUNT = 5, TAB_MODELS = 0, TAB_GENERAL = 4;
@@ -62,6 +66,17 @@ struct State {
     int selected = 1, rowCount = 1;
     bool inspect = false;
     int perFrame = 3;
+    // Audios
+    char audioQuery[96] = "";
+    sfx::Filter audioFilter, audioApplied;
+    sfx::Result audioResult;
+    bool audioHasResult = false;
+    std::vector<bool> audioOpenPack, audioOpenBank;
+    int audioSelBank = -1, audioSelSound = -1;
+    bool audioReveal = false;
+    bool audioShow = false, audioIgnoreFeet = true, audioRepeat = false;
+    int audioDelay = 4;
+    int audioRowSel = 1;
     char ini[MAX_PATH] = "";
     char gameDir[MAX_PATH] = "";
 } S;
@@ -188,7 +203,9 @@ struct IniFlag {
 std::vector<IniFlag> IniFlags() {
     return {{"inspecionar", &S.inspect},          {"visual_texturas", &S.view.textures},
             {"visual_arame", &S.view.wire},       {"visual_colisao", &S.view.collision},
-            {"visual_grade", &S.view.grid},       {"visual_girar", &S.spin}};
+            {"visual_grade", &S.view.grid},       {"visual_girar", &S.spin},
+            {"audio_mostrar", &S.audioShow},      {"audio_ignorar_passos", &S.audioIgnoreFeet},
+            {"audio_repetir", &S.audioRepeat}};
 }
 
 void SaveIni() {
@@ -201,6 +218,8 @@ void SaveIni() {
     }
     snprintf(buf, sizeof(buf), "%d", S.perFrame);
     WritePrivateProfileStringA("devtools", "miniaturas_por_quadro", buf, S.ini);
+    snprintf(buf, sizeof(buf), "%d", S.audioDelay);
+    WritePrivateProfileStringA("devtools", "audio_tempo", buf, S.ini);
     snprintf(buf, sizeof(buf), "%02X%02X%02X", static_cast<unsigned>(S.background & 0xFF),
              static_cast<unsigned>((S.background >> 8) & 0xFF), static_cast<unsigned>((S.background >> 16) & 0xFF));
     WritePrivateProfileStringA("devtools", "visual_fundo", buf, S.ini);
@@ -1064,6 +1083,734 @@ void CardPopup(ImVec2 shellPos, ImVec2 shellSize, bool escape) {
     ImGui::EndPopup();
 }
 
+// ---------------------------------------------------------------- aba Audios
+
+// Icones desenhados no traco da casa (o kit nao tem play, stop, download e repetir).
+void IconPlay(ImDrawList* dl, ImVec2 c, float s, ImU32 color) {
+    dl->AddTriangleFilled(ImVec2(c.x - s * 0.32f, c.y - s * 0.42f), ImVec2(c.x - s * 0.32f, c.y + s * 0.42f),
+                          ImVec2(c.x + s * 0.42f, c.y), color);
+}
+
+void IconStop(ImDrawList* dl, ImVec2 c, float s, ImU32 color) {
+    dl->AddRectFilled(ImVec2(c.x - s * 0.3f, c.y - s * 0.3f), ImVec2(c.x + s * 0.3f, c.y + s * 0.3f), color, s * 0.08f);
+}
+
+void IconDownload(ImDrawList* dl, ImVec2 c, float s, ImU32 color) {
+    float t = 1.5f * u;
+    dl->AddLine(ImVec2(c.x, c.y - s * 0.42f), ImVec2(c.x, c.y + s * 0.12f), color, t);
+    dl->AddLine(ImVec2(c.x - s * 0.26f, c.y - s * 0.12f), ImVec2(c.x, c.y + s * 0.15f), color, t);
+    dl->AddLine(ImVec2(c.x + s * 0.26f, c.y - s * 0.12f), ImVec2(c.x, c.y + s * 0.15f), color, t);
+    dl->AddLine(ImVec2(c.x - s * 0.4f, c.y + s * 0.42f), ImVec2(c.x + s * 0.4f, c.y + s * 0.42f), color, t);
+}
+
+void IconRepeat(ImDrawList* dl, ImVec2 c, float s, ImU32 color) {
+    float t = 1.5f * u, w = s * 0.4f, h = s * 0.24f, a = s * 0.13f;
+    dl->AddLine(ImVec2(c.x - w, c.y + h * 0.3f), ImVec2(c.x - w, c.y - h), color, t);
+    dl->AddLine(ImVec2(c.x - w, c.y - h), ImVec2(c.x + w * 0.7f, c.y - h), color, t);
+    dl->AddTriangleFilled(ImVec2(c.x + w * 0.6f, c.y - h - a), ImVec2(c.x + w * 0.6f, c.y - h + a), ImVec2(c.x + w * 0.6f + a * 1.6f, c.y - h),
+                          color);
+    dl->AddLine(ImVec2(c.x + w, c.y - h * 0.3f), ImVec2(c.x + w, c.y + h), color, t);
+    dl->AddLine(ImVec2(c.x + w, c.y + h), ImVec2(c.x - w * 0.7f, c.y + h), color, t);
+    dl->AddTriangleFilled(ImVec2(c.x - w * 0.6f, c.y + h - a), ImVec2(c.x - w * 0.6f, c.y + h + a), ImVec2(c.x - w * 0.6f - a * 1.6f, c.y + h),
+                          color);
+}
+
+// Botao redondo com um icone. kind: 0 contorno (on = cheio), 1 cheio e claro, 2 so o icone.
+bool RoundButton(const char* id, ImVec2 c, float r, int kind, bool on, void (*icon)(ImDrawList*, ImVec2, float, ImU32),
+                 const char* tip = nullptr, bool enabled = true) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImGui::SetCursorScreenPos(ImVec2(c.x - r, c.y - r));
+    bool clicked = ImGui::InvisibleButton(id, ImVec2(2 * r, 2 * r)) && enabled;
+    bool hovered = enabled && ImGui::IsItemHovered();
+    if (hovered) {
+        Hand();
+        if (tip) {
+            Tooltip(tip);
+        }
+    }
+    ImU32 ink;
+    if (!enabled) {
+        dl->AddCircle(c, r - 0.5f, col::White(14), 32, 1.0f);
+        ink = col::disabled;
+    } else if (kind == 1) {
+        dl->AddCircleFilled(c, r, hovered ? col::Rgba(245, 245, 245) : col::strong, 32);
+        ink = col::ink;
+    } else if (kind == 0) {
+        dl->AddCircleFilled(c, r, on ? col::strong : col::White(hovered ? 12 : 4), 32);
+        if (!on) {
+            dl->AddCircle(c, r - 0.5f, col::White(hovered ? 60 : 30), 32, 1.0f);
+        }
+        ink = on ? col::ink : (hovered ? col::text : col::column);
+    } else {
+        ink = on || hovered ? col::text : col::hint;
+    }
+    icon(dl, c, kind == 2 ? r * 1.25f : r, ink);
+    return clicked;
+}
+
+std::string Seconds(float s) {
+    return Decimal(s, 2) + " s";
+}
+
+bool AudioFilterActive() {
+    const sfx::Filter& f = S.audioFilter;
+    return !f.query.empty() || f.kind >= 0 || f.vehicle >= 0 || f.weapon >= 0 || f.loop != 0;
+}
+
+// Os veiculos que tem banco de motor, em ordem de nome (para a lista do filtro).
+const std::vector<std::pair<std::string, int>>& AudioVehicles() {
+    static std::vector<std::pair<std::string, int>> list;
+    if (list.empty() && sfx::Ready()) {
+        for (int i = 0; i < 212; ++i) {
+            const audio_data::VehicleBanks& v = audio_data::VEHICLE_BANKS[i];
+            if (v.player < 0 && v.dummy < 0) {
+                continue;
+            }
+            const catalog::Entry* e = catalog::Find(400 + i);
+            std::string name = e && !e->dff.empty() ? e->dff : std::to_string(400 + i);
+            name[0] = static_cast<char>(toupper(static_cast<unsigned char>(name[0])));
+            list.push_back({name, 400 + i});
+        }
+        std::sort(list.begin(), list.end());
+    }
+    return list;
+}
+
+// Abre o caminho ate um som (pacote e banco abertos) e pede para a arvore rolar ate ele.
+void RevealSound(int bank, int sound) {
+    const sfx::Bank* b = sfx::FindBank(bank);
+    if (!b) {
+        return;
+    }
+    // Fora do filtro atual: limpa o filtro (a arvore volta inteira, com o som aberto)
+    if (AudioFilterActive() && S.audioHasResult && static_cast<size_t>(bank) < S.audioResult.sounds.size()) {
+        const std::vector<int>& in = S.audioResult.sounds[bank];
+        if (std::find(in.begin(), in.end(), sound) == in.end()) {
+            S.audioQuery[0] = '\0';
+            S.audioFilter = sfx::Filter();
+        }
+    }
+    S.audioOpenPack.resize(sfx::Packs().size(), false);
+    S.audioOpenBank.resize(sfx::Banks().size(), false);
+    S.audioOpenPack[b->pack] = true;
+    S.audioOpenBank[bank] = true;
+    S.audioSelBank = bank;
+    S.audioSelSound = sound;
+    S.audioReveal = true;
+}
+
+void PlayOrStop(int bank, int sound) {
+    if (player::Playing() && player::Bank() == bank && player::Sound() == sound) {
+        player::Stop();
+        return;
+    }
+    S.audioSelBank = bank;
+    S.audioSelSound = sound;
+    if (!player::Play(bank, sound)) {
+        Toast("Trok DevTools", (std::string("N\xC3\xA3o deu para tocar: ") + player::Error()).c_str());
+    }
+}
+
+void SaveWav(int bank, int sound) {
+    std::string path;
+    if (sfx::ExportWav(bank, sound, &path)) {
+        size_t cut = path.find_last_of('\\');
+        Toast("Salvo em Trok DevTools\\sons", (cut == std::string::npos ? path : path.substr(cut + 1)).c_str());
+    } else {
+        Toast("Trok DevTools", "N\xC3\xA3o deu para salvar o .wav.");
+    }
+}
+
+// Lista suspensa da casa (como a do .img), com rolagem para listas longas. values[i] e o valor de labels[i].
+void ChoicePopup(const char* id, const std::vector<std::string>& labels, const std::vector<int>& values, int* value,
+                 float x, float y) {
+    ImGui::SetNextWindowPos(ImVec2(x, y));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6 * u, 6 * u));
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 8 * u);
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(18, 18, 18, 250));
+    if (ImGui::BeginPopup(id)) {
+        float w = 220 * u, h = 28 * u;
+        for (const std::string& l : labels) {
+            w = std::max(w, TextSize(fonts.desc, l.c_str()).x + 44 * u);
+        }
+        float listH = std::min(static_cast<float>(labels.size()) * h, 380 * u);
+        ImGui::BeginChild("##opcoes", ImVec2(w, listH), false);
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        for (size_t i = 0; i < labels.size(); ++i) {
+            ImVec2 p = ImGui::GetCursorScreenPos();
+            char bid[24];
+            snprintf(bid, sizeof(bid), "##op%d", static_cast<int>(i));
+            if (ImGui::InvisibleButton(bid, ImVec2(w - 10 * u, h))) {
+                *value = values[i];
+                ImGui::CloseCurrentPopup();
+            }
+            bool hovered = ImGui::IsItemHovered();
+            if (hovered) {
+                Hand();
+                dl->AddRectFilled(p, ImVec2(p.x + w - 10 * u, p.y + h), col::White(10), 6 * u);
+            }
+            bool chosen = *value == values[i];
+            ImVec2 ts = TextSize(fonts.desc, labels[i].c_str());
+            Text(dl, fonts.desc, p.x + 12 * u, p.y + (h - ts.y) * 0.5f, chosen ? col::text : col::column, labels[i].c_str());
+            if (chosen) {
+                DrawIcon(dl, Icon::Check, ImVec2(p.x + w - 26 * u, p.y + h * 0.5f), col::text, true);
+            }
+        }
+        ImGui::EndChild();
+        ImGui::EndPopup();
+    }
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
+}
+
+struct AudioRow {
+    int type; // 0 pacote, 1 banco, 2 som
+    int pack, bank, sound;
+    float y, h;
+};
+
+void AudioTree(float x, float y, float w, float h) {
+    const std::vector<sfx::Pack>& packs = sfx::Packs();
+    const std::vector<sfx::Bank>& banks = sfx::Banks();
+    S.audioOpenPack.resize(packs.size(), false);
+    S.audioOpenBank.resize(banks.size(), false);
+    bool filtered = AudioFilterActive();
+    const sfx::Result& r = S.audioResult;
+
+    // As linhas (so as que aparecem): pacote > banco > som
+    std::vector<AudioRow> rows;
+    float total = 0, revealY = -1;
+    auto add = [&](int type, int p, int b, int s, float rh) {
+        rows.push_back({type, p, b, s, total, rh});
+        total += rh;
+    };
+    for (int p = 0; p < static_cast<int>(packs.size()); ++p) {
+        if (filtered && r.bankCount[p] == 0) {
+            continue;
+        }
+        add(0, p, -1, -1, 58 * u);
+        if (!S.audioOpenPack[p]) {
+            continue;
+        }
+        for (int id : packs[p].banks) {
+            const sfx::Bank& b = banks[id];
+            if (filtered && r.sounds[id].empty()) {
+                continue;
+            }
+            bool sub = !b.text.empty() || !b.vehicleText.empty();
+            add(1, p, id, -1, (sub ? 52 : 34) * u);
+            if (!S.audioOpenBank[id]) {
+                continue;
+            }
+            const std::vector<int>* list = filtered ? &r.sounds[id] : nullptr;
+            int n = list ? static_cast<int>(list->size()) : static_cast<int>(b.sounds.size());
+            for (int k = 0; k < n; ++k) {
+                int s = list ? (*list)[k] : k;
+                if (S.audioReveal && id == S.audioSelBank && s == S.audioSelSound) {
+                    revealY = total;
+                }
+                add(2, p, id, s, 38 * u);
+            }
+            total += 6 * u;
+        }
+    }
+
+    ImGui::SetCursorScreenPos(ImVec2(x, y));
+    ImGui::BeginChild("##arvore", ImVec2(w, h), false, ImGuiWindowFlags_NoBackground);
+    if (S.audioReveal) {
+        if (revealY >= 0) {
+            ImGui::SetScrollY(std::max(0.0f, revealY - h * 0.4f));
+        }
+        S.audioReveal = false;
+    }
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 origin = ImGui::GetCursorScreenPos();
+    float scroll = ImGui::GetScrollY();
+    float rw = w - 14 * u;
+    for (const AudioRow& row : rows) {
+        if (row.y + row.h < scroll - 40 * u || row.y > scroll + h + 40 * u) {
+            continue;
+        }
+        float rx = origin.x, ry = origin.y + row.y;
+        char id[32];
+        if (row.type == 0) {
+            const sfx::Pack& p = packs[row.pack];
+            snprintf(id, sizeof(id), "##pac%d", row.pack);
+            ImGui::SetCursorScreenPos(ImVec2(rx, ry));
+            if (ImGui::InvisibleButton(id, ImVec2(rw, row.h - 4 * u))) {
+                S.audioOpenPack[row.pack] = !S.audioOpenPack[row.pack];
+            }
+            bool hovered = ImGui::IsItemHovered();
+            if (hovered) {
+                Hand();
+            }
+            Box(dl, ImVec2(rx, ry), ImVec2(rx + rw, ry + row.h - 4 * u), col::White(hovered ? 9 : 5), col::White(10), 8 * u);
+            DrawIcon(dl, S.audioOpenPack[row.pack] ? Icon::ChevronDown : Icon::ChevronRight,
+                     ImVec2(rx + 16 * u, ry + 18 * u), col::column, true);
+            Text(dl, fonts.title, rx + 30 * u, ry + 8 * u, col::text, p.name.c_str());
+            char counts[96];
+            if (filtered) {
+                snprintf(counts, sizeof(counts), "%d banks \xC2\xB7 %s sons no filtro", r.bankCount[row.pack],
+                         Thousands(r.soundCount[row.pack]).c_str());
+            } else {
+                snprintf(counts, sizeof(counts), "%d banks \xC2\xB7 %s sons", static_cast<int>(p.banks.size()),
+                         Thousands(p.sounds).c_str());
+            }
+            ImVec2 cs = TextSize(fonts.desc, counts);
+            Text(dl, fonts.desc, rx + rw - 14 * u - cs.x, ry + 11 * u, col::hint, counts);
+            Text(dl, fonts.desc, rx + 30 * u, ry + 8 * u + fonts.title->FontSize + 5 * u, col::column,
+                 Ellipsize(fonts.desc, p.description, rw - 44 * u).c_str());
+        } else if (row.type == 1) {
+            const sfx::Bank& b = banks[row.bank];
+            snprintf(id, sizeof(id), "##bank%d", row.bank);
+            float bx = rx + 18 * u, bw = rw - 18 * u;
+            ImGui::SetCursorScreenPos(ImVec2(bx, ry));
+            if (ImGui::InvisibleButton(id, ImVec2(bw, row.h - 2 * u))) {
+                S.audioOpenBank[row.bank] = !S.audioOpenBank[row.bank];
+            }
+            bool hovered = ImGui::IsItemHovered();
+            if (hovered) {
+                Hand();
+                dl->AddRectFilled(ImVec2(bx, ry), ImVec2(bx + bw, ry + row.h - 2 * u), col::White(6), 6 * u);
+            }
+            DrawIcon(dl, S.audioOpenBank[row.bank] ? Icon::ChevronDown : Icon::ChevronRight, ImVec2(bx + 12 * u, ry + 15 * u),
+                     col::hint, true);
+            char title[96];
+            snprintf(title, sizeof(title), "Bank_%03d  %s", b.number, b.name.c_str());
+            Text(dl, fonts.body, bx + 26 * u, ry + 6 * u, col::text, title);
+            char count[48];
+            int n = filtered ? static_cast<int>(r.sounds[row.bank].size()) : static_cast<int>(b.sounds.size());
+            snprintf(count, sizeof(count), b.ok ? "%d sons" : "sem cabe\xC3\xA7" "alho", n);
+            ImVec2 cs = TextSize(fonts.desc, count);
+            Text(dl, fonts.desc, bx + bw - 14 * u - cs.x, ry + 8 * u, col::hint, count);
+            std::string sub = b.text;
+            if (!b.vehicleText.empty()) {
+                sub += (sub.empty() ? "" : "  \xC2\xB7  ") + b.vehicleText;
+            }
+            if (!sub.empty()) {
+                Text(dl, fonts.desc, bx + 26 * u, ry + 6 * u + fonts.body->FontSize + 4 * u, col::hint,
+                     Ellipsize(fonts.desc, sub, bw - 40 * u).c_str());
+            }
+        } else {
+            const sfx::Bank& b = banks[row.bank];
+            const sfx::Sound& s = b.sounds[row.sound];
+            float sx = rx + 36 * u, sw = rw - 36 * u, rh = row.h - 4 * u;
+            bool playing = player::Playing() && player::Bank() == row.bank && player::Sound() == row.sound;
+            bool selected = S.audioSelBank == row.bank && S.audioSelSound == row.sound;
+            // Primeiro o download (a direita), depois o resto da linha (o clique na linha toca)
+            snprintf(id, sizeof(id), "##wav%d_%d", row.bank, row.sound);
+            float dlX = sx + sw - 20 * u;
+            if (RoundButton(id, ImVec2(dlX, ry + rh * 0.5f), 13 * u, 2, false, IconDownload, "Salvar em .wav")) {
+                SaveWav(row.bank, row.sound);
+            }
+            snprintf(id, sizeof(id), "##som%d_%d", row.bank, row.sound);
+            ImGui::SetCursorScreenPos(ImVec2(sx, ry));
+            if (ImGui::InvisibleButton(id, ImVec2(sw - 40 * u, rh))) {
+                PlayOrStop(row.bank, row.sound);
+            }
+            bool hovered = ImGui::IsItemHovered();
+            if (hovered) {
+                Hand();
+            }
+            if (playing || selected || hovered) {
+                Box(dl, ImVec2(sx, ry), ImVec2(sx + sw, ry + rh), col::White(playing ? 16 : selected ? 10 : 6),
+                    playing ? col::White(60) : 0, 8 * u);
+            }
+            ImVec2 c(sx + 18 * u, ry + rh * 0.5f);
+            dl->AddCircleFilled(c, 13 * u, playing ? col::strong : col::White(hovered ? 14 : 5), 32);
+            if (!playing) {
+                dl->AddCircle(c, 12.5f * u, col::White(hovered ? 70 : 34), 32, 1.0f);
+            }
+            if (playing) {
+                IconStop(dl, c, 13 * u, col::ink);
+            } else {
+                IconPlay(dl, ImVec2(c.x + 1.5f * u, c.y), 13 * u, hovered ? col::text : col::column);
+            }
+            char label[24];
+            snprintf(label, sizeof(label), "sound_%03d", row.sound + 1);
+            float tx = sx + 42 * u, ty = ry + (rh - fonts.body->FontSize) * 0.5f;
+            Text(dl, fonts.body, tx, ty, col::text, label);
+            tx += TextSize(fonts.body, label).x + 10 * u;
+            if (s.loop) {
+                const char* tag = "loop";
+                ImVec2 ts = TextSize(fonts.desc, tag);
+                float th = ts.y + 6 * u, tyy = ry + (rh - th) * 0.5f;
+                dl->AddRectFilled(ImVec2(tx, tyy), ImVec2(tx + ts.x + 16 * u, tyy + th), col::White(12), th * 0.5f);
+                Text(dl, fonts.desc, tx + 8 * u, tyy + 3 * u - 0.5f * u, col::column, tag);
+                tx += ts.x + 26 * u;
+            }
+            std::string extra = s.name;
+            if (!s.weapons.empty()) {
+                extra += (extra.empty() ? "" : "  \xC2\xB7  ") + s.weapons;
+            }
+            std::string dur = Seconds(s.seconds);
+            ImVec2 ds = TextSize(fonts.desc, dur.c_str());
+            float durX = dlX - 22 * u - ds.x;
+            if (!extra.empty()) {
+                Text(dl, fonts.desc, tx, ry + (rh - fonts.desc->FontSize) * 0.5f, col::hint,
+                     Ellipsize(fonts.desc, extra, durX - tx - 12 * u).c_str());
+            }
+            Text(dl, fonts.desc, durX, ry + (rh - ds.y) * 0.5f, col::column, dur.c_str());
+        }
+    }
+    if (rows.empty()) {
+        const char* none = "Nenhum som com esse filtro.";
+        ImVec2 ts = TextSize(fonts.desc, none);
+        Text(dl, fonts.desc, origin.x + (w - ts.x) * 0.5f, origin.y + 40 * u, col::hint, none);
+    }
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::Dummy(ImVec2(rw, std::max(1.0f, total)));
+    ImGui::EndChild();
+}
+
+// O player embaixo da arvore: o som escolhido, tocar/parar, repetir, salvar e o progresso.
+void AudioPlayerBar(float x, float y, float w, float h) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    Box(dl, ImVec2(x, y), ImVec2(x + w, y + h), col::White(5), col::White(12), 10 * u);
+    int bank = S.audioSelBank, sound = S.audioSelSound;
+    const sfx::Bank* b = sfx::FindBank(bank);
+    const sfx::Sound* s = sfx::FindSound(bank, sound);
+    bool playing = player::Playing() && player::Bank() == bank && player::Sound() == sound;
+    float r = 22 * u;
+    ImVec2 c(x + 14 * u + r, y + h * 0.5f);
+    if (RoundButton("##tocar", c, r, 1, false, playing ? IconStop : IconPlay, nullptr, s != nullptr)) {
+        PlayOrStop(bank, sound);
+    }
+    float tx = c.x + r + 14 * u;
+    float right = x + w - 14 * u;
+    float br = 17 * u;
+    ImVec2 saveC(right - br, y + h * 0.5f - 6 * u), repC(saveC.x - 2 * br - 10 * u, saveC.y);
+    bool repeat = player::Repeat();
+    if (RoundButton("##repetir", repC, br, 0, repeat, IconRepeat, repeat ? "Repetir: ligado" : "Repetir: desligado")) {
+        player::SetRepeat(!repeat);
+        S.audioRepeat = !repeat;
+        SaveIni();
+    }
+    if (RoundButton("##salvar", saveC, br, 0, false, IconDownload, "Salvar em .wav", s != nullptr)) {
+        SaveWav(bank, sound);
+    }
+    float textW = repC.x - br - 14 * u - tx;
+    char title[128], sub[160];
+    if (s && b) {
+        snprintf(title, sizeof(title), "%s  \xE2\x80\xBA  sound_%03d", b->name.c_str(), sound + 1);
+        snprintf(sub, sizeof(sub), "%s  \xC2\xB7  Bank_%03d  \xC2\xB7  %s Hz%s%s%s", sfx::Packs()[b->pack].name.c_str(), b->number,
+                 Thousands(s->rate).c_str(), s->loop ? "  \xC2\xB7  loop" : "", s->name.empty() ? "" : "  \xC2\xB7  ",
+                 s->name.c_str());
+    } else {
+        snprintf(title, sizeof(title), "Escolha um som na lista");
+        snprintf(sub, sizeof(sub), "ele toca aqui; d\xC3\xA1 para repetir e salvar em .wav");
+    }
+    Text(dl, fonts.body, tx, y + 12 * u, s ? col::text : col::column, Ellipsize(fonts.body, title, textW).c_str());
+    Text(dl, fonts.desc, tx, y + 12 * u + fonts.body->FontSize + 3 * u, col::hint, Ellipsize(fonts.desc, sub, textW).c_str());
+    // progresso
+    float pos = playing ? player::Position() : 0.0f, len = s ? s->seconds : 0.0f;
+    char time[48];
+    snprintf(time, sizeof(time), "%s / %s", Seconds(pos).c_str(), Seconds(len).c_str());
+    ImVec2 ts = TextSize(fonts.desc, time);
+    float barY = y + h - 16 * u, barX1 = right - ts.x - 12 * u;
+    dl->AddRectFilled(ImVec2(tx, barY), ImVec2(barX1, barY + 4 * u), col::White(14), 2 * u);
+    if (len > 0 && pos > 0) {
+        float f = std::min(1.0f, pos / len);
+        dl->AddRectFilled(ImVec2(tx, barY), ImVec2(tx + (barX1 - tx) * f, barY + 4 * u), col::strong, 2 * u);
+    }
+    Text(dl, fonts.desc, right - ts.x, barY - ts.y * 0.5f + 2 * u, col::column, time);
+}
+
+std::string PlayedTitle(const audiospy::Played& p) {
+    const sfx::Bank* b = sfx::FindBank(p.bank);
+    char buf[160];
+    if (b) {
+        snprintf(buf, sizeof(buf), "%s  \xE2\x80\xBA  %s  \xE2\x80\xBA  sound_%03d", sfx::Packs()[b->pack].name.c_str(),
+                 b->name.c_str(), p.sound + 1);
+    } else {
+        snprintf(buf, sizeof(buf), "slot %d  \xE2\x80\xBA  som %d", p.slot, p.sound);
+    }
+    return buf;
+}
+
+std::string PlayedSub(const audiospy::Played& p) {
+    const sfx::Bank* b = sfx::FindBank(p.bank);
+    const sfx::Sound* s = sfx::FindSound(p.bank, p.sound);
+    std::string out;
+    char buf[96];
+    if (b) {
+        snprintf(buf, sizeof(buf), "Bank_%03d", b->number);
+        out = buf;
+    } else {
+        out = "banco n\xC3\xA3o identificado";
+    }
+    if (s) {
+        out += "  \xC2\xB7  " + Seconds(s->seconds) + (s->loop ? "  \xC2\xB7  loop" : "");
+        if (!s->name.empty()) {
+            out += "  \xC2\xB7  " + s->name;
+        }
+    }
+    if (p.count > 1) {
+        snprintf(buf, sizeof(buf), "  \xC2\xB7  \xC3\x97%d", p.count);
+        out += buf;
+    }
+    return out;
+}
+
+// O lado direito: as opcoes do "audio tocando agora" e o historico.
+void AudioSide(float x, float y, float w, float h) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    Text(dl, fonts.title, x, y, col::text, "\xC3\x81udio tocando agora");
+    Text(dl, fonts.desc, x, y + fonts.title->FontSize + 4 * u, col::hint, "o que o jogo toca, com o banco e o som");
+    float top = y + fonts.title->FontSize + fonts.desc->FontSize + 16 * u;
+    ImGui::SetCursorScreenPos(ImVec2(x - 4 * u, top));
+    float optH = 4 * (36 * u) + 8 * u;
+    ImGui::BeginChild("##audioOpcoes", ImVec2(w + 8 * u, optH), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
+    Rows rows;
+    Keys none;
+    rows.Begin("audio", x, w, &S.audioRowSel, none, false);
+    if (rows.Toggle("Mostrar na tela (menu fechado)", &S.audioShow)) {
+        SaveIni();
+    }
+    if (rows.Stepper("Tempo na tela", &S.audioDelay, 1, 15, 1, "%d s", 4)) {
+        SaveIni();
+    }
+    if (rows.Toggle("Ignorar os passos", &S.audioIgnoreFeet)) {
+        audiospy::SetIgnoreFeet(S.audioIgnoreFeet);
+        SaveIni();
+    }
+    if (rows.Action("Limpar o hist\xC3\xB3rico", "Limpar")) {
+        audiospy::Clear();
+    }
+    rows.End();
+    ImGui::EndChild();
+
+    float listY = top + optH + 10 * u;
+    const std::deque<audiospy::Played>& hist = audiospy::History();
+    char title[64];
+    snprintf(title, sizeof(title), "Hist\xC3\xB3rico (%d)", static_cast<int>(hist.size()));
+    Text(dl, fonts.desc, x, listY, col::column, title);
+    if (!audiospy::BanksKnown() && !hist.empty()) {
+        const char* warn = "sem os nomes dos bancos";
+        ImVec2 ws = TextSize(fonts.desc, warn);
+        Text(dl, fonts.desc, x + w - ws.x, listY, col::Rgba(255, 196, 120), warn);
+    }
+    listY += fonts.desc->FontSize + 8 * u;
+    ImGui::SetCursorScreenPos(ImVec2(x, listY));
+    ImGui::BeginChild("##historico", ImVec2(w, y + h - listY), false, ImGuiWindowFlags_NoBackground);
+    ImDrawList* cdl = ImGui::GetWindowDrawList();
+    ImVec2 o = ImGui::GetCursorScreenPos();
+    float rowH = 48 * u, iw = w - 12 * u;
+    float scroll = ImGui::GetScrollY(), viewH = y + h - listY;
+    for (size_t i = 0; i < hist.size(); ++i) {
+        float ry = o.y + i * rowH;
+        if (i * rowH + rowH < scroll || i * rowH > scroll + viewH) {
+            continue;
+        }
+        const audiospy::Played& p = hist[i];
+        char id[24];
+        snprintf(id, sizeof(id), "##hist%d", static_cast<int>(i));
+        ImGui::SetCursorScreenPos(ImVec2(o.x, ry));
+        if (ImGui::InvisibleButton(id, ImVec2(iw, rowH - 4 * u)) && p.bank >= 0) {
+            RevealSound(p.bank, p.sound);
+            PlayOrStop(p.bank, p.sound);
+        }
+        bool hovered = ImGui::IsItemHovered();
+        if (hovered && p.bank >= 0) {
+            Hand();
+            Tooltip("Clique: achar na lista e tocar");
+        }
+        bool sel = p.bank >= 0 && p.bank == S.audioSelBank && p.sound == S.audioSelSound;
+        Box(cdl, ImVec2(o.x, ry), ImVec2(o.x + iw, ry + rowH - 4 * u), col::White(sel ? 14 : hovered ? 9 : 4),
+            col::White(sel ? 50 : 8), 7 * u);
+        char clock[16];
+        snprintf(clock, sizeof(clock), "%02d:%02d:%02d", p.time.wHour, p.time.wMinute, p.time.wSecond);
+        ImVec2 cs = TextSize(fonts.desc, clock);
+        Text(cdl, fonts.desc, o.x + iw - 10 * u - cs.x, ry + 7 * u, col::hint, clock);
+        Text(cdl, fonts.body, o.x + 10 * u, ry + 6 * u, col::text,
+             Ellipsize(fonts.body, PlayedTitle(p), iw - cs.x - 30 * u).c_str());
+        Text(cdl, fonts.desc, o.x + 10 * u, ry + 6 * u + fonts.body->FontSize + 3 * u, col::hint,
+             Ellipsize(fonts.desc, PlayedSub(p), iw - 20 * u).c_str());
+    }
+    if (hist.empty()) {
+        const char* none = "Nada ainda: os sons que o jogo tocar aparecem aqui.";
+        Text(cdl, fonts.desc, o.x + 4 * u, o.y + 6 * u, col::hint, none);
+    }
+    ImGui::SetCursorScreenPos(o);
+    ImGui::Dummy(ImVec2(iw, std::max(1.0f, hist.size() * rowH)));
+    ImGui::EndChild();
+}
+
+void TabAudio(float x, float y, float w, float h) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    if (!sfx::Ready()) {
+        ImVec2 c(x + w * 0.5f, y + h * 0.45f);
+        Spinner(dl, c, 12 * u, static_cast<float>(ImGui::GetTime()));
+        char text[128];
+        snprintf(text, sizeof(text), "Lendo os sons: %s", sfx::Status());
+        ImVec2 ts = TextSize(fonts.desc, text);
+        Text(dl, fonts.desc, c.x - ts.x * 0.5f, c.y + 22 * u, col::hint, text);
+        return;
+    }
+    // Barra: busca, tipo, veiculo, arma, loop e o "info do audio" na direita
+    float barH = 32 * u, searchW = std::min(340 * u, w * 0.3f);
+    SearchField("##buscaAudio", S.audioQuery, sizeof(S.audioQuery), "Buscar: ricochete, sultan, m4, 137", x, y, searchW, barH);
+    S.audioFilter.query = S.audioQuery;
+    float px = x + searchW + 14 * u, pw = 0, pillH = 28 * u, pillY = y + (barH - pillH) * 0.5f;
+    struct Drop {
+        const char* id;
+        const char* popup;
+        std::string label;
+        bool on;
+    };
+    std::string kindLabel = S.audioFilter.kind < 0 ? "Tipo" : sfx::KindName(S.audioFilter.kind);
+    std::string vehLabel = "Ve\xC3\xAD" "culo";
+    for (const auto& v : AudioVehicles()) {
+        if (v.second == S.audioFilter.vehicle) {
+            vehLabel = v.first;
+        }
+    }
+    int weaponCount = static_cast<int>(sizeof(audio_data::WEAPONS) / sizeof(audio_data::WEAPONS[0]));
+    std::string weapLabel = S.audioFilter.weapon < 0 ? "Arma" : audio_data::WEAPONS[S.audioFilter.weapon].name;
+    static const char* const loops[] = {"Loop", "S\xC3\xB3 com loop", "Sem loop"};
+    Drop drops[] = {{"##tipoAudio", "##tipoPop", kindLabel, S.audioFilter.kind >= 0},
+                    {"##veicAudio", "##veicPop", vehLabel, S.audioFilter.vehicle >= 0},
+                    {"##armaAudio", "##armaPop", weapLabel, S.audioFilter.weapon >= 0},
+                    {"##loopAudio", nullptr, loops[S.audioFilter.loop], S.audioFilter.loop != 0}};
+    float popupX[3] = {0, 0, 0};
+    for (int i = 0; i < 4; ++i) {
+        if (Pill(drops[i].id, drops[i].label.c_str(), drops[i].on, px, pillY, pillH, &pw)) {
+            if (drops[i].popup) {
+                ImGui::OpenPopup(drops[i].popup);
+            } else {
+                S.audioFilter.loop = (S.audioFilter.loop + 1) % 3;
+            }
+        }
+        if (i < 3) {
+            popupX[i] = px;
+        }
+        px += pw + 6 * u;
+    }
+    float popupY = pillY + pillH + 4 * u;
+    {
+        std::vector<std::string> labels = {"Todos os tipos"};
+        std::vector<int> values = {-1};
+        for (int k = 0; k < sfx::KIND_COUNT; ++k) {
+            labels.push_back(sfx::KindName(k));
+            values.push_back(k);
+        }
+        ChoicePopup("##tipoPop", labels, values, &S.audioFilter.kind, popupX[0], popupY);
+    }
+    {
+        std::vector<std::string> labels = {"Todos os ve\xC3\xAD" "culos"};
+        std::vector<int> values = {-1};
+        for (const auto& v : AudioVehicles()) {
+            labels.push_back(v.first);
+            values.push_back(v.second);
+        }
+        ChoicePopup("##veicPop", labels, values, &S.audioFilter.vehicle, popupX[1], popupY);
+    }
+    {
+        std::vector<std::string> labels = {"Todas as armas"};
+        std::vector<int> values = {-1};
+        for (int i = 0; i < weaponCount; ++i) {
+            labels.push_back(audio_data::WEAPONS[i].name);
+            values.push_back(i);
+        }
+        ChoicePopup("##armaPop", labels, values, &S.audioFilter.weapon, popupX[2], popupY);
+    }
+    const char* show = "Info do \xC3\xA1udio";
+    float showW = TextSize(fonts.desc, show).x + 24 * u;
+    if (Pill("##mostrarAudio", show, S.audioShow, x + w - showW, pillY, pillH, nullptr)) {
+        S.audioShow = !S.audioShow;
+        SaveIni();
+        Toast("Trok DevTools", S.audioShow ? "Info do \xC3\xA1udio ligada: feche o menu e os sons aparecem na tela."
+                                           : "Info do \xC3\xA1udio desligada.");
+    }
+    if (ImGui::IsItemHovered()) {
+        Tooltip("Com o menu fechado, mostra o banco e o som de cada \xC3\xA1udio que o jogo toca.");
+    }
+
+    // Filtro (so quando muda)
+    if (!(S.audioApplied == S.audioFilter) || !S.audioHasResult) {
+        S.audioResult = sfx::Apply(S.audioFilter);
+        S.audioHasResult = true;
+        bool wasActive = !S.audioApplied.query.empty() || S.audioApplied.kind >= 0 || S.audioApplied.vehicle >= 0 ||
+                         S.audioApplied.weapon >= 0 || S.audioApplied.loop != 0;
+        S.audioApplied = S.audioFilter;
+        // Com filtro: abre os pacotes com resultado (e os bancos, se forem poucos sons); sem filtro: fecha tudo
+        S.audioOpenPack.assign(sfx::Packs().size(), false);
+        S.audioOpenBank.assign(sfx::Banks().size(), false);
+        if (AudioFilterActive()) {
+            for (size_t p = 0; p < sfx::Packs().size(); ++p) {
+                S.audioOpenPack[p] = S.audioResult.bankCount[p] > 0;
+            }
+            if (S.audioResult.total <= 120) {
+                for (size_t b = 0; b < sfx::Banks().size(); ++b) {
+                    S.audioOpenBank[b] = !S.audioResult.sounds[b].empty();
+                }
+            }
+        } else if (wasActive && S.audioSelBank >= 0) {
+            RevealSound(S.audioSelBank, S.audioSelSound);
+        }
+    }
+
+    float statusY = y + barH + 10 * u;
+    char status[200];
+    snprintf(status, sizeof(status), "%d pacotes  \xC2\xB7  %s banks  \xC2\xB7  %s sons", static_cast<int>(sfx::Packs().size()),
+             Thousands(sfx::BankCount()).c_str(), Thousands(sfx::SoundCount()).c_str());
+    std::string line = status;
+    if (AudioFilterActive()) {
+        snprintf(status, sizeof(status), "  \xC2\xB7  %s no filtro", Thousands(S.audioResult.total).c_str());
+        line += status;
+    }
+    if (sfx::Failed() > 0) {
+        snprintf(status, sizeof(status), "  \xC2\xB7  %d bancos sem cabe\xC3\xA7" "alho", sfx::Failed());
+        line += status;
+    }
+    Text(dl, fonts.desc, x + 2 * u, statusY, col::hint, line.c_str());
+
+    float bodyY = statusY + fonts.desc->FontSize + 10 * u, bodyH = y + h - bodyY;
+    float leftW = std::floor(w * 0.62f), gap = 18 * u, rightX = x + leftW + gap, rightW = w - leftW - gap;
+    float playerH = 74 * u;
+    AudioTree(x, bodyY, leftW, bodyH - playerH - 10 * u);
+    AudioPlayerBar(x, bodyY + bodyH - playerH, leftW, playerH);
+    dl->AddLine(ImVec2(x + leftW + gap * 0.5f, bodyY), ImVec2(x + leftW + gap * 0.5f, bodyY + bodyH), col::separator);
+    AudioSide(rightX, bodyY, rightW, bodyH);
+}
+
+// Com o menu fechado: os ultimos sons, um cartao cada, a direita da tela; somem depois do tempo escolhido.
+bool AudioOverlayActive() {
+    if (!S.audioShow || audiospy::History().empty()) {
+        return false;
+    }
+    return GetTickCount() - audiospy::History().front().last < static_cast<DWORD>(S.audioDelay) * 1000u + 500u;
+}
+
+void AudioOverlay() {
+    if (!AudioOverlayActive()) {
+        return;
+    }
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    ImVec2 screen = ImGui::GetIO().DisplaySize;
+    DWORD now = GetTickCount(), life = static_cast<DWORD>(S.audioDelay) * 1000u;
+    float cardW = 360 * u, cardH = 46 * u, gap = 6 * u;
+    float x = screen.x - cardW - 24 * u, y = screen.y * 0.36f;
+    int shown = 0;
+    for (const audiospy::Played& p : audiospy::History()) {
+        DWORD age = now - p.last;
+        if (shown >= 6 || age > life + 500) {
+            break;
+        }
+        float alpha = age <= life ? 1.0f : 1.0f - (age - life) / 500.0f;
+        ImU32 a = static_cast<ImU32>(alpha * 236);
+        dl->AddRectFilled(ImVec2(x, y), ImVec2(x + cardW, y + cardH), IM_COL32(12, 12, 12, a), 9 * u);
+        dl->AddRect(ImVec2(x, y), ImVec2(x + cardW, y + cardH), col::White(static_cast<int>(16 * alpha)), 9 * u);
+        auto fade = [&](ImU32 c) { return (c & 0x00FFFFFF) | (static_cast<ImU32>(((c >> 24) & 0xFF) * alpha) << 24); };
+        Text(dl, fonts.body, x + 12 * u, y + 7 * u, fade(col::text), Ellipsize(fonts.body, PlayedTitle(p), cardW - 24 * u).c_str());
+        Text(dl, fonts.desc, x + 12 * u, y + 7 * u + fonts.body->FontSize + 3 * u, fade(col::hint),
+             Ellipsize(fonts.desc, PlayedSub(p), cardW - 24 * u).c_str());
+        y += cardH + gap;
+        ++shown;
+    }
+}
+
 // ---------------------------------------------------------------- outras abas
 
 void Placeholder(float x, float y, float w, float h, const char* title, const char* const* lines, int count) {
@@ -1101,6 +1848,13 @@ void TabGeneral(Rows& rows) {
         SaveIni();
     }
     if (rows.Toggle("Grade no ch\xC3\xA3o", &S.view.grid)) {
+        SaveIni();
+    }
+    rows.Section("\xC3\x81udio");
+    if (rows.Toggle("Mostrar o \xC3\xA1udio tocando agora (menu fechado)", &S.audioShow)) {
+        SaveIni();
+    }
+    if (rows.Stepper("Tempo na tela", &S.audioDelay, 1, 15, 1, "%d s", 4)) {
         SaveIni();
     }
     rows.Section("Miniaturas");
@@ -1256,12 +2010,15 @@ void Init(const char* iniPath, const char* gameDir) {
             unsigned long rgb = strtoul(hex, nullptr, 16);
             SetBackground(IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, 255));
         }
+        S.audioDelay = std::max(1, std::min(15, static_cast<int>(GetPrivateProfileIntA("devtools", "audio_tempo", 4, S.ini))));
         S.perFrame = std::max(1, std::min(8, static_cast<int>(GetPrivateProfileIntA("devtools", "miniaturas_por_quadro", 3,
                                                                                      S.ini))));
     }
     core::SetGameDir(S.gameDir);
     core::SetInspect(S.inspect);
     core::SetThumbsPerFrame(S.perFrame);
+    audiospy::SetIgnoreFeet(S.audioIgnoreFeet);
+    player::SetRepeat(S.audioRepeat);
 }
 
 void Toggle() {
@@ -1269,6 +2026,7 @@ void Toggle() {
     S.age = 0;
     if (!S.open) {
         core::SetBrowsing(false);
+        player::Stop(); // o player e do menu
         if (S.cardOpen) {
             S.cardOpen = false;
             core::Close();
@@ -1281,7 +2039,7 @@ bool CapturesInput() {
 }
 
 bool WantsFrame() {
-    return S.open || core::InspectOn() || ToastsVisible();
+    return S.open || core::InspectOn() || ToastsVisible() || AudioOverlayActive();
 }
 
 const char* Version() {
@@ -1305,9 +2063,15 @@ void Frame() {
                 OpenCard(look.model);
             }
         }
+        if (AudioOverlayActive()) {
+            PushStyle();
+            AudioOverlay();
+            PopStyle();
+        }
         DrawToasts();
         return;
     }
+    player::Update();
     bool fresh = S.age++ == 0;
     bool keysOk = !fresh && !io.WantTextInput && !CapturingKey();
     bool escape = keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
@@ -1337,12 +2101,7 @@ void Frame() {
         Placeholder(x, top, w, bodyH, "Anima\xC3\xA7\xC3\xB5" "es", lines, 2);
         break;
     }
-    case 2: {
-        const char* lines[] = {"Os bancos de som e as r\xC3\xA1" "dios, com player e busca.",
-                               "Tocar um som pelo id do banco e do slot."};
-        Placeholder(x, top, w, bodyH, "\xC3\x81udios", lines, 2);
-        break;
-    }
+    case 2: TabAudio(x, top, w, bodyH); break;
     case 3: {
         const char* lines[] = {"Localizar qualquer arquivo dos .img e da pasta do jogo.",
                                "Ver de onde o jogo est\xC3\xA1 lendo cada coisa (original, outro .img ou mod)."};
@@ -1378,7 +2137,9 @@ void Frame() {
 
     static const std::vector<Hint> hints = {{"Clique", "Abrir o card", false}, {"/trokdevtools", "Abrir e fechar", false},
                                             {"Esc", "Fechar", true}};
-    int clicked = EndShell(hints);
+    static const std::vector<Hint> audioHints = {{"Clique", "Tocar ou parar", false}, {"/trokdevtools", "Abrir e fechar", false},
+                                                 {"Esc", "Fechar", true}};
+    int clicked = EndShell(S.tab == 2 ? audioHints : hints);
     PopStyle();
     if (!keep || clicked == 2 || (escape && !cardWasOpen && popups == 0)) {
         Toggle();

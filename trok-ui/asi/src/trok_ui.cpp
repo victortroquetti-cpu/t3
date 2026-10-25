@@ -206,6 +206,7 @@ void BuildFonts(float screenHeight, const char* gameDir) {
         0x0020, 0x00FF, // Latin-1 (acentos do portugues)
         0x0400, 0x052F, // cirilico, como os mods da casa
         0x2013, 0x2026, // travessao, aspas, reticencias, bullet
+        0x2039, 0x203A, // as setas pequenas (‹ ›)
         0,
     };
     // So os icones que o kit usa: o atlas fica pequeno mesmo com o lucide completo.

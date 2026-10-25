@@ -771,6 +771,90 @@ void WriteGameFiles() {
     WriteImg("SAMP\\SAMP.IMG", 2);
 }
 
+// ---------------------------------------------------------------- audio (audio\CONFIG e audio\SFX no formato do jogo)
+
+#include "../../src/audio_data.h"
+
+const char* const PAKS[] = {"FEET", "GENRL", "PAIN_A", "SCRIPT", "SPC_EA", "SPC_FA", "SPC_GA", "SPC_NA", "SPC_PA"};
+const int PAK_FIRST_BANK[] = {0, 7, 144, 147, 365, 411, 429, 638, 690, 710};
+constexpr int FAKE_RATE = 22050, FAKE_SAMPLES = 1102; // 0,05 s por som
+BYTE g_soundManager[0x100];
+int g_soundRequests = 0;
+// Posicoes na aba Audios (1920x1080), conferidas nas capturas
+constexpr int AUDIO_ROW_Y = 281, AUDIO_WAV_X = 1120, AUDIO_HIST_X = 1170, AUDIO_HIST_Y = 362;
+
+int FakeSoundsInBank(int bank) {
+    if (bank == audio_data::WEAPONS_BANK) {
+        return 89;
+    }
+    return bank == 8 ? 3 : 1 + bank % 3; // o 8 e o 90S_P: 3 sons, o primeiro com loop
+}
+
+void WriteAudioFiles() {
+    CreateDirectoryA("audio", nullptr);
+    CreateDirectoryA("audio\\CONFIG", nullptr);
+    CreateDirectoryA("audio\\SFX", nullptr);
+    std::string pakFiles(9 * 0x34, '\0');
+    std::string lookup;
+    for (int p = 0; p < 9; ++p) {
+        strcpy(&pakFiles[p * 0x34], PAKS[p]);
+        std::string pak;
+        for (int bank = PAK_FIRST_BANK[p]; bank < PAK_FIRST_BANK[p + 1]; ++bank) {
+            int n = FakeSoundsInBank(bank);
+            std::string header(0x12C4, '\0');
+            *reinterpret_cast<short*>(&header[0]) = static_cast<short>(n);
+            std::string pcm;
+            for (int i = 0; i < n; ++i) {
+                BYTE* item = reinterpret_cast<BYTE*>(&header[4 + i * 12]);
+                *reinterpret_cast<DWORD*>(item) = static_cast<DWORD>(pcm.size());
+                *reinterpret_cast<DWORD*>(item + 4) = bank == 8 && i == 0 ? 0 : 0xFFFFFFFF;
+                *reinterpret_cast<WORD*>(item + 8) = FAKE_RATE;
+                for (int k = 0; k < FAKE_SAMPLES; ++k) {
+                    short v = static_cast<short>(8000 * std::sin(k * 0.06f * (1 + i)));
+                    pcm.append(reinterpret_cast<const char*>(&v), 2);
+                }
+            }
+            DWORD entry[3] = {static_cast<DWORD>(p), static_cast<DWORD>(pak.size()), static_cast<DWORD>(header.size() + pcm.size())};
+            lookup.append(reinterpret_cast<const char*>(entry), 12);
+            pak += header + pcm;
+        }
+        WriteText((std::string("audio\\SFX\\") + PAKS[p]).c_str(), pak);
+    }
+    WriteText("audio\\CONFIG\\PakFiles.dat", pakFiles);
+    WriteText("audio\\CONFIG\\BankLkup.dat", lookup);
+}
+
+// O carregador de bancos no AEAudioHardware (+0xD98): o slot 3 tem o 90S_P, o 4 um banco de passos, o 5 o WEAPONS.
+void BuildAudioMemory() {
+    BYTE* loader = static_cast<BYTE*>(calloc(1, 0x6E4));
+    BYTE* slots = static_cast<BYTE*>(calloc(45, 0x12D4));
+    *reinterpret_cast<BYTE**>(loader) = slots;
+    *reinterpret_cast<WORD*>(loader + 0xC) = 45;
+    *reinterpret_cast<WORD*>(loader + 0xE) = 710;
+    *reinterpret_cast<WORD*>(loader + 0x10) = 9;
+    for (int i = 0; i < 45; ++i) {
+        *reinterpret_cast<short*>(slots + i * 0x12D4 + 0x10) = -1;
+    }
+    *reinterpret_cast<short*>(slots + 3 * 0x12D4 + 0x10) = 8;
+    *reinterpret_cast<short*>(slots + 4 * 0x12D4 + 0x10) = 1;
+    *reinterpret_cast<short*>(slots + 5 * 0x12D4 + 0x10) = audio_data::WEAPONS_BANK;
+    Mem<BYTE*>(0xB5F8B8 + 0xD98) = loader;
+}
+
+void* __fastcall FakeRequestNewSound(void*, void*, BYTE* sound) {
+    ++g_soundRequests;
+    return sound;
+}
+
+// O jogo pedindo um som: slot, som no slot e evento (como o CAESoundManager recebe).
+void GameSound(int slot, int sound, int event) {
+    BYTE snd[0x74] = {};
+    *reinterpret_cast<short*>(snd) = static_cast<short>(slot);
+    *reinterpret_cast<short*>(snd + 2) = static_cast<short>(sound);
+    *reinterpret_cast<int*>(snd + 0xC) = event;
+    reinterpret_cast<void*(__fastcall*)(void*, void*, BYTE*)>(0x4EFB10)(g_soundManager, nullptr, snd);
+}
+
 // ---------------------------------------------------------------- o mundo
 
 void AddModel(int id, int type, Shape shape, const char* name, int txd, int img, const char* section, const char* ide) {
@@ -901,6 +985,8 @@ void BuildWorld() {
     }
     BuildTxds();
     WriteGameFiles();
+    WriteAudioFiles();
+    BuildAudioMemory();
 }
 
 // ---------------------------------------------------------------- quadros, entrada e capturas
@@ -1164,6 +1250,7 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     Redirect(FN_LOS, reinterpret_cast<void*>(FakeLineOfSight));
     Redirect(FN_CALC_SCREEN, reinterpret_cast<void*>(FakeCalcScreenCoors));
     Redirect(FN_PROCESS_ONE, reinterpret_cast<void*>(FakeProcessOneCommand));
+    Redirect(0x4EFB10, reinterpret_cast<void*>(FakeRequestNewSound)); // CAESoundManager::RequestNewSound
 
     // Camera em (0, -6, 1.8) olhando para +Y; o personagem em (0, 0, 1) olhando para +Y.
     static float camera[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -6, 1.8f, 1};
@@ -1488,6 +1575,52 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     Frames(120);
     Capture("07-depois-do-reset.bmp");
     CheckF(Variety(193, 190, 330, 330) > 6, "depois do Reset a miniatura volta (%.0f cores)", Variety(193, 190, 330, 330));
+
+    // 6b) A aba Audios: a arvore dos pacotes, a busca, salvar em .wav, tocar e o "audio tocando agora".
+    Click(960, 120);
+    for (int i = 0; i < 100 && !LogHas("sfx: "); ++i) {
+        Frames(3);
+    }
+    Frames(10);
+    Capture("11-audios.bmp");
+    Check(LogHas("sfx: 9 pacotes, 710 bancos"), "audio: 9 pacotes e 710 bancos lidos do SFX");
+    CheckF(Variety(198, 220, 1140, 700) > 8, "audio: a arvore dos pacotes desenhada (%.0f cores)", Variety(198, 220, 1140, 700));
+    Click(300, 154);
+    Type("90s_p");
+    Frames(20);
+    Capture("12-audios-busca.bmp");
+    std::string wav = g_out + "\\Trok DevTools\\sons\\GENRL_Bank_002_90S_P_sound_001.wav";
+    Click(AUDIO_WAV_X, AUDIO_ROW_Y);
+    Frames(5);
+    WIN32_FILE_ATTRIBUTE_DATA fa = {};
+    bool saved = GetFileAttributesExA(wav.c_str(), GetFileExInfoStandard, &fa) != 0;
+    CheckF(saved && fa.nFileSizeLow == 44 + FAKE_SAMPLES * 2, "salvar em .wav: o som do pacote com cabecalho RIFF (%.0f bytes)",
+           saved ? fa.nFileSizeLow : 0);
+    Click(400, AUDIO_ROW_Y);
+    Frames(10);
+    Capture("13-tocando.bmp");
+    Key(VK_F10, true);
+    Frames(3);
+    GameSound(3, 0, 63);
+    GameSound(4, 0, 0); // passos: ignorados
+    GameSound(5, 31, 0);
+    GameSound(5, 31, 0); // o mesmo de novo: soma no anterior
+    Frames(10);
+    Capture("14-audio-na-tela.bmp");
+    Check(g_soundRequests == 4, "gancho do RequestNewSound: o original chamado para todos os sons");
+    Check(LogHas("audio: carregador de bancos em AEAudioHardware+0xD98 (45 slots, 710 bancos)"),
+          "audio: o carregador de bancos achado no AEAudioHardware");
+    Check(LogHas("audio: primeiro som: GENRL 90S_P sound_001 (slot 3, evento 63)"), "audio: o primeiro som com pacote e banco");
+    CheckF(Variety(1500, 360, 1900, 520) > 4, "info do audio na tela com o menu fechado (%.0f cores)", Variety(1500, 360, 1900, 520));
+    Key(VK_F10, true);
+    Frames(10);
+    Capture("15-historico.bmp");
+    CheckF(Variety(AUDIO_HIST_X, AUDIO_HIST_Y, AUDIO_HIST_X + 400, AUDIO_HIST_Y + 90) > 4,
+           "historico no menu (%.0f cores)", Variety(AUDIO_HIST_X, AUDIO_HIST_Y, AUDIO_HIST_X + 400, AUDIO_HIST_Y + 90));
+    Click(AUDIO_HIST_X + 100, AUDIO_HIST_Y + 20);
+    Frames(10);
+    Capture("16-historico-clicado.bmp");
+    Click(200, 120); // de volta para Modelos
 
     // 7) Fechar o menu.
     Key(VK_F10, true);
