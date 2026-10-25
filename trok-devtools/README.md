@@ -114,4 +114,5 @@ Se algo não abrir ou travar, mande esse arquivo.
 ### Compilar e testar
 
 - `build.sh`: MinGW i686 + ImGui 1.89.9 + MinHook + o kit da casa → `build/` e `dist/Trok DevTools.asi`.
+- `test/concept/concept.sh`: as imagens de conceito em `test/out/concept/`, no Linux e sem o jogo. O menu de verdade (`devtools.cpp` e o kit) é desenhado sobre uma rua de mentira. Os modelos são desenhos low-poly feitos em Python (`models.py`), com os ids e nomes do jogo. O catálogo, o carregamento e o desenho 3D do `.asi` são trocados por versões que leem o que o `assets.py` gerou.
 - `test/smoke/run.sh`: roda o `build/Trok DevTools.asi` (rode o `build.sh` antes) no Wine 32 bits com Xvfb. O `host.c` é um `.exe` mínimo cuja `.bss` cobre os endereços do GTA, e o `fake_gta.cpp` monta ali o jogo de mentira: modelos, TXDs, colisões, `.ide`, `.img`, streaming, linha de visão e comandos de script. As capturas ficam em `test/out/smoke/`.

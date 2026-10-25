@@ -206,6 +206,11 @@ void DoSpawn(int id) {
         g_spawnOk = true;
         char text[160];
         snprintf(text, sizeof(text), "%d criado %.1f m \xC3\xA0 sua frente.", id, dist);
+        for (char* c = text; *c; ++c) {
+            if (*c == '.' && c[1] >= '0' && c[1] <= '9') {
+                *c = ','; // decimal como no resto do menu
+            }
+        }
         g_spawnMessage = text;
         DevToolsLog("criado %d (%s) em %.1f %.1f %.1f, handle %d", id, sk == gta::SPAWN_OBJECT ? "objeto"
                   : sk == gta::SPAWN_VEHICLE ? "veiculo" : "personagem", at.x, at.y, at.z, handle);
