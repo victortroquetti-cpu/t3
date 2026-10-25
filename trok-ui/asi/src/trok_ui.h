@@ -197,6 +197,10 @@ bool ToastsVisible();
 
 void Tooltip(const char* text);
 
+// O seletor de cor da casa (quadrado tipo Photoshop, matiz, RGB/hex, padrao e cores rapidas) num popup, o mesmo do
+// Rows::Color. Abra com ImGui::OpenPopup(id) e chame todo quadro (posicione com SetNextWindowPos antes). true = mudou.
+bool ColorPopup(const char* id, ImU32* color, ImU32 def);
+
 // true enquanto uma linha de tecla espera o jogador apertar algo (as setas nao navegam).
 bool CapturingKey();
 

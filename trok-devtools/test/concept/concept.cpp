@@ -649,6 +649,24 @@ int main(int argc, char** argv) {
     devtools::SetBackground(IM_COL32(0, 177, 64, 255));
     Frames(5);
     Shot(out + "/11-fundo-verde.ppm", scene);
+
+    // 3d. O botao Fundo (depois da pilula Girar) abre o seletor de cor da casa, para cima
+    int girarEnd = 0;
+    for (int x = 640; x > 300 && !girarEnd; --x) {
+        const float* p = &fb[(static_cast<size_t>(916) * W + x) * 3];
+        girarEnd = p[0] > 0.84f && p[1] > 0.84f ? x : 0;
+    }
+    mouse = ImVec2(girarEnd + 19.0f, 916.0f);
+    io.MouseDrawCursor = true;
+    clickNext = true;
+    Frames(8);
+    Shot(out + "/12-seletor-de-cor.ppm", scene);
+    Check(girarEnd > 0 && ImGui::GetCurrentContext()->OpenPopupStack.Size == 2, "botao Fundo: o seletor de cor abre sobre o card");
+    Key(ImGuiKey_Escape);
+    Frames(3);
+    Check(devtools::S.cardOpen && ImGui::GetCurrentContext()->OpenPopupStack.Size == 1, "Esc fecha so o seletor");
+    io.MouseDrawCursor = false;
+    mouse = ImVec2(-100, -100);
     devtools::SetBackground(devtools::BACKGROUND_DEFAULT);
 
     // 4. Criar no mundo: o aviso e o carro na frente do CJ, com o menu fechado

@@ -4,11 +4,11 @@ Uma ferramenta para modders dentro do GTA San Andreas: ver todos os modelos que 
 
 Por enquanto só a aba **Modelos** funciona. As outras (Animações, Áudios, Arquivos) estão no menu como "Em breve". As texturas não têm aba: ficam no card do modelo.
 
-**Estado:** v0.2, `.asi` compilado e testado fora do jogo (Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide` e `.img` de verdade: `test/smoke/run.sh`, 50 conferências e 12 capturas). Falta o teste no jogo de verdade.
+**Estado:** v0.2.1, `.asi` compilado e testado fora do jogo (Wine, com um GTA de mentira que tem modelos, TXDs, colisões, `.ide` e `.img` de verdade: `test/smoke/run.sh`, 52 conferências e 13 capturas). Falta o teste no jogo de verdade.
 
 **Novo na v0.2:**
 - A textura clicada no card mostra quem mais usa a mesma textura.
-- O visualizador ganhou a cor do fundo, com verde e azul para chroma key.
+- O visualizador ganhou a cor do fundo, no seletor de cor da casa.
 - Os botões do visualizador (Grade, Colisão...) agora recebem o clique. Antes o clique virava arrasto do modelo.
 - Os objetos nascem na altura dos olhos.
 - O Info ao apontar ficou certo com modelos grandes (bairros, terrenos).
@@ -46,7 +46,7 @@ Clique num card e abre o popup do modelo:
 - **Visualizador 3D:**
   - Arraste para girar, roda para zoom, duplo clique para centralizar.
   - As opções embaixo ficam salvas: **Texturas**, **Arame**, **Colisão** (as caixas, esferas e triângulos da colisão, em cima do modelo), **Grade** (o chão, 1 m por quadrado; clique para tirar) e **Girar** (gira sozinho).
-  - As bolinhas ao lado trocam a **cor do fundo**: escuro, cinza, claro, branco, verde e azul. O verde e o azul servem de chroma key para vídeo. No Geral dá para escolher qualquer cor.
+  - O botão **Fundo**, ao lado das opções, abre o seletor de cor da casa: o quadrado de saturação e brilho, a barra de matiz, RGB e hex, a cor padrão e cores rápidas. É o mesmo seletor do Geral. Para chroma key de vídeo, use verde puro (`00B140`) ou azul (`0047BB`).
 - **Informações:** ID, tipo, DFF, TXD (com o pai, se houver), o `.img` e o tamanho do arquivo, se é substituído, o `.ide` que define, distância de desenho, flags decodificadas, tamanho em metros, vértices, triângulos, materiais, atômicos e a colisão.
 - **Texturas:** as usadas pelo modelo e, separadas, as outras da mesma TXD. Cada uma mostra o tamanho e o formato. Clique numa textura para abrir a textura (abaixo).
 - **Criar no mundo (1:1):** cria o modelo na sua frente, virado para você. A distância cresce com o tamanho do modelo, para ele não nascer em cima de você.

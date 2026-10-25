@@ -31,19 +31,12 @@ namespace {
 
 using namespace tui;
 
-constexpr const char* VERSION_TAG = "v0.2";
+constexpr const char* VERSION_TAG = "v0.2.1";
 // As texturas ficam no card do modelo (clique numa textura): nao tem aba propria.
 const char* const TABS[] = {"Modelos", "Anima\xC3\xA7\xC3\xB5" "es", "\xC3\x81udios", "Arquivos", "Geral"};
 constexpr int TAB_COUNT = 5, TAB_MODELS = 0, TAB_GENERAL = 4;
 
-// Fundos do visualizador: os atalhos do card (o Geral aceita qualquer cor). Verde e azul servem de chroma key.
-struct Swatch {
-    ImU32 color;
-    const char* name;
-};
-const Swatch BACKGROUNDS[] = {{IM_COL32(20, 20, 20, 255), "Escuro"},          {IM_COL32(60, 63, 68, 255), "Cinza"},
-                              {IM_COL32(217, 217, 217, 255), "Claro"},       {IM_COL32(255, 255, 255, 255), "Branco"},
-                              {IM_COL32(0, 177, 64, 255), "Verde (chroma)"}, {IM_COL32(0, 71, 187, 255), "Azul (chroma)"}};
+// Fundo padrao do visualizador (o seletor de cor da casa troca, no card e no Geral).
 constexpr ImU32 BACKGROUND_DEFAULT = IM_COL32(20, 20, 20, 255);
 
 struct State {
@@ -660,31 +653,30 @@ void Viewer(const catalog::Entry& e, const mesh::Mesh* m, ImVec2 a, float side) 
         }
         ox += pw + 6 * u;
     }
-    // Fundo: bolinhas de cor ao lado das opcoes
-    ox += 8 * u;
-    float r = 9 * u, cy = oy + 13 * u;
-    for (int i = 0; i < static_cast<int>(sizeof(BACKGROUNDS) / sizeof(BACKGROUNDS[0])); ++i) {
-        ImVec2 c(ox + r, cy);
-        char id[16];
-        snprintf(id, sizeof(id), "##fundo%d", i);
-        ImGui::SetCursorScreenPos(ImVec2(c.x - r - 2 * u, c.y - r - 2 * u));
-        if (ImGui::InvisibleButton(id, ImVec2(2 * r + 4 * u, 2 * r + 4 * u))) {
-            SetBackground(BACKGROUNDS[i].color);
-            SaveIni();
-        }
-        bool hovered = ImGui::IsItemHovered();
-        bool chosen = (S.background | IM_COL32_A_MASK) == BACKGROUNDS[i].color;
-        if (hovered) {
-            Hand();
-            Tooltip((std::string("Fundo: ") + BACKGROUNDS[i].name).c_str());
-        }
-        dl->AddCircleFilled(c, r, BACKGROUNDS[i].color, 24);
-        dl->AddCircle(c, r, col::White(hovered ? 120 : 60), 24, 1.0f);
-        if (chosen) {
-            dl->AddCircle(c, r + 3 * u, col::strong, 24, 1.6f * u);
-        }
-        ox += 2 * r + 8 * u;
+    // Fundo: um quadradinho com a cor; o clique abre o seletor de cor da casa (o mesmo do Geral), para cima.
+    ox += 4 * u;
+    float sw = 30 * u, sh = 20 * u, sy = oy + 3 * u;
+    ImGui::SetCursorScreenPos(ImVec2(ox, oy));
+    if (ImGui::InvisibleButton("##fundo", ImVec2(sw + 52 * u, 26 * u))) {
+        ImGui::OpenPopup("##fundoPop");
     }
+    bool bgHovered = ImGui::IsItemHovered();
+    if (bgHovered) {
+        Hand();
+        Tooltip("Cor do fundo do visualizador");
+    }
+    dl->AddRectFilled(ImVec2(ox, sy), ImVec2(ox + sw, sy + sh), S.background | IM_COL32_A_MASK, 5 * u);
+    dl->AddRect(ImVec2(ox - 0.5f, sy - 0.5f), ImVec2(ox + sw + 0.5f, sy + sh + 0.5f), col::White(bgHovered ? 110 : 60), 5 * u,
+                0, 1.0f);
+    Text(dl, fonts.desc, ox + sw + 8 * u, oy + (26 * u - fonts.desc->FontSize) * 0.5f - 0.5f * u,
+         bgHovered ? col::text : col::column, "Fundo");
+    ImGui::SetNextWindowPos(ImVec2(ox, oy - 8 * u), ImGuiCond_Appearing, ImVec2(0.0f, 1.0f));
+    ImU32 bg = S.background;
+    if (ColorPopup("##fundoPop", &bg, BACKGROUND_DEFAULT)) {
+        SetBackground(bg);
+        SaveIni();
+    }
+    ox += sw + 8 * u + TextSize(fonts.desc, "Fundo").x + 12 * u;
     dl->ChannelsSetCurrent(0);
     dl->AddRectFilled(ImVec2(a.x + 4 * u, oy - 6 * u), ImVec2(ox, oy + 32 * u), IM_COL32(0, 0, 0, 120), 19 * u);
     dl->ChannelsMerge();
@@ -1319,6 +1311,8 @@ void Frame() {
     bool fresh = S.age++ == 0;
     bool keysOk = !fresh && !io.WantTextInput && !CapturingKey();
     bool escape = keysOk && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+    // Popups abertos (o card tambem e um): o Esc de um seletor de cor fecha so o seletor.
+    int popups = ImGui::GetCurrentContext()->OpenPopupStack.Size;
 
     float width = std::floor(std::max(760.0f, std::min(io.DisplaySize.x * 0.84f, 1560.0f)));
     float height = std::floor(std::max(520.0f, std::min(io.DisplaySize.y * 0.86f, 1000.0f)));
@@ -1380,13 +1374,13 @@ void Frame() {
     }
 
     bool cardWasOpen = S.cardOpen;
-    CardPopup(pos, ImVec2(width, height), escape && S.cardOpen);
+    CardPopup(pos, ImVec2(width, height), escape && S.cardOpen && popups <= 1);
 
     static const std::vector<Hint> hints = {{"Clique", "Abrir o card", false}, {"/trokdevtools", "Abrir e fechar", false},
                                             {"Esc", "Fechar", true}};
     int clicked = EndShell(hints);
     PopStyle();
-    if (!keep || clicked == 2 || (escape && !cardWasOpen)) {
+    if (!keep || clicked == 2 || (escape && !cardWasOpen && popups == 0)) {
         Toggle();
     }
     DrawToasts();

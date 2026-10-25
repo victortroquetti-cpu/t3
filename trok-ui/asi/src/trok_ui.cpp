@@ -1171,47 +1171,18 @@ bool PopupItem(const char* label, bool checked, bool isDefault, float width) {
 
 } // namespace
 
-bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
-    Start();
-    float sw = 36 * u, sh = 22 * u;
-    float sx = x_ + w_ - recuo_ * 0.5f - sw, sy = y_ + (rowH_ - sh) * 0.5f;
-    char hex[16], defHex[16];
-    HexText(*color, hex, sizeof(hex));
-    HexText(def, defHex, sizeof(defHex));
-    ImVec2 hs = TextSize(fonts.desc, hex);
-    float hexX = sx - 10 * u - hs.x;
+// O seletor de cor da casa num popup: quadrado de saturacao/brilho, barra de matiz, RGB e hex, a cor padrao e cores
+// rapidas. O mesmo do Rows::Color, para usar fora de uma linha (abra com ImGui::OpenPopup(id)).
+bool ColorPopup(const char* id, ImU32* color, ImU32 def) {
     bool changed = false;
-
-    ImGui::SetCursorScreenPos(ImVec2(hexX - 4 * u, y_));
-    bool clicked = ImGui::InvisibleButton("##corA", ImVec2(sx + sw - hexX + 4 * u, rowH_));
-    bool chov = ImGui::IsItemHovered();
-    if (chov) {
-        HandCursor();
-    }
-    if (Restore((*color | IM_COL32_A_MASK) != (def | IM_COL32_A_MASK), hexX, defHex)) {
-        *color = def;
-        changed = true;
-    }
-    if (clicked || (Selected() && keys_.enter)) {
-        *selected_ = index_;
-        ImGui::OpenPopup("##corPop");
-    }
-
-    bool hovered = Row(rowH_, chov);
-    Label(label, hovered);
-    Text(dl_, fonts.desc, hexX, y_ + (rowH_ - hs.y) * 0.5f, chov ? col::text : col::column, hex);
-    dl_->AddRectFilled(ImVec2(sx, sy), ImVec2(sx + sw, sy + sh), *color | IM_COL32_A_MASK, 5 * u);
-    dl_->AddRect(ImVec2(sx - 0.5f, sy - 0.5f), ImVec2(sx + sw + 0.5f, sy + sh + 0.5f), col::White(chov ? 70 : 40),
-                 5 * u, 0, 1.0f);
-
-    // Seletor: quadrado de saturacao/brilho, barra de matiz, RGB, o padrao e cores rapidas.
-    ImGui::SetNextWindowPos(ImVec2(sx + sw, sy + sh + 6 * u), ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
+    char hex[16], defHex[16];
+    HexText(def, defHex, sizeof(defHex));
     PushPopupStyle();
-    if (ImGui::BeginPopup("##corPop")) {
+    if (ImGui::BeginPopup(id)) {
         ImDrawList* pdl = ImGui::GetWindowDrawList();
         static float h = 0, s = 0, v = 0;
         static ImGuiID editing = 0;
-        ImGuiID pid = ImGui::GetID("##corPop");
+        ImGuiID pid = ImGui::GetID(id);
         if (ImGui::IsWindowAppearing() || editing != pid) {
             U32ToHsv(*color, &h, &s, &v);
             editing = pid;
@@ -1319,6 +1290,45 @@ bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
         ImGui::EndPopup();
     }
     PopPopupStyle();
+    return changed;
+}
+
+bool Rows::Color(const char* label, ImU32* color, ImU32 def) {
+    Start();
+    float sw = 36 * u, sh = 22 * u;
+    float sx = x_ + w_ - recuo_ * 0.5f - sw, sy = y_ + (rowH_ - sh) * 0.5f;
+    char hex[16], defHex[16];
+    HexText(*color, hex, sizeof(hex));
+    HexText(def, defHex, sizeof(defHex));
+    ImVec2 hs = TextSize(fonts.desc, hex);
+    float hexX = sx - 10 * u - hs.x;
+    bool changed = false;
+
+    ImGui::SetCursorScreenPos(ImVec2(hexX - 4 * u, y_));
+    bool clicked = ImGui::InvisibleButton("##corA", ImVec2(sx + sw - hexX + 4 * u, rowH_));
+    bool chov = ImGui::IsItemHovered();
+    if (chov) {
+        HandCursor();
+    }
+    if (Restore((*color | IM_COL32_A_MASK) != (def | IM_COL32_A_MASK), hexX, defHex)) {
+        *color = def;
+        changed = true;
+    }
+    if (clicked || (Selected() && keys_.enter)) {
+        *selected_ = index_;
+        ImGui::OpenPopup("##corPop");
+    }
+
+    bool hovered = Row(rowH_, chov);
+    Label(label, hovered);
+    Text(dl_, fonts.desc, hexX, y_ + (rowH_ - hs.y) * 0.5f, chov ? col::text : col::column, hex);
+    dl_->AddRectFilled(ImVec2(sx, sy), ImVec2(sx + sw, sy + sh), *color | IM_COL32_A_MASK, 5 * u);
+    dl_->AddRect(ImVec2(sx - 0.5f, sy - 0.5f), ImVec2(sx + sw + 0.5f, sy + sh + 0.5f), col::White(chov ? 70 : 40),
+                 5 * u, 0, 1.0f);
+
+    // Seletor: quadrado de saturacao/brilho, barra de matiz, RGB, o padrao e cores rapidas.
+    ImGui::SetNextWindowPos(ImVec2(sx + sw, sy + sh + 6 * u), ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
+    changed = ColorPopup("##corPop", color, def) || changed;
     Finish(rowH_);
     return changed;
 }

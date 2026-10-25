@@ -1320,37 +1320,54 @@ extern "C" __declspec(dllexport) int Run(unsigned memory, unsigned size) {
     Check(freeze && freeze->i[1] == 1, "criar: parado onde nasceu (0550)");
     Check(LogHas("criado 1337 (objeto)"), "log: criado 1337");
 
-    // Fundo do visualizador: a bolinha "Claro" ao lado das opcoes deixa o fundo claro.
-    int lightX = 0, run = 0;
-    for (int x = 400; x < 1010 && !lightX; ++x) {
+    // Fundo do visualizador: o botao "Fundo" depois das opcoes abre o seletor de cor da casa (quadrado tipo Photoshop).
+    int girarEnd = 0;
+    for (int x = 640; x > 300 && !girarEnd; --x) {
         DWORD p = Pixel(x, 916);
-        int r = (p >> 16) & 0xFF, g = (p >> 8) & 0xFF, b = p & 0xFF;
-        run = std::abs(r - 217) < 4 && std::abs(g - 217) < 4 && std::abs(b - 217) < 4 ? run + 1 : 0;
-        lightX = run >= 6 ? x - 2 : 0; // 6 pixels seguidos da cor: o meio da bolinha (texto nao faz isso)
+        girarEnd = ((p >> 16) & 0xFF) > 215 && ((p >> 8) & 0xFF) > 215 ? x : 0; // a pilula Girar (ligada, clara)
     }
-    CheckF(lightX > 0, "visualizador: as bolinhas de fundo ao lado das opcoes (Claro em x %.0f)", lightX);
-    if (lightX) {
-        Click(lightX, 916);
+    CheckF(girarEnd > 0, "visualizador: as opcoes embaixo (Girar termina em x %.0f)", girarEnd);
+    char ini[MAX_PATH];
+    GetFullPathNameA("Trok DevTools.ini", MAX_PATH, ini, nullptr);
+    if (girarEnd) {
+        Click(girarEnd + 19, 916);
         Frames(5);
-        Capture("09-fundo-claro.bmp");
+        Capture("09-seletor-de-cor.bmp");
+        // A bolinha branca da cor atual (#141414: canto de baixo a esquerda do quadrado); o quadrado tem 168u = 126 px.
+        int wx = 0, wy = 0;
+        for (int y = 300; y < 910 && !wx; ++y) {
+            for (int x = girarEnd; x < girarEnd + 300 && !wx; ++x) {
+                if ((Pixel(x, y) & 0xFFFFFF) == 0xFFFFFF) {
+                    wx = x, wy = y;
+                }
+            }
+        }
+        CheckF(wx > 0, "seletor de cor: o quadrado aberto acima do botao (a cor atual em y %.0f)", wy);
+        if (wx) {
+            Click(wx + 6, wy - 110); // perto do canto de cima a esquerda (o topo fica 116 px acima): quase branco
+            Frames(5);
+        }
+        Capture("09b-fundo-claro.bmp");
         DWORD bg = Pixel(300, 200);
-        CheckF(((bg >> 16) & 0xFF) > 180, "visualizador: fundo claro depois do clique (%.0f)", (bg >> 16) & 0xFF);
-        Click(lightX - 39, 916); // Escuro, duas bolinhas antes
+        CheckF(((bg >> 16) & 0xFF) > 180, "visualizador: fundo claro depois do clique no quadrado (%.0f)", (bg >> 16) & 0xFF);
+        char saved[16] = "";
+        GetPrivateProfileStringA("devtools", "visual_fundo", "", saved, sizeof(saved), ini);
+        CheckF(strlen(saved) == 6 && strtoul(saved, nullptr, 16) > 0xB00000, "fundo salvo no .ini (%.0f)", strtoul(saved, nullptr, 16));
+        Key(VK_ESCAPE); // fecha so o seletor
         Frames(5);
-        Capture("09b-fundo-escuro.bmp");
-        bg = Pixel(300, 200);
-        CheckF(((bg >> 16) & 0xFF) < 40, "visualizador: de volta ao fundo escuro (%.0f)", (bg >> 16) & 0xFF);
-        // A pilula Grade (antes das bolinhas) agora recebe o clique: o .ini guarda visual_grade=0 e volta a 1.
-        char ini[MAX_PATH];
-        GetFullPathNameA("Trok DevTools.ini", MAX_PATH, ini, nullptr);
-        Click(lightX - 112, 916);
-        Frames(5);
-        int gridOff = static_cast<int>(GetPrivateProfileIntA("devtools", "visual_grade", 1, ini));
-        Click(lightX - 112, 916);
-        Frames(5);
-        int gridOn = static_cast<int>(GetPrivateProfileIntA("devtools", "visual_grade", 0, ini));
-        CheckF(gridOff == 0 && gridOn == 1, "visualizador: a pilula Grade liga e desliga (%.0f)", gridOff * 10 + gridOn);
+        Capture("09c-esc-no-seletor.bmp");
+        CheckF(Variety(232, 150, 1016, 880) > 20 && ((Pixel(300, 200) >> 16) & 0xFF) > 180,
+               "Esc no seletor: fecha so o seletor, o card continua (%.0f cores)", Variety(232, 150, 1016, 880));
     }
+    // A pilula Grade (antes de Girar) agora recebe o clique: o .ini guarda visual_grade=0 e volta a 1.
+    int gradeX = girarEnd - 60;
+    Click(gradeX, 916);
+    Frames(5);
+    int gridOff = static_cast<int>(GetPrivateProfileIntA("devtools", "visual_grade", 1, ini));
+    Click(gradeX, 916);
+    Frames(5);
+    int gridOn = static_cast<int>(GetPrivateProfileIntA("devtools", "visual_grade", 0, ini));
+    CheckF(gridOff == 0 && gridOn == 1, "visualizador: a pilula Grade liga e desliga (%.0f)", gridOff * 10 + gridOn);
 
     // Textura em destaque: o painel da direita lista quem mais usa a mesma textura (a 1339 tem a mesma TXD).
     Model& trash2 = *FindModel(1339);
