@@ -196,13 +196,16 @@ void Engine::Frame(const Preset& preset, const Settings& s, const World& w, cons
                 if (b.cls != CLASS_AUTO || !b.enabled || b.cond != C_CHAT || !ChatMatches(b.trigger, line.text)) {
                     continue;
                 }
+                if (b.speechGuard && LooksLikeSpeech(b.trigger, line.text)) {
+                    continue; // "Fulano diz: ..." repassado pelo servidor: e fala, nao o aviso do sistema
+                }
                 std::string key = Normalize(b.trigger) + '\x1f' + b.text;
                 auto last = chatFired_.find(key);
                 if (last != chatFired_.end() && w.now - last->second < static_cast<unsigned>(b.cooldown)) {
                     continue;
                 }
                 Player who;
-                bool found = FindPlayer(line.text, line.author, w.players, &who);
+                bool found = FindPlayer(line.text, w.players, &who);
                 if (UsesTarget(b.text) && !found) {
                     Note(b.name.empty() ? std::string("Mensagem no chat") : b.name,
                          "O gatilho apareceu, mas o jogador da mensagem n\xC3\xA3o foi achado.");
@@ -250,8 +253,8 @@ void Engine::Frame(const Preset& preset, const Settings& s, const World& w, cons
         if (rising) {
             k.since = w.now;
             k.fired = false;
-            if (!keys->ModsOk(b.key)) {
-                k.fired = true; // outros modificadores: este aperto nao e desta bind
+            if (!keys->ModsOk(b.key) || !WhereOk(b, w.me.inVehicle)) {
+                k.fired = true; // outros modificadores, ou fora do lugar da bind (so no veiculo / so a pe)
                 continue;
             }
             if (b.mode == MODE_PRESS) {

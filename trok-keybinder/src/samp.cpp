@@ -38,10 +38,12 @@ constexpr DWORD PP_LOCAL_ID = 0x04, PP_LOCAL_NAME = 0x0A, PP_LOCAL_PLAYER = 0x22
 constexpr DWORD PI_REMOTE = 0x00, PI_NAME = 0x0C;
 constexpr DWORD RP_PED = 0x00, SP_GAME_PED = 0x2A4;
 constexpr DWORD LP_ACTIVE = 0x0C, LP_WASTED = 0x10;
-constexpr int CHAT_PLAYER = 2, CHAT_INFO = 4;
+constexpr int CHAT_INFO = 4; // mensagem do servidor (a fala de jogador e o tipo 2)
 constexpr size_t MAX_SEND = 128;
 
 constexpr DWORD GTA_PLAYER_PED = 0xB7CD98, GTA_CURR_AREA = 0xB72914, GTA_THE_CAMERA = 0xB6F028;
+// CPad::NewMouseControllerState: esquerdo, direito, meio, roda (2), lateral 1 e lateral 2, um byte cada.
+constexpr DWORD GTA_MOUSE_STATE = 0xB73418, MOUSE_MIDDLE = 2, MOUSE_X1 = 5, MOUSE_X2 = 6;
 constexpr DWORD GTA_CALC_SCREEN_COORS = 0x70CE30;
 constexpr DWORD PED_FLAGS_1 = 0x46D, PED_STATE = 0x530, PED_HEALTH = 0x540, PED_ARMOUR = 0x548, PED_VEHICLE = 0x58C,
                 PED_WEAPONS = 0x5A0, PED_WEAPON_SIZE = 0x1C, PED_ACTIVE_SLOT = 0x718;
@@ -226,20 +228,12 @@ bool NoObstacles(const Vec3& pos) {
 void __fastcall HookAddEntry(void* chat, void*, int type, const char* text, const char* prefix, DWORD textColor,
                              DWORD prefixColor) {
     o_addEntry(chat, type, text, prefix, textColor, prefixColor);
-    if (g_selfNotice || !text || (type != CHAT_PLAYER && type != CHAT_INFO)) {
+    // So mensagens do servidor (SendClientMessage): a fala de jogador (tipo 2) nunca dispara nada.
+    if (g_selfNotice || !text || type != CHAT_INFO) {
         return;
     }
     kb::ChatLine line;
     line.text = Convert(text, static_cast<int>(strnlen(text, 512)), CP_ACP, CP_UTF8);
-    if (type == CHAT_PLAYER && prefix) {
-        line.author = Convert(prefix, static_cast<int>(strnlen(prefix, 64)), CP_ACP, CP_UTF8);
-        if (!line.author.empty() && line.author.back() == ':') {
-            line.author.pop_back();
-        }
-        if (kb::SameNick(line.author, LocalName())) {
-            return; // a propria fala nunca dispara nada
-        }
-    }
     if (line.text.empty()) {
         return;
     }
@@ -483,6 +477,11 @@ bool PlayerDot(int id, float maxDistance, float screenW, float screenH, ImVec2* 
                dot->x <= screenW && dot->y <= screenH;
     }
     return false;
+}
+
+bool MouseButton(int which) {
+    DWORD offset = which == 0 ? MOUSE_MIDDLE : which == 1 ? MOUSE_X1 : MOUSE_X2;
+    return At<BYTE>(GTA_MOUSE_STATE, offset) != 0;
 }
 
 void TakeChat(std::vector<kb::ChatLine>* out) {

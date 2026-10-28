@@ -1,11 +1,18 @@
 #pragma once
 
-// Trok KeyBinder -- as binds, os presets e o arquivo (Trok KeyBinder.txt, UTF-8). Sem nada do jogo aqui: o mesmo
-// codigo roda no teste do Linux.
+// Trok KeyBinder -- as binds, os presets e a pasta do mod. Sem nada do jogo aqui: o mesmo codigo roda no teste do
+// Linux.
 //
 // Cada servidor ("ip:porta") aponta para um preset. O preset novo nasce com o nome do servidor; varios servidores
 // podem apontar para o mesmo preset (Horizonte 1, 2, 3 e 4 com o mesmo) e o preset pode ser renomeado.
+//
+// A pasta "Trok KeyBinder" (ao lado do .asi), em UTF-8:
+//   geral.txt            as opcoes do Geral e qual preset cada servidor usa
+//   presets\<nome>.txt   um arquivo por preset (copie para passar a alguem; um arquivo novo aqui entra sozinho)
+//   presets\apagados\    os presets apagados no menu
+//   Trok KeyBinder.log
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -32,6 +39,7 @@ enum Cond {
 };
 enum Seat { SEAT_ANY = 0, SEAT_DRIVER, SEAT_PASSENGER };
 enum Target { TARGET_NEAREST = 0, TARGET_ALL };
+enum Where { WHERE_ANY = 0, WHERE_VEHICLE, WHERE_FOOT }; // onde a bind vale (tecla e menu)
 
 constexpr int WEAPON_ANY = -1;
 
@@ -52,6 +60,8 @@ struct Bind {
     int mode = MODE_PRESS;
     bool inMenu = false; // aparece no menu circular
     std::string icon;    // nome do icone do Lucide no circulo e na lista ("" = nenhum)
+    std::string group;   // grupo no circulo ("" = direto no circulo)
+    int where = WHERE_ANY;
     // Automatico
     int cond = C_ENTER_VEHICLE;
     int value = 50;        // vida, colete, vida do veiculo ou arma (WEAPON_ANY = qualquer)
@@ -59,6 +69,7 @@ struct Bind {
     int delay = 0;         // ms depois da condicao
     std::string trigger;   // mensagem no chat: o trecho que dispara
     int cooldown = 5000;   // mensagem no chat: espera minima entre disparos (ms)
+    bool speechGuard = true; // mensagem no chat: ignora a linha com ":" antes do trecho (fala repassada pelo servidor)
     // Ao redor
     int radius = 5;        // m
     int target = TARGET_NEAREST;
@@ -67,7 +78,9 @@ struct Bind {
 
 struct Preset {
     std::string name;
+    int flood = 1200; // ms entre duas mensagens mandadas pelo mod (o anti-flood deste preset)
     std::vector<Bind> binds;
+    std::string file; // o arquivo dele em presets\ (nao vai dentro do arquivo)
 };
 
 struct ServerLink {
@@ -79,7 +92,6 @@ struct ServerLink {
 struct Settings {
     bool enabled = true;
     Hotkey radial;           // abre o menu circular
-    int flood = 1200;        // ms entre duas mensagens mandadas pelo mod
     int hold = 2000;         // ms segurando para "Segurar"
     int doubleTap = 350;     // ms entre os dois toques de "Duas vezes"
     int viewDistance = 25;   // m (Na visao)
@@ -93,14 +105,35 @@ struct Data {
     std::vector<Preset> presets;
     std::vector<ServerLink> servers;
     std::string lastPreset; // o preset editado fora de um servidor
+    std::vector<std::string> knownFiles; // arquivos de presets\ que o mod leu ou gravou (nao vai no arquivo)
 };
 
-// ---------------------------------------------------------------- arquivo
+// ---------------------------------------------------------------- arquivos
 
-std::string Serialize(const Data& d);
+std::string SerializeGeral(const Data& d);   // [geral] e os [servidor]
+std::string SerializePreset(const Preset& p); // [preset] e as [bind] dele
+std::string Serialize(const Data& d);        // tudo junto (o arquivo unico da v0.1)
+// Le qualquer um dos tres. O "intervalo" do [geral] da v0.1 vale para os presets sem o deles.
 bool Parse(const std::string& text, Data* d);
-bool LoadFile(const char* path, Data* d);
-bool SaveFile(const char* path, const Data& d); // grava num .tmp e troca (o antigo vira .bak)
+
+// Caminhos em UTF-8 (no Windows, as funcoes "W": nomes com acento funcionam).
+FILE* OpenFile(const std::string& path, const char* mode);
+bool ReadText(const std::string& path, std::string* out);
+bool WriteText(const std::string& path, const std::string& text); // .tmp e troca; nao mexe se ja for igual
+bool FileExists(const std::string& path);
+bool MakeDir(const std::string& path);
+std::string JoinPath(const std::string& dir, const std::string& name);
+
+// A pasta do mod. Load: o geral.txt e todos os presets\*.txt. Save: grava o que mudou, renomeia o arquivo do preset
+// renomeado e move para presets\apagados\ o de um preset apagado.
+bool LoadFolder(const std::string& dir, Data* d);
+bool SaveFolder(const std::string& dir, Data& d);
+// Presets\*.txt que apareceram depois (copiados de alguem): entram com nome unico. Devolve quantos.
+int MergeNewPresets(const std::string& dir, Data& d);
+// O arquivo unico da v0.1 (Trok KeyBinder.txt ao lado do .asi) vira a pasta; o antigo fica como .antigo.
+bool MigrateOldFile(const std::string& oldFile, const std::string& dir, Data* d);
+// "hzrp: policia?" -> "hzrp_ policia_" (sem os caracteres que o Windows recusa), ate 60 bytes.
+std::string SafeFileName(const std::string& name);
 
 // ---------------------------------------------------------------- presets
 
@@ -134,6 +167,19 @@ bool RadialConflict(const Settings& s, const Bind& b);
 // Binds ligadas com a tecla do atalho do menu circular.
 std::vector<int> RadialConflicts(const std::vector<Bind>& binds, const Hotkey& radial);
 
+bool WhereOk(const Bind& b, bool inVehicle);
+
+// ---------------------------------------------------------------- menu de binds (ordem e grupos)
+
+// As binds que dividem o mesmo lugar no menu com b (no mesmo grupo; as da visao na lista, as outras no circulo), na
+// ordem do menu, sem a propria (self).
+std::vector<int> MenuPeers(const std::vector<Bind>& binds, const Bind& b, int self);
+// Posicao (1 = primeira) da bind index entre as dela no menu.
+int MenuPosition(const std::vector<Bind>& binds, int index);
+// Leva a bind index para a posicao (1 = primeira) entre as dela no menu. Devolve o novo indice.
+int MoveInMenu(std::vector<Bind>& binds, int index, int position);
+std::vector<std::string> Groups(const std::vector<Bind>& binds); // na ordem em que aparecem
+
 std::vector<std::string> Lines(const std::string& text); // linhas nao vazias
 // Troca (id)/{id} e (nick)/{nick} pelo jogador.
 std::string Fill(const std::string& line, int id, const std::string& nick);
@@ -159,9 +205,12 @@ struct Player {
     float distance = 0; // m (0 = nao se sabe)
 };
 
-// Quem pediu: o autor (fala de jogador), um nick conectado que aparece na mensagem ou um ID "(12)", "[12]", "ID 12".
+// A linha parece fala de jogador repassada pelo servidor ("Fulano diz: ...")? Ha um ":" antes do trecho.
+bool LooksLikeSpeech(const std::string& trigger, const std::string& message);
+
+// Quem pediu: um nick conectado que aparece na mensagem ou um ID "(12)", "[12]", "ID 12", "#12".
 // players = os conectados (sem o jogador local). false = ninguem achado.
-bool FindPlayer(const std::string& message, const std::string& author, const std::vector<Player>& players, Player* out);
+bool FindPlayer(const std::string& message, const std::vector<Player>& players, Player* out);
 
 bool SameNick(const std::string& a, const std::string& b);
 bool Ignored(const Bind& b, const std::string& nick);

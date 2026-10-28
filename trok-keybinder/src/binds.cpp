@@ -7,6 +7,14 @@
 #include <cstdlib>
 #include <cstring>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <cerrno>
+#include <dirent.h>
+#include <sys/stat.h>
+#endif
+
 namespace kb {
 namespace {
 
@@ -145,39 +153,52 @@ bool SameMoment(const Bind& a, const Bind& b) {
 
 // ---------------------------------------------------------------- arquivo
 
-std::string Serialize(const Data& d) {
-    std::string out = "# Trok KeyBinder -- binds e presets (UTF-8). Edite com o jogo fechado.\n\n[geral]\n";
+std::string SerializeGeral(const Data& d) {
+    std::string out = "# Trok KeyBinder -- opcoes e servidores (UTF-8). Os presets ficam em presets\\.\n\n[geral]\n";
     char line[512];
     const Settings& s = d.settings;
     snprintf(line, sizeof(line),
-             "ligado=%d\nmenu_tecla=%d\nmenu_mods=%d\nintervalo=%d\nsegurar=%d\nduas_vezes=%d\nvisao_distancia=%d\n"
+             "ligado=%d\nmenu_tecla=%d\nmenu_mods=%d\nsegurar=%d\nduas_vezes=%d\nvisao_distancia=%d\n"
              "visao_bolinha=%d\nvisao_lista=%d\nmenu_tamanho=%d\n",
-             s.enabled ? 1 : 0, s.radial.key, s.radial.mods, s.flood, s.hold, s.doubleTap, s.viewDistance,
-             s.viewDot ? 1 : 0, s.viewList ? 1 : 0, s.radialSize);
+             s.enabled ? 1 : 0, s.radial.key, s.radial.mods, s.hold, s.doubleTap, s.viewDistance, s.viewDot ? 1 : 0,
+             s.viewList ? 1 : 0, s.radialSize);
     out += line;
     out += "ultimo_preset=" + Escape(d.lastPreset) + "\n";
-    for (const Preset& p : d.presets) {
-        out += "\n[preset]\nnome=" + Escape(p.name) + "\n";
-        for (const Bind& b : p.binds) {
-            out += "\n[bind]\nclasse=";
-            out += CLASS_KEYS[Clamp(b.cls, 0, CLASS_COUNT - 1)];
-            out += "\nnome=" + Escape(b.name) + "\ntexto=" + Escape(b.text) + "\nicone=" + Escape(b.icon) + "\n";
-            snprintf(line, sizeof(line),
-                     "ligada=%d\ntecla=%d\nmods=%d\nmodo=%d\nmenu=%d\ncondicao=%d\nvalor=%d\nassento=%d\natraso=%d\n"
-                     "espera=%d\nraio=%d\nalvo=%d\n",
-                     b.enabled ? 1 : 0, b.key.key, b.key.mods, b.mode, b.inMenu ? 1 : 0, b.cond, b.value, b.seat,
-                     b.delay, b.cooldown, b.radius, b.target);
-            out += line;
-            out += "gatilho=" + Escape(b.trigger) + "\nignorar=";
-            for (size_t i = 0; i < b.ignore.size(); ++i) {
-                out += (i ? "," : "") + b.ignore[i];
-            }
-            out += "\n";
-        }
-    }
     for (const ServerLink& l : d.servers) {
         out += "\n[servidor]\nendereco=" + Escape(l.address) + "\nnome=" + Escape(l.hostname) + "\npreset=" +
                Escape(l.preset) + "\n";
+    }
+    return out;
+}
+
+std::string SerializePreset(const Preset& p) {
+    char line[512];
+    std::string out = "# Trok KeyBinder -- um preset (UTF-8). Copie este arquivo para a pasta presets de outra pessoa.\n";
+    out += "\n[preset]\nnome=" + Escape(p.name) + "\nintervalo=" + std::to_string(p.flood) + "\n";
+    for (const Bind& b : p.binds) {
+        out += "\n[bind]\nclasse=";
+        out += CLASS_KEYS[Clamp(b.cls, 0, CLASS_COUNT - 1)];
+        out += "\nnome=" + Escape(b.name) + "\ntexto=" + Escape(b.text) + "\nicone=" + Escape(b.icon) +
+               "\ngrupo=" + Escape(b.group) + "\n";
+        snprintf(line, sizeof(line),
+                 "ligada=%d\ntecla=%d\nmods=%d\nmodo=%d\nmenu=%d\nonde=%d\ncondicao=%d\nvalor=%d\nassento=%d\n"
+                 "atraso=%d\nespera=%d\nignorar_fala=%d\nraio=%d\nalvo=%d\n",
+                 b.enabled ? 1 : 0, b.key.key, b.key.mods, b.mode, b.inMenu ? 1 : 0, b.where, b.cond, b.value, b.seat,
+                 b.delay, b.cooldown, b.speechGuard ? 1 : 0, b.radius, b.target);
+        out += line;
+        out += "gatilho=" + Escape(b.trigger) + "\nignorar=";
+        for (size_t i = 0; i < b.ignore.size(); ++i) {
+            out += (i ? "," : "") + b.ignore[i];
+        }
+        out += "\n";
+    }
+    return out;
+}
+
+std::string Serialize(const Data& d) {
+    std::string out = SerializeGeral(d);
+    for (const Preset& p : d.presets) {
+        out += "\n" + SerializePreset(p);
     }
     return out;
 }
@@ -187,6 +208,8 @@ bool Parse(const std::string& text, Data* d) {
     enum { NONE, GERAL, PRESET, BIND, SERVER } section = NONE;
     size_t pos = 0;
     bool any = false;
+    int legacyFlood = 0;            // o "intervalo" do [geral] da v0.1
+    std::vector<bool> hasFlood;     // o preset trouxe o dele?
     while (pos <= text.size()) {
         size_t end = text.find('\n', pos);
         if (end == std::string::npos) {
@@ -214,6 +237,7 @@ bool Parse(const std::string& text, Data* d) {
             } else if (t == "[preset]") {
                 section = PRESET;
                 d->presets.push_back(Preset());
+                hasFlood.push_back(false);
             } else if (t == "[bind]") {
                 section = d->presets.empty() ? NONE : BIND;
                 if (section == BIND) {
@@ -240,7 +264,7 @@ bool Parse(const std::string& text, Data* d) {
             if (key == "ligado") s.enabled = n != 0;
             else if (key == "menu_tecla") s.radial.key = n;
             else if (key == "menu_mods") s.radial.mods = n & 7;
-            else if (key == "intervalo") s.flood = Clamp(n, 500, 10000);
+            else if (key == "intervalo") legacyFlood = Clamp(n, 500, 10000);
             else if (key == "segurar") s.hold = Clamp(n, 500, 5000);
             else if (key == "duas_vezes") s.doubleTap = Clamp(n, 150, 1000);
             else if (key == "visao_distancia") s.viewDistance = Clamp(n, 3, 100);
@@ -250,6 +274,10 @@ bool Parse(const std::string& text, Data* d) {
             else if (key == "ultimo_preset") d->lastPreset = val;
         } else if (section == PRESET) {
             if (key == "nome") d->presets.back().name = val;
+            else if (key == "intervalo") {
+                d->presets.back().flood = Clamp(n, 500, 10000);
+                hasFlood.back() = true;
+            }
         } else if (section == BIND) {
             Bind& b = d->presets.back().binds.back();
             if (key == "classe") {
@@ -260,6 +288,9 @@ bool Parse(const std::string& text, Data* d) {
             else if (key == "nome") b.name = val;
             else if (key == "texto") b.text = val;
             else if (key == "icone") b.icon = Trim(val);
+            else if (key == "grupo") b.group = Trim(val);
+            else if (key == "onde") b.where = Clamp(n, 0, 2);
+            else if (key == "ignorar_fala") b.speechGuard = n != 0;
             else if (key == "tecla") b.key.key = n;
             else if (key == "mods") b.key.mods = n & 7;
             else if (key == "modo") b.mode = Clamp(n, 0, MODE_COUNT - 1);
@@ -293,6 +324,11 @@ bool Parse(const std::string& text, Data* d) {
             break;
         }
     }
+    for (size_t i = 0; i < d->presets.size(); ++i) {
+        if (!hasFlood[i] && legacyFlood) {
+            d->presets[i].flood = legacyFlood;
+        }
+    }
     // Presets sem nome ou repetidos ganham um nome unico; servidores sem endereco saem.
     for (size_t i = 0; i < d->presets.size(); ++i) {
         std::string base = d->presets[i].name.empty() ? std::string("Preset") : d->presets[i].name;
@@ -307,41 +343,292 @@ bool Parse(const std::string& text, Data* d) {
     return any;
 }
 
-bool LoadFile(const char* path, Data* d) {
-    FILE* f = fopen(path, "rb");
+// ---------------------------------------------------------------- pasta
+
+#ifdef _WIN32
+namespace {
+std::wstring Wide(const std::string& utf8) {
+    int n = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    std::wstring w(n > 0 ? n : 1, L'\0');
+    if (n > 0) {
+        MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &w[0], n);
+    }
+    w.resize(wcslen(w.c_str()));
+    return w;
+}
+
+std::string Narrow(const wchar_t* w) {
+    int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, nullptr, 0, nullptr, nullptr);
+    std::string s(n > 0 ? n : 1, '\0');
+    if (n > 0) {
+        WideCharToMultiByte(CP_UTF8, 0, w, -1, &s[0], n, nullptr, nullptr);
+    }
+    s.resize(strlen(s.c_str()));
+    return s;
+}
+} // namespace
+
+FILE* OpenFile(const std::string& path, const char* mode) {
+    return _wfopen(Wide(path).c_str(), Wide(mode).c_str());
+}
+
+bool FileExists(const std::string& path) {
+    return GetFileAttributesW(Wide(path).c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
+bool MakeDir(const std::string& path) {
+    return CreateDirectoryW(Wide(path).c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS;
+}
+
+std::string JoinPath(const std::string& dir, const std::string& name) {
+    return dir.empty() ? name : dir + "\\" + name;
+}
+
+namespace {
+bool MovePath(const std::string& from, const std::string& to) {
+    return MoveFileExW(Wide(from).c_str(), Wide(to).c_str(), MOVEFILE_REPLACE_EXISTING) != 0;
+}
+
+void RemovePath(const std::string& path) {
+    DeleteFileW(Wide(path).c_str());
+}
+
+std::vector<std::string> ListTxt(const std::string& dir) {
+    std::vector<std::string> out;
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(Wide(JoinPath(dir, "*.txt")).c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE) {
+        return out;
+    }
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            out.push_back(Narrow(fd.cFileName));
+        }
+    } while (FindNextFileW(h, &fd));
+    FindClose(h);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+} // namespace
+#else
+FILE* OpenFile(const std::string& path, const char* mode) {
+    return fopen(path.c_str(), mode);
+}
+
+bool FileExists(const std::string& path) {
+    struct stat st;
+    return stat(path.c_str(), &st) == 0;
+}
+
+bool MakeDir(const std::string& path) {
+    return mkdir(path.c_str(), 0755) == 0 || errno == EEXIST;
+}
+
+std::string JoinPath(const std::string& dir, const std::string& name) {
+    return dir.empty() ? name : dir + "/" + name;
+}
+
+namespace {
+bool MovePath(const std::string& from, const std::string& to) {
+    return rename(from.c_str(), to.c_str()) == 0;
+}
+
+void RemovePath(const std::string& path) {
+    remove(path.c_str());
+}
+
+std::vector<std::string> ListTxt(const std::string& dir) {
+    std::vector<std::string> out;
+    DIR* d = opendir(dir.c_str());
+    if (!d) {
+        return out;
+    }
+    while (dirent* e = readdir(d)) {
+        std::string name = e->d_name;
+        struct stat st;
+        if (name.size() > 4 && name.compare(name.size() - 4, 4, ".txt") == 0 &&
+            stat(JoinPath(dir, name).c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+            out.push_back(name);
+        }
+    }
+    closedir(d);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+} // namespace
+#endif
+
+bool ReadText(const std::string& path, std::string* out) {
+    out->clear();
+    FILE* f = OpenFile(path, "rb");
     if (!f) {
-        *d = Data();
         return false;
     }
-    std::string text;
     char buf[4096];
     size_t n;
     while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
-        text.append(buf, n);
+        out->append(buf, n);
     }
     fclose(f);
-    return Parse(text, d);
+    return true;
 }
 
-bool SaveFile(const char* path, const Data& d) {
-    std::string tmp = std::string(path) + ".tmp", bak = std::string(path) + ".bak";
-    FILE* f = fopen(tmp.c_str(), "wb");
+bool WriteText(const std::string& path, const std::string& text) {
+    std::string old;
+    if (ReadText(path, &old) && old == text) {
+        return true; // igual: nao mexe (nem na data do arquivo)
+    }
+    std::string tmp = path + ".tmp";
+    FILE* f = OpenFile(tmp, "wb");
     if (!f) {
         return false;
     }
-    std::string text = Serialize(d);
     bool ok = fwrite(text.data(), 1, text.size(), f) == text.size();
     ok = fclose(f) == 0 && ok;
-    if (!ok) {
-        remove(tmp.c_str());
+    if (!ok || !MovePath(tmp, path)) {
+        RemovePath(tmp);
         return false;
     }
-    remove(bak.c_str());
-    rename(path, bak.c_str());
-    if (rename(tmp.c_str(), path) != 0) {
-        rename(bak.c_str(), path);
+    return true;
+}
+
+std::string SafeFileName(const std::string& name) {
+    std::string out;
+    for (char c : name) {
+        unsigned char u = static_cast<unsigned char>(c);
+        out += (u < 32 || strchr("\\/:*?\"<>|", c)) ? '_' : c;
+    }
+    if (out.size() > 60) {
+        size_t cut = 60;
+        while (cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) {
+            --cut;
+        }
+        out.resize(cut);
+    }
+    while (!out.empty() && (out.back() == '.' || out.back() == ' ')) {
+        out.pop_back(); // o Windows nao aceita nome terminando em ponto ou espaco
+    }
+    return out.empty() ? std::string("preset") : out;
+}
+
+namespace {
+
+bool SameFile(const std::string& a, const std::string& b) {
+    return SameNick(a, b); // o Windows nao diferencia maiusculas
+}
+
+// O arquivo de cada preset: o nome dele, sem caracteres proibidos, sem repetir.
+std::vector<std::string> FileNames(const Data& d) {
+    std::vector<std::string> out;
+    for (const Preset& p : d.presets) {
+        std::string base = SafeFileName(p.name), name = base + ".txt";
+        for (int n = 2;; ++n) {
+            bool taken = false;
+            for (const std::string& o : out) {
+                taken = taken || SameFile(o, name);
+            }
+            if (!taken) {
+                break;
+            }
+            name = base + " (" + std::to_string(n) + ").txt";
+        }
+        out.push_back(name);
+    }
+    return out;
+}
+
+bool AddPresetFile(const std::string& presetsDir, const std::string& file, Data& d) {
+    std::string text;
+    Data one;
+    if (!ReadText(JoinPath(presetsDir, file), &text) || !Parse(text, &one) || one.presets.empty()) {
         return false;
     }
+    Preset p = one.presets[0];
+    if (p.name.empty() || p.name == "Preset") {
+        p.name = file.substr(0, file.size() - 4);
+    }
+    p.name = UniqueName(d, p.name);
+    p.file = file;
+    d.presets.push_back(p);
+    d.knownFiles.push_back(file);
+    return true;
+}
+
+} // namespace
+
+bool LoadFolder(const std::string& dir, Data* d) {
+    *d = Data();
+    std::string text;
+    bool any = false;
+    if (ReadText(JoinPath(dir, "geral.txt"), &text)) {
+        Parse(text, d);
+        d->presets.clear();
+        any = true;
+    }
+    std::string presets = JoinPath(dir, "presets");
+    for (const std::string& f : ListTxt(presets)) {
+        any = AddPresetFile(presets, f, *d) || any;
+    }
+    return any;
+}
+
+int MergeNewPresets(const std::string& dir, Data& d) {
+    std::string presets = JoinPath(dir, "presets");
+    int added = 0;
+    for (const std::string& f : ListTxt(presets)) {
+        bool known = false;
+        for (const std::string& k : d.knownFiles) {
+            known = known || SameFile(k, f);
+        }
+        if (!known && AddPresetFile(presets, f, d)) {
+            ++added;
+        }
+    }
+    return added;
+}
+
+bool SaveFolder(const std::string& dir, Data& d) {
+    std::string presets = JoinPath(dir, "presets");
+    if (!MakeDir(dir) || !MakeDir(presets)) {
+        return false;
+    }
+    bool ok = WriteText(JoinPath(dir, "geral.txt"), SerializeGeral(d));
+    std::vector<std::string> names = FileNames(d);
+    for (size_t i = 0; i < d.presets.size(); ++i) {
+        Preset& p = d.presets[i];
+        // Renomeado: o arquivo antigo vira o novo (o conteudo vem logo abaixo).
+        if (!p.file.empty() && p.file != names[i] && FileExists(JoinPath(presets, p.file)) &&
+            !FileExists(JoinPath(presets, names[i]))) {
+            MovePath(JoinPath(presets, p.file), JoinPath(presets, names[i]));
+        }
+        ok = WriteText(JoinPath(presets, names[i]), SerializePreset(p)) && ok;
+        p.file = names[i];
+    }
+    // Arquivos que eram de um preset que nao existe mais (apagado ou renomeado): vao para apagados\.
+    for (const std::string& f : d.knownFiles) {
+        bool used = false;
+        for (const std::string& n : names) {
+            used = used || SameFile(n, f);
+        }
+        if (!used && FileExists(JoinPath(presets, f))) {
+            std::string trash = JoinPath(presets, "apagados");
+            MakeDir(trash);
+            MovePath(JoinPath(presets, f), JoinPath(trash, f));
+        }
+    }
+    d.knownFiles = names;
+    return ok;
+}
+
+bool MigrateOldFile(const std::string& oldFile, const std::string& dir, Data* d) {
+    std::string text;
+    if (FileExists(JoinPath(dir, "geral.txt")) || !ReadText(oldFile, &text) || !Parse(text, d)) {
+        return false;
+    }
+    if (!SaveFolder(dir, *d)) {
+        return false;
+    }
+    MovePath(oldFile, oldFile + ".antigo");
     return true;
 }
 
@@ -560,6 +847,73 @@ std::vector<int> RadialConflicts(const std::vector<Bind>& binds, const Hotkey& r
     for (size_t i = 0; i < binds.size(); ++i) {
         if (RadialConflict(s, binds[i])) {
             out.push_back(static_cast<int>(i));
+        }
+    }
+    return out;
+}
+
+bool WhereOk(const Bind& b, bool inVehicle) {
+    return b.where == WHERE_ANY || (b.where == WHERE_VEHICLE) == inVehicle;
+}
+
+// ---------------------------------------------------------------- menu de binds
+
+namespace {
+bool InMenu(const Bind& b) {
+    return b.inMenu && b.cls != CLASS_AUTO;
+}
+} // namespace
+
+std::vector<int> MenuPeers(const std::vector<Bind>& binds, const Bind& b, int self) {
+    std::vector<int> out;
+    for (size_t i = 0; i < binds.size(); ++i) {
+        const Bind& o = binds[i];
+        if (static_cast<int>(i) != self && InMenu(o) && (o.cls == CLASS_VIEW) == (b.cls == CLASS_VIEW) &&
+            SameNick(o.group, b.group)) {
+            out.push_back(static_cast<int>(i));
+        }
+    }
+    return out;
+}
+
+int MenuPosition(const std::vector<Bind>& binds, int index) {
+    std::vector<int> peers = MenuPeers(binds, binds[index], index);
+    int pos = 1;
+    for (int i : peers) {
+        pos += i < index;
+    }
+    return pos;
+}
+
+int MoveInMenu(std::vector<Bind>& binds, int index, int position) {
+    std::vector<int> peers = MenuPeers(binds, binds[index], index);
+    position = Clamp(position, 1, static_cast<int>(peers.size()) + 1);
+    if (position == MenuPosition(binds, index)) {
+        return index;
+    }
+    Bind b = binds[index];
+    binds.erase(binds.begin() + index);
+    // Os indices dos vizinhos depois de tirar a bind.
+    for (int& i : peers) {
+        i -= i > index;
+    }
+    int at = position <= static_cast<int>(peers.size()) ? peers[position - 1] : peers.back() + 1;
+    binds.insert(binds.begin() + at, b);
+    return at;
+}
+
+std::vector<std::string> Groups(const std::vector<Bind>& binds) {
+    std::vector<std::string> out;
+    for (const Bind& b : binds) {
+        if (b.group.empty()) {
+            continue;
+        }
+        bool seen = false;
+        for (const std::string& g : out) {
+            seen = seen || SameNick(g, b.group);
+        }
+        if (!seen) {
+            out.push_back(b.group);
         }
     }
     return out;
@@ -789,15 +1143,13 @@ bool Ignored(const Bind& b, const std::string& nick) {
     return false;
 }
 
-bool FindPlayer(const std::string& message, const std::string& author, const std::vector<Player>& players, Player* out) {
-    if (!author.empty()) {
-        for (const Player& p : players) {
-            if (SameNick(p.nick, author)) {
-                *out = p;
-                return true;
-            }
-        }
-    }
+bool LooksLikeSpeech(const std::string& trigger, const std::string& message) {
+    std::string t = Normalize(trigger), m = Normalize(message);
+    size_t at = t.empty() ? std::string::npos : m.find(t);
+    return at != std::string::npos && m.substr(0, at).find(':') != std::string::npos;
+}
+
+bool FindPlayer(const std::string& message, const std::vector<Player>& players, Player* out) {
     std::string text = StripColors(message);
     // Nick que aparece na mensagem ("Fulano_Silva" ou "Fulano Silva"): o primeiro; no empate, o mais comprido.
     size_t bestAt = std::string::npos, bestLen = 0;

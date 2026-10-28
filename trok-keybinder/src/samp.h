@@ -50,7 +50,11 @@ bool FindTarget(float maxDistance, float screenW, float screenH, kb::Player* out
 // longe que maxDistance.
 bool PlayerDot(int id, float maxDistance, float screenW, float screenH, ImVec2* dot);
 
-// Mensagens que chegaram no chat (falas e mensagens do servidor) desde a ultima chamada.
+// Botao do mouse no estado do proprio GTA (com o mouse no jogo, as mensagens da janela nao chegam): 0 = meio,
+// 1 = lateral de tras (Mouse 4), 2 = lateral da frente (Mouse 5).
+bool MouseButton(int which);
+
+// Mensagens do servidor que chegaram no chat desde a ultima chamada (a fala dos jogadores fica de fora).
 void TakeChat(std::vector<kb::ChatLine>* out);
 
 } // namespace samp

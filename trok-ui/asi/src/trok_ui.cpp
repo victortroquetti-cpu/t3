@@ -1149,7 +1149,12 @@ std::string HotkeyName(ImGuiKey key, int mods) {
         if (mods & HotkeyShift) s += "Shift + ";
         if (mods & HotkeyAlt) s += "Alt + ";
     }
-    return s + ImGui::GetKeyName(key);
+    switch (key) {
+    case ImGuiKey_MouseMiddle: return s + "Bot\xC3\xA3o do meio";
+    case ImGuiKey_MouseX1: return s + "Mouse 4";
+    case ImGuiKey_MouseX2: return s + "Mouse 5";
+    default: return s + ImGui::GetKeyName(key);
+    }
 }
 
 bool Rows::Hotkey(const char* label, ImGuiKey* key, int* mods, ImGuiKey def) {
@@ -1200,7 +1205,9 @@ bool Rows::Hotkey(const char* label, ImGuiKey* key, int* mods, ImGuiKey def) {
         } else {
             for (int k = ImGuiKey_NamedKey_BEGIN; k < ImGuiKey_NamedKey_END; ++k) {
                 ImGuiKey kk = static_cast<ImGuiKey>(k);
-                bool isMouse = kk >= ImGuiKey_MouseLeft && kk <= ImGuiKey_MouseWheelY;
+                // O botao do meio e os laterais valem; o esquerdo e o direito nao (clicam no menu).
+                bool sideMouse = kk == ImGuiKey_MouseMiddle || kk == ImGuiKey_MouseX1 || kk == ImGuiKey_MouseX2;
+                bool isMouse = kk >= ImGuiKey_MouseLeft && kk <= ImGuiKey_MouseWheelY && !sideMouse;
                 bool isMod = kk >= ImGuiKey_ReservedForModCtrl;
                 if (isMouse || isMod || kk == ImGuiKey_Escape || !ImGui::IsKeyPressed(kk, false)) {
                     continue;

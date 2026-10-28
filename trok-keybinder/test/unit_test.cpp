@@ -4,6 +4,7 @@
 #include "engine.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <set>
 #include <string>
@@ -52,9 +53,9 @@ static World Base(unsigned now) {
 static void TestFile() {
     Data d;
     d.settings.radial = {546, HK_CTRL};
-    d.settings.flood = 1500;
     Preset p;
     p.name = "hzrp policia";
+    p.flood = 1500;
     Bind a;
     a.cls = CLASS_KEY;
     a.name = "Sauda\xC3\xA7\xC3\xA3o";
@@ -94,7 +95,7 @@ static void TestFile() {
     Check(back.presets[0].binds[1].ignore.size() == 2 && back.presets[0].binds[1].ignore[1] == "Catharina",
           "lista de ignorados");
     Check(back.presets[0].binds[2].trigger == c.trigger && back.presets[0].binds[2].delay == 1500, "gatilho do chat");
-    Check(back.settings.radial == d.settings.radial && back.settings.flood == 1500, "geral");
+    Check(back.settings.radial == d.settings.radial && back.presets[0].flood == 1500, "geral e o anti-flood do preset");
     Check(back.servers.size() == 1 && back.servers[0].preset == "hzrp policia", "servidor ligado ao preset");
 
     Data junk;
@@ -207,15 +208,14 @@ static void TestText() {
 
     std::vector<Player> ps = {{12, "Fulano_Silva", 0}, {7, "Ana", 0}, {33, "Ana_Clara", 0}, {5, "Bob_Bob", 0}};
     Player p;
-    Check(FindPlayer("[Atendimento] Fulano_Silva esta precisando de atendimento", "", ps, &p) && p.id == 12,
+    Check(FindPlayer("[Atendimento] Fulano_Silva esta precisando de atendimento", ps, &p) && p.id == 12,
           "nick na mensagem");
-    Check(FindPlayer("[Atendimento] Fulano Silva esta precisando", "", ps, &p) && p.id == 12, "nick com espaco");
-    Check(FindPlayer("Ana_Clara pediu ajuda", "", ps, &p) && p.id == 33, "o nick mais comprido no mesmo lugar");
-    Check(FindPlayer("Banana pediu ajuda (ID 5)", "", ps, &p) && p.id == 5, "Ana dentro de Banana nao conta; ID 5");
-    Check(FindPlayer("Alguem [7] precisa", "", ps, &p) && p.id == 7, "ID entre colchetes");
-    Check(FindPlayer("Novo pedido de #33", "", ps, &p) && p.id == 33, "ID com #");
-    Check(FindPlayer("socorro", "Bob_Bob", ps, &p) && p.id == 5, "autor da fala");
-    Check(!FindPlayer("ID 99 pediu", "", ps, &p) && !FindPlayer("ninguem (123) aqui", "", ps, &p),
+    Check(FindPlayer("[Atendimento] Fulano Silva esta precisando", ps, &p) && p.id == 12, "nick com espaco");
+    Check(FindPlayer("Ana_Clara pediu ajuda", ps, &p) && p.id == 33, "o nick mais comprido no mesmo lugar");
+    Check(FindPlayer("Banana pediu ajuda (ID 5)", ps, &p) && p.id == 5, "Ana dentro de Banana nao conta; ID 5");
+    Check(FindPlayer("Alguem [7] precisa", ps, &p) && p.id == 7, "ID entre colchetes");
+    Check(FindPlayer("Novo pedido de #33", ps, &p) && p.id == 33, "ID com #");
+    Check(!FindPlayer("ID 99 pediu", ps, &p) && !FindPlayer("ninguem (123) aqui", ps, &p),
           "ID de ninguem conectado nao conta");
 }
 
@@ -306,7 +306,7 @@ static void TestEngineKeys() {
     s.enabled = true;
     Check(e.Queued() == 4, "mod desligado: nada dispara");
 
-    std::vector<std::string> sent = Drain(e, now, s.flood, now + 5000);
+    std::vector<std::string> sent = Drain(e, now, 1200, now + 5000);
     Check(sent.size() == 4 && sent[0] == "oi galera, tudo bem?" && sent[3] == "/motor", "fila na ordem");
     Engine f;
     Preset multi;
@@ -363,7 +363,7 @@ static void TestEngineAuto() {
             w.now = now;
             e.Frame(p, s, w, nullptr);
             std::string m;
-            if (e.Next(now, s.flood, &m)) sent.push_back(m);
+            if (e.Next(now, 1200, &m)) sent.push_back(m);
             now += 16;
         }
     };
@@ -425,9 +425,9 @@ static void TestEngineAuto() {
     adm.binds = {atender};
     World cw = Base(1000);
     cw.players = {{12, "Fulano_Silva", 0}, {40, "Beltrano", 0}};
-    cw.chat = {{"{FF9900}[SOS] Fulano_Silva (12) est\xC3\xA1 precisando de atendimento", ""}};
+    cw.chat = {{"{FF9900}[SOS] Fulano_Silva (12) est\xC3\xA1 precisando de atendimento"}};
     c.Frame(adm, s, cw, nullptr);
-    cw.chat = {{"[SOS] Beltrano (40) esta precisando de atendimento", ""}};
+    cw.chat = {{"[SOS] Beltrano (40) esta precisando de atendimento"}};
     cw.now = 2000;
     c.Frame(adm, s, cw, nullptr);
     cw.chat.clear();
@@ -436,18 +436,18 @@ static void TestEngineAuto() {
         cw.now = t;
         c.Frame(adm, s, cw, nullptr);
         std::string m;
-        if (c.Next(t, s.flood, &m)) got.push_back(m);
+        if (c.Next(t, 1200, &m)) got.push_back(m);
     }
     Check(got.size() == 1 && got[0] == "/atender 12", "chat: /atender 12; o segundo pedido cai na espera de 5 s");
-    cw.chat = {{"[SOS] Beltrano (40) esta precisando de atendimento", ""}};
+    cw.chat = {{"[SOS] Beltrano (40) esta precisando de atendimento"}};
     cw.now = 9000;
     c.Frame(adm, s, cw, nullptr);
-    cw.chat = {{"[SOS] alguem esta precisando de atendimento", ""}};
+    cw.chat = {{"[SOS] alguem esta precisando de atendimento"}};
     cw.now = 15000;
     c.Frame(adm, s, cw, nullptr);
     std::string m;
     got.clear();
-    while (c.Next(cw.now += 2000, s.flood, &m)) got.push_back(m);
+    while (c.Next(cw.now += 2000, 1200, &m)) got.push_back(m);
     Check(got.size() == 1 && got[0] == "/atender 40", "chat: depois da espera vai o 40; sem jogador nao vai");
     std::vector<Notice> notes = c.TakeNotices();
     Check(notes.size() == 1, "aviso quando o jogador do pedido nao e achado");
@@ -488,6 +488,142 @@ static void TestEngineTargets() {
     Check(e.TakeNotices().size() == 3, "um aviso por bind que nao rodou");
 }
 
+static void TestV2Model() {
+    // Campos novos no arquivo, e o intervalo do [geral] da v0.1 vale para os presets sem o deles.
+    Data old;
+    Parse("[geral]\nintervalo=2000\n[preset]\nnome=A\n[preset]\nnome=B\nintervalo=900\n", &old);
+    Check(old.presets.size() == 2 && old.presets[0].flood == 2000 && old.presets[1].flood == 900,
+          "anti-flood: o do [geral] antigo vale para o preset sem o dele");
+    Preset p;
+    p.name = "Teste";
+    Bind b;
+    b.text = "/x";
+    b.group = "Pol\xC3\xAD" "cia";
+    b.where = WHERE_VEHICLE;
+    b.speechGuard = false;
+    p.binds.push_back(b);
+    Data back;
+    Parse(SerializePreset(p), &back);
+    Check(back.presets.size() == 1 && back.presets[0].binds[0].group == b.group && back.presets[0].binds[0].where == WHERE_VEHICLE &&
+              !back.presets[0].binds[0].speechGuard,
+          "grupo, onde vale e ignorar fala no arquivo do preset");
+
+    // Fala repassada pelo servidor nao dispara.
+    Check(LooksLikeSpeech("est\xC3\xA1 precisando de atendimento", "Fulano_Silva diz: esta precisando de atendimento") &&
+              !LooksLikeSpeech("est\xC3\xA1 precisando de atendimento", "[SOS] Fulano_Silva (12) esta precisando de atendimento"),
+          "\":\" antes do trecho = fala; o aviso do sistema passa");
+    Engine e;
+    Settings s;
+    Preset adm;
+    Bind atender;
+    atender.cls = CLASS_AUTO;
+    atender.cond = C_CHAT;
+    atender.trigger = "precisando de atendimento";
+    atender.text = "/atender (id)";
+    adm.binds = {atender};
+    World w = Base(1000);
+    w.players = {{12, "Fulano_Silva", 0}};
+    w.chat = {{"Fulano_Silva diz: estou precisando de atendimento"}};
+    e.Frame(adm, s, w, nullptr);
+    std::string m;
+    Check(!e.Next(5000, 1200, &m) && e.Scheduled() == 0, "fala de jogador (com \":\") nao dispara");
+    adm.binds[0].speechGuard = false;
+    w.now = 9000;
+    e.Frame(adm, s, w, nullptr);
+    w.chat.clear();
+    w.now = 9100;
+    e.Frame(adm, s, w, nullptr);
+    Check(e.Next(9100, 1200, &m) && m == "/atender 12", "com \"ignorar fala\" desligado, dispara");
+
+    // So no veiculo / so a pe.
+    Engine k;
+    Preset car;
+    Bind cinto;
+    cinto.text = "/cinto";
+    cinto.key = {600, 0};
+    cinto.where = WHERE_VEHICLE;
+    car.binds = {cinto};
+    FakeKeys keys;
+    World cw = Base(0);
+    k.Frame(car, s, cw, &keys);
+    keys.down = {600};
+    cw.now = 20;
+    k.Frame(car, s, cw, &keys);
+    keys.down.clear();
+    cw.now = 40;
+    k.Frame(car, s, cw, &keys);
+    Check(k.Queued() == 0, "\"so no veiculo\": a pe a tecla nao dispara");
+    cw.me.inVehicle = true;
+    keys.down = {600};
+    cw.now = 60;
+    k.Frame(car, s, cw, &keys);
+    Check(k.Queued() == 1 && WhereOk(cinto, true) && !WhereOk(cinto, false), "\"so no veiculo\": no carro dispara");
+
+    // Ordem no menu: a posicao entre as binds do mesmo grupo (as da visao a parte).
+    std::vector<Bind> list(5);
+    for (int i = 0; i < 5; ++i) {
+        list[i].name = std::string(1, static_cast<char>('A' + i));
+        list[i].inMenu = true;
+    }
+    list[2].cls = CLASS_VIEW;   // C fica na lista da visao
+    list[3].group = "G";        // D no grupo G
+    Check(MenuPosition(list, 4) == 3 && MenuPosition(list, 2) == 1 && MenuPosition(list, 3) == 1,
+          "posicao no menu conta so o mesmo grupo e o mesmo menu");
+    int at = MoveInMenu(list, 4, 1);
+    Check(at == 0 && list[0].name == "E" && list[1].name == "A" && list[2].name == "B", "E vai para a primeira posicao");
+    at = MoveInMenu(list, 0, 9);
+    Check(list[at].name == "E" && MenuPosition(list, at) == 3, "posicao alem do fim vai para o fim");
+    Check(Groups(list).size() == 1 && Groups(list)[0] == "G", "grupos do menu");
+}
+
+static void TestFolder() {
+    std::string dir = "test/out/pasta";
+    std::string presets = JoinPath(dir, "presets");
+    if (system(("rm -rf '" + dir + "'").c_str())) {
+    }
+    Data d;
+    LinkServer(d, "10.0.0.1:7777", "Horizonte RP | Servidor 1");
+    d.presets[0].binds.push_back(Bind());
+    int pol = NewPreset(d, "hzrp pol\xC3\xAD" "cia: \"nova\"?", false, -1);
+    d.presets[pol].binds.push_back(Bind());
+    Check(SaveFolder(dir, d), "pasta gravada");
+    Check(FileExists(JoinPath(dir, "geral.txt")) && FileExists(JoinPath(presets, "Horizonte RP _ Servidor 1.txt")) &&
+              FileExists(JoinPath(presets, "hzrp pol\xC3\xAD" "cia_ _nova__.txt")),
+          "geral.txt e um arquivo por preset (sem os caracteres que o Windows recusa)");
+    Data back;
+    Check(LoadFolder(dir, &back) && back.presets.size() == 2 && back.servers.size() == 1 && back.knownFiles.size() == 2,
+          "pasta lida de volta");
+    RenamePreset(back, 1, "hzrp policia");
+    SaveFolder(dir, back);
+    Check(FileExists(JoinPath(presets, "hzrp policia.txt")) && !FileExists(JoinPath(presets, "hzrp pol\xC3\xAD" "cia_ _nova__.txt")),
+          "renomear o preset renomeia o arquivo");
+    DeletePreset(back, 1);
+    SaveFolder(dir, back);
+    Check(!FileExists(JoinPath(presets, "hzrp policia.txt")) && FileExists(JoinPath(JoinPath(presets, "apagados"), "hzrp policia.txt")),
+          "apagar o preset move o arquivo para presets/apagados");
+    // Um amigo manda o arquivo dele, com o mesmo nome de preset.
+    std::string text;
+    ReadText(JoinPath(presets, "Horizonte RP _ Servidor 1.txt"), &text);
+    WriteText(JoinPath(presets, "do amigo.txt"), text);
+    Check(MergeNewPresets(dir, back) == 1 && back.presets.size() == 2 && back.presets[1].name == "Horizonte RP | Servidor 1 (2)" &&
+              MergeNewPresets(dir, back) == 0,
+          "arquivo novo em presets entra sozinho, com nome unico (e uma vez so)");
+    SaveFolder(dir, back);
+    Check(FileExists(JoinPath(presets, "do amigo.txt")) == false && FileExists(JoinPath(presets, "Horizonte RP _ Servidor 1 (2).txt")),
+          "o preset que veio de fora ganha o arquivo com o nome dele");
+    // A v0.1 tinha um arquivo so.
+    std::string old = "test/out/Trok KeyBinder.txt", dir2 = "test/out/pasta2";
+    if (system(("rm -rf '" + dir2 + "' '" + old + ".antigo'").c_str())) {
+    }
+    WriteText(old, "[geral]\nintervalo=1500\n[preset]\nnome=velho\n[bind]\ntexto=/oi\n[servidor]\nendereco=1.2.3.4:7777\npreset=velho\n");
+    Data migrated;
+    Check(MigrateOldFile(old, dir2, &migrated) && FileExists(JoinPath(JoinPath(dir2, "presets"), "velho.txt")) &&
+              FileExists(old + ".antigo") && !FileExists(old) && migrated.presets[0].flood == 1500,
+          "o arquivo da v0.1 vira a pasta (e o antigo fica como .antigo)");
+    Data again;
+    Check(!MigrateOldFile(old + ".antigo", dir2, &again), "com a pasta ja feita, nao migra de novo");
+}
+
 int main() {
     TestFile();
     TestPresets();
@@ -496,6 +632,8 @@ int main() {
     TestEngineKeys();
     TestEngineAuto();
     TestEngineTargets();
+    TestV2Model();
+    TestFolder();
     printf("%s\n", failures ? "FALHOU" : "PASSOU");
     return failures ? 1 : 0;
 }

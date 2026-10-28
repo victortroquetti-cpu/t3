@@ -172,6 +172,8 @@ static Data MakeData() {
         for (const auto& io : iconOf) {
             if (b.name == io[0]) b.icon = io[1];
         }
+        if (b.name == "Algemar" || b.name == "Revistar") b.group = "Pol\xC3\xAD" "cia"; // um grupo no circulo
+        if (b.name == "Motor") b.where = WHERE_VEHICLE;                                  // so no veiculo
     }
     d.presets.push_back(pol);
     Preset lad;
@@ -300,17 +302,9 @@ static int RadialFrames(int n, ImVec2 mouse, bool keyDown, const std::function<v
     return chosen;
 }
 
-static std::vector<radial::Item> Items(const Preset& p, bool target) {
-    std::vector<radial::Item> items;
-    for (int pass = 0; pass < 2; ++pass) {
-        for (size_t i = 0; i < p.binds.size(); ++i) {
-            const Bind& b = p.binds[i];
-            bool view = b.cls == CLASS_VIEW;
-            if (!b.enabled || !b.inMenu || b.cls == CLASS_AUTO || view != (pass == 0) || (view && !target)) continue;
-            items.push_back({b.name, b.cls == CLASS_AROUND ? "Ao redor" : "", static_cast<int>(i), icons::Find(b.icon)});
-        }
-    }
-    return items;
+// Os itens como o jogo monta (a pe).
+static std::vector<radial::Item> Items(const Preset& p, bool target, bool inVehicle = false) {
+    return radial::BuildCircle(p, target, inVehicle);
 }
 
 // Centro da fatia i de n (0 = em cima, sentido horario).
@@ -356,7 +350,7 @@ int main(int argc, char** argv) {
 
     // Automatico: abre o "Farol" (linha 1 preset, 2 aviso, 3 como funciona, 4 Trancar, 5 Cinto, 6 Farol).
     GoTab(1);
-    OpenRow(6);
+    OpenRow(7);
     Shot(dir + "/08_editor_tempo_repetido.ppm");
     Check(RedPixels() > 60, "editor: o tempo repetido em vermelho");
     size_t before = g_data.presets[0].binds.size();
@@ -373,8 +367,8 @@ int main(int argc, char** argv) {
 
     // Atender (chat): linha 8 = Atender; no editor, a linha 8 e "Testar com uma mensagem".
     GoTab(1);
-    OpenRow(8);
-    Press(ImGuiKey_DownArrow, 7);
+    OpenRow(9);
+    Press(ImGuiKey_DownArrow, 8);
     Press(ImGuiKey_Enter);
     MenuFrames(10, [](int f, ImGuiIO& io) {
         if (f == 2) io.AddInputCharactersUTF8("{FF9900}[SOS]{FFFFFF} Fulano_Silva (12) est\xC3\xA1 prec{33AA33}isando de atendimento");
@@ -385,7 +379,7 @@ int main(int argc, char** argv) {
 
     // Padrao: "Kit medico" (linha 1 preset, 2 aviso, 3 como funciona, 4..8 binds: Kit e a 8).
     GoTab(0);
-    OpenRow(8);
+    OpenRow(9);
     Shot(dir + "/11_editor_tecla_repetida.ppm");
     Check(RedPixels() > 60, "editor: tecla repetida (outra aba) em vermelho");
     Leave(1);
@@ -393,7 +387,7 @@ int main(int argc, char** argv) {
     // Ao redor: "Multar todos" (linha 1 preset, 2 aviso, 3 como funciona, 4 Algemar, 5 Revistar, 6 Multar), pelo
     // numero da linha, como nas listas da casa.
     GoTab(2);
-    Press(ImGuiKey_6);
+    Press(ImGuiKey_7);
     MenuFrames(20, [](int, ImGuiIO&) {});
     Shot(dir + "/12_editor_ao_redor.ppm");
     Leave(1);
@@ -415,8 +409,8 @@ int main(int argc, char** argv) {
 
     // O icone: na Saudacao (linha 4 do Padrao), a linha 7 do editor abre a grade; escolher o carro e salvar.
     GoTab(0);
-    OpenRow(4);
-    Press(ImGuiKey_7);
+    OpenRow(5);
+    Press(ImGuiKey_8);
     Press(ImGuiKey_Enter);
     MenuFrames(10, [](int, ImGuiIO&) {});
     ImVec2 carCell = menu::IconCell(1 + icons::Find("car"));
@@ -435,6 +429,17 @@ int main(int argc, char** argv) {
           "grade de icones: o carro escolhido e salvo na bind");
     g_data.presets[0].binds[0].icon = "hand";
 
+    // A busca na aba (linha 4): so a Lanterna.
+    GoTab(0);
+    Press(ImGuiKey_4);
+    Press(ImGuiKey_Enter);
+    MenuFrames(8, [](int f, ImGuiIO& io) {
+        if (f == 2) io.AddInputCharactersUTF8("lanter");
+    });
+    MenuFrames(20, [](int, ImGuiIO&) {});
+    Shot(dir + "/19_busca.ppm");
+    Press(ImGuiKey_Escape);
+
     // Geral com o atalho do circulo igual ao de uma bind: recusado.
     GoTab(6);
     Hotkey radialBefore = g_data.settings.radial;
@@ -446,9 +451,12 @@ int main(int argc, char** argv) {
     menu::Toggle();
     Check(!menu::IsOpen(), "menu fechado");
 
-    // Circulo sem alvo, mouse na 3a fatia.
+    // Circulo sem alvo, a pe: Saudacao, Reparar e o grupo Policia (o Motor e so no veiculo).
     float clock = 10.0f;
     std::vector<radial::Item> items = Items(g_data.presets[0], false);
+    Check(items.size() == 3 && items[2].children.size() == 2 && items[2].label == "Pol\xC3\xAD" "cia",
+          "circulo a pe: o Motor (so no veiculo) fica de fora; Algemar e Revistar no grupo Policia");
+    Check(Items(g_data.presets[0], false, true).size() == 4, "no veiculo o Motor aparece");
     radial::Open(items, "Binds", "", clock);
     ImVec2 third = Slice(2, static_cast<int>(items.size()));
     RadialFrames(20, third, true, [](int, ImGuiIO&) {}, &clock);
@@ -457,7 +465,45 @@ int main(int argc, char** argv) {
         if (f == 1) io.AddMouseButtonEvent(0, true);
         if (f == 2) io.AddMouseButtonEvent(0, false);
     }, &clock);
-    Check(chosen == items[2].bind && !radial::IsOpen(), "clique na fatia roda a bind dela e fecha");
+    Check(chosen < 0 && radial::IsOpen(), "clique no grupo abre o circulo do grupo");
+    RadialFrames(20, ImVec2(10, 10), true, [](int, ImGuiIO&) {}, &clock);
+    ImVec2 g0 = Slice(0, 2);
+    RadialFrames(10, g0, true, [](int, ImGuiIO&) {}, &clock);
+    Shot(dir + "/20_circulo_grupo.ppm", true);
+    chosen = RadialFrames(4, ImVec2(W * 0.5f, H * 0.5f), true, [](int f, ImGuiIO& io) {
+        if (f == 1) io.AddMouseButtonEvent(0, true);
+        if (f == 2) io.AddMouseButtonEvent(0, false);
+    }, &clock);
+    Check(chosen < 0 && radial::IsOpen(), "o meio do grupo volta (nao fecha)");
+    chosen = RadialFrames(4, Slice(0, 3), true, [](int f, ImGuiIO& io) {
+        if (f == 1) io.AddMouseButtonEvent(0, true);
+        if (f == 2) io.AddMouseButtonEvent(0, false);
+    }, &clock);
+    Check(chosen == items[0].bind && !radial::IsOpen(), "de volta no circulo, o clique na fatia roda a bind e fecha");
+    radial::Open(items, "Binds", "", clock);
+    RadialFrames(10, ImVec2(10, 10), true, [](int, ImGuiIO&) {}, &clock);
+    RadialFrames(3, ImVec2(10, 10), true, [](int f, ImGuiIO& io) {
+        if (f == 1) Key(io, ImGuiKey_3, true);
+        if (f == 2) Key(io, ImGuiKey_3, false);
+    }, &clock);
+    chosen = RadialFrames(4, ImVec2(10, 10), true, [](int f, ImGuiIO& io) {
+        if (f == 1) Key(io, ImGuiKey_2, true);
+        if (f == 2) Key(io, ImGuiKey_2, false);
+    }, &clock);
+    Check(chosen == items[2].children[1].bind, "tecla 3 abre o grupo e a 2 roda a segunda bind dele");
+    radial::Open(items, "Binds", "", clock);
+    RadialFrames(10, ImVec2(10, 10), true, [](int, ImGuiIO&) {}, &clock);
+    for (int k = 0; k < 2; ++k) {
+        RadialFrames(3, ImVec2(10, 10), true, [](int f, ImGuiIO& io) {
+            if (f == 1) io.AddMouseWheelEvent(0, -1);
+        }, &clock);
+    }
+    Shot(dir + "/21_circulo_roda.ppm", true);
+    chosen = RadialFrames(4, ImVec2(10, 10), true, [](int f, ImGuiIO& io) {
+        if (f == 1) Key(io, ImGuiKey_Enter, true);
+        if (f == 2) Key(io, ImGuiKey_Enter, false);
+    }, &clock);
+    Check(chosen == items[1].bind, "circulo: a roda do mouse anda pelas fatias (2 para baixo) e o Enter roda");
 
     // Com alvo: as binds da visao primeiro e o nome no meio; segurar o atalho, apontar e soltar.
     items = Items(g_data.presets[0], true);
@@ -468,7 +514,6 @@ int main(int argc, char** argv) {
     chosen = RadialFrames(2, first, false, [](int, ImGuiIO&) {}, &clock);
     Check(chosen == items[0].bind && g_data.presets[0].binds[chosen].cls == CLASS_VIEW,
           "segurar, apontar e soltar roda a bind da visao");
-    Check(items.size() > static_cast<size_t>(radial::PAGE), "mais de 8 binds: paginas");
 
     // O numero da fatia (2) roda a segunda.
     items = Items(g_data.presets[0], false);
@@ -481,11 +526,7 @@ int main(int argc, char** argv) {
     Check(chosen == items[1].bind, "circulo: a tecla 2 roda a segunda fatia");
 
     // A lista presa no jogador da mira, saindo da bolinha do meio dele (905, 534 na cena).
-    std::vector<radial::Item> view;
-    for (size_t i = 0; i < g_data.presets[0].binds.size(); ++i) {
-        const Bind& b = g_data.presets[0].binds[i];
-        if (b.cls == CLASS_VIEW && b.inMenu) view.push_back({b.name, "", static_cast<int>(i), icons::Find(b.icon)});
-    }
+    std::vector<radial::Item> view = radial::BuildList(g_data.presets[0], false);
     ImVec2 anchor(905, 534);
     auto list = [&](int n, ImVec2 mouse, bool keyDown, bool visible, const std::function<void(int, ImGuiIO&)>& input) {
         int got = -1;
@@ -524,6 +565,19 @@ int main(int argc, char** argv) {
         if (f == 2) Key(io, ImGuiKey_3, false);
     });
     Check(chosen == view[2].bind, "lista: a tecla 3 roda o terceiro item");
+    radial::OpenList(view, "Fulano_Silva", "12", clock);
+    list(10, ImVec2(10, 10), false, true, [](int, ImGuiIO&) {});
+    list(3, ImVec2(10, 10), false, true, [](int f, ImGuiIO& io) {
+        if (f == 1) io.AddMouseWheelEvent(0, -1);
+    });
+    list(3, ImVec2(10, 10), false, true, [](int f, ImGuiIO& io) {
+        if (f == 1) io.AddMouseWheelEvent(0, -1);
+    });
+    chosen = list(3, ImVec2(10, 10), false, true, [](int f, ImGuiIO& io) {
+        if (f == 1) Key(io, ImGuiKey_Enter, true);
+        if (f == 2) Key(io, ImGuiKey_Enter, false);
+    });
+    Check(chosen == view[2].bind, "lista: a roda do mouse anda (2 para baixo) e o Enter roda");
     radial::OpenList(view, "Fulano_Silva", "12", clock);
     list(10, ImVec2(10, 10), false, true, [](int, ImGuiIO&) {});
     list(10, ImVec2(10, 10), false, false, [](int, ImGuiIO&) {});

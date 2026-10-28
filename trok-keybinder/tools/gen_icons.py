@@ -32,7 +32,7 @@ ICONS = [
     ('hammer', 'Martelo'), ('zap', 'Energia'), ('map-pin', 'Local'), ('flag', 'Bandeira'),
     ('star', 'Estrela'), ('clock', 'Relógio'), ('beer', 'Cerveja'), ('coffee', 'Café'),
     ('utensils', 'Comer'), ('cigarette', 'Cigarro'), ('paw-print', 'Animal'), ('info', 'Info'),
-    ('check', 'Ok'), ('x', 'Fechar'), ('ban', 'Proibido'),
+    ('check', 'Ok'), ('x', 'Fechar'), ('ban', 'Proibido'), ('folder', 'Pasta'),
 ]
 
 NUM = re.compile(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?')

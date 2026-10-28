@@ -233,7 +233,8 @@ void BuildSamp() {
     Mem<BYTE*>(g_samp + NETGAME) = g_netGame; // por ultimo: com ele o .asi registra o /trokbinder
 }
 
-// O arquivo de binds que o jogador ja teria: um preset ligado ao servidor de teste.
+// O arquivo de binds da v0.1 (Trok KeyBinder.txt ao lado do .asi), com um preset ligado ao servidor de teste: o .asi
+// tem que passar para a pasta Trok KeyBinder (geral.txt + presets\).
 void WriteBinds() {
     FILE* f = fopen("Trok KeyBinder.txt", "wb");
     fprintf(f, "[geral]\nligado=1\nmenu_tecla=%d\nintervalo=1200\n\n", static_cast<int>(ImGuiKey_B));
@@ -249,6 +250,7 @@ void WriteBinds() {
             static_cast<int>(ImGuiKey_F7));
     fprintf(f, "[bind]\nclasse=visao\nnome=Revistar\ntexto=/revistar (id)\nmenu=1\n\n");
     fprintf(f, "[bind]\nclasse=visao\nnome=Documentos\ntexto=/rg (id)\nmenu=1\n\n");
+    fprintf(f, "[bind]\nclasse=padrao\nnome=Lateral\ntexto=/lateral\ntecla=%d\n\n", static_cast<int>(ImGuiKey_MouseX1));
     fprintf(f, "[servidor]\nendereco=127.0.0.1:7777\nnome=Horizonte Roleplay | Servidor 1\n"
                "preset=Horizonte Roleplay | Servidor 1\n");
     fclose(f);
@@ -336,7 +338,7 @@ double Covered(int x0, int y0, int x1, int y1, bool white = false) {
 }
 
 bool LogHas(const char* text) {
-    FILE* f = fopen("Trok KeyBinder.log", "rb");
+    FILE* f = fopen("Trok KeyBinder\\Trok KeyBinder.log", "rb");
     if (!f) {
         return false;
     }
@@ -464,6 +466,13 @@ int main(int argc, char** argv) {
                 Check(name && strcmp(name, "trokbinder") == 0, "/trokbinder registrado no CInput do samp.dll");
                 Check(LogHas("preset em uso: \"Horizonte Roleplay | Servidor 1\" (127.0.0.1:7777)"),
                       "log: o preset do servidor 127.0.0.1:7777 em uso");
+                Check(GetFileAttributesA("Trok KeyBinder\\geral.txt") != INVALID_FILE_ATTRIBUTES &&
+                          GetFileAttributesA("Trok KeyBinder\\presets\\Horizonte Roleplay _ Servidor 1.txt") !=
+                              INVALID_FILE_ATTRIBUTES &&
+                          GetFileAttributesA("Trok KeyBinder.txt.antigo") != INVALID_FILE_ATTRIBUTES &&
+                          GetFileAttributesA("Trok KeyBinder.txt") == INVALID_FILE_ATTRIBUTES,
+                      "o arquivo da v0.1 virou a pasta Trok KeyBinder (geral.txt + presets\\) e o antigo, .antigo");
+                Check(LogHas("passado para a pasta"), "log: a migracao");
                 next();
             }
         }
@@ -497,6 +506,16 @@ int main(int argc, char** argv) {
                 snprintf(text, sizeof(text), "/cinto depois do /tranca, com o anti-flood (%lu ms)", cinto->at - tranca->at);
                 Check(cinto->at > tranca->at && cinto->at - tranca->at >= 1150, text);
             }
+            // Fala de jogador (tipo 2) e fala repassada pelo servidor ("diz:"): nenhuma dispara.
+            void* chat = reinterpret_cast<void*>(Mem<DWORD>(g_samp + 0x21A0E4));
+            reinterpret_cast<AddEntryFn>(g_samp + FN_ADD_ENTRY)(chat, 2, "Fulano_Silva esta precisando de atendimento",
+                                                               "Fulano_Silva", 0xFFFFFFFF, 0xFFFFFFFF);
+            reinterpret_cast<AddEntryFn>(g_samp + FN_ADD_ENTRY)(
+                chat, 4, "Camilla_Souza diz: esta precisando de atendimento", nullptr, 0xFFFFFFFF, 0);
+            next();
+        }
+        if (step == 9 && at(1500)) {
+            Check(g_sent.size() == sentBefore + 2, "fala de jogador e \"Fulano diz:\" nao disparam o /atender");
             // Mensagem do servidor com cores no meio das palavras e sem acento.
             void* chat = reinterpret_cast<void*>(Mem<DWORD>(g_samp + 0x21A0E4));
             reinterpret_cast<AddEntryFn>(g_samp + FN_ADD_ENTRY)(
@@ -504,15 +523,24 @@ int main(int argc, char** argv) {
                 0xFFFFFFFF, 0);
             next();
         }
-        if (step == 9 && at(1500)) {
+        if (step == 10 && at(1500)) {
             Check(SentCount("/atender 12") == 1, "mensagem no chat: /atender 12");
             Check(!g_chat.empty(), "o AddEntry original continua sendo chamado (o chat do SA-MP recebe)");
             Key(VK_F7, true);
             next();
         }
-        if (step == 10 && at(120)) { Key(VK_F7, false); next(); }
-        if (step == 11 && at(1500)) {
+        if (step == 11 && at(120)) { Key(VK_F7, false); next(); }
+        if (step == 12 && at(1500)) {
             Check(SentCount("/algemar 3") == 1, "ao redor (F7, 3 m): /algemar 3 (o Lucas, a 2,3 m)");
+            Mem<BYTE>(0xB73418 + 5) = 1; // CPad::NewMouseControllerState: o lateral de tras (Mouse 4)
+            next();
+        }
+        if (step == 13 && at(120)) {
+            Mem<BYTE>(0xB73418 + 5) = 0;
+            next();
+        }
+        if (step == 14 && at(1500)) {
+            Check(SentCount("/lateral") == 1, "Mouse 4 (lido do mouse do GTA) mandou /lateral");
             Check(Capture("bolinha.bmp"), "back buffer salvo (bolinha.bmp)");
             double dot = Covered(W / 2 - 5, H / 2 - 5, W / 2 + 5, H / 2 + 5, true);
             double around = Covered(W / 2 - 60, H / 2 + 20, W / 2 + 60, H / 2 + 80);
@@ -523,8 +551,8 @@ int main(int argc, char** argv) {
             Key('B', true); // com o Fulano na mira: a lista presa nele (toque rapido: fica aberta)
             next();
         }
-        if (step == 12 && at(100)) { Key('B', false); next(); }
-        if (step == 13 && at(500)) {
+        if (step == 15 && at(100)) { Key('B', false); next(); }
+        if (step == 16 && at(500)) {
             Check(Capture("lista.bmp"), "back buffer salvo (lista.bmp)");
             double panel = Covered(W / 2 + static_cast<int>(40 * u), H / 2 - 10, W / 2 + static_cast<int>(150 * u), H / 2 + 40);
             double other = Covered(W / 2 - 200, H / 2 - 10, W / 2 - 40, H / 2 + 40);
@@ -536,16 +564,16 @@ int main(int argc, char** argv) {
             Key('2', true); // o numero sutil do segundo item
             next();
         }
-        if (step == 14 && at(100)) { Key('2', false); next(); }
-        if (step == 15 && at(1500)) {
+        if (step == 17 && at(100)) { Key('2', false); next(); }
+        if (step == 18 && at(1500)) {
             Check(SentCount("/rg 12") == 1, "lista: a tecla 2 mandou /rg 12 (Documentos, no Fulano)");
             Check(g_cursorMode == 0, "cursor do SA-MP devolvido (modo 0)");
             Field(F_NO_OBSTACLES) = 0; // uma parede na frente: ninguem na mira
             Key('B', true);
             next();
         }
-        if (step == 16 && at(100)) { Key('B', false); next(); }
-        if (step == 17 && at(500)) {
+        if (step == 19 && at(100)) { Key('B', false); next(); }
+        if (step == 20 && at(500)) {
             Check(Capture("circulo.bmp"), "back buffer salvo (circulo.bmp)");
             double ring = Covered(W / 2 - 120, H / 2 - 30, W / 2 + 120, H / 2 + 30);
             char text[120];
@@ -554,16 +582,16 @@ int main(int argc, char** argv) {
             Mouse(W / 2, static_cast<int>(H / 2 - 139 * u), 0); // a fatia de cima: o Motor
             next();
         }
-        if (step == 18 && at(200)) { Mouse(W / 2, static_cast<int>(H / 2 - 139 * u), WM_LBUTTONDOWN); next(); }
-        if (step == 19 && at(100)) { Mouse(W / 2, static_cast<int>(H / 2 - 139 * u), WM_LBUTTONUP); next(); }
-        if (step == 20 && at(1500)) {
+        if (step == 21 && at(200)) { Mouse(W / 2, static_cast<int>(H / 2 - 139 * u), WM_LBUTTONDOWN); next(); }
+        if (step == 22 && at(100)) { Mouse(W / 2, static_cast<int>(H / 2 - 139 * u), WM_LBUTTONUP); next(); }
+        if (step == 23 && at(1500)) {
             Check(SentCount("/motor") == 1 && SentCount("/revistar 12") == 0,
                   "circulo: o clique na fatia mandou /motor (as binds da visao ficam de fora sem alvo)");
             Check(g_cursorMode == 0, "cursor do SA-MP devolvido (modo 0)");
             reinterpret_cast<CmdProc>(Field(F_CMD_PROC))(""); // /trokbinder
             next();
         }
-        if (step == 21 && at(600)) {
+        if (step == 24 && at(600)) {
             Check(Capture("menu.bmp"), "back buffer salvo (menu.bmp)");
             double menu = Covered(W / 2 - 150, H / 2 - 60, W / 2 + 150, H / 2 + 60);
             char text[120];
@@ -574,13 +602,13 @@ int main(int argc, char** argv) {
             Key(VK_F5, true); // com o menu aberto, nenhuma bind dispara
             next();
         }
-        if (step == 22 && at(120)) { Key(VK_F5, false); next(); }
-        if (step == 23 && at(800)) {
+        if (step == 25 && at(120)) { Key(VK_F5, false); next(); }
+        if (step == 26 && at(800)) {
             Check(g_sent.size() == sentBefore, "com o menu aberto a tecla nao dispara");
             reinterpret_cast<CmdProc>(Field(F_CMD_PROC))("");
             next();
         }
-        if (step == 24 && at(500)) {
+        if (step == 27 && at(500)) {
             Check(g_cursorMode == 0, "menu fechado no segundo /trokbinder (cursor modo 0)");
             break;
         }

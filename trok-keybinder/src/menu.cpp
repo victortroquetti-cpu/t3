@@ -20,8 +20,8 @@ namespace {
 using namespace tui;
 using namespace kb;
 
-constexpr const char* VERSION = "0.1.0";
-constexpr const char* VERSION_TAG = "v0.1";
+constexpr const char* VERSION = "0.2.0";
+constexpr const char* VERSION_TAG = "v0.2";
 
 #define RED "{FF6B6B}"
 #define AMBER "{FFC457}"
@@ -43,6 +43,8 @@ struct Draft {
     char text[1024] = {};
     char trigger[192] = {};
     char test[256] = {};
+    char group[48] = {};
+    int position = 1; // posicao no menu entre as do mesmo grupo
     ImGuiKey key = ImGuiKey_None;
     int mods = 0;
     bool confirmDelete = false;
@@ -62,6 +64,7 @@ struct State {
     bool confirmPresetDelete = false;
     int conflictCursor = -1; // a ultima bind aberta pelo "Ver" do aviso de conflito
     ImVec2 iconButton, iconButtonTop; // cantos do botao do icone (o seletor abre embaixo dele, ou em cima)
+    char search[CLASS_COUNT][64] = {}; // a busca de cada aba de binds
     std::vector<ImVec2> iconCells;
 } S;
 
@@ -125,13 +128,18 @@ std::string Seconds(int ms) {
 }
 
 std::string KeyText(const Bind& b) {
+    std::string s;
     if (b.key.Empty()) {
-        return b.inMenu ? "S\xC3\xB3 no menu" : "Sem tecla";
+        s = b.inMenu ? "S\xC3\xB3 no menu" : "Sem tecla";
+    } else {
+        s = HotkeyName(static_cast<ImGuiKey>(b.key.key), b.key.mods);
+        if (b.mode == MODE_HOLD) s += " \xC2\xB7 segurar";
+        if (b.mode == MODE_DOUBLE) s += " \xC2\xB7 2x";
+        if (b.inMenu) s += " \xC2\xB7 menu";
     }
-    std::string s = HotkeyName(static_cast<ImGuiKey>(b.key.key), b.key.mods);
-    if (b.mode == MODE_HOLD) s += " \xC2\xB7 segurar";
-    if (b.mode == MODE_DOUBLE) s += " \xC2\xB7 2x";
-    if (b.inMenu) s += " \xC2\xB7 menu";
+    if (b.inMenu && !b.group.empty()) s += " (" + b.group + ")";
+    if (b.where == WHERE_VEHICLE) s += " \xC2\xB7 no ve\xC3\xAD" "culo";
+    if (b.where == WHERE_FOOT) s += " \xC2\xB7 a p\xC3\xA9";
     return s;
 }
 
@@ -190,6 +198,8 @@ void OpenEditor(const Preset& p, int index, int cls) {
     Copy(d.name, sizeof(d.name), d.b.name);
     Copy(d.text, sizeof(d.text), d.b.text);
     Copy(d.trigger, sizeof(d.trigger), d.b.trigger);
+    Copy(d.group, sizeof(d.group), d.b.group);
+    d.position = index >= 0 ? MenuPosition(p.binds, index) : static_cast<int>(MenuPeers(p.binds, d.b, -1).size()) + 1;
     d.key = static_cast<ImGuiKey>(d.b.key.key);
     d.mods = d.b.key.mods;
     S.selected[TAB_COUNT] = 1;
@@ -200,6 +210,10 @@ void SyncDraft() {
     d.b.name = d.name;
     d.b.text = d.text;
     d.b.trigger = d.trigger;
+    std::string group = d.group;
+    while (!group.empty() && group.back() == ' ') group.pop_back();
+    while (!group.empty() && group[0] == ' ') group.erase(0, 1);
+    d.b.group = group;
     d.b.key.key = d.key;
     d.b.key.mods = d.mods;
 }
@@ -208,7 +222,8 @@ bool Same(const Bind& a, const Bind& b) {
     return a.cls == b.cls && a.enabled == b.enabled && a.name == b.name && a.text == b.text && a.key == b.key &&
            a.mode == b.mode && a.inMenu == b.inMenu && a.cond == b.cond && a.value == b.value && a.seat == b.seat &&
            a.delay == b.delay && a.trigger == b.trigger && a.cooldown == b.cooldown && a.radius == b.radius &&
-           a.target == b.target && a.ignore == b.ignore && a.icon == b.icon;
+           a.target == b.target && a.ignore == b.ignore && a.icon == b.icon && a.group == b.group &&
+           a.where == b.where && a.speechGuard == b.speechGuard;
 }
 
 // Tudo que impede uma bind de ser salva ou ligada: o mesmo tempo na mesma condicao (automaticas), o mesmo gesto
@@ -263,10 +278,16 @@ bool SaveDraft(Preset& p, const Settings& set) {
     if (d.b.name.empty()) {
         d.b.name = NameFromText(d.b.text);
     }
+    int at;
     if (d.index >= 0 && d.index < static_cast<int>(p.binds.size())) {
         p.binds[d.index] = d.b;
+        at = d.index;
     } else {
         p.binds.push_back(d.b);
+        at = static_cast<int>(p.binds.size()) - 1;
+    }
+    if (d.b.inMenu && d.b.cls != CLASS_AUTO) {
+        MoveInMenu(p.binds, at, d.position); // a posicao escolhida no menu
     }
     Toast("Bind salva", d.b.name.c_str());
     d.open = false;
@@ -376,8 +397,26 @@ void KeyRows(Rows& r, Draft& d, const Preset& p, const Settings& set) {
     if (clash.radial) {
         r.Note(RED "\xC3\x89 o atalho do menu de binds", "aba Geral");
     }
+    static const char* const wheres[] = {"Sempre", "S\xC3\xB3 no ve\xC3\xAD" "culo", "S\xC3\xB3 a p\xC3\xA9"};
+    r.Segmented("Vale", &d.b.where, wheres, 3, WHERE_ANY);
     r.Toggle("Adicionar ao menu de binds", &d.b.inMenu);
     IconRow(r, d);
+    if (d.b.inMenu) {
+        if (d.b.cls != CLASS_VIEW) {
+            r.Input("Grupo no c\xC3\xADrculo (opcional)", d.group, sizeof(d.group), "ex.: Pol\xC3\xAD" "cia", false, 240);
+            std::vector<std::string> groups = Groups(p.binds);
+            if (!groups.empty()) {
+                std::string list;
+                for (size_t i = 0; i < groups.size(); ++i) list += (i ? ", " : "") + groups[i];
+                r.Note("Grupos deste preset", list.c_str());
+            }
+        }
+        SyncDraft();
+        int peers = static_cast<int>(MenuPeers(p.binds, d.b, d.index).size());
+        d.position = std::min(std::max(d.position, 1), peers + 1);
+        const char* where = d.b.cls == CLASS_VIEW ? "Posi\xC3\xA7\xC3\xA3o na lista" : "Posi\xC3\xA7\xC3\xA3o no c\xC3\xADrculo";
+        r.Stepper(where, &d.position, 1, peers + 1, 1, "%d", peers + 1);
+    }
 }
 
 void WeaponRow(Rows& r, Draft& d) {
@@ -441,18 +480,24 @@ void AutoRows(Rows& r, Draft& d, const Preset& p, const Context& c) {
         if (r.Slider("Esperar entre disparos", &secs, 0, 60, 1, "%d s", 5)) {
             d.b.cooldown = secs * 1000;
         }
+        r.Toggle("Ignorar fala de jogador (\":\" antes do trecho)", &d.b.speechGuard);
         r.Info("Como o jogador \xC3\xA9 achado",
-               "Cores e acentos n\xC3\xA3o importam. Para o (id) e o (nick), o mod procura na pr\xC3\xB3pria mensagem: quem "
-               "falou, o nick de algu\xC3\xA9m conectado (Fulano_Silva ou Fulano Silva) ou um ID como (12), [12], ID 12 "
-               "ou #12. Se o texto usa (id)/(nick) e ningu\xC3\xA9m \xC3\xA9 achado, a bind n\xC3\xA3o vai.");
+               "S\xC3\xB3 mensagens do servidor contam: a fala dos jogadores nunca dispara. Cores e acentos n\xC3\xA3o "
+               "importam. Para o (id) e o (nick), o mod procura na pr\xC3\xB3pria mensagem o nick de algu\xC3\xA9m "
+               "conectado (Fulano_Silva ou Fulano Silva) ou um ID como (12), [12], ID 12 ou #12. Se o texto usa "
+               "(id)/(nick) e ningu\xC3\xA9m \xC3\xA9 achado, a bind n\xC3\xA3o vai. Servidor que repassa a fala local "
+               "como mensagem dele (\"Fulano diz: ...\"): com \"Ignorar fala\" ligado, linha com \":\" antes do trecho "
+               "n\xC3\xA3o conta.");
         r.Input("Testar com uma mensagem", d.test, sizeof(d.test), "cole aqui uma mensagem do chat", false, 330);
         if (d.test[0]) {
             std::string result;
             if (!ChatMatches(d.trigger, d.test)) {
                 result = "N\xC3\xA3o dispara";
+            } else if (d.b.speechGuard && LooksLikeSpeech(d.trigger, d.test)) {
+                result = "N\xC3\xA3o dispara (parece fala: \":\" antes do trecho)";
             } else {
                 Player who;
-                bool found = FindPlayer(d.test, "", c.players, &who);
+                bool found = FindPlayer(d.test, c.players, &who);
                 std::vector<std::string> lines = Lines(d.text);
                 if (UsesTarget(d.text) && !found) {
                     result = AMBER "Dispara, mas sem jogador (n\xC3\xA3o vai)";
@@ -661,10 +706,22 @@ bool ClassList(Rows& r, Preset& p, const Settings& set, int cls) {
         "binds com o nome dele no meio.",
     };
     r.Info("Como funciona", about[cls]);
+    int inTab = 0;
+    for (const Bind& b : p.binds) {
+        inTab += b.cls == cls;
+    }
+    char* query = S.search[cls];
+    if (inTab > 0) {
+        r.Search("Buscar", query, sizeof(S.search[cls]), "nome, texto, tecla ou grupo");
+    }
+    std::string q = Normalize(query);
     int shown = 0;
     for (size_t i = 0; i < p.binds.size(); ++i) {
         Bind& b = p.binds[i];
         if (b.cls != cls) {
+            continue;
+        }
+        if (!q.empty() && Normalize(Title(b) + " " + b.text + " " + Summary(b) + " " + b.group).find(q) == std::string::npos) {
             continue;
         }
         ++shown;
@@ -685,7 +742,7 @@ bool ClassList(Rows& r, Preset& p, const Settings& set, int cls) {
         }
     }
     if (!shown) {
-        r.Note("Nenhuma bind aqui ainda", "");
+        r.Note(inTab ? "Nenhuma bind com essa busca" : "Nenhuma bind aqui ainda", "");
     }
     if (r.Action("Nova bind", "Adicionar")) {
         OpenEditor(p, -1, cls);
@@ -754,6 +811,9 @@ bool TabPresets(Rows& r, Context& c) {
     char count[32];
     snprintf(count, sizeof(count), "%d", static_cast<int>(cur.binds.size()));
     r.Note("Binds", count);
+    changed |= r.Slider("Intervalo entre mensagens (anti-flood)", &cur.flood, 500, 5000, 100, "%d ms", 1200);
+    std::string file = cur.file.empty() ? SafeFileName(cur.name) + ".txt" : cur.file;
+    r.Note("Arquivo", ("Trok KeyBinder\\presets\\" + file).c_str());
     r.Section("Mais presets");
     if (r.Action("Novo preset vazio", "Criar")) {
         int n = NewPreset(data, "Novo preset", false, -1);
@@ -821,7 +881,6 @@ bool TabGeral(Rows& r, Data& data) {
         }
     }
     changed |= r.Slider("Tamanho do c\xC3\xADrculo", &s.radialSize, 70, 140, 5, "%d%%", DEFAULTS.radialSize);
-    changed |= r.Slider("Intervalo entre mensagens", &s.flood, 500, 5000, 100, "%d ms", DEFAULTS.flood);
     changed |= r.Slider("Segurar por", &s.hold, 500, 5000, 100, "%d ms", DEFAULTS.hold);
     changed |= r.Slider("2x seguidas: at\xC3\xA9", &s.doubleTap, 150, 1000, 25, "%d ms", DEFAULTS.doubleTap);
     changed |= r.Slider("Na vis\xC3\xA3o: dist\xC3\xA2ncia", &s.viewDistance, 3, 100, 1, "%d m", DEFAULTS.viewDistance);
@@ -835,7 +894,7 @@ bool TabGeral(Rows& r, Data& data) {
     r.Section("Nunca dispara com");
     r.Note("Chat, di\xC3\xA1logo, placar (Tab) e pausa", "bloqueado");
     r.Note("Menus com cursor (este e os de outros mods)", "bloqueado");
-    r.Note("Arquivo", "Trok KeyBinder.txt (UTF-8)");
+    r.Note("Pasta", "Trok KeyBinder (ao lado do .asi)");
     return changed;
 }
 

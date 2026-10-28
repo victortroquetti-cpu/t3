@@ -29,8 +29,7 @@ struct Me {
 };
 
 struct ChatLine {
-    std::string text;   // UTF-8
-    std::string author; // fala de jogador: o nick de quem falou
+    std::string text; // UTF-8; so mensagens do servidor (a fala dos jogadores nunca chega aqui)
 };
 
 struct World {

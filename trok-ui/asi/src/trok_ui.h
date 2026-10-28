@@ -139,7 +139,8 @@ public:
     bool Slider(const char* label, int* value, int min, int max, int step, const char* fmt, int def);
     bool Keybind(const char* label, ImGuiKey* key, ImGuiKey def);
     // Atalho com Ctrl/Shift/Alt (mods: HotkeyCtrl | HotkeyShift | HotkeyAlt). Um modificador sozinho, apertado e
-    // solto, vira a propria tecla. Backspace limpa, Esc ou botao direito cancela.
+    // solto, vira a propria tecla. O botao do meio e os laterais do mouse tambem valem. Backspace limpa, Esc ou
+    // botao direito cancela.
     bool Hotkey(const char* label, ImGuiKey* key, int* mods, ImGuiKey def);
     bool Color(const char* label, ImU32* color, ImU32 def);
     bool Dropdown(const char* label, int* index, const char* const* options, int count, int def);

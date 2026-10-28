@@ -24,13 +24,14 @@ status=0
 run() {
     local name=$1
     echo "== $name"
-    rm -f "$OUT/Trok KeyBinder.log" "$OUT/Trok KeyBinder.txt"* "$OUT"/*.bmp
+    rm -rf "$OUT/Trok KeyBinder" "$OUT/Trok KeyBinder.txt"* "$OUT"/*.bmp
     python3 test/smoke/make_fake_samp.py "$OUT/samp.dll" $([ "$name" = outra-versao ] && echo r3)
     (cd "$OUT" && timeout 120 xvfb-run -a -s "-screen 0 1600x900x24" wine fake_gta.exe "Trok KeyBinder.asi" "$name") \
         2>/dev/null || status=1
     mkdir -p "$OUT/$name"
     mv -f "$OUT"/*.bmp "$OUT/$name/" 2>/dev/null || true
-    cp "$OUT/Trok KeyBinder.log" "$OUT/$name/" 2>/dev/null || true
+    rm -f "$OUT/$name/Trok KeyBinder.log"
+    cp "$OUT/Trok KeyBinder/Trok KeyBinder.log" "$OUT/$name/" 2>/dev/null || true
     sed 's/^/   log| /' "$OUT/$name/Trok KeyBinder.log" 2>/dev/null || echo "   (sem log do .asi)"
 }
 for scenario in ${SCENARIOS:-direto outra-versao}; do

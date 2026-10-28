@@ -78,8 +78,8 @@ DWORD g_sampKeyboardTick = 0;
 volatile LONG g_presentCalls = 0;
 volatile DWORD g_lastPresent = 0;
 float g_fontScreenH = 0.0f;
-char g_logPath[MAX_PATH] = {};
-char g_dataPath[MAX_PATH] = {};
+std::string g_dir;     // a pasta "Trok KeyBinder" ao lado do .asi (UTF-8)
+std::string g_logPath; // Trok KeyBinder\Trok KeyBinder.log
 
 kb::Data g_data;
 kb::Engine g_engine;
@@ -154,7 +154,7 @@ void __cdecl CmdTrokBinder(const char*) {
               g_ready ? "pronto" : "NAO pronto", g_presentCalls, GetTickCount() - g_lastPresent, g_hookMode);
     if (!g_ready || GetTickCount() - g_lastPresent > 2000) {
         samp::Notice("{FF8A8A}[Trok KeyBinder]{FFFFFF} o desenho ainda n\xC3\xA3o est\xC3\xA1 ativo. Me envie o arquivo "
-                     "{FFD27A}Trok KeyBinder.log{FFFFFF} (mesma pasta do .asi).");
+                     "{FFD27A}Trok KeyBinder.log{FFFFFF} (pasta Trok KeyBinder, ao lado do .asi).");
     }
 }
 
@@ -332,8 +332,8 @@ void InitImGui(IDirect3DDevice9* device) {
 }
 
 void Save() {
-    if (g_dataPath[0] && !kb::SaveFile(g_dataPath, g_data)) {
-        BinderLog("nao consegui gravar %s", g_dataPath);
+    if (!g_dir.empty() && !kb::SaveFolder(g_dir, g_data)) {
+        BinderLog("nao consegui gravar a pasta %s", g_dir.c_str());
     }
 }
 
@@ -366,7 +366,13 @@ int CurrentPreset(const samp::ServerInfo& server) {
 class ImGuiKeys : public kb::Keys {
 public:
     bool Down(int key) const override {
-        return key > 0 && ImGui::IsKeyDown(static_cast<ImGuiKey>(key));
+        if (key <= 0) {
+            return false;
+        }
+        ImGuiKey k = static_cast<ImGuiKey>(key);
+        // Com o mouse no jogo (sem cursor), os botoes chegam pelo DirectInput: o estado do proprio GTA.
+        int mouse = k == ImGuiKey_MouseMiddle ? 0 : k == ImGuiKey_MouseX1 ? 1 : k == ImGuiKey_MouseX2 ? 2 : -1;
+        return ImGui::IsKeyDown(k) || (mouse >= 0 && samp::MouseButton(mouse));
     }
     bool ModsOk(const kb::Hotkey& h) const override {
         ImGuiKey k = static_cast<ImGuiKey>(h.key);
@@ -386,45 +392,6 @@ bool HasViewBinds(const kb::Preset& p) {
         }
     }
     return false;
-}
-
-// As binds da visao marcadas "No menu" (a lista presa no jogador).
-std::vector<radial::Item> ViewItems(const kb::Preset& p) {
-    std::vector<radial::Item> items;
-    for (size_t i = 0; i < p.binds.size(); ++i) {
-        const kb::Bind& b = p.binds[i];
-        if (b.enabled && b.inMenu && b.cls == kb::CLASS_VIEW) {
-            radial::Item it;
-            it.label = b.name.empty() ? kb::Lines(b.text).empty() ? std::string() : kb::Lines(b.text)[0] : b.name;
-            it.bind = static_cast<int>(i);
-            it.icon = icons::Find(b.icon);
-            items.push_back(it);
-        }
-    }
-    return items;
-}
-
-std::vector<radial::Item> RadialItems(const kb::Preset& p, bool target) {
-    std::vector<radial::Item> items;
-    for (int pass = 0; pass < 2; ++pass) {
-        for (size_t i = 0; i < p.binds.size(); ++i) {
-            const kb::Bind& b = p.binds[i];
-            if (!b.enabled || !b.inMenu || b.cls == kb::CLASS_AUTO) {
-                continue;
-            }
-            bool view = b.cls == kb::CLASS_VIEW;
-            if (view != (pass == 0) || (view && !target)) {
-                continue;
-            }
-            radial::Item it;
-            it.label = b.name.empty() ? kb::Lines(b.text).empty() ? std::string() : kb::Lines(b.text)[0] : b.name;
-            it.tag = view ? std::string() : b.cls == kb::CLASS_AROUND ? std::string("Ao redor") : std::string();
-            it.bind = static_cast<int>(i);
-            it.icon = icons::Find(b.icon);
-            items.push_back(it);
-        }
-    }
-    return items;
 }
 
 void RenderOverlay(IDirect3DDevice9* device) {
@@ -466,6 +433,13 @@ void RenderOverlay(IDirect3DDevice9* device) {
             menu::Toggle();
             radial::Close();
             BinderLog("menu %s", menu::IsOpen() ? "aberto" : "fechado");
+            // Presets copiados para a pasta com o jogo aberto entram quando o menu abre.
+            int added = menu::IsOpen() && !g_dir.empty() ? kb::MergeNewPresets(g_dir, g_data) : 0;
+            if (added > 0) {
+                BinderLog("%d preset(s) novo(s) em presets\\", added);
+                tui::Toast("Presets novos", (std::to_string(added) + " arquivo(s) da pasta presets entraram.").c_str());
+                Save();
+            }
         }
     }
 
@@ -529,11 +503,11 @@ void RenderOverlay(IDirect3DDevice9* device) {
         g_radialTarget = w.target;
         std::string title = w.hasTarget ? w.target.nick : std::string("Binds");
         std::string sub = w.hasTarget ? std::to_string(w.target.id) : std::string(); // so o numero, ao lado do nick
-        std::vector<radial::Item> view = ViewItems(preset);
+        std::vector<radial::Item> view = radial::BuildList(preset, w.me.inVehicle);
         if (w.hasTarget && set.viewList && !view.empty()) {
             radial::OpenList(view, title, sub, time); // presa no jogador, saindo da bolinha
         } else {
-            radial::Open(RadialItems(preset, w.hasTarget), title, sub, time);
+            radial::Open(radial::BuildCircle(preset, w.hasTarget, w.me.inVehicle), title, sub, time);
         }
         radialPressed = false;
     }
@@ -566,7 +540,7 @@ void RenderOverlay(IDirect3DDevice9* device) {
 
     // A fila: uma mensagem por vez, no intervalo (nunca com a pausa aberta).
     std::string message;
-    if (!paused && w.sendReady && g_engine.Next(now, set.flood, &message)) {
+    if (!paused && w.sendReady && g_engine.Next(now, preset.flood, &message)) {
         samp::Send(message);
     }
     for (const kb::Notice& n : g_engine.TakeNotices()) {
@@ -934,10 +908,10 @@ DWORD WINAPI Boot(LPVOID) {
 } // namespace
 
 void BinderLog(const char* fmt, ...) {
-    if (!g_logPath[0]) {
+    if (g_logPath.empty()) {
         return;
     }
-    FILE* file = fopen(g_logPath, "a");
+    FILE* file = kb::OpenFile(g_logPath, "a");
     if (!file) {
         return;
     }
@@ -956,21 +930,29 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
         g_module = module;
         DisableThreadLibraryCalls(module);
-        GetModuleFileNameA(module, g_logPath, MAX_PATH);
-        snprintf(g_dataPath, sizeof(g_dataPath), "%s", g_logPath);
-        char* slash = strrchr(g_logPath, '\\');
-        char* dataSlash = strrchr(g_dataPath, '\\');
-        if (slash && dataSlash) {
-            strcpy(slash + 1, "Trok KeyBinder.log");
-            strcpy(dataSlash + 1, "Trok KeyBinder.txt");
-        } else {
-            g_logPath[0] = 0;
-            g_dataPath[0] = 0;
+        // A pasta do .asi em UTF-8 (com acento no caminho, as funcoes "A" do Windows falham).
+        wchar_t wide[MAX_PATH] = {};
+        GetModuleFileNameW(module, wide, MAX_PATH);
+        char utf8[MAX_PATH * 3] = {};
+        WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8, sizeof(utf8), nullptr, nullptr);
+        std::string asiDir = utf8;
+        size_t slash = asiDir.find_last_of('\\');
+        if (slash != std::string::npos) {
+            asiDir.resize(slash);
+            g_dir = kb::JoinPath(asiDir, "Trok KeyBinder");
+            kb::MakeDir(g_dir);
+            g_logPath = kb::JoinPath(g_dir, "Trok KeyBinder.log");
         }
         BinderLog("Trok KeyBinder .asi v%s -- esperando o render e o samp.dll", menu::Version());
-        if (g_dataPath[0] && kb::LoadFile(g_dataPath, &g_data)) {
-            BinderLog("%d presets e %d servidores lidos de Trok KeyBinder.txt", static_cast<int>(g_data.presets.size()),
-                      static_cast<int>(g_data.servers.size()));
+        if (!g_dir.empty()) {
+            std::string oldFile = kb::JoinPath(asiDir, "Trok KeyBinder.txt");
+            if (kb::MigrateOldFile(oldFile, g_dir, &g_data)) {
+                BinderLog("Trok KeyBinder.txt da v0.1 passado para a pasta (o antigo ficou como .antigo)");
+            } else {
+                kb::LoadFolder(g_dir, &g_data);
+            }
+            BinderLog("%d presets e %d servidores lidos da pasta Trok KeyBinder",
+                      static_cast<int>(g_data.presets.size()), static_cast<int>(g_data.servers.size()));
         }
         CreateThread(nullptr, 0, Boot, nullptr, 0, nullptr);
     }

@@ -22,6 +22,9 @@ struct State {
     std::string title, subtitle;
     float openedAt = 0;
     int page = 0;
+    int group = -1; // o grupo aberto (indice em items)
+    int sel = -1;   // a fatia marcada pela roda ou pelas setas (indice nos itens do nivel; -1 = nenhuma)
+    ImVec2 lastMouse;
     bool released = false;
 } S;
 
@@ -190,10 +193,18 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
     float appear = Ease((time - S.openedAt) / 0.14f);
     float sc = (0.9f + 0.1f * appear) * k;
     float outerR = 196 * u * sc, innerR = 82 * u * sc, hubR = 70 * u * sc;
-    int n = static_cast<int>(S.items.size());
+    bool inGroup = S.group >= 0 && S.group < static_cast<int>(S.items.size());
+    const std::vector<Item>& items = inGroup ? S.items[S.group].children : S.items;
+    int n = static_cast<int>(items.size());
     int pages = std::max(1, (n + PAGE - 1) / PAGE);
-    if (pages > 1 && io.MouseWheel != 0) {
-        S.page = (S.page + (io.MouseWheel < 0 ? 1 : pages - 1)) % pages;
+    // A roda e as setas andam pelas fatias (e passam de pagina sozinhas); Enter roda a marcada.
+    int step1 = (io.MouseWheel < 0 || ImGui::IsKeyPressed(ImGuiKey_RightArrow, true) ||
+                 ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) ? 1
+              : (io.MouseWheel > 0 || ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true) ||
+                 ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) ? -1 : 0;
+    if (n > 0 && step1) {
+        S.sel = S.sel < 0 ? (step1 > 0 ? S.page * PAGE : std::min(n, S.page * PAGE + PAGE) - 1) : (S.sel + step1 + n) % n;
+        S.page = S.sel / PAGE;
     }
     S.page = std::min(S.page, pages - 1);
     int first = S.page * PAGE;
@@ -210,15 +221,26 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
         while (angle < 0) angle += 2 * PI;
         hover = static_cast<int>(std::floor((angle + step * 0.5f) / step)) % count;
     }
+    bool mouseMoved = io.MousePos.x != S.lastMouse.x || io.MousePos.y != S.lastMouse.y;
+    S.lastMouse = io.MousePos;
+    if (hover >= 0 && mouseMoved) {
+        S.sel = first + hover; // o mouse tambem marca
+    }
+    if (S.sel >= 0 && (S.sel < first || S.sel >= first + count)) {
+        S.sel = -1;
+    }
+    int marked = hover >= 0 && mouseMoved ? hover : S.sel >= 0 ? S.sel - first : hover;
     if (hover >= 0 || hubHover) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     }
 
     int chosen = -1;
-    bool close = false;
+    bool close = false, back = false;
     if (ImGui::IsMouseClicked(0)) {
         if (hover >= 0) {
             chosen = first + hover;
+        } else if (hubHover && inGroup) {
+            back = true; // o meio do grupo volta
         } else {
             close = true; // no meio ou fora do circulo
         }
@@ -227,7 +249,12 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
     if (digit > 0 && digit <= count) {
         chosen = first + digit - 1; // o numero da fatia, como nas listas da casa
     }
-    if (ImGui::IsMouseClicked(1) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || pressedAgain) {
+    if (marked >= 0 && (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))) {
+        chosen = first + marked;
+    }
+    if (ImGui::IsMouseClicked(1) && inGroup) {
+        back = true;
+    } else if (ImGui::IsMouseClicked(1) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || pressedAgain) {
         close = true;
     }
     // Segurar o atalho, apontar e soltar. Um toque rapido deixa o circulo aberto para clicar.
@@ -247,7 +274,7 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
     float midR = (outerR + innerR) * 0.5f;
     float gap = count > 1 ? 6 * u * sc : 0.0f;
     for (int i = 0; i < count; ++i) {
-        bool lit = i == hover;
+        bool lit = i == marked;
         float grow = Anim(ImGui::GetID("##kbFatia") + static_cast<ImGuiID>(i), lit ? 1.0f : 0.0f, 18.0f);
         float out = outerR + 9 * u * sc * grow;
         float ac = -PI * 0.5f + i * step;
@@ -258,7 +285,7 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
         } else {
             Sector(dl, center, innerR, out, ac - step * 0.5f, ac + step * 0.5f, gap, Alpha(fill, appear));
         }
-        const Item& it = S.items[first + i];
+        const Item& it = items[first + i];
         ImVec2 at(center.x + std::cos(ac) * midR, center.y + std::sin(ac) * midR);
         float chord = count == 1 ? thick * 2.2f : 2 * midR * std::sin(std::min(step, PI) * 0.5f) * 0.82f;
         float maxW = std::min(chord, thick * 1.45f);
@@ -294,14 +321,20 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
     dl->AddCircleFilled(center, hubR, Alpha(IM_COL32(12, 12, 12, 244), appear), 64);
     dl->AddCircle(center, hubR + 0.5f, Alpha(col::White(hubHover ? 40 : 16), appear), 64, 1.0f);
     if (hubHover) {
-        DrawIcon(dl, Icon::Close, ImVec2(center.x, center.y - 9 * u * k), Alpha(col::text, appear));
-        Centered(dl, fonts.desc, ImVec2(center.x, center.y + 13 * u * k), Alpha(col::hint, appear), "Fechar");
+        DrawIcon(dl, inGroup ? Icon::ChevronLeft : Icon::Close, ImVec2(center.x, center.y - 9 * u * k),
+                 Alpha(col::text, appear));
+        Centered(dl, fonts.desc, ImVec2(center.x, center.y + 13 * u * k), Alpha(col::hint, appear),
+                 inGroup ? "Voltar" : "Fechar");
     } else if (count == 0) {
         Centered(dl, fonts.body, ImVec2(center.x, center.y - 9 * u * k), Alpha(col::text, appear), "Nenhuma bind");
         Centered(dl, fonts.desc, ImVec2(center.x, center.y + 11 * u * k), Alpha(col::hint, appear), "no menu");
     } else {
         float ty = center.y - (pages > 1 ? 6 * u * k : 0);
-        TitleWithId(dl, fonts.title, ImVec2(center.x, ty), hubR * 1.7f, S.title, S.subtitle, appear, true);
+        if (inGroup) {
+            TitleWithId(dl, fonts.title, ImVec2(center.x, ty), hubR * 1.7f, S.items[S.group].label, "", appear, true);
+        } else {
+            TitleWithId(dl, fonts.title, ImVec2(center.x, ty), hubR * 1.7f, S.title, S.subtitle, appear, true);
+        }
         if (pages > 1) {
             float dotsY = center.y + 18 * u * k;
             float spacing = 10 * u * k;
@@ -313,16 +346,26 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
         }
     }
     if (pages > 1) {
-        char hint[64];
-        snprintf(hint, sizeof(hint), "Roda do mouse: p\xC3\xA1gina %d de %d", S.page + 1, pages);
+        char hint[128];
+        snprintf(hint, sizeof(hint), "P\xC3\xA1gina %d de %d \xC2\xB7 a roda do mouse passa as fatias", S.page + 1, pages);
         Centered(dl, fonts.desc, ImVec2(center.x, center.y + outerR + 34 * u * sc), Alpha(col::hint, appear), hint);
     }
 
+    if (chosen >= 0 && chosen < n && !items[chosen].children.empty() && !inGroup) {
+        S.group = chosen; // entra no grupo
+        S.page = 0;
+        S.sel = -1;
+        return -1;
+    }
     if (chosen >= 0 && chosen < n) {
         S.open = false;
-        return S.items[chosen].bind;
+        return items[chosen].bind;
     }
-    if (close) {
+    if (back) {
+        S.group = -1;
+        S.page = 0;
+        S.sel = -1;
+    } else if (close) {
         S.open = false;
     }
     return -1;
@@ -411,8 +454,9 @@ int ListFrame(ImDrawList* dl, ImVec2 anchor, bool visible, float time, bool keyD
         L.selected = hover;
         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     }
-    if (n > 0 && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) L.selected = (L.selected + 1) % n;
-    if (n > 0 && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) L.selected = (L.selected + n - 1) % n;
+    // Setas e roda do mouse andam pela lista (a roda nao chega no jogo com a lista aberta).
+    if (n > 0 && (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true) || io.MouseWheel < 0)) L.selected = (L.selected + 1) % n;
+    if (n > 0 && (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true) || io.MouseWheel > 0)) L.selected = (L.selected + n - 1) % n;
 
     int chosen = -1;
     bool close = false;
@@ -487,6 +531,66 @@ int ListFrame(ImDrawList* dl, ImVec2 anchor, bool visible, float time, bool keyD
         L.open = false;
     }
     return -1;
+}
+
+// As binds da visao marcadas "No menu" (a lista presa no jogador), so as que valem agora (no veiculo / a pe).
+std::vector<Item> BuildList(const kb::Preset& p, bool inVehicle) {
+    std::vector<Item> items;
+    for (size_t i = 0; i < p.binds.size(); ++i) {
+        const kb::Bind& b = p.binds[i];
+        if (b.enabled && b.inMenu && b.cls == kb::CLASS_VIEW && kb::WhereOk(b, inVehicle)) {
+            Item it;
+            it.label = b.name.empty() ? kb::Lines(b.text).empty() ? std::string() : kb::Lines(b.text)[0] : b.name;
+            it.bind = static_cast<int>(i);
+            it.icon = icons::Find(b.icon);
+            items.push_back(it);
+        }
+    }
+    return items;
+}
+
+// O circulo: as binds "No menu" que valem agora (no veiculo / a pe), na ordem do preset; as do mesmo grupo viram
+// uma fatia de grupo (no lugar da primeira delas) que abre o circulo do grupo.
+std::vector<Item> BuildCircle(const kb::Preset& p, bool target, bool inVehicle) {
+    std::vector<Item> items;
+    static const int folder = icons::Find("folder");
+    for (int pass = 0; pass < 2; ++pass) {
+        for (size_t i = 0; i < p.binds.size(); ++i) {
+            const kb::Bind& b = p.binds[i];
+            if (!b.enabled || !b.inMenu || b.cls == kb::CLASS_AUTO || !kb::WhereOk(b, inVehicle)) {
+                continue;
+            }
+            bool view = b.cls == kb::CLASS_VIEW;
+            if (view != (pass == 0) || (view && !target)) {
+                continue;
+            }
+            Item it;
+            it.label = b.name.empty() ? kb::Lines(b.text).empty() ? std::string() : kb::Lines(b.text)[0] : b.name;
+            it.tag = view ? std::string() : b.cls == kb::CLASS_AROUND ? std::string("Ao redor") : std::string();
+            it.bind = static_cast<int>(i);
+            it.icon = icons::Find(b.icon);
+            if (b.group.empty()) {
+                items.push_back(it);
+                continue;
+            }
+            Item* group = nullptr;
+            for (Item& g : items) {
+                if (!g.children.empty() && kb::SameNick(g.label, b.group)) {
+                    group = &g;
+                }
+            }
+            if (!group) {
+                Item g;
+                g.label = b.group;
+                g.icon = folder;
+                items.push_back(g);
+                group = &items.back();
+            }
+            group->children.push_back(it);
+            group->tag = std::to_string(group->children.size()) + (group->children.size() == 1 ? " bind" : " binds");
+        }
+    }
+    return items;
 }
 
 void DrawDot(ImDrawList* dl, ImVec2 at, float time) {
