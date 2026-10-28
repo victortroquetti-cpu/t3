@@ -1124,6 +1124,122 @@ bool Rows::Keybind(const char* label, ImGuiKey* key, ImGuiKey def) {
 
 namespace {
 
+bool IsModifierKey(ImGuiKey k) {
+    return k >= ImGuiKey_LeftCtrl && k <= ImGuiKey_RightSuper;
+}
+
+int HeldMods() {
+    ImGuiIO& io = ImGui::GetIO();
+    return (io.KeyCtrl ? HotkeyCtrl : 0) | (io.KeyShift ? HotkeyShift : 0) | (io.KeyAlt ? HotkeyAlt : 0);
+}
+
+ImGuiKey g_hotkeyMod = ImGuiKey_None; // modificador apertado sozinho durante a captura (vira a tecla se for solto)
+
+} // namespace
+
+std::string HotkeyName(ImGuiKey key, int mods) {
+    if (key == ImGuiKey_None) {
+        return "Nenhuma";
+    }
+    std::string s;
+    if (!IsModifierKey(key)) {
+        if (mods & HotkeyCtrl) s += "Ctrl + ";
+        if (mods & HotkeyShift) s += "Shift + ";
+        if (mods & HotkeyAlt) s += "Alt + ";
+    }
+    return s + ImGui::GetKeyName(key);
+}
+
+bool Rows::Hotkey(const char* label, ImGuiKey* key, int* mods, ImGuiKey def) {
+    Start();
+    ImGuiID& capturing = g_capturingKey;
+    ImGuiID myId = Id("##hk");
+    bool isCapturing = capturing == myId;
+
+    std::string shown;
+    if (isCapturing) {
+        int held = HeldMods();
+        shown = held ? HotkeyName(ImGuiKey_A, held) : std::string("Pressione o atalho");
+        if (held) {
+            shown.replace(shown.size() - 1, 1, "...");
+        }
+    } else {
+        shown = HotkeyName(*key, *mods);
+    }
+    float cw = std::max(68 * u, TextSize(fonts.desc, shown.c_str()).x + 24 * u), ch = 26 * u;
+    float cx = x_ + w_ - recuo_ * 0.5f - cw, cy = y_ + (rowH_ - ch) * 0.5f;
+    bool changed = false;
+
+    ImGui::SetCursorScreenPos(ImVec2(cx, cy));
+    bool clicked = ImGui::InvisibleButton("##hk", ImVec2(cw, ch));
+    bool khov = ImGui::IsItemHovered();
+    if (khov) {
+        HandCursor();
+    }
+    std::string defText = HotkeyName(def, 0);
+    if (Restore((*key != def || (*mods && def != ImGuiKey_None)) && !isCapturing, cx, defText.c_str())) {
+        *key = def;
+        *mods = 0;
+        changed = true;
+    }
+    if (clicked || (Selected() && keys_.enter && !isCapturing)) {
+        capturing = myId;
+        isCapturing = true;
+        g_hotkeyMod = ImGuiKey_None;
+        *selected_ = index_;
+    } else if (isCapturing) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsMouseClicked(1)) {
+            capturing = 0;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Backspace, false)) {
+            *key = ImGuiKey_None;
+            *mods = 0;
+            capturing = 0;
+            changed = true;
+        } else {
+            for (int k = ImGuiKey_NamedKey_BEGIN; k < ImGuiKey_NamedKey_END; ++k) {
+                ImGuiKey kk = static_cast<ImGuiKey>(k);
+                bool isMouse = kk >= ImGuiKey_MouseLeft && kk <= ImGuiKey_MouseWheelY;
+                bool isMod = kk >= ImGuiKey_ReservedForModCtrl;
+                if (isMouse || isMod || kk == ImGuiKey_Escape || !ImGui::IsKeyPressed(kk, false)) {
+                    continue;
+                }
+                if (IsModifierKey(kk)) {
+                    if (g_hotkeyMod == ImGuiKey_None) {
+                        g_hotkeyMod = kk;
+                    }
+                    continue;
+                }
+                *key = kk;
+                *mods = HeldMods();
+                capturing = 0;
+                changed = true;
+                break;
+            }
+            // So o modificador, apertado e solto: ele mesmo e a tecla.
+            if (capturing && g_hotkeyMod != ImGuiKey_None && ImGui::IsKeyReleased(g_hotkeyMod)) {
+                *key = g_hotkeyMod;
+                *mods = 0;
+                capturing = 0;
+                changed = true;
+            }
+        }
+        isCapturing = capturing == myId;
+    }
+
+    bool hovered = Row(rowH_, khov);
+    Label(label, hovered);
+    float pulse = isCapturing ? 0.55f + 0.45f * std::sin(static_cast<float>(ImGui::GetTime()) * 6.0f) : 1.0f;
+    Box(dl_, ImVec2(cx, cy), ImVec2(cx + cw, cy + ch), col::White(khov || isCapturing ? 14 : 8),
+        col::White(isCapturing ? static_cast<int>(90 * pulse) : (khov ? 40 : 22)), 6 * u);
+    ImVec2 ts = TextSize(fonts.desc, shown.c_str());
+    ImU32 tc = isCapturing ? Fade(col::text, pulse) : (*key == ImGuiKey_None ? col::hint : col::text);
+    Text(dl_, fonts.desc, cx + (cw - ts.x) * 0.5f, cy + (ch - ts.y) * 0.5f, tc, shown.c_str());
+    Finish(rowH_);
+    return changed;
+}
+
+namespace {
+
 void HsvToU32(float h, float s, float v, ImU32* out) {
     float r, g, b;
     ImGui::ColorConvertHSVtoRGB(h, s, v, r, g, b);
@@ -1551,9 +1667,9 @@ bool TextField(const char* id, char* buffer, size_t size, const char* placeholde
     return changed;
 }
 
-bool Rows::Input(const char* label, char* buffer, size_t size, const char* placeholder, bool password) {
+bool Rows::Input(const char* label, char* buffer, size_t size, const char* placeholder, bool password, float width) {
     Start();
-    float fw = 240 * u, fh = 26 * u;
+    float fw = width * u, fh = 26 * u;
     float fx = x_ + w_ - recuo_ * 0.5f - fw, fy = y_ + (rowH_ - fh) * 0.5f;
     dl_->ChannelsSplit(3);
     dl_->ChannelsSetCurrent(2);
@@ -1591,9 +1707,9 @@ bool Rows::Search(const char* label, char* buffer, size_t size, const char* plac
     return changed;
 }
 
-bool Rows::Multiline(const char* label, char* buffer, size_t size, const char* placeholder, int lines) {
+bool Rows::Multiline(const char* label, char* buffer, size_t size, const char* placeholder, int lines, float width) {
     Start();
-    float fw = 240 * u, fh = fonts.desc->FontSize * lines + 14 * u;
+    float fw = width * u, fh = fonts.desc->FontSize * lines + 14 * u;
     float rowH = fh + 8 * u;
     float fx = x_ + w_ - recuo_ * 0.5f - fw, fy = y_ + 4 * u;
     dl_->ChannelsSplit(3);
@@ -1767,6 +1883,92 @@ bool Rows::TableItem(const char* const* cells, const float* widths, int count) {
     }
     Finish(rowH_);
     return activated;
+}
+
+namespace {
+
+// Corta o texto (UTF-8) com "..." para caber em width.
+std::string Ellipsize(ImFont* font, const char* text, float width) {
+    if (TextSize(font, text).x <= width) {
+        return text;
+    }
+    std::string s = text;
+    while (!s.empty()) {
+        do {
+            s.pop_back();
+        } while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80);
+        if (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0xC0) {
+            s.pop_back();
+        }
+        if (TextSize(font, (s + "...").c_str()).x <= width) {
+            return s + "...";
+        }
+    }
+    return "...";
+}
+
+} // namespace
+
+bool Rows::Entry(const char* label, const char* detail, bool* enabled, ImU32 detailColor) {
+    Start();
+    float tw = 44 * u, th = 24 * u;
+    float tx = x_ + w_ - recuo_ * 0.5f - tw, ty = y_ + (rowH_ - th) * 0.5f;
+    ImGui::SetCursorScreenPos(ImVec2(tx, ty));
+    bool toggled = ImGui::InvisibleButton("##e", ImVec2(tw, th));
+    bool thov = ImGui::IsItemHovered();
+    if (thov) {
+        HandCursor();
+    }
+    ImGui::SetCursorScreenPos(ImVec2(x_, y_));
+    bool opened = ImGui::InvisibleButton("##eLinha", ImVec2(w_, rowH_));
+    bool rowHov = ImGui::IsItemHovered();
+    if (rowHov) {
+        HandCursor();
+    }
+    bool hovered = rowHov || thov;
+    if ((Selected() && keys_.enter) || keys_.digit == index_) {
+        opened = true;
+    }
+    if (Selected() && keys_.space) {
+        toggled = true;
+    }
+    if (toggled) {
+        *enabled = !*enabled;
+        *selected_ = index_;
+    }
+    if (opened) {
+        *selected_ = index_;
+    }
+    if (Selected()) {
+        dl_->AddRectFilled(ImVec2(x_, y_), ImVec2(x_ + w_, y_ + rowH_), col::selection, 6 * u);
+    } else if (hovered) {
+        dl_->AddRectFilled(ImVec2(x_, y_), ImVec2(x_ + w_, y_ + rowH_), col::hover, 6 * u);
+    }
+    float centerY = y_ + rowH_ * 0.5f;
+    Number(hovered, centerY);
+    float detailW = detail && *detail ? std::min(TextSize(fonts.desc, detail).x, w_ * 0.45f) : 0.0f;
+    float detailX = tx - 14 * u - detailW;
+    std::string shownLabel = Ellipsize(fonts.body, label, detailX - labelX_ - 14 * u);
+    Text(dl_, fonts.body, labelX_, centerY - fonts.body->FontSize * 0.5f, *enabled ? col::text : col::hint,
+         shownLabel.c_str());
+    if (detailW > 0) {
+        std::string shownDetail = Ellipsize(fonts.desc, detail, detailW);
+        ImU32 dc = detailColor ? detailColor : col::column;
+        Text(dl_, fonts.desc, detailX, centerY - fonts.desc->FontSize * 0.5f, *enabled ? dc : Fade(dc, 0.5f),
+             shownDetail.c_str());
+    }
+    float t = Anim(Id("##entry"), *enabled ? 1.0f : 0.0f);
+    float track = thov ? 40 + 200 * t : 32 + 194 * t;
+    float knobBase = thov ? 226.0f : 196.0f;
+    float knob = knobBase + (18 - knobBase) * t;
+    float r = th * 0.5f;
+    dl_->AddRectFilled(ImVec2(tx, ty), ImVec2(tx + tw, ty + th), Gray(track), r);
+    float border = (1 - t) * (thov ? 34 : 22);
+    dl_->AddRect(ImVec2(tx - 0.5f, ty - 0.5f), ImVec2(tx + tw + 0.5f, ty + th + 0.5f), col::White((int)border),
+                 r + 0.5f, 0, 1.0f);
+    dl_->AddCircleFilled(ImVec2(tx + r + (tw - th) * t, ty + r), r - 3 * u, Gray(knob), 24);
+    Finish(rowH_);
+    return opened && !toggled;
 }
 
 bool Rows::CheckItem(const char* text, bool* checked) {

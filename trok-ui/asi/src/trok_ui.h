@@ -137,11 +137,17 @@ public:
     bool Segmented(const char* label, int* index, const char* const* options, int count, int def);
     bool Slider(const char* label, int* value, int min, int max, int step, const char* fmt, int def);
     bool Keybind(const char* label, ImGuiKey* key, ImGuiKey def);
+    // Atalho com Ctrl/Shift/Alt (mods: HotkeyCtrl | HotkeyShift | HotkeyAlt). Um modificador sozinho, apertado e
+    // solto, vira a propria tecla. Backspace limpa, Esc ou botao direito cancela.
+    bool Hotkey(const char* label, ImGuiKey* key, int* mods, ImGuiKey def);
     bool Color(const char* label, ImU32* color, ImU32 def);
     bool Dropdown(const char* label, int* index, const char* const* options, int count, int def);
-    bool Input(const char* label, char* buffer, size_t size, const char* placeholder, bool password = false);
+    // width: largura do campo (em u, a escala da casa).
+    bool Input(const char* label, char* buffer, size_t size, const char* placeholder, bool password = false,
+               float width = 240);
     bool Search(const char* label, char* buffer, size_t size, const char* placeholder);
-    bool Multiline(const char* label, char* buffer, size_t size, const char* placeholder, int lines = 3);
+    bool Multiline(const char* label, char* buffer, size_t size, const char* placeholder, int lines = 3,
+                   float width = 240);
     void Progress(const char* label, float fraction, bool indeterminate = false);
     void Loading(const char* label, const char* status);
     void Badges(const char* label, const char* const* badges, const int* kinds, int count); // 0 neutro, 1 forte, 2 contorno
@@ -154,6 +160,9 @@ public:
     void TableHeader(const char* const* columns, const float* widths, int count);
     bool TableItem(const char* const* cells, const float* widths, int count);
     bool CheckItem(const char* text, bool* checked);
+    // Linha de lista com um resumo a direita e o interruptor. true = a linha foi aberta (clique fora do interruptor,
+    // Enter ou 1-9); o interruptor so troca *enabled. detailColor 0 = a cor dos valores. Desligada, a linha apaga.
+    bool Entry(const char* label, const char* detail, bool* enabled, ImU32 detailColor = 0);
     bool RadioItem(const char* text, int* group, int value);
 
     int Count() const { return index_; }
@@ -203,5 +212,9 @@ bool ColorPopup(const char* id, ImU32* color, ImU32 def);
 
 // true enquanto uma linha de tecla espera o jogador apertar algo (as setas nao navegam).
 bool CapturingKey();
+
+enum { HotkeyCtrl = 1, HotkeyShift = 2, HotkeyAlt = 4 };
+// "Ctrl + Shift + L" ("Nenhuma" sem tecla).
+std::string HotkeyName(ImGuiKey key, int mods);
 
 } // namespace tui

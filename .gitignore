@@ -35,3 +35,7 @@ trok-headmove/test/out/
 trok-devtools/build/
 trok-devtools/test/out/
 trok-devtools/test/concept/__pycache__/
+
+# Trok KeyBinder
+trok-keybinder/build/
+trok-keybinder/test/out/
