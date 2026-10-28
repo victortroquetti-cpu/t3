@@ -62,6 +62,7 @@ static void TestFile() {
     a.key = {560, HK_CTRL | HK_SHIFT};
     a.mode = MODE_DOUBLE;
     a.inMenu = true;
+    a.icon = "hand";
     p.binds.push_back(a);
     Bind r;
     r.cls = CLASS_AROUND;
@@ -87,7 +88,8 @@ static void TestFile() {
     Check(Serialize(back) == text, "gravar -> ler -> gravar da o mesmo arquivo");
     Check(back.presets.size() == 1 && back.presets[0].binds.size() == 3, "preset com as 3 binds");
     const Bind& b0 = back.presets[0].binds[0];
-    Check(b0.text == a.text && b0.name == a.name && b0.key == a.key && b0.mode == MODE_DOUBLE && b0.inMenu,
+    Check(b0.text == a.text && b0.name == a.name && b0.key == a.key && b0.mode == MODE_DOUBLE && b0.inMenu &&
+              b0.icon == "hand",
           "bind de tecla: texto com 2 linhas, nome com acento, Ctrl+Shift, duas vezes");
     Check(back.presets[0].binds[1].ignore.size() == 2 && back.presets[0].binds[1].ignore[1] == "Catharina",
           "lista de ignorados");

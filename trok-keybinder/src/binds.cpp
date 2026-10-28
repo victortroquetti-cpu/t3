@@ -161,7 +161,7 @@ std::string Serialize(const Data& d) {
         for (const Bind& b : p.binds) {
             out += "\n[bind]\nclasse=";
             out += CLASS_KEYS[Clamp(b.cls, 0, CLASS_COUNT - 1)];
-            out += "\nnome=" + Escape(b.name) + "\ntexto=" + Escape(b.text) + "\n";
+            out += "\nnome=" + Escape(b.name) + "\ntexto=" + Escape(b.text) + "\nicone=" + Escape(b.icon) + "\n";
             snprintf(line, sizeof(line),
                      "ligada=%d\ntecla=%d\nmods=%d\nmodo=%d\nmenu=%d\ncondicao=%d\nvalor=%d\nassento=%d\natraso=%d\n"
                      "espera=%d\nraio=%d\nalvo=%d\n",
@@ -259,6 +259,7 @@ bool Parse(const std::string& text, Data* d) {
             } else if (key == "ligada") b.enabled = n != 0;
             else if (key == "nome") b.name = val;
             else if (key == "texto") b.text = val;
+            else if (key == "icone") b.icon = Trim(val);
             else if (key == "tecla") b.key.key = n;
             else if (key == "mods") b.key.mods = n & 7;
             else if (key == "modo") b.mode = Clamp(n, 0, MODE_COUNT - 1);

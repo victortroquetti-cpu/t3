@@ -18,7 +18,7 @@ g++ -std=c++17 -O1 -Wall -Wextra -Isrc test/unit_test.cpp src/binds.cpp src/engi
 ICON_FLAG=""
 if [ -n "$ICONS" ]; then ICON_FLAG="-DTROK_UI_TEST_ICONS=\"$ICONS\""; fi
 g++ -std=c++17 -O2 -DTROK_UI_TEST_FONT="\"$FONT\"" $ICON_FLAG -I$ASI/test/stub -I$I -I$ASI/src -Isrc \
-    test/render_test.cpp src/menu.cpp src/radial.cpp src/binds.cpp $ASI/src/trok_ui.cpp \
+    test/render_test.cpp src/menu.cpp src/radial.cpp src/icons.cpp src/binds.cpp $ASI/src/trok_ui.cpp \
     $I/imgui.cpp $I/imgui_draw.cpp $I/imgui_tables.cpp $I/imgui_widgets.cpp -o "$OUT/render_test"
 BG=""
 if [ -n "${2:-}" ]; then

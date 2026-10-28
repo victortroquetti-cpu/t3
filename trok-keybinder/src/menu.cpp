@@ -4,6 +4,7 @@
 
 #include "menu.h"
 
+#include "icons.h"
 #include "trok_ui.h"
 
 #include "imgui.h"
@@ -59,6 +60,9 @@ struct State {
     char rename[64] = {};
     std::string renameFor;
     bool confirmPresetDelete = false;
+    int conflictCursor = -1; // a ultima bind aberta pelo "Ver" do aviso de conflito
+    ImVec2 iconButton, iconButtonTop; // cantos do botao do icone (o seletor abre embaixo dele, ou em cima)
+    std::vector<ImVec2> iconCells;
 } S;
 
 const Settings DEFAULTS;
@@ -204,7 +208,7 @@ bool Same(const Bind& a, const Bind& b) {
     return a.cls == b.cls && a.enabled == b.enabled && a.name == b.name && a.text == b.text && a.key == b.key &&
            a.mode == b.mode && a.inMenu == b.inMenu && a.cond == b.cond && a.value == b.value && a.seat == b.seat &&
            a.delay == b.delay && a.trigger == b.trigger && a.cooldown == b.cooldown && a.radius == b.radius &&
-           a.target == b.target && a.ignore == b.ignore;
+           a.target == b.target && a.ignore == b.ignore && a.icon == b.icon;
 }
 
 // Tudo que impede uma bind de ser salva ou ligada: o mesmo tempo na mesma condicao (automaticas), o mesmo gesto
@@ -269,6 +273,92 @@ bool SaveDraft(Preset& p, const Settings& set) {
     return true;
 }
 
+// A grade de icones (Nenhum + os do Lucide), embaixo do botao, alinhada a direita dele.
+void IconPopup(Draft& d) {
+    int cur = icons::Find(d.b.icon);
+    int n = icons::Count() + 1, cols = 8, rowsN = (n + cols - 1) / cols;
+    float cell = 34 * u, pad = 8 * u, titleH = 24 * u;
+    float w = cols * cell + 2 * pad, h = titleH + rowsN * cell + 2 * pad;
+    // Embaixo do botao, alinhada a direita dele; sem espaco embaixo, em cima.
+    float y = S.iconButton.y + 4 * u;
+    if (y + h > ImGui::GetIO().DisplaySize.y - 8 * u) {
+        y = S.iconButtonTop.y - 4 * u - h;
+    }
+    ImGui::SetNextWindowPos(ImVec2(S.iconButton.x - w, y), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 8 * u);
+    if (ImGui::BeginPopup("##icones", ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 o = ImGui::GetCursorScreenPos();
+        const char* title = cur >= 0 ? icons::Label(cur) : "Nenhum";
+        S.iconCells.assign(n, ImVec2());
+        for (int k = 0; k < n; ++k) {
+            int idx = k - 1; // a primeira casa e "Nenhum"
+            ImVec2 p(o.x + (k % cols) * cell, o.y + titleH + (k / cols) * cell);
+            ImGui::SetCursorScreenPos(p);
+            ImGui::PushID(k);
+            bool click = ImGui::InvisibleButton("##icone", ImVec2(cell, cell));
+            bool hov = ImGui::IsItemHovered();
+            ImGui::PopID();
+            bool sel = idx == cur;
+            ImVec2 a(p.x + 2 * u, p.y + 2 * u), b(p.x + cell - 2 * u, p.y + cell - 2 * u);
+            if (sel || hov) {
+                dl->AddRectFilled(a, b, col::White(sel ? 22 : 12), 6 * u);
+            }
+            if (sel) {
+                dl->AddRect(a, b, col::White(70), 6 * u, 0, 1.0f);
+            }
+            ImVec2 c(p.x + cell * 0.5f, p.y + cell * 0.5f);
+            S.iconCells[k] = c;
+            ImU32 ink = hov || sel ? col::text : col::column;
+            if (idx < 0) {
+                float r = 7 * u; // sem icone: um circulo cortado
+                dl->AddCircle(c, r, col::hint, 24, 1.5f * u);
+                dl->AddLine(ImVec2(c.x - r * 0.7f, c.y + r * 0.7f), ImVec2(c.x + r * 0.7f, c.y - r * 0.7f), col::hint, 1.5f * u);
+            } else {
+                icons::Draw(dl, idx, c, 18 * u, ink);
+            }
+            if (hov) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                title = idx < 0 ? "Nenhum" : icons::Label(idx);
+            }
+            if (click) {
+                d.b.icon = idx < 0 ? std::string() : std::string(icons::Name(idx));
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        Text(dl, fonts.desc, o.x + 4 * u, o.y + (titleH - fonts.desc->FontSize) * 0.5f, col::hint, title);
+        ImGui::SetCursorScreenPos(ImVec2(o.x, o.y + titleH + rowsN * cell));
+        ImGui::Dummy(ImVec2(1, 1));
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::PopStyleVar(2);
+}
+
+void IconRow(Rows& r, Draft& d) {
+    int cur = icons::Find(d.b.icon);
+    std::string label = cur >= 0 ? icons::Label(cur) : "Nenhum";
+    const char* gap = "      "; // espaco para o icone dentro do botao
+    std::string button = cur >= 0 ? gap + label : label;
+    ImVec2 bmin, bmax;
+    if (r.Action("\xC3\x8D" "cone (no c\xC3\xADrculo e na lista)", button.c_str(), &bmin, &bmax)) {
+        ImGui::OpenPopup("##icones");
+    }
+    S.iconButton = bmax;
+    S.iconButtonTop = bmin;
+    if (cur >= 0) {
+        float tw = TextSize(fonts.desc, button.c_str()).x;
+        float start = bmin.x + (bmax.x - bmin.x - tw) * 0.5f;
+        icons::Draw(ImGui::GetWindowDrawList(), cur, ImVec2(start + TextSize(fonts.desc, gap).x * 0.4f,
+                                                           (bmin.y + bmax.y) * 0.5f), 15 * u, col::text);
+    }
+    IconPopup(d);
+}
+
 void KeyRows(Rows& r, Draft& d, const Preset& p, const Settings& set) {
     SyncDraft();
     Clash clash = ClashesOf(p, set, d.b, d.index);
@@ -281,12 +371,13 @@ void KeyRows(Rows& r, Draft& d, const Preset& p, const Settings& set) {
     for (int i : clash.key) {
         std::string label = RED "Mesma ativa\xC3\xA7\xC3\xA3o: " + Title(p.binds[i]);
         std::string where = std::string("aba ") + ClassName(p.binds[i].cls);
-        r.Value(label.c_str(), where.c_str());
+        r.Note(label.c_str(), where.c_str());
     }
     if (clash.radial) {
-        r.Value(RED "\xC3\x89 o atalho do menu de binds", "aba Geral");
+        r.Note(RED "\xC3\x89 o atalho do menu de binds", "aba Geral");
     }
     r.Toggle("Adicionar ao menu de binds", &d.b.inMenu);
+    IconRow(r, d);
 }
 
 void WeaponRow(Rows& r, Draft& d) {
@@ -371,7 +462,7 @@ void AutoRows(Rows& r, Draft& d, const Preset& p, const Context& c) {
                     result = "Dispara";
                 }
             }
-            r.Value("Resultado", result.c_str());
+            r.Note("Resultado", result.c_str());
         }
         break;
     }
@@ -394,7 +485,7 @@ void AutoRows(Rows& r, Draft& d, const Preset& p, const Context& c) {
     }
     for (int i : clash) {
         std::string label = RED "Mesmo tempo: " + Title(p.binds[i]);
-        r.Value(label.c_str(), Seconds(p.binds[i].delay).c_str());
+        r.Note(label.c_str(), Seconds(p.binds[i].delay).c_str());
     }
 }
 
@@ -444,7 +535,7 @@ void AroundRows(Rows& r, Draft& d, const Context& c) {
         }
     }
     if (near.empty() && d.b.ignore.empty()) {
-        r.Value("Ningu\xC3\xA9m por perto agora", "chegue perto para escolher");
+        r.Note("Ningu\xC3\xA9m por perto agora", "chegue perto para escolher");
     }
 }
 
@@ -465,11 +556,11 @@ bool Editor(Rows& r, Preset& p, const Context& c) {
             char label[96], value[32];
             snprintf(label, sizeof(label), AMBER "Linha %d passa de 128 letras", static_cast<int>(i + 1));
             snprintf(value, sizeof(value), "%d (o SA-MP corta)", n);
-            r.Value(label, value);
+            r.Note(label, value);
         }
     }
     if ((d.b.cls == CLASS_AROUND || d.b.cls == CLASS_VIEW) && !lines.empty() && !UsesTarget(d.text)) {
-        r.Value(AMBER "Sem (id) nem (nick) no texto", "vai igual para todos");
+        r.Note(AMBER "Sem (id) nem (nick) no texto", "vai igual para todos");
     }
     switch (d.b.cls) {
     case CLASS_KEY:
@@ -494,7 +585,7 @@ bool Editor(Rows& r, Preset& p, const Context& c) {
     SyncDraft();
     if (d.b.cls != CLASS_AUTO) {
         if (d.key == ImGuiKey_None && !d.b.inMenu) {
-            r.Value(AMBER "Sem tecla e fora do menu", "n\xC3\xA3o tem como usar");
+            r.Note(AMBER "Sem tecla e fora do menu", "n\xC3\xA3o tem como usar");
         }
     }
     r.Section("");
@@ -523,22 +614,41 @@ bool ClassList(Rows& r, Preset& p, const Settings& set, int cls) {
         S.tab = TAB_PRESETS;
     }
     // Conflitos em qualquer aba do preset: o aviso aparece em todas.
+    // "Ver" abre a proxima bind em conflito (na aba dela), uma de cada vez.
     bool tabs[CLASS_COUNT] = {};
-    int clashes = 0;
+    std::vector<int> clashing;
     for (size_t i = 0; i < p.binds.size(); ++i) {
         if (ClashesOf(p, set, p.binds[i], static_cast<int>(i)).Any()) {
             tabs[p.binds[i].cls] = true;
-            ++clashes;
+            clashing.push_back(static_cast<int>(i));
         }
     }
-    if (clashes) {
+    if (!clashing.empty()) {
         std::string where;
+        int tabCount = 0;
         for (int t = 0; t < CLASS_COUNT; ++t) {
-            if (tabs[t]) where += (where.empty() ? "" : ", ") + std::string(ClassName(t));
+            if (tabs[t]) {
+                where += (where.empty() ? "" : ", ") + std::string(ClassName(t));
+                ++tabCount;
+            }
         }
-        char label[96];
-        snprintf(label, sizeof(label), RED "%d binds em conflito (em vermelho)", clashes);
-        r.Value(label, where.c_str());
+        if (tabCount > 2) {
+            where = std::to_string(tabCount) + " abas";
+        }
+        char label[160];
+        snprintf(label, sizeof(label), RED "%d binds em conflito (%s)", static_cast<int>(clashing.size()), where.c_str());
+        if (r.Action(label, "Ver")) {
+            int next = clashing[0];
+            for (int i : clashing) {
+                if (i > S.conflictCursor) {
+                    next = i;
+                    break;
+                }
+            }
+            S.conflictCursor = next;
+            S.tab = p.binds[next].cls;
+            OpenEditor(p, next, p.binds[next].cls);
+        }
     }
     static const char* const about[] = {
         "Uma tecla (ou Ctrl/Shift/Alt + tecla) manda um comando ou uma frase. Pressionar, segurar ou 2x seguidas. "
@@ -575,7 +685,7 @@ bool ClassList(Rows& r, Preset& p, const Settings& set, int cls) {
         }
     }
     if (!shown) {
-        r.Value("Nenhuma bind aqui ainda", "");
+        r.Note("Nenhuma bind aqui ainda", "");
     }
     if (r.Action("Nova bind", "Adicionar")) {
         OpenEditor(p, -1, cls);
@@ -584,7 +694,7 @@ bool ClassList(Rows& r, Preset& p, const Settings& set, int cls) {
 }
 
 void TabMacro(Rows& r) {
-    r.Value("Macro", "em breve");
+    r.Note("Macro", "em breve");
     r.Info("O que vai fazer",
            "Gravar o que voc\xC3\xAA faz no chat e nos menus: abrir o chat, escrever, escolher um item de um menu pelo "
            "ID do item (n\xC3\xA3o pela posi\xC3\xA7\xC3\xA3o: o mod procura o item no menu certo). Parar de gravar "
@@ -600,8 +710,8 @@ bool TabPresets(Rows& r, Context& c) {
     bool changed = false;
     r.Section(c.connected ? "Este servidor" : "Fora de um servidor");
     if (c.connected) {
-        r.Value("Servidor", c.hostname.empty() ? c.address.c_str() : AutoName(c.hostname).c_str());
-        r.Value("Endere\xC3\xA7o", c.address.c_str());
+        r.Note("Servidor", c.hostname.empty() ? c.address.c_str() : AutoName(c.hostname).c_str());
+        r.Note("Endere\xC3\xA7o", c.address.c_str());
     }
     std::vector<const char*> names;
     for (const Preset& p : data.presets) {
@@ -640,10 +750,10 @@ bool TabPresets(Rows& r, Context& c) {
     for (size_t i = 0; i < servers.size(); ++i) {
         list += (i ? ", " : "") + servers[i];
     }
-    r.Value("Servidores com este preset", servers.empty() ? "nenhum" : list.c_str());
+    r.Note("Servidores com este preset", servers.empty() ? "nenhum" : list.c_str());
     char count[32];
     snprintf(count, sizeof(count), "%d", static_cast<int>(cur.binds.size()));
-    r.Value("Binds", count);
+    r.Note("Binds", count);
     r.Section("Mais presets");
     if (r.Action("Novo preset vazio", "Criar")) {
         int n = NewPreset(data, "Novo preset", false, -1);
@@ -680,7 +790,7 @@ bool TabPresets(Rows& r, Context& c) {
             snprintf(value, sizeof(value), "%d %s \xC2\xB7 %s", static_cast<int>(p.binds.size()),
                      p.binds.size() == 1 ? "bind" : "binds",
                      sv.empty() ? "sem servidor" : sv.size() == 1 ? sv[0].c_str() : (std::to_string(sv.size()) + " servidores").c_str());
-            r.Value(p.name.c_str(), value);
+            r.Note(p.name.c_str(), value);
         }
     }
     r.Info("Compartilhar",
@@ -723,9 +833,9 @@ bool TabGeral(Rows& r, Data& data) {
         changed = true;
     }
     r.Section("Nunca dispara com");
-    r.Value("Chat, di\xC3\xA1logo, placar (Tab) e pausa", "bloqueado");
-    r.Value("Menus com cursor (este e os de outros mods)", "bloqueado");
-    r.Value("Arquivo", "Trok KeyBinder.txt (UTF-8)");
+    r.Note("Chat, di\xC3\xA1logo, placar (Tab) e pausa", "bloqueado");
+    r.Note("Menus com cursor (este e os de outros mods)", "bloqueado");
+    r.Note("Arquivo", "Trok KeyBinder.txt (UTF-8)");
     return changed;
 }
 
@@ -742,6 +852,14 @@ void Toggle() {
 
 bool IsOpen() {
     return S.open;
+}
+
+std::string EditingName() {
+    return S.open && S.d.open ? S.d.b.name : std::string();
+}
+
+ImVec2 IconCell(int k) {
+    return k >= 0 && k < static_cast<int>(S.iconCells.size()) ? S.iconCells[k] : ImVec2(-1, -1);
 }
 
 bool Frame(Context& c) {

@@ -3,6 +3,7 @@
 // conferem o que o jogador faria: salvar com conflito nao salva, o circulo devolve a bind clicada, segurar e soltar.
 // Uso: ./render_test <pasta de saida> [cena.rgb 1920x1080 com um jogador no meio]
 #include "binds.h"
+#include "icons.h"
 #include "imgui.h"
 #include "menu.h"
 #include "radial.h"
@@ -163,6 +164,15 @@ static Data MakeData() {
     pol.binds.push_back(KeyBind("Documentos", "/rg (id)", ImGuiKey_None, 0, MODE_PRESS, true, CLASS_VIEW));
     pol.binds.push_back(KeyBind("Mensagem", "/pm (id) Ol\xC3\xA1 (nick), tudo certo?", ImGuiKey_None, 0, MODE_PRESS, true,
                             CLASS_VIEW));
+    const char* const iconOf[][2] = {{"Sauda\xC3\xA7\xC3\xA3o", "hand"}, {"Lanterna", "flashlight"}, {"Reparar", "wrench"},
+                                    {"Motor", "power"}, {"Kit m\xC3\xA9" "dico", "cross"}, {"Algemar", "link"},
+                                    {"Revistar", "search"}, {"Mandar parar", "megaphone"}, {"Algemar alvo", "link"},
+                                    {"Documentos", "id-card"}, {"Mensagem", "message-circle"}};
+    for (Bind& b : pol.binds) {
+        for (const auto& io : iconOf) {
+            if (b.name == io[0]) b.icon = io[1];
+        }
+    }
     d.presets.push_back(pol);
     Preset lad;
     lad.name = "hzrp ladrao";
@@ -297,7 +307,7 @@ static std::vector<radial::Item> Items(const Preset& p, bool target) {
             const Bind& b = p.binds[i];
             bool view = b.cls == CLASS_VIEW;
             if (!b.enabled || !b.inMenu || b.cls == CLASS_AUTO || view != (pass == 0) || (view && !target)) continue;
-            items.push_back({b.name, b.cls == CLASS_AROUND ? "Ao redor" : "", static_cast<int>(i)});
+            items.push_back({b.name, b.cls == CLASS_AROUND ? "Ao redor" : "", static_cast<int>(i), icons::Find(b.icon)});
         }
     }
     return items;
@@ -388,6 +398,43 @@ int main(int argc, char** argv) {
     Shot(dir + "/12_editor_ao_redor.ppm");
     Leave(1);
 
+    // O aviso de conflito e acessivel: "Ver" (linha 2, Enter) abre a proxima bind em conflito, na aba dela.
+    GoTab(0);
+    Press(ImGuiKey_2);
+    Press(ImGuiKey_Enter);
+    MenuFrames(10, [](int, ImGuiIO&) {});
+    std::string firstClash = menu::EditingName();
+    Leave(1);
+    Press(ImGuiKey_Enter); // a selecao continua no "Ver"
+    MenuFrames(10, [](int, ImGuiIO&) {});
+    std::string secondClash = menu::EditingName();
+    Shot(dir + "/17_ver_conflito.ppm");
+    Check(firstClash == "Kit m\xC3\xA9" "dico" && secondClash == "Cinto",
+          "\"Ver\" abre a proxima bind em conflito (Kit medico, depois Cinto na aba Automatico)");
+    Leave(1);
+
+    // O icone: na Saudacao (linha 4 do Padrao), a linha 7 do editor abre a grade; escolher o carro e salvar.
+    GoTab(0);
+    OpenRow(4);
+    Press(ImGuiKey_7);
+    Press(ImGuiKey_Enter);
+    MenuFrames(10, [](int, ImGuiIO&) {});
+    ImVec2 carCell = menu::IconCell(1 + icons::Find("car"));
+    MenuFrames(6, [&](int f, ImGuiIO& io) { io.AddMousePosEvent(carCell.x, carCell.y); });
+    Shot(dir + "/18_seletor_icones.ppm");
+    MenuFrames(6, [&](int f, ImGuiIO& io) {
+        io.AddMousePosEvent(carCell.x, carCell.y);
+        if (f == 1) io.AddMouseButtonEvent(0, true);
+        if (f == 2) io.AddMouseButtonEvent(0, false);
+    });
+    MenuFrames(10, [](int f, ImGuiIO& io) {
+        if (f == 2) { Key(io, ImGuiKey_LeftCtrl, true); Key(io, ImGuiMod_Ctrl, true); Key(io, ImGuiKey_S, true); }
+        if (f == 3) { Key(io, ImGuiKey_S, false); Key(io, ImGuiKey_LeftCtrl, false); Key(io, ImGuiMod_Ctrl, false); }
+    });
+    Check(carCell.x > 0 && g_data.presets[0].binds[0].icon == "car" && menu::EditingName().empty(),
+          "grade de icones: o carro escolhido e salvo na bind");
+    g_data.presets[0].binds[0].icon = "hand";
+
     // Geral com o atalho do circulo igual ao de uma bind: recusado.
     GoTab(6);
     Hotkey radialBefore = g_data.settings.radial;
@@ -414,7 +461,7 @@ int main(int argc, char** argv) {
 
     // Com alvo: as binds da visao primeiro e o nome no meio; segurar o atalho, apontar e soltar.
     items = Items(g_data.presets[0], true);
-    radial::Open(items, "Fulano_Silva", "ID 12", clock);
+    radial::Open(items, "Fulano_Silva", "12", clock);
     ImVec2 first = Slice(0, std::min(radial::PAGE, static_cast<int>(items.size())));
     RadialFrames(30, first, true, [](int, ImGuiIO&) {}, &clock);
     Shot(dir + "/14_circulo_alvo.ppm", true);
@@ -437,7 +484,7 @@ int main(int argc, char** argv) {
     std::vector<radial::Item> view;
     for (size_t i = 0; i < g_data.presets[0].binds.size(); ++i) {
         const Bind& b = g_data.presets[0].binds[i];
-        if (b.cls == CLASS_VIEW && b.inMenu) view.push_back({b.name, "", static_cast<int>(i)});
+        if (b.cls == CLASS_VIEW && b.inMenu) view.push_back({b.name, "", static_cast<int>(i), icons::Find(b.icon)});
     }
     ImVec2 anchor(905, 534);
     auto list = [&](int n, ImVec2 mouse, bool keyDown, bool visible, const std::function<void(int, ImGuiIO&)>& input) {
@@ -454,7 +501,7 @@ int main(int argc, char** argv) {
         }
         return got;
     };
-    radial::OpenList(view, "Fulano_Silva", "ID 12", clock);
+    radial::OpenList(view, "Fulano_Silva", "12", clock);
     list(20, ImVec2(10, 10), true, true, [](int, ImGuiIO&) {});
     ImVec2 second = radial::ListItemCenter(1);
     list(10, second, true, true, [](int, ImGuiIO&) {});
@@ -470,21 +517,21 @@ int main(int argc, char** argv) {
         if (f == 2) io.AddMouseButtonEvent(0, false);
     });
     Check(chosen == view[1].bind && !radial::ListOpen(), "lista: clique no item roda a bind dele e fecha");
-    radial::OpenList(view, "Fulano_Silva", "ID 12", clock);
+    radial::OpenList(view, "Fulano_Silva", "12", clock);
     list(10, ImVec2(10, 10), false, true, [](int, ImGuiIO&) {});
     chosen = list(4, ImVec2(10, 10), false, true, [](int f, ImGuiIO& io) {
         if (f == 1) Key(io, ImGuiKey_3, true);
         if (f == 2) Key(io, ImGuiKey_3, false);
     });
     Check(chosen == view[2].bind, "lista: a tecla 3 roda o terceiro item");
-    radial::OpenList(view, "Fulano_Silva", "ID 12", clock);
+    radial::OpenList(view, "Fulano_Silva", "12", clock);
     list(10, ImVec2(10, 10), false, true, [](int, ImGuiIO&) {});
     list(10, ImVec2(10, 10), false, false, [](int, ImGuiIO&) {});
     bool waits = radial::ListOpen();
     list(20, ImVec2(10, 10), false, false, [](int, ImGuiIO&) {});
     Check(waits && !radial::ListOpen(), "jogador some da visao: a lista espera 0,3 s e fecha");
     anchor = ImVec2(W - 60.0f, 520);
-    radial::OpenList(view, "Fulano_Silva", "ID 12", clock);
+    radial::OpenList(view, "Fulano_Silva", "12", clock);
     list(20, ImVec2(10, 10), false, true, [](int, ImGuiIO&) {});
     Check(radial::ListItemCenter(0).x < anchor.x, "perto da borda direita a lista abre do lado esquerdo");
     radial::Close();

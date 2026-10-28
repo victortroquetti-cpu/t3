@@ -24,7 +24,7 @@ for f in buffer.c hook.c trampoline.c hde/hde32.c; do
     MINHOOK_OBJECTS="$MINHOOK_OBJECTS $obj"
 done
 
-SOURCES="src/main.cpp src/samp.cpp src/binds.cpp src/engine.cpp src/menu.cpp src/radial.cpp $ASI/src/trok_ui.cpp \
+SOURCES="src/main.cpp src/samp.cpp src/binds.cpp src/engine.cpp src/menu.cpp src/radial.cpp src/icons.cpp $ASI/src/trok_ui.cpp \
  $IMGUI/imgui.cpp $IMGUI/imgui_draw.cpp $IMGUI/imgui_tables.cpp $IMGUI/imgui_widgets.cpp \
  $IMGUI/backends/imgui_impl_dx9.cpp $IMGUI/backends/imgui_impl_win32.cpp"
 

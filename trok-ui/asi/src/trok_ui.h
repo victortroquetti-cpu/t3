@@ -130,7 +130,8 @@ public:
     void Begin(const char* id, float x, float width, int* selected, const Keys& keys, bool showNumbers = true);
     int End(); // devolve quantas linhas foram desenhadas
 
-    bool Action(const char* label, const char* button);
+    // buttonMin/buttonMax: onde o botao ficou (para desenhar algo dentro dele, como um icone).
+    bool Action(const char* label, const char* button, ImVec2* buttonMin = nullptr, ImVec2* buttonMax = nullptr);
     bool Stepper(const char* label, int* value, int min, int max, int step, const char* fmt, int def);
     bool Cycle(const char* label, int* index, const char* const* options, int count, int def);
     bool Toggle(const char* label, bool* value);
@@ -153,6 +154,8 @@ public:
     void Badges(const char* label, const char* const* badges, const int* kinds, int count); // 0 neutro, 1 forte, 2 contorno
     void Info(const char* label, const char* tooltip);
     void Value(const char* label, const char* value); // so leitura: o valor a direita
+    // Linha so de leitura que nao e um item: sem numero, nao entra nas setas nem nos atalhos 1-9 (avisos, dados).
+    void Note(const char* label, const char* value = "");
     void Section(const char* title);
 
     // Itens de lista (estilo Trok Dialogs). Devolvem true quando o item e ativado (Enter, clique duplo, 1-9).

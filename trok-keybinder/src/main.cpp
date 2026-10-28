@@ -18,6 +18,7 @@
 #include "imgui_impl_win32.h"
 #include "binds.h"
 #include "engine.h"
+#include "icons.h"
 #include "menu.h"
 #include "radial.h"
 #include "samp.h"
@@ -396,6 +397,7 @@ std::vector<radial::Item> ViewItems(const kb::Preset& p) {
             radial::Item it;
             it.label = b.name.empty() ? kb::Lines(b.text).empty() ? std::string() : kb::Lines(b.text)[0] : b.name;
             it.bind = static_cast<int>(i);
+            it.icon = icons::Find(b.icon);
             items.push_back(it);
         }
     }
@@ -418,6 +420,7 @@ std::vector<radial::Item> RadialItems(const kb::Preset& p, bool target) {
             it.label = b.name.empty() ? kb::Lines(b.text).empty() ? std::string() : kb::Lines(b.text)[0] : b.name;
             it.tag = view ? std::string() : b.cls == kb::CLASS_AROUND ? std::string("Ao redor") : std::string();
             it.bind = static_cast<int>(i);
+            it.icon = icons::Find(b.icon);
             items.push_back(it);
         }
     }
@@ -525,7 +528,7 @@ void RenderOverlay(IDirect3DDevice9* device) {
         g_radialHasTarget = w.hasTarget;
         g_radialTarget = w.target;
         std::string title = w.hasTarget ? w.target.nick : std::string("Binds");
-        std::string sub = w.hasTarget ? "ID " + std::to_string(w.target.id) : std::string();
+        std::string sub = w.hasTarget ? std::to_string(w.target.id) : std::string(); // so o numero, ao lado do nick
         std::vector<radial::Item> view = ViewItems(preset);
         if (w.hasTarget && set.viewList && !view.empty()) {
             radial::OpenList(view, title, sub, time); // presa no jogador, saindo da bolinha

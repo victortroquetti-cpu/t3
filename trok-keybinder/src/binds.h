@@ -51,6 +51,7 @@ struct Bind {
     Hotkey key;
     int mode = MODE_PRESS;
     bool inMenu = false; // aparece no menu circular
+    std::string icon;    // nome do icone do Lucide no circulo e na lista ("" = nenhum)
     // Automatico
     int cond = C_ENTER_VEHICLE;
     int value = 50;        // vida, colete, vida do veiculo ou arma (WEAPON_ANY = qualquer)

@@ -2,6 +2,7 @@
 
 #include "radial.h"
 
+#include "icons.h"
 #include "trok_ui.h"
 
 #include <algorithm>
@@ -127,6 +128,23 @@ void Sector(ImDrawList* dl, ImVec2 c, float r0, float r1, float a0, float a1, fl
     dl->AddPolyline(edge.data(), static_cast<int>(edge.size()), color, ImDrawFlags_Closed, 1.0f);
 }
 
+// "Fulano_Silva 12": o nick e, ao lado, so o numero do ID, apagado. at = o meio (centered) ou o comeco da linha, na
+// altura do meio. O nick e cortado com "..." para caber em maxW.
+void TitleWithId(ImDrawList* dl, ImFont* font, ImVec2 at, float maxW, const std::string& nick, const std::string& id,
+                 float alpha, bool centered) {
+    float gap = id.empty() ? 0.0f : 6 * u;
+    float idW = id.empty() ? 0.0f : TextSize(font, id.c_str()).x;
+    std::vector<std::string> lines = Wrap(font, nick, std::max(20 * u, maxW - idW - gap));
+    std::string shown = lines.size() > 1 ? lines[0] + "..." : lines[0]; // nick sem espaco: Wrap ja corta com "..."
+    float nickW = TextSize(font, shown.c_str()).x;
+    float x = centered ? at.x - (nickW + gap + idW) * 0.5f : at.x;
+    float y = at.y - font->FontSize * 0.5f;
+    Text(dl, font, x, y, Alpha(col::text, alpha), shown.c_str());
+    if (!id.empty()) {
+        Text(dl, font, x + nickW + gap, y, Alpha(col::hint, alpha), id.c_str());
+    }
+}
+
 // 1..9 apertado neste quadro (fileira de cima ou teclado numerico); 0 = nenhum.
 int DigitPressed() {
     for (int d = 1; d <= 9; ++d) {
@@ -247,14 +265,20 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
         std::vector<std::string> lines = Wrap(fonts.body, it.label.empty() ? std::string("(sem nome)") : it.label, maxW);
         float lineH = fonts.body->FontSize * 1.08f;
         float tagH = it.tag.empty() ? 0.0f : fonts.desc->FontSize * 1.2f;
-        float numH = fonts.desc->FontSize * 1.15f;
-        float total = numH + lines.size() * lineH + tagH;
+        float iconSize = 20 * u * sc, iconH = it.icon >= 0 ? iconSize + 5 * u * sc : 0.0f;
+        float total = iconH + lines.size() * lineH + tagH;
         float y = at.y - total * 0.5f + lineH * 0.5f;
+        // O numero sutil fica na borda de fora da fatia; o icone, em cima do nome.
         char number[4];
         snprintf(number, sizeof(number), "%d", i + 1);
-        Centered(dl, fonts.desc, ImVec2(at.x, y - lineH * 0.5f + numH * 0.5f),
+        float numR = out - 12 * u * sc;
+        Centered(dl, fonts.desc, ImVec2(center.x + std::cos(ac) * numR, center.y + std::sin(ac) * numR),
                  Alpha(lit ? IM_COL32(18, 18, 18, 150) : col::number, appear), number);
-        y += numH;
+        if (it.icon >= 0) {
+            icons::Draw(dl, it.icon, ImVec2(at.x, y - lineH * 0.5f + iconSize * 0.5f), iconSize,
+                        Alpha(lit ? col::ink : col::text, appear));
+            y += iconH;
+        }
         ImU32 textColor = Alpha(lit ? col::ink : col::text, appear);
         for (const std::string& l : lines) {
             Centered(dl, fonts.body, ImVec2(at.x, y), textColor, l);
@@ -276,15 +300,10 @@ int Frame(ImDrawList* dl, ImVec2 center, float time, bool keyDown, bool pressedA
         Centered(dl, fonts.body, ImVec2(center.x, center.y - 9 * u * k), Alpha(col::text, appear), "Nenhuma bind");
         Centered(dl, fonts.desc, ImVec2(center.x, center.y + 11 * u * k), Alpha(col::hint, appear), "no menu");
     } else {
-        bool sub = !S.subtitle.empty();
-        float ty = center.y - (sub ? 9 * u * k : 0) - (pages > 1 ? 6 * u * k : 0);
-        std::vector<std::string> t = Wrap(fonts.title, S.title, hubR * 1.7f);
-        Centered(dl, fonts.title, ImVec2(center.x, ty), Alpha(col::text, appear), t[0]);
-        if (sub) {
-            Centered(dl, fonts.desc, ImVec2(center.x, ty + 20 * u * k), Alpha(col::hint, appear), S.subtitle);
-        }
+        float ty = center.y - (pages > 1 ? 6 * u * k : 0);
+        TitleWithId(dl, fonts.title, ImVec2(center.x, ty), hubR * 1.7f, S.title, S.subtitle, appear, true);
         if (pages > 1) {
-            float dotsY = center.y + (sub ? 30 : 18) * u * k;
+            float dotsY = center.y + 18 * u * k;
             float spacing = 10 * u * k;
             float x0 = center.x - (pages - 1) * spacing * 0.5f;
             for (int p = 0; p < pages; ++p) {
@@ -353,13 +372,19 @@ int ListFrame(ImDrawList* dl, ImVec2 anchor, bool visible, float time, bool keyD
     float k = size / 100.0f;
     float appear = Ease((time - L.openedAt) / 0.14f);
     int n = static_cast<int>(L.items.size());
-    float rowH = 30 * u * k, pad = 12 * u * k, headH = 46 * u * k, gapX = 30 * u * k, radius = 8 * u * k;
+    float rowH = 30 * u * k, pad = 12 * u * k, headH = 36 * u * k, gapX = 30 * u * k, radius = 8 * u * k;
 
-    // Largura: o maior entre o nick e os itens (com a seta), entre 190u e 340u.
+    // Largura: o maior entre o nick (com o ID) e os itens, entre 190u e 340u.
     float numW = TextSize(fonts.desc, "9").x + 8 * u * k; // o numero sutil antes do nome
-    float width = TextSize(fonts.body, L.title.c_str()).x + 2 * pad;
+    bool anyIcon = false;
     for (const Item& it : L.items) {
-        width = std::max(width, TextSize(fonts.body, it.label.c_str()).x + 2 * pad + numW + 22 * u * k);
+        anyIcon = anyIcon || it.icon >= 0;
+    }
+    float iconW = anyIcon ? 24 * u * k : 0.0f; // a coluna dos icones (todos alinhados)
+    numW += iconW;
+    float width = TextSize(fonts.body, (L.title + "  " + L.subtitle).c_str()).x + 2 * pad;
+    for (const Item& it : L.items) {
+        width = std::max(width, TextSize(fonts.body, it.label.c_str()).x + 2 * pad + numW);
     }
     width = std::min(std::max(width, 190 * u * k), 340 * u * k);
     float height = headH + std::max(1, n) * rowH + pad * 0.5f;
@@ -426,11 +451,7 @@ int ListFrame(ImDrawList* dl, ImVec2 anchor, bool visible, float time, bool keyD
     dl->AddRectFilled(ImVec2(x, y), ImVec2(x + width, y + height), Alpha(IM_COL32(12, 12, 12, 244), a), radius);
     dl->AddRect(ImVec2(x - 0.5f, y - 0.5f), ImVec2(x + width + 0.5f, y + height + 0.5f), Alpha(col::White(18), a),
                 radius, 0, 1.0f);
-    Text(dl, fonts.body, x + pad, y + 9 * u * k, Alpha(col::text, a), L.title.c_str());
-    if (!L.subtitle.empty()) {
-        Text(dl, fonts.desc, x + pad, y + 9 * u * k + fonts.body->FontSize + 2 * u, Alpha(col::hint, a),
-             L.subtitle.c_str());
-    }
+    TitleWithId(dl, fonts.body, ImVec2(x + pad, y + headH * 0.5f), width - 2 * pad, L.title, L.subtitle, a, false);
     dl->AddLine(ImVec2(x + pad, y + headH - 1), ImVec2(x + width - pad, y + headH - 1), Alpha(col::separator, a), 1.0f);
     if (n == 0) {
         Text(dl, fonts.desc, x + pad, y + headH + (rowH - fonts.desc->FontSize) * 0.5f, Alpha(col::hint, a),
@@ -450,10 +471,12 @@ int ListFrame(ImDrawList* dl, ImVec2 anchor, bool visible, float time, bool keyD
             Text(dl, fonts.desc, x + pad, ry + (rowH - fonts.desc->FontSize) * 0.5f,
                  Alpha(lit ? col::numberSel : col::number, a), number);
         }
-        std::vector<std::string> one = Wrap(fonts.body, L.items[i].label, width - 2 * pad - numW - 22 * u * k);
+        if (L.items[i].icon >= 0) {
+            icons::Draw(dl, L.items[i].icon, ImVec2(x + pad + numW - iconW + 8 * u * k, ry + rowH * 0.5f), 16 * u * k,
+                        Alpha(lit ? col::text : col::column, a));
+        }
+        std::vector<std::string> one = Wrap(fonts.body, L.items[i].label, width - 2 * pad - numW);
         Text(dl, fonts.body, x + pad + numW, ty, Alpha(lit ? col::text : col::column, a), one[0].c_str());
-        DrawIcon(dl, Icon::ChevronRight, ImVec2(x + width - pad - 4 * u, ry + rowH * 0.5f),
-                 Alpha(lit ? col::text : col::hint, a), true);
     }
 
     if (chosen >= 0 && chosen < n) {

@@ -763,10 +763,12 @@ void Rows::Finish(float height) {
     y_ = ImGui::GetCursorScreenPos().y;
 }
 
-bool Rows::Action(const char* label, const char* button) {
+bool Rows::Action(const char* label, const char* button, ImVec2* buttonMin, ImVec2* buttonMax) {
     Start();
     float bw = std::max(144 * u, TextSize(fonts.desc, button).x + 30 * u), bh = 26 * u;
     float bx = x_ + w_ - recuo_ * 0.5f - bw, by = y_ + (rowH_ - bh) * 0.5f;
+    if (buttonMin) *buttonMin = ImVec2(bx, by);
+    if (buttonMax) *buttonMax = ImVec2(bx + bw, by + bh);
     ImGui::SetCursorScreenPos(ImVec2(bx, by));
     bool clicked = ImGui::InvisibleButton("##acao", ImVec2(bw, bh));
     bool bHovered = ImGui::IsItemHovered();
@@ -1796,6 +1798,19 @@ void Rows::Badges(const char* label, const char* const* badges, const int* kinds
         x -= 6 * u;
     }
     Finish(rowH_);
+}
+
+void Rows::Note(const char* label, const char* value) {
+    y_ = ImGui::GetCursorScreenPos().y;
+    float right = x_ + w_ - recuo_ * 0.5f, cy = y_ + rowH_ * 0.5f;
+    RichText(dl_, fonts.body, labelX_, cy - fonts.body->FontSize * 0.5f, col::text, label);
+    if (value && *value) {
+        ImVec2 ts = TextSize(fonts.desc, value);
+        Text(dl_, fonts.desc, right - ts.x, cy - ts.y * 0.5f, col::column, value);
+    }
+    ImGui::SetCursorScreenPos(ImVec2(x_, y_));
+    ImGui::Dummy(ImVec2(w_, rowH_ + gap_));
+    y_ = ImGui::GetCursorScreenPos().y;
 }
 
 void Rows::Info(const char* label, const char* tooltip) {

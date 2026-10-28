@@ -4,6 +4,7 @@
 // Na visao), Macro (em breve), Presets (o preset de cada servidor) e Geral.
 
 #include "binds.h"
+#include "imgui.h"
 
 #include <string>
 #include <vector>
@@ -26,5 +27,9 @@ struct Context {
 
 // Desenha o menu, se aberto. true = algo mudou (gravar o arquivo).
 bool Frame(Context& c);
+
+// Para os testes: o nome da bind aberta no editor ("" = nenhuma) e o meio da casa k da grade de icones aberta.
+std::string EditingName();
+ImVec2 IconCell(int k);
 
 } // namespace menu

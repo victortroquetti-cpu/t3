@@ -14,7 +14,7 @@ Classes de bind, uma aba cada:
 - **No Wine** (`test/smoke/run.sh`): um GTA e um samp.dll de mentira recebem teclas de verdade na janela, e o teste confere cada mensagem que o mod manda pelo `CInput::Send`. São 39 conferências em 2 cenários.
 - **No Linux:**
   - `test/run.sh`: o motor, os presets e o arquivo (80 conferências);
-  - o menu, o círculo e a lista desenhados em imagens (20 conferências).
+  - o menu, o círculo e a lista desenhados em imagens (22 conferências).
 
 Falta o teste no jogo de verdade.
 
@@ -33,7 +33,7 @@ Precisa do `gta_sa.exe` 1.0 US e do SA-MP 0.3.7 R1. Em outra versão o mod fica 
 Digite **`/trokbinder`** no chat.
 
 - **Setas** e **Enter** andam e abrem.
-- **O número de uma linha (1-9)** leva até ela e, numa linha de bind, abre a bind.
+- **O número de uma linha (1-9)** leva até ela e, numa linha de bind, abre a bind. Só as linhas que fazem alguma coisa têm número; avisos e dados (o endereço do servidor, os "bloqueado" do Geral) ficam sem número e as setas passam direto por eles.
 - **Esc** volta do editor e fecha o menu.
 
 No editor, **Ctrl+S** salva.
@@ -62,6 +62,7 @@ As automáticas que caem nesse momento **esperam** fechar (até 15 s).
 - **Texto:** comando ou frase, uma mensagem por linha. Passou de 128 letras? O editor avisa (o SA-MP corta).
 - **Adicionar ao menu de binds:** a bind aparece no círculo. Com ela no menu, a tecla é opcional.
 - **Nome:** o que aparece no círculo e na lista. Vazio, vira a primeira linha do texto.
+- **Ícone:** aparece no círculo e na lista (abaixo).
 
 ## Automático
 
@@ -121,7 +122,8 @@ O alvo é o jogador mais perto da **linha do centro da tela**:
 Uma **bolinha** aparece no meio do corpo dele, só se houver bind da visão.
 
 Com alguém na mira, o atalho do menu de binds abre a **lista presa no jogador**, como nos menus de alvo dos servidores RP de FiveM:
-- Ela sai da bolinha, com o nick e o ID em cima, e **segue o jogador** na tela.
+- Ela sai da bolinha, com o nick e o número do ID ao lado (`Fulano_Silva 12`), e **segue o jogador** na tela.
+- Cada item tem o número sutil e o ícone da bind.
 - **Para rodar uma bind:**
   - clique no item;
   - ou aperte o **número** dele;
@@ -146,7 +148,17 @@ O atalho fica no Geral (nenhum por padrão).
 - **Mais de 8 binds:** viram páginas, trocadas na roda do mouse.
 - **Fechar:** Esc, botão direito, clique no meio ou o atalho de novo.
 
-Com o Geral em "Círculo", as binds da visão também entram no círculo quando há alguém na mira (primeiro elas, com o nome do jogador no meio).
+Cada fatia mostra o ícone da bind em cima do nome e o número na borda de fora.
+
+Com o Geral em "Círculo", as binds da visão também entram no círculo quando há alguém na mira (primeiro elas, com `Fulano_Silva 12` no meio).
+
+## Ícones
+
+No editor da bind, **Ícone** abre a grade com 71 ícones do [Lucide](https://lucide.dev) (a família que o kit da casa usa): carro, trancar, chave, algemas, revistar, documento, megafone, lanterna, vida, cruz, telefone, dinheiro... Passe o mouse para ver o nome; a primeira casa tira o ícone.
+
+O `lucide.ttf` da casa é um recorte com poucos ícones, então estes vêm desenhados no próprio mod (traços tirados dos SVG do Lucide por `tools/gen_icons.py`).
+
+![Ícones](docs/12-icones.png)
 
 ![Círculo](docs/10-circulo.png)
 
@@ -162,7 +174,7 @@ Com o Geral em "Círculo", as binds da visão também entram no círculo quando 
 | Ctrl+K numa e K na outra | não |
 
 - **O atalho do círculo** não pode ser a tecla de uma bind, de nenhum preset.
-- **No topo de cada aba**, um aviso diz quantas binds estão em conflito e em quais abas.
+- **No topo de cada aba**, um aviso diz quantas binds estão em conflito e em quais abas. O botão **Ver** (ou Enter no número dele) abre a próxima bind em conflito, já na aba dela; o editor mostra qual é a outra.
 
 ![Tecla repetida](docs/04-tecla-repetida.png)
 
@@ -207,7 +219,10 @@ test/smoke/run.sh     # Wine 32 bits + Xvfb: o .asi num GTA e SA-MP de mentira
 O kit da casa vem de `../trok-ui/asi`. Esta versão acrescentou ao kit:
 - `Rows::Hotkey` (atalho com Ctrl/Shift/Alt);
 - `Rows::Entry` (linha de lista com resumo e interruptor);
-- a largura dos campos de texto.
+- `Rows::Note` (linha só de leitura, sem número);
+- a largura dos campos de texto e o retângulo do botão do `Rows::Action`.
+
+Os ícones: `tools/gen_icons.py <pasta com os SVG do Lucide> src/icons_data.h` (Lucide, licença ISC, © Lucide Icons and Contributors).
 
 ## Endereços
 
