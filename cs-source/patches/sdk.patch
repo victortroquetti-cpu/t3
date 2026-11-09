@@ -170,6 +170,23 @@ index bac7584..5a27262 100644
  private:
  	
  	C_HL2MP_Player( const C_HL2MP_Player & );
+diff --git a/src/game/client/hl2mp/clientmode_hl2mpnormal.cpp b/src/game/client/hl2mp/clientmode_hl2mpnormal.cpp
+index 35bfd1c..e835688 100644
+--- a/src/game/client/hl2mp/clientmode_hl2mpnormal.cpp
++++ b/src/game/client/hl2mp/clientmode_hl2mpnormal.cpp
+@@ -73,7 +73,12 @@ IViewPortPanel* CHudViewport::CreatePanelByName( const char *szPanelName )
+ 
+ 	if ( Q_strcmp( PANEL_SCOREBOARD, szPanelName) == 0 )
+ 	{
++#ifdef TROK
++		extern IViewPortPanel *TrokScoreboard_Create( IViewPort *pViewPort ); // client/trok/ui/trok_scoreboard.cpp
++		newpanel = TrokScoreboard_Create( this );
++#else
+ 		newpanel = new CHL2MPClientScoreBoardDialog( this );
++#endif
+ 		return newpanel;
+ 	}
+ 	else if ( Q_strcmp(PANEL_INFO, szPanelName) == 0 )
 diff --git a/src/game/client/hl2mp/hud_deathnotice.cpp b/src/game/client/hl2mp/hud_deathnotice.cpp
 index 400fcf0..92dc8bd 100644
 --- a/src/game/client/hl2mp/hud_deathnotice.cpp

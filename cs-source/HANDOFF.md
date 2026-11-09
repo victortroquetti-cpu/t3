@@ -156,6 +156,30 @@ e longe, abertura da mira, recuo) para os scripts `weapon_trok_*.txt`. Guia camp
   6. tamanho do jogador: HL2MP 72 em pé / 36 agachado, olho agachado 28; CS:S 62 / 45, olho agachado 47
      (avaliar `GetViewVectors` com as medidas do CS:S nos mapas do CS:S (ver estudo DA/Momentum 1.4g).
 
+## Rodada "o que der das TCs" (09/11, nuvem; nada testado no jogo)
+
+- Bots: correções de seguir caminho do NT;RE (patch em `NextBotPathFollow`), memória de onde
+  travaram (`trok_bot_travou_meia_vida`), mira pelo cano (`trok_bot_mira_cano*`), fogo de
+  supressão (`trok_bot_supressao`).
+- Movimento: virada logo depois do pulo, pulo atrasado na borda, pulo antecipado e teto de
+  velocidade no pulo (`trok_pulo_*`, tempos previstos em rede no `CHL2MP_Player`, patch).
+  **Testar:** caixa a caixa trocando de lado; sair de borda correndo e pular atrasado; erro de
+  predição (`cl_showerror 1`, `cl_predictionlist`) ao pular em rede.
+- Arma: FOV da arma mirando, alça centrada mirando, balanço ao andar, recuo que fica
+  (`trok_recuo_fixo`). **Testar:** alinhar a alça de cada arma de novo (o atraso some na mira).
+- Placar do TAB próprio.
+
+Ficam para casa / artista (registrado a pedido do dono, que quer o nível visual do NEOTOKYO
+Rebuild, estilo Combat Arms, arcade e sem fotorrealismo):
+- **Armas e animações próprias**: modelos de arma em 1ª pessoa com animações feitas para elas
+  (as do NT;RE e do DA são arte deles, não podem entrar). Animações de 3ª pessoa para o que o
+  movimento novo faz (escalar, virada no ar) pedem modelo de jogador próprio; com os do CS:S/HL2
+  só dá para reaproveitar o que já existe.
+- **Visual**: iluminação dos mapas (HDR, luz de ambiente, `env_tonemap_controller`,
+  `color_correction` com LUT própria, bloom moderado). É trabalho de mapa e de ajuste olhando o jogo.
+- **Mapa no estilo do CA que o dono já tem**: precisa virar BSP (Hammer). Medidas de pulo,
+  escalada e vãos para construir: `design/medidas-mapas.md`. Gerar nav mesh para os bots.
+
 ## O que o simulador mostrou (para não refazer)
 
 - O bot padrão do HL2MP mira o centro exato: ~93% de acerto em alvo parado em **todos** os níveis,

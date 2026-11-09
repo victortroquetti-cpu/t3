@@ -62,6 +62,7 @@ Ficou de fora: minimapa (precisa de imagem de cada mapa), placar do TAB (próxim
 4. Mapa de fundo: fazer um `background01.bsp` próprio (câmera lenta) e o `chapterbackgrounds.txt`.
 5. Arsenal e Perfil (concepts prontos): precisam de sistema de loadout no servidor (hoje é
    `trok_armas_iniciais`).
-6. Placar do TAB como `IViewPortPanel` (NT;RE `neo_scoreboard.cpp`), minimapa.
+6. Placar do TAB: feito (`client/trok/ui/trok_scoreboard.cpp`, troca o do HL2MP no
+   `CreatePanelByName`). Falta: estilo do bot (o cliente não sabe), assistências, minimapa.
 7. Para portar mais widgets prontos (tabelas, campos de texto, rolagem), o NeoUI do NT;RE
    (`neo_ui.cpp`, ~3700 linhas, mesma licença) é o atalho; o menu atual não depende dele.
