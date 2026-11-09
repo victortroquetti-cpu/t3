@@ -357,6 +357,13 @@ REFS = [
      "Mapbase: fork do SDK com VScript, entidades e correções (base SP, porte MP em andamento)"),
     ("sourcemod", "https://github.com/alliedmodders/sourcemod",
      "SourceMod: plugins de servidor para o CS:S original (referência de eventos e gamedata do CS:S)"),
+    # Modos zumbi (só leitura de regras e números: GPL ou sem licença; não copiar código nem assets).
+    ("zombiereloaded", "https://github.com/srcdslab/sm-plugin-zombiereloaded",
+     "Zombie:Reloaded (GPLv3): infecção completa para CS:S; classes, coice, configs"),
+    ("zombie-riot", "https://github.com/jono666/Zombie-Riot",
+     "Zombie Riot (fork 1.9.1b, sem licença declarada): survival em ondas com bots no CS:S"),
+    ("zombie-escape-amxx", "https://github.com/z0h1r-LK/Zombie_Escape",
+     "Zombie Escape para CS 1.6 (GPLv3, base Zombie Plague 5.0): regras do modo fuga"),
 ]
 
 
