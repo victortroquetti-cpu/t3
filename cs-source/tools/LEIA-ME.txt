@@ -21,6 +21,15 @@ JOGAR
     nav_generate        (espere terminar; o mapa reinicia)
     nav_analyze         (opcional: deixa os bots bem melhores)
 
+JOGAR COM AMIGOS (online, de graça)
+  Cada amigo precisa do SDK Base, do CS:S e deste mesmo zip instalado.
+  Quem hospeda: console > exec online, depois JOGAR no menu (com ou sem bots).
+    Senha da sala: sv_password "suasenha"
+  Os amigos: console > connect IP_DE_QUEM_HOSPEDA   (com senha: password suasenha antes)
+  O IP: libere a porta 27015 (UDP e TCP) no roteador e passe o IP público; ou, sem
+    acesso ao roteador, usem todos uma rede virtual grátis (Radmin VPN, ZeroTier,
+    Tailscale) e passe o IP que ela mostra.
+
 CONTROLES (se vierem errados: exec config_default no console)
   Botão 2 (direito)            mira pelo cano
   Shift                        corre (arma abaixa e não atira)

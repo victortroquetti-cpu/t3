@@ -216,6 +216,17 @@ preservadas), empurrão por arma, bots zumbis caçando e humanos recuando.
 abrir o jogo, rodar comandos, ler console e erros, tirar print, começar partida com bots e compilar
 modelo e mapa. Testado só com um jogo falso; falta confirmar o `-netconport` no SDK de 2025.
 
+## Servidor local, cfgs e jogar online
+
+- **Corrigido:** num servidor local (JOGAR e CRIAR PARTIDA do menu), o motor executa o `listenserver.cfg`, e não
+  o `server.cfg`. Sem ele, o `balanceamento.cfg` e o `movimento.cfg` nunca rodavam fora do dedicado. Agora o
+  `cfg/listenserver.cfg` chama o `server.cfg`. O `server.cfg` deixou de definir a cota de bots, que apagaria
+  os bots pedidos pelo menu.
+- `cfg/online.cfg` (`exec online`): mesma jogabilidade, sem trapaças, aberto na internet, senha opcional.
+  Guia em `design/jogar-online.md` e na seção JOGAR COM AMIGOS do `tools/LEIA-ME.txt`.
+- A testar: confirmar no console, ao carregar o mapa, a linha "Executing listen server config file" e os
+  valores (`trok_pulo_altura` deve vir do `movimento.cfg`).
+
 ## Decisões novas do dono (ainda sem código)
 
 - **Killstreak** como no Combat Arms, porém mais moderno. Recompensas, números e se vale em todos os
