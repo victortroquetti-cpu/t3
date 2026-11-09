@@ -82,9 +82,9 @@ avaliaram a história. Placar final, depois do confronto: 4 "aprovar com condiç
 3. A rede aparece na arte **como ruína**, nunca como tecnologia brilhante: micélio dentro de cabos,
    torres de rádio, antenas e racks abandonados. Nada de holograma ou interface da corporação.
 4. "Veio do espaço" sai como fato (clichê): vira boato sem confirmação.
-5. O "fungo controlado" no PvP: um único espaço, só trocas laterais com custo, **todas liberadas
-   desde o início para todos, nunca vendidas nem ganhas por nível**, com sinal visual no modelo, e
-   **desligado para humanos no Surto** (infectado tem que continuar sendo ameaça clara).
+5. O "fungo controlado" no PvP: o conselho pediu cuidado com vantagem de atributo (pay-to-win).
+   **Decisão do dono**: vira itens raros, mais tarde; nada de sistema de escolha agora. Quando for
+   feito, lembrar: humano no Surto continua sem nada de infectado (leitura clara de ameaça).
 6. Facções com silhueta distinta em 3 segundos: a corporação usa **uniforme padronizado** (todos
    iguais, limpos); os Remanescentes são **sobreviventes táticos de verdade** (gente boa, bem
    treinada, equipamento tático real), mas **sem uniforme único**: cada um monta o próprio kit,
@@ -123,12 +123,9 @@ mudar.
 - Exército solo: **mercenários** brigando entre si, cada um pelo próprio pagamento (a ganância
   justifica o todos contra todos).
 
-**O Lacre no jogo** (proposta; só depois do dono pedir): um espaço "cepa", escolha antes da partida,
-cada opção com ganho pequeno e custo:
-- Fôlego: corrida dura mais / sua respiração ofegante é ouvida mais longe.
-- Faro: ouve passos inimigos mais longe / seus passos fazem mais barulho.
-- Calo: escala mais rápido e leva menos dano de queda / mira pelo cano um pouco mais lenta.
-- Sangue frio: recuo assenta mais rápido com pouca vida / a tela demora mais a se recuperar do dano.
+**Tecnologia e fungo controlado no jogo** (decisão do dono): **não** vira sistema de escolha
+nem espaço de "cepa". Serão **itens raros** que dão algum benefício a mais justamente por serem
+raros. **Ainda não**: equipamentos ficam para depois.
 
 ## Tom e vibe
 
