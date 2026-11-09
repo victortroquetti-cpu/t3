@@ -9,7 +9,6 @@ licença do repositório e cite a origem no comentário.
 | `refs/zmr-game` | Zombie Master: Reborn, mod MP completo sobre o SDK 2013 (Linux e Windows) | Source 1 SDK License | estrutura de um mod MP grande, regras próprias, jogador próprio, armas próprias, HUD, NPCs em massa |
 | `refs/mapbase` | Mapbase, fork do SDK com VScript, entidades e correções (layout antigo `sp/` e `mp/`) | Source 1 SDK License | VScript (Squirrel) no SDK 2013, entidades de lógica, correções de bugs conhecidos |
 | `refs/sourcemod` | SourceMod (plugins de servidor) | GPLv3 | **só consulta**: nomes de eventos e props do CS:S original (`gamedata/sm-cstrike.games`, `plugins/include/cstrike.inc`) para imitar comportamento. Não copie código (GPL). |
-
 | `refs/zombiereloaded` | Zombie:Reloaded, infecção para CS:S | GPLv3 | regras e números do modo infecção (classes, coice por arma e parte do corpo); **só leitura** |
 | `refs/zombie-riot` | Zombie Riot, survival com bots no CS:S | sem licença declarada; traz assets de terceiros | ondas por "dias"; **só leitura**, nenhum asset |
 | `refs/zombie-escape-amxx` | Zombie Escape (CS 1.6, base ZP 5.0) | GPLv3 | regras do modo fuga; **só leitura** |
