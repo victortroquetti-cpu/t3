@@ -92,6 +92,49 @@ visibilidade, luz nem hiding spots, e a nota fica só pela estrutura (entradas e
 Mapas com parkour precisam de links de pulo entre as caixas e pilastras: confira com
 `nav_edit 1` e ligue à mão (`nav_connect`) onde o gerador não ligou.
 
+## Estilos de jogo e trabalho em equipe
+
+Na vida real cada um joga de um jeito. Cada bot sorteia um **estilo**, com os papéis do CS
+competitivo. O estilo muda **decisões**, não a habilidade: mira e reação continuam vindo do nível.
+
+| Estilo | Peso padrão | Como joga |
+|---|---|---|
+| **Equilibrado** | 30 | Alterna entre segurar e caçar pela personalidade. |
+| **Entry** | 20 | Agressivo (0,85–1). Rota direta, quase nunca segura, corre para a luta dos colegas, não anda devagar. |
+| **Lurker** | 15 | Rotas longe das do time (custo da rota dos colegas ×3). Indo para uma pista, mira um ponto 450–750u ao lado do inimigo, para chegar pelo flanco. |
+| **Âncora** | 20 | Segura lugares cobertos e pouco expostos, 2,2× mais tempo, agachado e sem largar o posto. **Emboscada**: mira e espera, e só atira quando o inimigo chega perto (700u), vira de costas, já está à vista há 2,5 s ou quando leva tiro. |
+| **Suporte** | 15 | Anda 220–420u atrás de um colega (de preferência um jogador humano; no máximo 2 por líder), cobrindo o ângulo que ele não cobre. Quando o colega entra em luta, vai trocar o abate (trade). |
+
+- Pesos: `trok_bot_estilos "equilibrado 30 entry 20 lurker 15 ancora 20 suporte 15"`.
+- Para testar um estilo: `trok_bot_estilo ancora` (vazio volta ao sorteio). Os dois valem para os próximos bots.
+- `trok_bot_estilos_info` lista cada bot com nível, estilo, agressividade e se está segurando posição.
+
+### O time como time
+
+O módulo `trok_bot_team.*` guarda o que o time sabe e o que cada um está fazendo:
+
+- **Avisos (o "call").** Quem vê um inimigo passa a posição para o time a cada segundo. Passos e tiros ouvidos viram pista com erro (200–250u), porque o som dá a região, não o ponto. No mata-mata sem times, cada bot só usa o que ele mesmo viu ou ouviu.
+- **Apoio e trade.** Colega lutando a menos de 2200u: os outros vão ajudar, mas pela rota que ninguém do time usou, o que vira flanco naturalmente. No máximo 2 indo para a mesma luta.
+- **Ângulos.** Segurando uma posição, o bot vigia as entradas da região e escolhe uma que **nenhum colega** está cuidando (cada bot "reivindica" o ângulo que olha). Andando em grupo, cada um olha para onde os outros não estão olhando: frente, flancos e, com 3 ou mais, costas.
+- **Espalhar.** Dois bots nunca seguram a mesma área, e o time prefere segurar regiões diferentes. Destinos perto do destino de um colega (500u) valem menos.
+
+### Por que eles não andam mais todos iguais
+
+O "plástico" dos bots do HL2MP tinha causa concreta:
+- todos usavam a rota mais curta, sem variação por bot;
+- todos iam primeiro para a arma mais próxima;
+- todos andavam pelo meio do caminho, em fila.
+
+O que mudou:
+
+- **Rota própria.** A cada caçada, o bot sorteia uma "preferência de corredor" (células de 512u mais ou menos caras para ele). Dois bots indo ao mesmo lugar pegam caminhos diferentes. Por cima disso, ele foge da rota que colegas usaram nos últimos 20 s e, se for cauteloso, de onde gente morreu há pouco (perigo do nav, que decai sozinho).
+- **Destino variado.** Pistas do time mais 30 áreas sorteadas, longe dos destinos dos colegas e dos últimos 5 lugares que o bot visitou. A distância preferida depende da agressividade.
+- **Ritmo próprio.**
+  - Hesita 0,1–1,5 s ao nascer, olhando em volta, então não saem em trem.
+  - Ao chegar no destino, para e confere: mais tempo os cautelosos, menos os entry.
+  - Os cautelosos andam sem fazer barulho na reta final até uma pista.
+- **Faixa no corredor.** Cada bot anda deslocado até ~36u do meio, numa faixa que oscila devagar e muda a cada 3–8 s. Só em área larga, sem pulo e sem beirada; com parede ou buraco, volta para o meio.
+
 ## Como testar
 
 ```
@@ -104,7 +147,7 @@ exec bots
 - `trok_bot_debug_percepcao 1`: a barra de percepção dele sobre cada inimigo.
 - `trok_bot_debug_mira 1`: o ponto de mira e o erro em graus.
 - `trok_bot_tatico_mostrar 2000`: pinta o nav pela nota (verde = bom para segurar). `trok_bot_tatico_info` lista as regiões mais defensáveis.
-- `trok_bot_mira_humana 0`, `trok_bot_audicao 0`, `trok_bot_tatica 0`, `trok_bot_pulo_agachado 0`: liga e desliga cada parte, para comparar com o bot do HL2MP.
+- `trok_bot_mira_humana 0`, `trok_bot_audicao 0`, `trok_bot_tatica 0`, `trok_bot_pulo_agachado 0`, `trok_bot_faixa 0`, `trok_bot_rota_variedade 0`: liga e desliga cada parte, para comparar com o bot do HL2MP.
 - Depois de editar `scripts/trok_bot_perfis.txt`: `trok_bot_perfis_recarregar`, `hl2mp_bot_kick all` e adicione os bots de novo.
 
 Testes que medem "parece gente":
@@ -112,8 +155,10 @@ Testes que medem "parece gente":
 1. **Tempo até o primeiro acerto.** Apareça de frente a 500u e a 1500u, 20 vezes por nível. O expert deve ficar em torno de 0,3–0,5 s; o fácil, acima de 0,8 s.
 2. **Esconderijo.** Agachado e parado atrás de uma caixa, só a cabeça para fora, a 1500u. O bot de passagem não deve te ver na maior parte das vezes. Correndo ou atirando, deve ver.
 3. **Strafe.** O bot não deve "tremer" (trocar de lado a cada quadro). Lados de 0,3–1 s.
-4. **Parkour.** Num mapa com caixas e pilastras, `trok_bot_tatico_mostrar` deve pintar de verde os lugares de difícil acesso, e bots com `uso_tatico` alto devem subir neles.
-5. **Teste cego.** Alguém assiste a demo sem saber quem é bot e tenta adivinhar.
+4. **Mesmo caminho.** Com `trok_bot_estilo equilibrado` e 6 bots num time, eles não devem sair do spawn em fila nem chegar todos pelo mesmo corredor. Compare com `trok_bot_rota_variedade 0`.
+5. **Emboscada.** Com `trok_bot_estilo ancora`, passe por uma entrada que um bot âncora vigia, de frente e de longe: ele deve esperar (com a mira em você) até você chegar perto ou virar.
+6. **Parkour.** Num mapa com caixas e pilastras, `trok_bot_tatico_mostrar` deve pintar de verde os lugares de difícil acesso, e bots com `uso_tatico` alto devem subir neles.
+7. **Teste cego.** Alguém assiste a demo sem saber quem é bot e tenta adivinhar.
 
 ## O que ainda não foi verificado
 
@@ -127,8 +172,8 @@ pesquisa; espere ajuste depois dos primeiros testes.
 - Busca pela última posição conhecida: ir até lá e procurar nos esconderijos próximos, em vez de esquecer.
 - Som pela distância no nav, não em linha reta (parede grossa abafa de verdade).
 - Controle de recuo parcial por nível, rajadas de longe e ajustes de mira por arma.
-- Trabalho em equipe: dividir entradas entre bots do mesmo time e trocar abate (trade).
-- Bots infectados para o modo quarentena (NextBot com ataque corpo a corpo e quebra de barricada).
+- Rotações: quando o time perde um lugar ou ouve muita luta de um lado, parte do time gira para lá.
+- Modo zumbi/quarentena: estilos e cérebro próprios para infectados (perseguição, cerco, quebrar barricada) e para humanos (trancar abrigos, defender juntos), em cima desta base.
 
 ## Fontes
 

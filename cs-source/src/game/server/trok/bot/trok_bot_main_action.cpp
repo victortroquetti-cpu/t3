@@ -6,6 +6,7 @@
 #include "trok_bot.h"
 #include "trok_bot_main_action.h"
 #include "trok_bot_vision.h"
+#include "trok_bot_team.h"
 #include "hl2mp_player.h"
 #include "NextBotUtil.h"
 
@@ -36,6 +37,8 @@ CTrokBotMainAction::CTrokBotMainAction()
 	m_flFlinchError = 0.0f;
 	m_flFlinchTime = 0.0f;
 	m_flRetargetUntil = 0.0f;
+	m_flLastInjured = -100.0f;
+	m_flThreatSeenSince = 0.0f;
 	m_iStrafeDir = 0;
 }
 
@@ -46,6 +49,22 @@ ActionResult< CHL2MPBot > CTrokBotMainAction::Update( CHL2MPBot *me, float inter
 
 	if ( trok_bot_audicao.GetBool() )
 		ListenForFootsteps( me );
+
+	// Avisa o time onde está o inimigo que ele está vendo (o "call" do CS).
+	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat( true );
+	if ( threat && threat->GetEntity() && m_intelTimer.IsElapsed() )
+	{
+		m_intelTimer.Start( 1.0f );
+		TrokBot_AddIntel( me, threat->GetLastKnownPosition(), 0.0f );
+	}
+
+	// Emboscada: desde quando o alvo atual está à vista.
+	CBaseEntity *pSeen = threat ? threat->GetEntity() : NULL;
+	if ( pSeen != m_hThreatSeen.Get() )
+	{
+		m_hThreatSeen = pSeen;
+		m_flThreatSeenSince = gpGlobals->curtime;
+	}
 
 	return result;
 }
@@ -108,6 +127,7 @@ void CTrokBotMainAction::ListenForFootsteps( CHL2MPBot *me )
 		return;
 
 	vision->NoteNoise( pLoudest, 0.15f + 0.35f * flLoudest );
+	TrokBot_AddIntel( me, pLoudest->GetAbsOrigin(), 250.0f );	// passos dão a região, não o ponto
 
 	// Olha na direção do barulho com erro: sabe de onde veio, não o ponto exato.
 	Vector toNoise = pLoudest->GetAbsOrigin() - me->GetAbsOrigin();
@@ -123,6 +143,7 @@ EventDesiredResult< CHL2MPBot > CTrokBotMainAction::OnInjured( CHL2MPBot *me, co
 	const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
 	m_flFlinchError = MIN( m_flFlinchError + profile.flMiraTremorFerido, 3.0f * profile.flMiraTremorFerido );
 	m_flFlinchTime = gpGlobals->curtime;
+	m_flLastInjured = gpGlobals->curtime;
 
 	// Quem atirou chama atenção na hora.
 	CTrokBotVision *vision = static_cast< CTrokBotVision * >( me->GetVisionInterface() );
@@ -135,7 +156,13 @@ EventDesiredResult< CHL2MPBot > CTrokBotMainAction::OnInjured( CHL2MPBot *me, co
 EventDesiredResult< CHL2MPBot > CTrokBotMainAction::OnWeaponFired( CHL2MPBot *me, CBaseCombatCharacter *whoFired, CBaseCombatWeapon *weapon )
 {
 	if ( whoFired && whoFired != me )
+	{
 		static_cast< CTrokBotVision * >( me->GetVisionInterface() )->NoteGunfire( whoFired );
+
+		// Tiro de inimigo ouvido por perto vira pista para o time (com erro: som dá a região).
+		if ( me->IsEnemy( whoFired ) && me->IsRangeLessThan( whoFired, 2500.0f ) )
+			TrokBot_AddIntel( me, whoFired->GetAbsOrigin(), 200.0f );
+	}
 
 	return TryContinue();
 }
@@ -144,6 +171,9 @@ EventDesiredResult< CHL2MPBot > CTrokBotMainAction::OnWeaponFired( CHL2MPBot *me
 // trocar de alvo; o bot não emenda o próximo tiro no mesmo quadro.
 EventDesiredResult< CHL2MPBot > CTrokBotMainAction::OnOtherKilled( CHL2MPBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
 {
+	if ( victim )
+		TrokBot_NoteDeath( victim );
+
 	if ( victim && victim == m_hAimSubject.Get() )
 	{
 		const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
@@ -153,12 +183,43 @@ EventDesiredResult< CHL2MPBot > CTrokBotMainAction::OnOtherKilled( CHL2MPBot *me
 	return BaseClass::OnOtherKilled( me, victim, info );
 }
 
-QueryResultType CTrokBotMainAction::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+EventDesiredResult< CHL2MPBot > CTrokBotMainAction::OnKilled( CHL2MPBot *me, const CTakeDamageInfo &info )
+{
+	TrokBot_NoteDeath( me );
+	TrokBot_ReleaseGoal( me );
+	TrokBot_ReleaseHold( me );
+	return BaseClass::OnKilled( me, info );
+}
+
+QueryResultType CTrokBotMainAction::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
 {
 	if ( gpGlobals->curtime < m_flRetargetUntil )
 		return ANSWER_NO;
 
-	return BaseClass::ShouldAttack( me, them );
+	// Emboscada (âncora segurando posição): mira e espera. Atira quando o
+	// inimigo chega perto, vira de costas, já está à vista há um tempo
+	// (vai acabar vendo) ou quando o próprio bot leva tiro.
+	CHL2MPBot *me = (CHL2MPBot *)meBot->GetEntity();
+	const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
+	if ( profile.bEmboscada && TrokBot_IsHolding( me ) && them && them->GetEntity() &&
+		 gpGlobals->curtime - m_flLastInjured > 3.0f )
+	{
+		CBaseEntity *pThem = them->GetEntity();
+		bool bClose = me->IsRangeLessThan( pThem, 700.0f );
+
+		Vector theirForward;
+		AngleVectors( pThem->EyeAngles(), &theirForward );
+		Vector toMe = me->EyePosition() - pThem->EyePosition();
+		toMe.NormalizeInPlace();
+		bool bLookingAway = DotProduct( theirForward, toMe ) < 0.6f;
+
+		bool bSeenLong = gpGlobals->curtime - m_flThreatSeenSince > 2.5f;
+
+		if ( !bClose && !bLookingAway && !bSeenLong )
+			return ANSWER_NO;
+	}
+
+	return BaseClass::ShouldAttack( meBot, them );
 }
 
 //-----------------------------------------------------------------------------

@@ -9,6 +9,7 @@
 #include "nav_mesh.h"
 #include "nav_area.h"
 #include "fmtstr.h"
+#include "trok_bot_team.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -388,8 +389,19 @@ CNavArea *CTrokTacticalMap::FindHoldArea( CHL2MPBot *me, float flMaxRange, const
 		if ( pAvoid && pAvoid->Find( entry.pArea ) != pAvoid->InvalidIndex() )
 			continue;
 
+		// Ninguém empilha na mesma área.
+		if ( TrokBot_IsHoldTaken( me, entry.pArea ) )
+			continue;
+
 		// Bot tático escolhe pela nota; bot "burrinho" escolhe meio ao acaso.
 		float flValue = flTactics * entry.flScore + ( 1.0f - flTactics ) * RandomFloat( 0.0f, 0.6f ) - 0.15f * flDist / flMaxRange;
+
+		// O time cobre lugares diferentes: região que um colega já segura vale menos.
+		flValue -= 0.25f * TrokBot_CountTeamHoldsInRegion( me, entry.iRegion );
+
+		// Âncora quer esconderijo: coberto e pouco exposto, para surpreender.
+		if ( profile.iEstilo == TROK_ESTILO_ANCORA )
+			flValue += 0.15f * entry.flCover + 0.1f * ( 1.0f - entry.flExposure );
 		if ( flValue > flBest )
 		{
 			flBest = flValue;

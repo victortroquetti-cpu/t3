@@ -31,6 +31,7 @@ public:
 	virtual EventDesiredResult< CHL2MPBot > OnInjured( CHL2MPBot *me, const CTakeDamageInfo &info );
 	virtual EventDesiredResult< CHL2MPBot > OnWeaponFired( CHL2MPBot *me, CBaseCombatCharacter *whoFired, CBaseCombatWeapon *weapon );
 	virtual EventDesiredResult< CHL2MPBot > OnOtherKilled( CHL2MPBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CHL2MPBot > OnKilled( CHL2MPBot *me, const CTakeDamageInfo &info );
 
 	virtual QueryResultType ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;
 
@@ -62,6 +63,10 @@ private:
 	CountdownTimer m_strafeTimer;
 
 	CountdownTimer m_listenTimer;
+	CountdownTimer m_intelTimer;
+	float m_flLastInjured;
+	float m_flThreatSeenSince;				// emboscada: há quanto tempo o alvo atual está à vista
+	CHandle< CBaseEntity > m_hThreatSeen;
 };
 
 #endif // TROK_BOT_MAIN_ACTION_H

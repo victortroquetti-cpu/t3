@@ -113,7 +113,10 @@ em `hl2mp_bot.cpp`), torna `CHL2MPBotMainAction::Dodge` virtual/protegido e cham
 | Giro / pulo agachado | `trok_bot_body.cpp` | `GetMaxHeadAngularVelocity`, `ClimbUpToLedge` |
 | Mira, strafe, audição | `trok_bot_main_action.*` | `SelectTargetPoint`, `Dodge`, `ShouldAttack` |
 | Mapa tático | `trok_bot_tactical.*` | `TrokTacticalMap().GetArea/GetRegion/FindHoldArea` |
-| Cérebro e segurar posição | `trok_bot_behaviors.cpp` | `TrokBot_ScenarioAction`: modo novo = ação nova aqui |
+| Cérebro, caçada, segurar, acompanhar, hesitar | `trok_bot_behaviors.cpp` | `TrokBot_ScenarioAction`: modo novo = ação/cérebro novo aqui |
+| Estilos (entry, lurker, âncora, suporte, equilibrado) | `trok_bot_profile.*` (`iEstilo` e multiplicadores) | estilo muda decisão, nunca mira/reação |
+| Memória do time (pistas, destinos, rotas, vigia, posições, líder, perigo) | `trok_bot_team.*` | `CTrokBotPathCost` para qualquer caminho com variedade |
+| Faixa no corredor | `trok_bot_body.cpp` (`CTrokBotLocomotion::Approach`) | só em área larga sem pulo |
 
 Cuidados ao mexer:
 - `IsVisibleEntityNoticed` é chamado de vários lugares (via `IsAbleToSee`), então o acumulador é por tempo, não por chamada.

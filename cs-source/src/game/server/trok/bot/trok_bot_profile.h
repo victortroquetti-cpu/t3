@@ -16,6 +16,21 @@
 #pragma once
 #endif
 
+// Estilo de jogo (papéis do CS competitivo). Sorteado por bot com os pesos de
+// trok_bot_estilos; trok_bot_estilo força um para testar.
+enum TrokBotStyle_t
+{
+	TROK_ESTILO_EQUILIBRADO = 0,	// faz um pouco de tudo
+	TROK_ESTILO_ENTRY,				// entra primeiro, corre, procura a luta
+	TROK_ESTILO_LURKER,				// sozinho por rotas longe do time, pega por trás
+	TROK_ESTILO_ANCORA,				// segura um lugar por muito tempo e embosca
+	TROK_ESTILO_SUPORTE,			// anda atrás de um colega para trocar o abate
+
+	TROK_ESTILO_COUNT
+};
+
+const char *TrokBot_StyleName( int iStyle );
+
 struct TrokBotProfile_t
 {
 	char	szNivel[ 16 ];
@@ -43,6 +58,13 @@ struct TrokBotProfile_t
 	float	flChanceAgachar;		// 0..1: chance de agachar no meio do tiroteio
 	float	flAgressividade;		// 0..1: 0 = segura posição boa, 1 = caça o inimigo
 	float	flUsoTatico;			// 0..1: quanto usa o mapa tático (lugares seguros, entradas)
+
+	// --- Estilo (preenchido por TrokBot_BuildProfile, não vem do arquivo) ---
+	int		iEstilo;				// TrokBotStyle_t
+	float	flRotaVariedade;		// multiplica trok_bot_rota_variedade
+	float	flRotaColegas;			// multiplica trok_bot_rota_colegas (lurker evita muito o time)
+	float	flTempoSegurar;			// multiplica o tempo que segura um lugar
+	bool	bEmboscada;				// segurando posição, espera o inimigo chegar perto ou se distrair para atirar
 };
 
 // Perfil final de um bot (nível + personalidade sorteada).

@@ -6,9 +6,68 @@
 #include "trok_bot_profile.h"
 #include "filesystem.h"
 #include "KeyValues.h"
+#include "utlstring.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
+
+static ConVar trok_bot_estilos( "trok_bot_estilos", "equilibrado 30 entry 20 lurker 15 ancora 20 suporte 15", FCVAR_GAMEDLL,
+	"Pesos do sorteio de estilo dos bots (vale para os próximos bots)." );
+static ConVar trok_bot_estilo( "trok_bot_estilo", "", FCVAR_GAMEDLL,
+	"Força um estilo para todos os próximos bots (equilibrado, entry, lurker, ancora, suporte). Vazio = sorteio." );
+
+static const char *s_pszStyleNames[ TROK_ESTILO_COUNT ] = { "equilibrado", "entry", "lurker", "ancora", "suporte" };
+
+const char *TrokBot_StyleName( int iStyle )
+{
+	return ( iStyle >= 0 && iStyle < TROK_ESTILO_COUNT ) ? s_pszStyleNames[ iStyle ] : "?";
+}
+
+static int StyleFromName( const char *pszName )
+{
+	for ( int i = 0; i < TROK_ESTILO_COUNT; ++i )
+	{
+		if ( !Q_stricmp( pszName, s_pszStyleNames[ i ] ) )
+			return i;
+	}
+	return -1;
+}
+
+// Sorteio ponderado a partir de "nome peso nome peso ...".
+static int PickStyle( void )
+{
+	int iForced = StyleFromName( trok_bot_estilo.GetString() );
+	if ( iForced >= 0 )
+		return iForced;
+
+	float flWeights[ TROK_ESTILO_COUNT ] = {};
+	float flTotal = 0.0f;
+
+	CUtlVector< CUtlString > parts;
+	V_SplitString( trok_bot_estilos.GetString(), " ", parts );
+	for ( int i = 0; i + 1 < parts.Count(); i += 2 )
+	{
+		int iStyle = StyleFromName( parts[ i ] );
+		float flWeight = atof( parts[ i + 1 ] );
+		if ( iStyle >= 0 && flWeight > 0.0f )
+		{
+			flWeights[ iStyle ] += flWeight;
+			flTotal += flWeight;
+		}
+	}
+
+	if ( flTotal <= 0.0f )
+		return TROK_ESTILO_EQUILIBRADO;
+
+	float flRoll = RandomFloat( 0.0f, flTotal );
+	for ( int i = 0; i < TROK_ESTILO_COUNT; ++i )
+	{
+		flRoll -= flWeights[ i ];
+		if ( flRoll <= 0.0f && flWeights[ i ] > 0.0f )
+			return i;
+	}
+	return TROK_ESTILO_EQUILIBRADO;
+}
 
 static ConVar trok_bot_personalidade( "trok_bot_personalidade", "0.12", FCVAR_GAMEDLL,
 	"Variação sorteada por bot em cima do nível (0.12 = até 12% para mais ou para menos).", true, 0, true, 0.5 );
@@ -117,4 +176,43 @@ void TrokBot_BuildProfile( int iDificuldade, TrokBotProfile_t *pOut )
 	p.flGiroMax				= Jitter( p.flGiroMax, v );
 	p.flAgressividade		= clamp( p.flAgressividade + RandomFloat( -2.0f * v, 2.0f * v ) * 1.5f, 0.0f, 1.0f );
 	p.flUsoTatico			= clamp( Jitter( p.flUsoTatico, v ), 0.0f, 1.0f );
+
+	// Estilo: muda decisões (o que fazer), não a habilidade (mira, reação).
+	p.iEstilo = PickStyle();
+	p.flRotaVariedade = 1.0f;
+	p.flRotaColegas = 1.0f;
+	p.flTempoSegurar = 1.0f;
+	p.bEmboscada = false;
+
+	switch ( p.iEstilo )
+	{
+	case TROK_ESTILO_ENTRY:
+		p.flAgressividade = RandomFloat( 0.85f, 1.0f );
+		p.flRotaVariedade = 0.6f;		// vai pelo caminho direto
+		p.flRotaColegas = 0.5f;
+		p.flTempoSegurar = 0.5f;
+		break;
+
+	case TROK_ESTILO_LURKER:
+		p.flAgressividade = RandomFloat( 0.4f, 0.6f );
+		p.flRotaVariedade = 1.6f;
+		p.flRotaColegas = 3.0f;			// foge da rota do time
+		p.flTempoSegurar = 0.8f;
+		break;
+
+	case TROK_ESTILO_ANCORA:
+		p.flAgressividade = RandomFloat( 0.0f, 0.2f );
+		p.flUsoTatico = MAX( p.flUsoTatico, 0.7f );
+		p.flTempoSegurar = 2.2f;
+		p.bEmboscada = true;
+		break;
+
+	case TROK_ESTILO_SUPORTE:
+		p.flAgressividade = RandomFloat( 0.4f, 0.6f );
+		p.flRotaColegas = 0.2f;			// anda junto
+		break;
+
+	default:
+		break;
+	}
 }
