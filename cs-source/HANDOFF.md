@@ -117,6 +117,37 @@ passar os números para o `cfg/movimento.cfg`; e das armas (cadência, tiros par
 e longe, abertura da mira, recuo) para os scripts `weapon_trok_*.txt`. Guia campo a campo em
 `design/sistemas-jogabilidade.md`. Só números; nada de arquivo do jogo.
 
+## Interface e estudos dos mods do SDK (09/11, nuvem; nada visto rodando)
+
+- **Menu próprio** no lugar do menu do GameUI: `client/trok/ui/trok_menu.cpp` (tela inicial,
+  pausa, jogar contra bots), fontes Barlow (OFL) em `resource/fonts`, esquema em
+  `resource/TrokScheme.res`. Patches: `vgui_int.cpp` (cria e registra) e `cdll_client_int.cpp`
+  (`HandleUiToggle`: ESC volta das subtelas). Concepts, identidade e próximos passos em
+  `design/ui.md`. **Testar primeiro:** se as fontes carregam (nome da família no Windows; se não,
+  o VGUI cai numa fonte padrão), escala em 1080p/1440p, ESC dentro da partida, foco do teclado
+  depois de fechar o diálogo de opções.
+- **Escadas dos mapas do CS:S** (pincéis `CONTENTS_LADDER`): o movimento do HL2 só tratava
+  `func_useableladder`. `CTrokGameMovement` agora usa as duas (`LadderMove`, `OnLadder`,
+  `FullLadderMove`) e liga o ajuste de escada do CS:S (`sv_ladder_dampen`, `sv_ladder_angle`)
+  com `|| defined( TROK )` em `gamemovement.cpp`. Testar em de_nuke, de_aztec, cs_office (subir,
+  descer, pular da escada, bots na escada).
+- **Zoom da mira** agora é chamado no cliente e no servidor (`SetFOV` é previsto): começa no
+  mesmo tique, sem esperar o ping.
+- Estudos completos (código com a mesma licença, pode ser reaproveitado com crédito):
+  `design/estudo-neotokyo.md` e `design/estudo-da-momentum-ff.md`. Backlog que saiu deles, por
+  ganho:
+  1. deslize com estado em rede e recarga (hoje dá para encadear deslize→pulo→pouso agachado);
+  2. "lurch" do Momentum (troca de direção logo depois do pulo, sem ganhar velocidade) + tempo de
+     coyote + teto de velocidade no pulo (Fortress Forever);
+  3. `GetViewModelFOV` por arma (fecha `mira_fov_arma`) e balanço da arma ao andar; o
+     `CalcViewModelLag` da Valve roda depois do nosso e tira a alça do centro olhando para
+     cima/baixo na mira;
+  4. recuo que sobe e fica (estilo CoD) mexendo nos ângulos do usercmd no cliente;
+  5. bots: correções do `PathFollower` do NT;RE (vãos, quedas, desvio), penalidade em área onde
+     travou, supressão, bots usando a mira;
+  6. tamanho do jogador: HL2MP 72 em pé / 36 agachado, olho agachado 28; CS:S 62 / 45, olho agachado 47
+     `GetViewVectors` com as medidas do CS:S nos mapas do CS:S (ver estudo DA/Momentum 1.4).
+
 ## O que o simulador mostrou (para não refazer)
 
 - O bot padrão do HL2MP mira o centro exato: ~93% de acerto em alvo parado em **todos** os níveis,

@@ -1,0 +1,16 @@
+Trok: créditos de terceiros
+==========================
+
+Código
+- Source SDK 2013 (Valve Corporation), Source 1 SDK License.
+- Arquitetura do menu próprio (client/trok/ui/trok_menu.cpp) baseada no NEOTOKYO Rebuild
+  (https://github.com/NeotokyoRebuild/neo), Source 1 SDK License:
+  neo/ui/neo_root.cpp e OverrideInterface.cpp.
+
+Fontes
+- Barlow e Barlow Condensed, Copyright 2017 The Barlow Project Authors
+  (https://github.com/jpt/barlow), SIL Open Font License 1.1 (resource/fonts/OFL.txt).
+
+Conteúdo montado (não incluído no pacote)
+- Counter-Strike: Source e Half-Life 2: Deathmatch / Source SDK Base 2013 (Valve), lidos da
+  instalação do jogador.

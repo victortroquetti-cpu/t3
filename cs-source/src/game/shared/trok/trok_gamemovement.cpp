@@ -66,12 +66,61 @@ public:
 	virtual void FullWalkMove( void );
 	virtual bool CheckJumpButton( void );
 
+	// Escadas: o HL2 só conhece func_useableladder; as escadas dos mapas do CS:S são
+	// pincéis com CONTENTS_LADDER, tratadas pelo CGameMovement. Usa as duas.
+	virtual bool LadderMove( void );
+	virtual bool OnLadder( trace_t &trace );
+	virtual void FullLadderMove( void );
+
 private:
+	bool OnHL2Ladder( void );
 	bool IsDucked( void ) const;
 	bool IsSliding( void ) const;
 	void TryStartSlide( void );
 	bool TryMantle( void );
 };
+
+//-----------------------------------------------------------------------------
+// Escadas (achado do estudo em design/estudo-da-momentum-ff.md, 1.4-a)
+//-----------------------------------------------------------------------------
+bool CTrokGameMovement::OnHL2Ladder( void )
+{
+	trace_t tr; // ignorado pelo CHL2GameMovement::OnLadder (só olha o func_useableladder atual)
+	return BaseClass::OnLadder( tr );
+}
+
+bool CTrokGameMovement::LadderMove( void )
+{
+	if ( BaseClass::LadderMove() )
+		return true;
+	return CGameMovement::LadderMove();
+}
+
+// Mesma regra do CGameMovement::OnLadder (que é inline em gamemovement.cpp): pincel de
+// escada ou superfície marcada como escalável.
+bool CTrokGameMovement::OnLadder( trace_t &trace )
+{
+	if ( OnHL2Ladder() )
+		return true;
+	if ( trace.contents & CONTENTS_LADDER )
+		return true;
+	IPhysicsSurfaceProps *pPhysProps = MoveHelper()->GetSurfaceProps();
+	if ( pPhysProps )
+	{
+		const surfacedata_t *pSurfaceData = pPhysProps->GetSurfaceData( trace.surface.surfaceProps );
+		if ( pSurfaceData && pSurfaceData->game.climbable != 0 )
+			return true;
+	}
+	return false;
+}
+
+void CTrokGameMovement::FullLadderMove( void )
+{
+	if ( OnHL2Ladder() )
+		BaseClass::FullLadderMove();
+	else
+		CGameMovement::FullLadderMove();
+}
 
 bool CTrokGameMovement::IsDucked( void ) const
 {

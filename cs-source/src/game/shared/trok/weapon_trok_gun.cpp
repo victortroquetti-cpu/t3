@@ -343,11 +343,11 @@ void CWeaponTrokGun::SetADS( bool bOn )
 		return;
 	m_bADS = bOn;
 
-#ifndef CLIENT_DLL
+	// Nos dois lados: m_iFOV, m_flFOVTime e m_hZoomOwner são previstos, então o zoom
+	// começa no mesmo tique no cliente (só no servidor chegaria um ping depois).
 	CBasePlayer *pPlayer = GetPlayerOwner();
 	if ( pPlayer )
 		pPlayer->SetFOV( this, bOn ? (int)Info().m_flTrokADSFov : 0, Info().m_flTrokADSTime );
-#endif
 }
 
 void CWeaponTrokGun::ItemPostFrame( void )
