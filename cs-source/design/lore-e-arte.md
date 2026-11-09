@@ -110,12 +110,18 @@ mudar.
   controlável). Aliados da resistência.
 - **Os Remanescentes**: a resistência de sobreviventes, os jogadores.
 
-**Times**: mata-mata em equipe = **Primum** (segurança da corporação, limpa e uniforme) contra
-**Remanescentes** (resistência: sobreviventes táticos, bem treinados, cada um com seu kit). Exército solo = **Contratados** sem bandeira.
+**Mercenários e especialistas** (decisão do dono):
+- **Mercenários**: uma facção própria, gente que se vende à ganância; trabalham para quem pagar
+  mais, quase sempre a Primum (fazem o trabalho sujo que a corporação não assume).
+- **Especialistas**: a **elite dos sobreviventes** (Remanescentes). São os personagens principais,
+  como os "specs" do Combat Arms, com **skins de arma próprias**. Por enquanto só visual.
 
-**Mercenários e especialistas** (decisão do dono): mercenários são os soldados comuns de cada lado;
-especialistas são personagens principais (como os "specs" do Combat Arms), com **skins de arma
-próprias**. Por enquanto só visual.
+**Times** (proposta encaixando isso):
+- Mata-mata em equipe: **Mercenários** (a serviço da Primum) contra **Remanescentes** (com os
+  especialistas). Leitura rápida: mercenário com equipamento caro e padronizado de contrato;
+  remanescente com kit tático montado por cada um.
+- Exército solo: **mercenários** brigando entre si, cada um pelo próprio pagamento (a ganância
+  justifica o todos contra todos).
 
 **O Lacre no jogo** (proposta; só depois do dono pedir): um espaço "cepa", escolha antes da partida,
 cada opção com ganho pequeno e custo:
