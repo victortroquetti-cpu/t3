@@ -47,7 +47,9 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
    - tecnologia/fungo controlado = **itens raros** no futuro, sem exagero; **equipamentos ainda não**;
    - nome do jogo provisório **Rearmed** (complemento e nome da corporação ainda em aberto);
    - **vai ter killstreak** (série de abates), como no Combat Arms, porém mais moderno. As
-     recompensas e os números ainda não foram definidos: perguntar ao dono antes de fazer.
+     recompensas e os números ainda não foram definidos: perguntar ao dono antes de fazer;
+   - **sem nível, XP ou patente por enquanto** (decisão do dono). Não fazer nem sugerir agora;
+   - tudo **de graça**: nada pago (a licença do SDK também exige mod gratuito).
 
 ## Ler primeiro (nesta ordem)
 
@@ -136,7 +138,6 @@ O backlog está no fim do `HANDOFF.md`. Ideias já oferecidas ao dono e **ainda 
 fazer sem ele pedir):
 - tela de resultado do fim da partida;
 - criar partida pelo menu;
-- progressão / XP;
 - outros modos do CA;
 - faca e granadas;
 - arsenal;
