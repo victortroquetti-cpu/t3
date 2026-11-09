@@ -214,6 +214,11 @@ bool CWeaponTrokGun::IsAutomatic( void ) const
 	return Info().m_bTrokAuto;
 }
 
+bool CWeaponTrokGun::HasADS( void ) const
+{
+	return Info().m_flTrokADSFov > 0.0f;
+}
+
 float CWeaponTrokGun::CurrentSpreadDegrees( void ) const
 {
 	const CHL2MPSWeaponInfo &info = Info();

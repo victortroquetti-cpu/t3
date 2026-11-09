@@ -449,6 +449,55 @@ void TrokBot_NoteDeath( CBaseCombatCharacter *victim )
 }
 
 //-----------------------------------------------------------------------------
+// Áreas onde bots travaram
+//-----------------------------------------------------------------------------
+static ConVar trok_bot_travou_meia_vida( "trok_bot_travou_meia_vida", "120", FCVAR_CHEAT,
+	"Segundos para a lembrança de 'travou aqui' cair pela metade." );
+
+struct StuckMark_t
+{
+	float flCount;
+	float flTime;
+};
+static CUtlMap< unsigned int, StuckMark_t > s_stuck( DefLessFunc( unsigned int ) );
+static string_t s_stuckMap = NULL_STRING;
+
+static void StuckCheckMap( void )
+{
+	if ( s_stuckMap != gpGlobals->mapname )
+	{
+		s_stuck.RemoveAll();
+		s_stuckMap = gpGlobals->mapname;
+	}
+}
+
+float TrokBot_StuckLevel( const CNavArea *area )
+{
+	if ( !area || s_stuck.Count() == 0 )
+		return 0.0f;
+	StuckCheckMap();
+	int i = s_stuck.Find( area->GetID() );
+	if ( i == s_stuck.InvalidIndex() )
+		return 0.0f;
+	const float flHalf = MAX( 1.0f, trok_bot_travou_meia_vida.GetFloat() );
+	return s_stuck[ i ].flCount * powf( 0.5f, ( gpGlobals->curtime - s_stuck[ i ].flTime ) / flHalf );
+}
+
+void TrokBot_NoteStuck( CHL2MPBot *me )
+{
+	CNavArea *area = me->GetLastKnownArea();
+	if ( !area )
+		return;
+	StuckCheckMap();
+	const float flLevel = TrokBot_StuckLevel( area );
+	int i = s_stuck.Find( area->GetID() );
+	if ( i == s_stuck.InvalidIndex() )
+		i = s_stuck.Insert( area->GetID() );
+	s_stuck[ i ].flCount = flLevel + 1.0f;
+	s_stuck[ i ].flTime = gpGlobals->curtime;
+}
+
+//-----------------------------------------------------------------------------
 // Custo de caminho com variedade
 //-----------------------------------------------------------------------------
 
@@ -520,6 +569,11 @@ float CTrokBotPathCost::operator()( CNavArea *area, CNavArea *fromArea, const CN
 	float flDanger = MIN( area->GetDanger( m_me->GetTeamNumber() ), 3.0f );
 	if ( flDanger > 0.0f )
 		flMult *= 1.0f + 0.8f * m_flCaution * flDanger;
+
+	// Bots travaram aqui: cada vez pesa mais; depois de umas três, quase proibido.
+	const float flStuck = TrokBot_StuckLevel( area );
+	if ( flStuck > 0.1f )
+		flMult *= ( flStuck >= 3.0f ) ? 20.0f : 1.0f + 2.0f * flStuck;
 
 	float cost = dist * flMult;
 

@@ -16,6 +16,7 @@
 #include "bot/hl2mp_bot_body.h"
 #include "bot/hl2mp_bot_locomotion.h"
 #include "nav_area.h"
+#include "trok_bot_team.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -99,6 +100,12 @@ public:
 	{
 		m_flLedgeHeight = landingGoal.z - GetFeet().z;
 		return BaseClass::ClimbUpToLedge( landingGoal, landingForward, obstacle );
+	}
+
+	virtual void OnStuck( void )
+	{
+		BaseClass::OnStuck();
+		TrokBot_NoteStuck( static_cast< CHL2MPBot * >( GetBot() ) );
 	}
 
 	virtual void Update( void )

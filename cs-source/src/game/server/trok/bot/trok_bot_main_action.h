@@ -46,6 +46,8 @@ private:
 	void ListenForFootsteps( CHL2MPBot *me );
 	void CheckCorners( CHL2MPBot *me );
 	void UpdateFireWindow( CHL2MPBot *me );
+	void UpdateADS( CHL2MPBot *me );
+	void UpdateSuppression( CHL2MPBot *me );
 
 	// Mira (estado de um "engajamento" com o alvo atual).
 	mutable CHandle< CBaseEntity > m_hAimSubject;
@@ -80,6 +82,14 @@ private:
 
 	CountdownTimer m_listenTimer;
 	CountdownTimer m_intelTimer;
+
+	// Mira pelo cano e fogo de supressão (ideias do NEOTOKYO Rebuild: ShouldAim e
+	// CNEOBotSuppressiveFire)
+	CountdownTimer m_adsTimer;
+	float m_flLastVisibleThreat;
+	bool m_bSuppressArmed;					// viu o inimigo; pode suprimir quando ele sumir
+	float m_flSuppressUntil;
+	Vector m_vecSuppress;
 	float m_flLastInjured;
 	float m_flThreatSeenSince;				// emboscada: há quanto tempo o alvo atual está à vista
 	CHandle< CBaseEntity > m_hThreatSeen;

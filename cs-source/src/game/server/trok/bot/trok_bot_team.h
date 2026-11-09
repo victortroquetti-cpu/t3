@@ -69,6 +69,11 @@ void TrokBot_SetLeader( CHL2MPBot *me, CBasePlayer *pLeader );
 // Perigo (chamado quando alguém morre)
 void TrokBot_NoteDeath( CBaseCombatCharacter *victim );
 
+// Área onde um bot travou: o time aprende e evita (ideia do NEOTOKYO Rebuild,
+// neo_bot_path_reservation). Decai com o tempo; zera ao trocar de mapa.
+void TrokBot_NoteStuck( CHL2MPBot *me );
+float TrokBot_StuckLevel( const CNavArea *area );
+
 // Custo de caminho com variedade: cada bot tem uma "preferência de rota"
 // (corredores que ele gosta mais), evita a rota dos colegas e, se for
 // cauteloso, áreas onde gente morreu há pouco.

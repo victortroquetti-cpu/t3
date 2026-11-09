@@ -9,6 +9,7 @@
 #include "trok_bot_team.h"
 #include "hl2mp_player.h"
 #include "NextBotUtil.h"
+#include "trok/weapon_trok_gun.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -74,6 +75,10 @@ CTrokBotMainAction::CTrokBotMainAction()
 	m_pCornerArea = NULL;
 	m_pCornerPrevArea = NULL;
 	m_iCornerSpot = 0;
+	m_flLastVisibleThreat = -100.0f;
+	m_bSuppressArmed = false;
+	m_flSuppressUntil = 0.0f;
+	m_vecSuppress = vec3_origin;
 }
 
 //-----------------------------------------------------------------------------
@@ -86,6 +91,9 @@ ActionResult< CHL2MPBot > CTrokBotMainAction::Update( CHL2MPBot *me, float inter
 	UpdateFireWindow( me );
 	if ( !m_bFireWindowOpen )
 		me->ReleaseFireButton();
+
+	UpdateSuppression( me );
+	UpdateADS( me );
 
 	if ( trok_bot_audicao.GetBool() )
 		ListenForFootsteps( me );
@@ -402,6 +410,119 @@ void CTrokBotMainAction::UpdateFireWindow( CHL2MPBot *me )
 	}
 
 	m_bFireWindowOpen = ( m_combatPhase == PHASE_BURST );
+}
+
+//-----------------------------------------------------------------------------
+// Mira pelo cano: de média/longa distância, sem pressa, quem tem disciplina mira.
+//-----------------------------------------------------------------------------
+static ConVar trok_bot_mira_cano( "trok_bot_mira_cano", "1", FCVAR_CHEAT, "Bots usam a mira pelo cano." );
+static ConVar trok_bot_mira_cano_dist( "trok_bot_mira_cano_dist", "700", FCVAR_CHEAT, "Distância (u) a partir da qual os bots miram pelo cano." );
+static ConVar trok_bot_supressao( "trok_bot_supressao", "1", FCVAR_CHEAT, "Bots atiram onde o inimigo sumiu por um instante (fogo de supressão)." );
+
+void CTrokBotMainAction::UpdateADS( CHL2MPBot *me )
+{
+	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( me->GetActiveWeapon() );
+	if ( !pGun || !pGun->HasADS() )
+		return;
+
+	const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
+	const float flRange = VisibleThreatRange( me );
+	if ( flRange >= 0.0f )
+		m_flLastVisibleThreat = gpGlobals->curtime;
+
+	const bool bSkilled = profile.flDisciplina >= 0.3f;
+	bool bWant = false;
+	if ( trok_bot_mira_cano.GetBool() && bSkilled )
+	{
+		if ( flRange >= trok_bot_mira_cano_dist.GetFloat() && me->GetIntentionInterface()->ShouldHurry( me ) != ANSWER_YES )
+			bWant = true;
+		if ( gpGlobals->curtime < m_flSuppressUntil )
+			bWant = true;
+		// Perdeu de vista agora: segura a mira um instante (não fica entrando e saindo).
+		if ( pGun->IsADS() && gpGlobals->curtime - m_flLastVisibleThreat < 1.0f )
+			bWant = true;
+	}
+
+	if ( pGun->IsADS() != bWant && m_adsTimer.IsElapsed() )
+	{
+		me->PressAltFireButton( 0.05f ); // o botão 2 alterna a mira nas armas do Trok
+		m_adsTimer.Start( 0.5f );
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Fogo de supressão: o inimigo que estava à vista sumiu atrás de algo; por 1,5 a
+// 2,5 s atira onde ele estava, varrendo de um lado a outro, sem atirar em colega.
+// Erro de 10 graus na direção e 20% na distância, como no NT;RE.
+//-----------------------------------------------------------------------------
+void CTrokBotMainAction::UpdateSuppression( CHL2MPBot *me )
+{
+	if ( !trok_bot_supressao.GetBool() )
+		return;
+
+	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat( false );
+	if ( !threat || !threat->GetEntity() || !threat->GetEntity()->IsAlive() )
+	{
+		m_flSuppressUntil = 0.0f;
+		m_bSuppressArmed = false;
+		return;
+	}
+
+	if ( threat->IsVisibleRecently() && threat->GetTimeSinceLastSeen() < 0.1f )
+	{
+		m_bSuppressArmed = true;
+		m_flSuppressUntil = 0.0f;
+		return;
+	}
+
+	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( me->GetActiveWeapon() );
+	const bool bGunOk = pGun && pGun->IsAutomatic() && pGun->Clip1() >= MAX( 1, pGun->GetMaxClip1() / 4 );
+
+	if ( m_bSuppressArmed && threat->WasEverVisible() )
+	{
+		m_bSuppressArmed = false;
+		const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
+		if ( bGunOk && threat->GetTimeSinceLastSeen() < 1.0f && RandomFloat() < profile.flDisciplina )
+		{
+			const Vector eye = me->EyePosition();
+			Vector target = threat->GetLastKnownPosition() + Vector( 0, 0, 40.0f );
+			Vector dir = target - eye;
+			float flDist = dir.NormalizeInPlace();
+			QAngle ang;
+			VectorAngles( dir, ang );
+			ang.y += RandomFloat( -10.0f, 10.0f );
+			ang.x += RandomFloat( -3.0f, 3.0f );
+			AngleVectors( ang, &dir );
+			m_vecSuppress = eye + dir * flDist * RandomFloat( 0.8f, 1.2f );
+			m_flSuppressUntil = gpGlobals->curtime + RandomFloat( 1.5f, 2.5f );
+		}
+	}
+
+	if ( gpGlobals->curtime >= m_flSuppressUntil || !bGunOk )
+		return;
+
+	// Varre ±64u de lado.
+	const Vector eye = me->EyePosition();
+	Vector toTarget = m_vecSuppress - eye;
+	Vector side( -toTarget.y, toTarget.x, 0.0f );
+	side.NormalizeInPlace();
+	const Vector aim = m_vecSuppress + side * ( 64.0f * sinf( gpGlobals->curtime * 2.5f ) );
+	me->GetBodyInterface()->AimHeadTowards( aim, IBody::IMPORTANT, 0.2f, NULL, "Fogo de supressão" );
+
+	// Só atira olhando para lá e sem colega na frente (rajadas curtas para reconferir).
+	Vector forward;
+	me->EyeVectors( &forward );
+	Vector toAim = aim - eye;
+	toAim.NormalizeInPlace();
+	if ( DotProduct( forward, toAim ) < 0.996f ) // ~5 graus
+		return;
+
+	trace_t tr;
+	UTIL_TraceLine( eye, aim, MASK_SHOT, me, COLLISION_GROUP_NONE, &tr );
+	if ( tr.m_pEnt && tr.m_pEnt->IsPlayer() && tr.m_pEnt->GetTeamNumber() == me->GetTeamNumber() && me->GetTeamNumber() > TEAM_SPECTATOR )
+		return;
+
+	me->PressFireButton( 0.1f );
 }
 
 void CTrokBotMainAction::Dodge( CHL2MPBot *me )

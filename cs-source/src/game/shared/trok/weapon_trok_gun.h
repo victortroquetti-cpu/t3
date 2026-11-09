@@ -41,6 +41,7 @@ public:
 	float GetMoveSpeedScale( void ) const;		// peso da arma × (mirando ? lentidão da mira : 1)
 	float CurrentSpreadDegrees( void ) const;
 	bool IsAutomatic( void ) const;
+	bool HasADS( void ) const;
 #ifdef CLIENT_DLL
 	// Para o HUD: 0 = normal, 1 = correndo com a arma abaixada / mirando pelo cano.
 	float GetSprintBlend( void ) const { return m_flViewmodelSprint; }
