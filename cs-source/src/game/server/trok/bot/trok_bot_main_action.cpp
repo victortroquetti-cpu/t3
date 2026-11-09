@@ -264,10 +264,18 @@ Vector CTrokBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBase
 	}
 	m_flAimLastQuery = flNow;
 
+	// Tamanho do alvo na tela (graus da meia largura do tronco, ~13u).
+	// Gente mira mais fino em alvo pequeno (longe) e leva mais tempo para isso
+	// (lei de Fitts): o erro mínimo acompanha o tamanho do alvo e a meia-vida
+	// cresce com a dificuldade do alvo.
+	float flTargetHalfWidth = RAD2DEG( atanf( 13.0f / flRange ) );
+	float flErrorFloor = MIN( profile.flMiraErroMinimo, profile.flMiraPrecisaoAlvo * flTargetHalfWidth );
+	float flIndex = log2f( 1.0f + m_flAimInitialError / MAX( 0.05f, flTargetHalfWidth ) );
+	float flHalfLife = MAX( 0.05f, profile.flMiraMeiaVida ) * ( 0.6f + 0.2f * flIndex );
+
 	// Foco: o erro cai pela metade a cada meia-vida, até o mínimo.
 	float t = flNow - m_flAimStart;
-	float flError = profile.flMiraErroMinimo +
-		( m_flAimInitialError - profile.flMiraErroMinimo ) * powf( 0.5f, t / MAX( 0.05f, profile.flMiraMeiaVida ) );
+	float flError = flErrorFloor + ( m_flAimInitialError - flErrorFloor ) * powf( 0.5f, t / flHalfLife );
 
 	// Alvo atravessando a visão rápido é difícil de acompanhar.
 	Vector toSubject = subject->WorldSpaceCenter() - eye;

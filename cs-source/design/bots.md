@@ -160,6 +160,30 @@ Testes que medem "parece gente":
 6. **Parkour.** Num mapa com caixas e pilastras, `trok_bot_tatico_mostrar` deve pintar de verde os lugares de difícil acesso, e bots com `uso_tatico` alto devem subir neles.
 7. **Teste cego.** Alguém assiste a demo sem saber quem é bot e tenta adivinhar.
 
+## Simulador (comparação sem o jogo)
+
+`tools/botsim/botsim.py` reimplementa, com as mesmas fórmulas e constantes, as decisões do bot
+padrão (constantes do SDK da Valve) e do bot do Trok. Ele roda os dois nos mesmos cenários
+sintéticos: percepção, duelo de mira, strafe, rotas de 8 bots e nota tática. `tools/botsim/report.py`
+monta a página com os gráficos. Não substitui o jogo: não tem física real, nav de mapa real,
+recuo nem partidas inteiras.
+
+```
+python3 -I cs-source/tools/botsim/botsim.py botsim_result.json
+python3 -I cs-source/tools/botsim/report.py botsim_result.json botsim_report.html
+```
+
+Ele já pegou um erro de ajuste. Na primeira versão, o erro mínimo da mira era fixo em graus e,
+de longe, ficava maior que o corpo do alvo (o bot nunca acertava a 1500u). O giro baixo também
+não acompanhava ADAD de perto, por causa da desaceleração do NextBot perto do alvo. Ajustes:
+
+- `mira_precisao_alvo`: o erro mínimo não passa disto × a meia largura do alvo na tela, e a meia-vida cresce com a dificuldade do alvo (lei de Fitts).
+- `giro_max` subiu: 400 / 600 / 800 / 950 °/s. O padrão do NextBot é 1000.
+- `intervalo_rastreio` caiu: 0,40 / 0,20 / 0,12 / 0,08 s.
+
+Resultado na simulação, alvo parado a 300u: o padrão acerta ~93% em **todos** os níveis (mira o
+centro exato); o Trok vai de ~36% (fácil) a ~87% (expert) e acerta a cabeça às vezes.
+
 ## O que ainda não foi verificado
 
 O código passou na checagem de sintaxe e tipos (`trok.py check`) contra o SDK, mas **ainda não

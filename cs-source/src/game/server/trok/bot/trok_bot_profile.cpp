@@ -78,11 +78,11 @@ static ConVar trok_bot_personalidade( "trok_bot_personalidade", "0.12", FCVAR_GA
 // Base: tempo de reação visual humano ~0.2-0.3 s; jogadores fracos passam de 0.4 s.
 static const TrokBotProfile_t s_DefaultProfiles[ TROK_BOT_LEVELS ] =
 {
-	//  nível      reação         perc  campo  aud   erro0  erroMin meiaV  rastr  ferido cabeça giro  interv  strafe      agach  agress tático
-	{ "facil",    0.45f, 0.70f,   0.60f, 100,  0.6f,  9.0f,  2.5f,   0.60f, 4.0f,  6.0f,  0.05f, 180,  0.45f,  0.0f, 0.0f, 0.00f, 0.60f, 0.10f },
-	{ "normal",   0.30f, 0.45f,   0.85f, 110,  0.8f,  6.0f,  1.5f,   0.40f, 3.0f,  4.0f,  0.15f, 300,  0.25f,  0.5f, 1.1f, 0.05f, 0.50f, 0.40f },
-	{ "dificil",  0.22f, 0.32f,   1.00f, 120,  1.0f,  4.0f,  0.9f,   0.28f, 2.0f,  3.0f,  0.30f, 450,  0.15f,  0.35f, 0.8f, 0.12f, 0.50f, 0.70f },
-	{ "expert",   0.17f, 0.25f,   1.15f, 130,  1.1f,  3.0f,  0.6f,   0.20f, 1.5f,  2.5f,  0.45f, 600,  0.10f,  0.25f, 0.6f, 0.18f, 0.50f, 0.90f },
+	//  nível      reação         perc  campo  aud   erro0  erroMin precAlvo meiaV  rastr  ferido cabeça giro  interv  strafe      agach  agress tático
+	{ "facil",    0.45f, 0.70f,   0.60f, 100,  0.6f,  9.0f,  2.5f,   1.00f,  0.60f, 4.0f,  6.0f,  0.05f, 400,  0.40f,  0.0f, 0.0f, 0.00f, 0.60f, 0.10f },
+	{ "normal",   0.30f, 0.45f,   0.85f, 110,  0.8f,  6.0f,  1.5f,   0.75f,  0.40f, 3.0f,  4.0f,  0.15f, 600,  0.20f,  0.5f, 1.1f, 0.05f, 0.50f, 0.40f },
+	{ "dificil",  0.22f, 0.32f,   1.00f, 120,  1.0f,  4.0f,  0.9f,   0.60f,  0.28f, 2.0f,  3.0f,  0.30f, 800,  0.12f,  0.35f, 0.8f, 0.12f, 0.50f, 0.70f },
+	{ "expert",   0.17f, 0.25f,   1.15f, 130,  1.1f,  3.0f,  0.6f,   0.50f,  0.20f, 1.5f,  2.5f,  0.45f, 950,  0.08f,  0.25f, 0.6f, 0.18f, 0.50f, 0.90f },
 };
 
 static TrokBotProfile_t s_Profiles[ TROK_BOT_LEVELS ];
@@ -121,6 +121,7 @@ void TrokBot_ReloadProfiles( void )
 		ReadFloat( pLevel, "audicao", &p.flAudicao );
 		ReadFloat( pLevel, "mira_erro_inicial", &p.flMiraErroInicial );
 		ReadFloat( pLevel, "mira_erro_minimo", &p.flMiraErroMinimo );
+		ReadFloat( pLevel, "mira_precisao_alvo", &p.flMiraPrecisaoAlvo );
 		ReadFloat( pLevel, "mira_meia_vida", &p.flMiraMeiaVida );
 		ReadFloat( pLevel, "mira_rastreio", &p.flMiraRastreio );
 		ReadFloat( pLevel, "mira_tremor_ferido", &p.flMiraTremorFerido );
@@ -170,6 +171,7 @@ void TrokBot_BuildProfile( int iDificuldade, TrokBotProfile_t *pOut )
 	p.flAudicao				= Jitter( p.flAudicao, v );
 	p.flMiraErroInicial		= Jitter( p.flMiraErroInicial, v );
 	p.flMiraErroMinimo		= Jitter( p.flMiraErroMinimo, v );
+	p.flMiraPrecisaoAlvo	= Jitter( p.flMiraPrecisaoAlvo, v );
 	p.flMiraMeiaVida		= Jitter( p.flMiraMeiaVida, v );
 	p.flMiraRastreio		= Jitter( p.flMiraRastreio, v );
 	p.flChanceCabeca		= clamp( Jitter( p.flChanceCabeca, v * 2.0f ), 0.0f, 1.0f );

@@ -45,6 +45,7 @@ struct TrokBotProfile_t
 	// --- Mira ---
 	float	flMiraErroInicial;		// graus: erro ao começar a mirar num alvo novo
 	float	flMiraErroMinimo;		// graus: erro que sobra mesmo mirando há muito tempo
+	float	flMiraPrecisaoAlvo;		// o erro mínimo também não passa disto × meia largura do alvo (alvo longe = mira mais fina, como gente faz)
 	float	flMiraMeiaVida;			// s: tempo para o erro cair pela metade (foco)
 	float	flMiraRastreio;			// graus de erro por 100 graus/s de movimento angular do alvo
 	float	flMiraTremorFerido;		// graus somados ao erro quando leva dano

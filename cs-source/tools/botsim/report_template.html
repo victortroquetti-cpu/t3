@@ -1,0 +1,530 @@
+<title>Bots: padrão x Trok</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: coluna de leitura de ~980px; cada teste é uma seção com pergunta, gráfico e leitura. */
+:root {
+  --bg: #f7f8f9;
+  --panel: #ffffff;
+  --ink: #15191e;
+  --ink-2: #4c5560;
+  --ink-3: #79828c;
+  --rule: #dfe3e7;
+  --grid: #e9ecef;
+  --default: #eb6834;
+  --trok: #2a78d6;
+  --heat-0: #eef3f9;
+  --heat-1: #0e3f7a;
+  --font-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #16181b; --panel: #1d2024; --ink: #eef0f2; --ink-2: #b6bdc5; --ink-3: #87909a;
+    --rule: #2f343a; --grid: #262a2f; --default: #d95926; --trok: #3987e5;
+    --heat-0: #1f2833; --heat-1: #8cc0ff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #16181b; --panel: #1d2024; --ink: #eef0f2; --ink-2: #b6bdc5; --ink-3: #87909a;
+  --rule: #2f343a; --grid: #262a2f; --default: #d95926; --trok: #3987e5;
+  --heat-0: #1f2833; --heat-1: #8cc0ff; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+main { max-width: 980px; margin: 0 auto; display: grid; gap: 44px; }
+h1, h2 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: 0.01em; }
+h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.1; }
+h2 { font-size: 23px; line-height: 1.2; }
+h3 { font: 600 14px/1.3 var(--font-body); margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--ink-2); font-size: 16px; }
+.eyebrow { font: 500 12px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+header { display: grid; gap: 14px; }
+.note { border-left: 3px solid var(--rule); padding: 2px 0 2px 14px; color: var(--ink-2); font-size: 14px; max-width: 72ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--ink-2); align-items: center; }
+.key { display: inline-flex; align-items: center; gap: 8px; }
+.swatch { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+.swatch.default { background: var(--default); }
+.swatch.trok { background: var(--trok); }
+
+/* Resumo */
+.summary { border: 1px solid var(--rule); border-radius: 10px; background: var(--panel); overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 500 12px/1.3 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+tr:last-child td { border-bottom: 0; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td .d { color: var(--default); font-weight: 500; }
+td .t { color: var(--trok); font-weight: 500; }
+
+section { display: grid; gap: 16px; }
+.section-head { display: grid; gap: 8px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button {
+  font: 500 13px/1 var(--font-body); color: var(--ink-2); background: transparent; border: 0;
+  padding: 9px 14px; cursor: pointer; border-right: 1px solid var(--rule);
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg button:focus-visible { outline: 2px solid var(--trok); outline-offset: -2px; }
+.seg-label { font-size: 13px; color: var(--ink-3); }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 720px) { .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); } }
+.chart { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 14px 10px; display: grid; gap: 6px; min-width: 0; position: relative; }
+.chart .sub { font-size: 13px; color: var(--ink-3); }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.stat-row { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); }
+.stat-row b { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink); }
+.read { color: var(--ink-2); font-size: 14.5px; }
+.read strong { color: var(--ink); font-weight: 600; }
+
+svg text { font-family: var(--font-mono); font-size: 11px; fill: var(--ink-3); }
+svg .axis line, svg .gridline { stroke: var(--grid); stroke-width: 1; }
+svg .baseline { stroke: var(--rule); stroke-width: 1; }
+svg .line-default { fill: none; stroke: var(--default); stroke-width: 2; }
+svg .line-trok { fill: none; stroke: var(--trok); stroke-width: 2; }
+svg .bar-default { fill: var(--default); }
+svg .bar-trok { fill: var(--trok); }
+svg .label { fill: var(--ink-2); font-size: 11px; }
+svg .label-strong { fill: var(--ink); font-size: 11px; font-weight: 500; }
+svg .cross { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
+svg .hit { fill: transparent; cursor: crosshair; }
+svg .wall { fill: var(--ink-3); opacity: 0.55; }
+svg .cell-text { fill: var(--ink); font-size: 9px; }
+
+.tip {
+  position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); border-radius: 6px;
+  padding: 7px 9px; font: 400 12px/1.4 var(--font-mono); white-space: nowrap; z-index: 5;
+  transform: translate(-50%, calc(-100% - 10px));
+}
+.tip[hidden] { display: none !important; }
+details { border: 1px solid var(--rule); border-radius: 10px; background: var(--panel); }
+details summary { cursor: pointer; padding: 12px 14px; font-weight: 500; font-size: 14px; }
+details summary:focus-visible { outline: 2px solid var(--trok); outline-offset: 2px; }
+details .scroll { overflow-x: auto; border-top: 1px solid var(--rule); }
+code { font-family: var(--font-mono); font-size: 13px; background: var(--grid); padding: 1px 5px; border-radius: 4px; }
+.limits { display: grid; gap: 8px; }
+.limits ul { margin: 0; padding-left: 20px; color: var(--ink-2); display: grid; gap: 4px; max-width: 72ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Mod Trok · simulação dos modelos de decisão</span>
+    <h1>Bots: padrão do HL2MP x Trok</h1>
+    <p class="lede">Os dois bots rodam os mesmos cenários milhares de vezes com as mesmas fórmulas e constantes do código: o padrão vem do SDK da Valve, o nosso vem de <code>trok/bot</code>. Não é o jogo rodando. É o que cada cérebro decide, medido.</p>
+    <div class="legend" aria-label="Legenda">
+      <span class="key"><span class="swatch default"></span>Bot padrão (HL2MP / NextBot)</span>
+      <span class="key"><span class="swatch trok"></span>Bot do Trok</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="h-resumo">
+    <div class="section-head">
+      <span class="eyebrow">Resumo</span>
+      <h2 id="h-resumo">O que mudou, em números</h2>
+    </div>
+    <div class="summary"><table id="summary"></table></div>
+  </section>
+
+  <section aria-labelledby="h-perc">
+    <div class="section-head">
+      <span class="eyebrow">Teste 1 · percepção</span>
+      <h2 id="h-perc">Quanto tempo até perceber um inimigo</h2>
+      <p class="read">Chance de já ter percebido o inimigo (eixo vertical) ao longo dos segundos em que ele está à vista. O padrão percebe qualquer um que esteja no campo de visão, com o mesmo atraso fixo. O nosso depende de distância, exposição, luz, movimento e de onde o inimigo está na visão.</p>
+    </div>
+    <div class="controls">
+      <span class="seg-label">Nível dos bots</span>
+      <div class="seg" role="group" aria-label="Nível dos bots no teste de percepção" id="seg-perc"></div>
+    </div>
+    <div class="grid-2" id="perc-charts"></div>
+  </section>
+
+  <section aria-labelledby="h-duel">
+    <div class="section-head">
+      <span class="eyebrow">Teste 2 · mira</span>
+      <h2 id="h-duel">Duelo de 3 segundos contra um alvo</h2>
+      <p class="read">O alvo aparece 20° fora da mira, parado ou fazendo ADAD (troca de lado a cada 0,3 a 0,9 s, a 190u/s). Fuzil com cone de 2°, 10 tiros por segundo. Contamos a fração de tiros que acertam o corpo ou a cabeça.</p>
+    </div>
+    <div class="grid-2">
+      <div class="chart" id="duel-level"></div>
+      <div class="chart" id="duel-first"></div>
+    </div>
+    <div class="controls">
+      <span class="seg-label">Nível dos bots</span>
+      <div class="seg" role="group" aria-label="Nível dos bots no duelo" id="seg-duel"></div>
+    </div>
+    <div class="chart" id="duel-dist"></div>
+    <details>
+      <summary>Tabela completa do duelo</summary>
+      <div class="scroll"><table id="duel-table"></table></div>
+    </details>
+  </section>
+
+  <section aria-labelledby="h-strafe">
+    <div class="section-head">
+      <span class="eyebrow">Teste 3 · movimento em combate</span>
+      <h2 id="h-strafe">Strafe: tremedeira x lados de verdade</h2>
+      <p class="read">Posição lateral do bot durante 6 segundos de tiroteio. O padrão sorteia esquerda, direita ou nada a cada 0,1 s. O nosso escolhe um lado e segura, troca, e às vezes para para atirar parado.</p>
+    </div>
+    <div class="controls">
+      <span class="seg-label">Nível dos bots</span>
+      <div class="seg" role="group" aria-label="Nível dos bots no strafe" id="seg-strafe"></div>
+    </div>
+    <div class="chart" id="strafe-chart"></div>
+  </section>
+
+  <section aria-labelledby="h-rotas">
+    <div class="section-head">
+      <span class="eyebrow">Teste 4 · rotas</span>
+      <h2 id="h-rotas">8 bots do mesmo time saindo do spawn para o mesmo lugar</h2>
+      <p class="read">Mapa sintético com três corredores entre o spawn (esquerda) e o objetivo (direita); o do meio é o mais curto. Cor = em média quantos dos 8 bots passaram por cada célula, em 300 rodadas. O nosso também sorteia estilos (entry, lurker, âncora, suporte, equilibrado) a cada rodada.</p>
+    </div>
+    <div class="grid-2" id="route-maps"></div>
+    <div class="grid-2">
+      <div class="chart" id="route-lanes"></div>
+      <div class="chart" id="route-stats"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-tat">
+    <div class="section-head">
+      <span class="eyebrow">Teste 5 · lugares estratégicos</span>
+      <h2 id="h-tat">Nota tática num mapa com laboratório só por pulo</h2>
+      <p class="read">Mapa sintético com chão, caixas, uma plataforma com degraus e um laboratório alto que só se alcança pulando 3 pilastras quebradas. O mesmo cálculo do código do Trok (regiões, entradas, pulos de acesso, exposição) dá a nota de cada lugar. O bot padrão não avalia lugares: ele só caça, então não há o que comparar aqui.</p>
+    </div>
+    <div class="grid-2">
+      <div class="chart" id="tact-map"></div>
+      <div class="chart" id="tact-bars"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-lim" class="limits">
+    <span class="eyebrow">Leia antes de concluir</span>
+    <h2 id="h-lim">O que este teste prova e o que não prova</h2>
+    <ul>
+      <li>Prova como cada cérebro decide: quando percebe, onde mira, como faz strafe, que rota escolhe e que lugar acha bom. As fórmulas e constantes são as mesmas do código de cada bot.</li>
+      <li>Não prova o jogo: física e colisão reais, nav mesh de mapas reais, recuo das armas, animação, rede e o comportamento de partidas inteiras. Isso só o build rodando mostra.</li>
+      <li>O simulador já serviu: na primeira rodada ele mostrou que o nosso bot errava demais de longe (erro mínimo maior que o corpo do alvo) e não acompanhava ADAD de perto (giro baixo). Corrigimos no código antes desta página: o erro mínimo agora acompanha o tamanho do alvo na tela e o giro subiu.</li>
+      <li>Para rodar de novo: <code>python3 cs-source/tools/botsim/botsim.py</code> e <code>python3 cs-source/tools/botsim/report.py</code>.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+const DATA = /*DATA*/null;
+const LEVELS = ["facil", "normal", "dificil", "expert"];
+const LEVEL_NAME = { facil: "Fácil", normal: "Normal", dificil: "Difícil", expert: "Expert" };
+const NS = "http://www.w3.org/2000/svg";
+const pct = v => v == null ? "—" : Math.round(v * 100) + "%";
+const sec = v => v == null ? "nunca (6 s)" : v.toFixed(2).replace(".", ",") + " s";
+const num = (v, d = 2) => v.toFixed(d).replace(".", ",");
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function svgBox(container, w, h) {
+  const s = el("svg", { viewBox: `0 0 ${w} ${h}`, role: "img" });
+  container.appendChild(s);
+  return s;
+}
+function tipFor(container) {
+  let t = container.querySelector(".tip");
+  if (!t) { t = document.createElement("div"); t.className = "tip"; t.hidden = true; container.appendChild(t); }
+  return t;
+}
+function showTip(container, svg, x, y, html) {
+  const t = tipFor(container);
+  const r = svg.getBoundingClientRect(), c = container.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  const px = r.left - c.left + x * r.width / vb.width;
+  const py = r.top - c.top + y * r.height / vb.height;
+  t.innerHTML = html;
+  t.style.left = Math.max(70, Math.min(c.width - 70, px)) + "px";
+  t.style.top = py + "px";
+  t.hidden = false;
+}
+function hideTip(container) { const t = container.querySelector(".tip"); if (t) t.hidden = true; }
+
+function segmented(id, options, initial, onChange) {
+  const root = document.getElementById(id);
+  options.forEach(o => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = LEVEL_NAME[o] || o; b.id = id + "-" + o;
+    b.setAttribute("aria-pressed", o === initial ? "true" : "false");
+    b.addEventListener("click", () => {
+      root.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false"));
+      b.setAttribute("aria-pressed", "true");
+      onChange(o);
+    });
+    root.appendChild(b);
+  });
+}
+
+/* ---------------- Resumo ---------------- */
+function buildSummary() {
+  const P = DATA.percepcao, D = DATA.duelo, S = DATA.strafe, R = DATA.rotas, T = DATA.tatico;
+  const sc = id => P.find(s => s.id === id);
+  const duel = (dist, strafe) => D.find(r => r.dist === dist && r.strafe === strafe).res;
+  const B = sc("B").curvas, Dp = sc("D").curvas;
+  const d300 = duel(300, false);
+  const rows = [
+    ["Agachado atrás de caixa, só a cabeça, 1500u (expert)",
+      `<span class="d">vê ${pct(B.padrao_expert.p1s)} em 1 s</span> · <span class="t">vê ${pct(B.trok_expert.p1s)} em 1 s, ${pct(B.trok_expert.p6s)} em 6 s</span>`,
+      "O padrão enxerga até um rosto atrás de caixa a 1500u em 0,25 s."],
+    ["Correndo na periferia, 52° do centro (normal)",
+      `<span class="d">vê ${pct(Dp.padrao_normal.p6s)}</span> · <span class="t">vê ${pct(Dp.trok_normal.p6s)} (mediana ${sec(Dp.trok_normal.mediana)})</span>`,
+      "O padrão é cego fora dos 90° de FOV."],
+    ["Acerto contra alvo parado a 300u, do fácil ao expert",
+      `<span class="d">${pct(d300.padrao_facil.acerto)} → ${pct(d300.padrao_expert.acerto)}</span> · <span class="t">${pct(d300.trok_facil.acerto)} → ${pct(d300.trok_expert.acerto)}</span>`,
+      "No padrão, a dificuldade quase não muda a mira: ele mira o centro exato."],
+    ["Tiros na cabeça (expert, parado, 300u)",
+      `<span class="d">${pct(d300.padrao_expert.cabeca)}</span> · <span class="t">${pct(d300.trok_expert.cabeca)}</span>`,
+      "O padrão nunca mira a cabeça."],
+    ["Trocas de lado no strafe por segundo (normal)",
+      `<span class="d">${num(S.padrao_normal.trocas_por_s, 1)}</span> · <span class="t">${num(S.trok_normal.trocas_por_s, 1)}</span>`,
+      "O padrão treme; o nosso faz lados de verdade."],
+    ["Bots no mesmo corredor / sobreposição de caminho",
+      `<span class="d">${pct(R.padrao.maioria_mesmo_corredor)} / ${pct(R.padrao.sobreposicao)}</span> · <span class="t">${pct(R.trok.maioria_mesmo_corredor)} / ${pct(R.trok.sobreposicao)}</span>`,
+      "No padrão, todo mundo em fila pela mesma linha."],
+    ["Nota do laboratório só por pulos x chão",
+      `<span class="d">sem avaliação</span> · <span class="t">${num(T.resumo["Laboratório (só por 3 pilastras)"].media)} x ${num(T.resumo["Chão"].media)}</span>`,
+      `Acesso: ${T.laboratorio.acesso} pulos, ${T.laboratorio.entradas_pe} entradas a pé.`],
+  ];
+  const t = document.getElementById("summary");
+  t.innerHTML = `<thead><tr><th>Situação</th><th><span style="color:var(--default)">Padrão</span> · <span style="color:var(--trok)">Trok</span></th><th>Leitura</th></tr></thead><tbody>${
+    rows.map(r => `<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td>${r[2]}</td></tr>`).join("")}</tbody>`;
+}
+
+/* ---------------- Percepção ---------------- */
+function lineChart(container, series, opts) {
+  container.querySelectorAll("svg").forEach(s => s.remove());
+  const W = 440, H = 230, m = { l: 40, r: 14, t: 10, b: 30 };
+  const svg = svgBox(container, W, H);
+  const xMax = opts.xMax, x = v => m.l + v / xMax * (W - m.l - m.r), y = v => H - m.b - v * (H - m.t - m.b);
+  [0, 0.25, 0.5, 0.75, 1].forEach(v => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: v === 0 ? "baseline" : "gridline" }, svg);
+    el("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = Math.round(v * 100) + "%";
+  });
+  for (let s = 0; s <= xMax; s += 1) el("text", { x: x(s), y: H - 10, "text-anchor": "middle" }, svg).textContent = s + " s";
+  series.forEach(se => {
+    const d = se.t.map((tv, i) => `${i ? "L" : "M"}${x(tv).toFixed(1)},${y(se.p[i]).toFixed(1)}`).join("");
+    el("path", { d, class: se.cls }, svg);
+  });
+  const cross = el("line", { y1: m.t, y2: H - m.b, class: "cross", visibility: "hidden" }, svg);
+  const hit = el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, class: "hit" }, svg);
+  const move = ev => {
+    const r = svg.getBoundingClientRect();
+    const vx = (ev.clientX - r.left) * W / r.width;
+    const tv = Math.max(0, Math.min(xMax, (vx - m.l) / (W - m.l - m.r) * xMax));
+    const i = Math.round(tv * 10);
+    cross.setAttribute("x1", x(i / 10)); cross.setAttribute("x2", x(i / 10)); cross.setAttribute("visibility", "visible");
+    showTip(container, svg, x(i / 10), m.t + 10, `${num(i / 10, 1)} s<br>` + series.map(s => `${s.name}: ${pct(s.p[i])}`).join("<br>"));
+  };
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(container); });
+}
+function renderPerception(level) {
+  const root = document.getElementById("perc-charts");
+  if (!root.children.length) {
+    DATA.percepcao.forEach(sc => {
+      const c = document.createElement("div"); c.className = "chart"; c.id = "perc-" + sc.id;
+      c.innerHTML = `<h3>${sc.id} · ${sc.nome}</h3><div class="sub">${sc.desc}</div><div class="stat-row"></div>`;
+      root.appendChild(c);
+    });
+  }
+  DATA.percepcao.forEach(sc => {
+    const c = document.getElementById("perc-" + sc.id);
+    const a = sc.curvas["padrao_" + level], b = sc.curvas["trok_" + level];
+    lineChart(c, [
+      { name: "Padrão", cls: "line-default", t: a.t, p: a.p },
+      { name: "Trok", cls: "line-trok", t: b.t, p: b.p },
+    ], { xMax: 6 });
+    c.querySelector(".stat-row").innerHTML =
+      `<span>Padrão: mediana <b>${sec(a.mediana)}</b></span><span>Trok: mediana <b>${sec(b.mediana)}</b>, vê em 6 s <b>${pct(b.p6s)}</b></span>`;
+  });
+}
+
+/* ---------------- Duelo ---------------- */
+function groupedBars(container, title, sub, groups, valueKey, fmt, maxV, note, width) {
+  container.innerHTML = `<h3>${title}</h3><div class="sub">${sub}</div>`;
+  const W = width || 460, H = 240, m = { l: 40, r: 10, t: 16, b: 40 };
+  const svg = svgBox(container, W, H);
+  const y = v => H - m.b - v / maxV * (H - m.t - m.b);
+  const ticks = maxV <= 1 ? [0, 0.25, 0.5, 0.75, 1] : [0, maxV / 4, maxV / 2, 3 * maxV / 4, maxV];
+  ticks.forEach(v => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: v === 0 ? "baseline" : "gridline" }, svg);
+    el("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = fmt(v, true);
+  });
+  const gw = (W - m.l - m.r) / groups.length, bw = Math.min(26, gw / 3);
+  groups.forEach((g, i) => {
+    const cx = m.l + gw * (i + 0.5);
+    [["padrao", -1, "bar-default", "Padrão"], ["trok", 1, "bar-trok", "Trok"]].forEach(([k, side, cls, name]) => {
+      const v = g[k][valueKey];
+      const bx = cx + (side < 0 ? -bw - 1 : 1);
+      if (v == null) {
+        el("text", { x: bx + bw / 2, y: y(0) - 4, "text-anchor": "middle", class: "label" }, svg).textContent = "—";
+        return;
+      }
+      const top = y(v), h = Math.max(1, y(0) - top);
+      const r = Math.min(4, h / 2, bw / 2);
+      el("path", { d: `M${bx},${y(0)}V${top + r}Q${bx},${top} ${bx + r},${top}H${bx + bw - r}Q${bx + bw},${top} ${bx + bw},${top + r}V${y(0)}Z`, class: cls }, svg);
+      const hit = el("rect", { x: bx - 2, y: m.t, width: bw + 4, height: H - m.t - m.b, class: "hit" }, svg);
+      hit.addEventListener("pointermove", () => showTip(container, svg, bx + bw / 2, top, `${g.label}<br>${name}: ${fmt(v)}`));
+      hit.addEventListener("pointerleave", () => hideTip(container));
+    });
+    g.label.split("\n").forEach((line, k) =>
+      el("text", { x: cx, y: H - m.b + 15 + k * 13, "text-anchor": "middle", class: k ? "" : "label" }, svg).textContent = line);
+  });
+  if (note) { const n = document.createElement("div"); n.className = "sub"; n.textContent = note; container.appendChild(n); }
+}
+function duelRes(dist, strafe) { return DATA.duelo.find(r => r.dist === dist && r.strafe === strafe).res; }
+function renderDuelStatic() {
+  const r300 = duelRes(300, false);
+  groupedBars(document.getElementById("duel-level"), "Acerto por nível", "Alvo parado a 300u", LEVELS.map(l => ({
+    label: LEVEL_NAME[l], padrao: r300["padrao_" + l], trok: r300["trok_" + l],
+  })), "acerto", (v, axis) => Math.round(v * 100) + "%", 1, "No padrão a barra quase não muda: mira perfeita no centro em todos os níveis.");
+  const rs = duelRes(800, true);
+  groupedBars(document.getElementById("duel-first"), "Tempo até o primeiro acerto", "Alvo fazendo ADAD a 800u (mediana)", LEVELS.map(l => ({
+    label: LEVEL_NAME[l], padrao: rs["padrao_" + l], trok: rs["trok_" + l],
+  })), "primeiro", (v, axis) => axis ? num(v, 1) + " s" : num(v) + " s", 2.5, "O nosso precisa de tempo de foco; o padrão acerta em ~0,35 s em qualquer nível.");
+  const t = document.getElementById("duel-table");
+  let html = "<thead><tr><th>Alvo</th><th>Distância</th><th>Nível</th><th>Acerto</th><th>Cabeça</th><th>1º acerto</th><th>Sem acerto em 3 s</th></tr></thead><tbody>";
+  DATA.duelo.forEach(row => LEVELS.forEach(l => {
+    const a = row.res["padrao_" + l], b = row.res["trok_" + l];
+    html += `<tr><td>${row.strafe ? "ADAD" : "Parado"}</td><td class="num">${row.dist}u</td><td>${LEVEL_NAME[l]}</td>
+      <td class="num"><span class="d">${pct(a.acerto)}</span> · <span class="t">${pct(b.acerto)}</span></td>
+      <td class="num"><span class="d">${pct(a.cabeca)}</span> · <span class="t">${pct(b.cabeca)}</span></td>
+      <td class="num"><span class="d">${a.primeiro == null ? "—" : num(a.primeiro) + " s"}</span> · <span class="t">${b.primeiro == null ? "—" : num(b.primeiro) + " s"}</span></td>
+      <td class="num"><span class="d">${pct(a.sem_acerto)}</span> · <span class="t">${pct(b.sem_acerto)}</span></td></tr>`;
+  }));
+  t.innerHTML = html + "</tbody>";
+}
+function renderDuel(level) {
+  const groups = [];
+  [false, true].forEach(strafe => [300, 800, 1500].forEach(dist => {
+    const r = duelRes(dist, strafe);
+    groups.push({ label: `${dist}u\n${strafe ? "ADAD" : "parado"}`, padrao: r["padrao_" + level], trok: r["trok_" + level] });
+  }));
+  groupedBars(document.getElementById("duel-dist"), `Acerto por distância · ${LEVEL_NAME[level]}`, "Fração dos tiros que acertam, em 3 s de duelo",
+    groups, "acerto", (v) => Math.round(v * 100) + "%", 1, null, 900);
+}
+
+/* ---------------- Strafe ---------------- */
+function renderStrafe(level) {
+  const c = document.getElementById("strafe-chart");
+  const a = DATA.strafe["padrao_" + level], b = DATA.strafe["trok_" + level];
+  c.innerHTML = `<h3>Posição lateral (u) · ${LEVEL_NAME[level]}</h3><div class="stat-row">
+    <span>Padrão: <b>${num(a.trocas_por_s, 1)}</b> trocas/s, deslocamento <b>${Math.round(a.amplitude_u)}u</b></span>
+    <span>Trok: <b>${num(b.trocas_por_s, 1)}</b> trocas/s, deslocamento <b>${Math.round(b.amplitude_u)}u</b></span></div>`;
+  const W = 900, H = 240, m = { l: 46, r: 14, t: 10, b: 28 };
+  const svg = svgBox(c, W, H);
+  const all = a.trace.concat(b.trace);
+  const lim = Math.max(40, Math.ceil(Math.max(...all.map(Math.abs)) / 50) * 50);
+  const n = a.trace.length, dt = 6 / n;
+  const x = i => m.l + i / (n - 1) * (W - m.l - m.r), y = v => m.t + (lim - v) / (2 * lim) * (H - m.t - m.b);
+  [-lim, -lim / 2, 0, lim / 2, lim].forEach(v => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: v === 0 ? "baseline" : "gridline" }, svg);
+    el("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = Math.round(v);
+  });
+  for (let s = 0; s <= 6; s++) el("text", { x: m.l + s / 6 * (W - m.l - m.r), y: H - 8, "text-anchor": "middle" }, svg).textContent = s + " s";
+  [[a.trace, "line-default"], [b.trace, "line-trok"]].forEach(([tr, cls]) =>
+    el("path", { d: tr.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(""), class: cls }, svg));
+  el("text", { x: x(n - 1) - 4, y: y(a.trace[n - 1]) - 6, "text-anchor": "end", class: "label-strong" }, svg).textContent = "Padrão";
+  el("text", { x: x(n - 1) - 4, y: y(b.trace[n - 1]) + 14, "text-anchor": "end", class: "label-strong" }, svg).textContent = "Trok";
+}
+
+/* ---------------- Rotas ---------------- */
+function heatMap(container, map, values, maxV, labels) {
+  const rows = map.length, cols = map[0].length, cs = 14;
+  const W = cols * cs, H = rows * cs;
+  const svg = svgBox(container, W, H);
+  const cs0 = getComputedStyle(document.documentElement);
+  const c0 = cs0.getPropertyValue("--heat-0").trim(), c1 = cs0.getPropertyValue("--heat-1").trim();
+  const mix = t => {
+    const h = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
+    const a = h(c0), b = h(c1);
+    return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",") + ")";
+  };
+  for (let yy = 0; yy < rows; yy++) for (let xx = 0; xx < cols; xx++) {
+    const ch = map[yy][xx];
+    if (ch === "#") { el("rect", { x: xx * cs, y: yy * cs, width: cs, height: cs, class: "wall" }, svg); continue; }
+    const v = values[xx + "," + yy] || 0;
+    const r = el("rect", { x: xx * cs + 0.5, y: yy * cs + 0.5, width: cs - 1, height: cs - 1, rx: 2, fill: mix(Math.min(1, v / maxV)) }, svg);
+    r.addEventListener("pointermove", () => showTip(container, svg, xx * cs + cs / 2, yy * cs, labels(xx, yy, v)));
+    r.addEventListener("pointerleave", () => hideTip(container));
+  }
+  return svg;
+}
+function renderRoutes() {
+  const R = DATA.rotas, root = document.getElementById("route-maps");
+  [["padrao", "Padrão: todos pela mesma linha"], ["trok", "Trok: rotas próprias e longe da rota dos colegas"]].forEach(([k, title]) => {
+    const c = document.createElement("div"); c.className = "chart";
+    c.innerHTML = `<h3>${title}</h3><div class="sub">S = spawn · G = objetivo · cinza = parede</div>`;
+    root.appendChild(c);
+    const svg = heatMap(c, R.mapa, R[k].calor, 1, (x, y, v) => `célula ${x},${y}<br>${num(v * 8, 1)} de 8 bots passam aqui`);
+    R.mapa.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (ch === "S" || ch === "G") el("text", { x: x * 14 + 7, y: y * 14 + 10, "text-anchor": "middle", class: "cell-text" }, svg).textContent = ch;
+    }));
+  });
+  const lanes = ["cima", "meio", "baixo"];
+  groupedBars(document.getElementById("route-lanes"), "Que corredor cada bot pegou", "Fração dos bots, 300 rodadas",
+    lanes.map(l => ({ label: l[0].toUpperCase() + l.slice(1), padrao: { v: R.padrao.corredores[l] }, trok: { v: R.trok.corredores[l] } })),
+    "v", v => Math.round(v * 100) + "%", 1, null);
+  const s = document.getElementById("route-stats");
+  s.innerHTML = `<h3>Quanto os caminhos se repetem</h3><div class="sub">Médias de 300 rodadas com 8 bots</div>
+  <table><thead><tr><th>Medida</th><th>Padrão</th><th>Trok</th></tr></thead><tbody>
+  <tr><td>Bots no corredor da maioria</td><td class="num"><span class="d">${pct(R.padrao.maioria_mesmo_corredor)}</span></td><td class="num"><span class="t">${pct(R.trok.maioria_mesmo_corredor)}</span></td></tr>
+  <tr><td>Sobreposição média entre dois caminhos</td><td class="num"><span class="d">${pct(R.padrao.sobreposicao)}</span></td><td class="num"><span class="t">${pct(R.trok.sobreposicao)}</span></td></tr>
+  <tr><td>Diferença entre o primeiro e o último a chegar</td><td class="num"><span class="d">${num(R.padrao.espalhamento_chegada_s, 1)} s</span></td><td class="num"><span class="t">${num(R.trok.espalhamento_chegada_s, 1)} s</span></td></tr>
+  </tbody></table>
+  <div class="sub">O corredor do meio é o mais curto, então o Trok ainda usa ele mais; o que muda é a linha dentro dele, quem sai primeiro e quem vai pelos lados.</div>`;
+}
+
+/* ---------------- Tático ---------------- */
+function renderTactical() {
+  const T = DATA.tatico, c = document.getElementById("tact-map");
+  c.innerHTML = `<h3>Nota de cada lugar (escuro = melhor para segurar)</h3><div class="sub">L = laboratório · 1 2 3 = pilastras · c = caixas · p = plataforma · s = degraus</div>`;
+  const svg = heatMap(c, T.mapa, T.notas, 0.6, (x, y, v) => `${T.mapa[y][x] === "." ? "chão" : T.mapa[y][x]} · altura ${T.alturas[x + "," + y]}u<br>nota ${num(v)}`);
+  T.mapa.forEach((row, y) => [...row].forEach((ch, x) => {
+    if ("L123cps".includes(ch)) el("text", { x: x * 14 + 7, y: y * 14 + 10, "text-anchor": "middle", class: "cell-text" }, svg).textContent = ch;
+  }));
+  const order = ["Laboratório (só por 3 pilastras)", "Pilastra", "Topo de caixa", "Plataforma (degraus)", "Degrau", "Chão"];
+  const b = document.getElementById("tact-bars");
+  b.innerHTML = `<h3>Nota média por tipo de lugar</h3><div class="sub">Laboratório: ${T.laboratorio.acesso} pulos para chegar, ${T.laboratorio.entradas_pe} entradas a pé, ${T.laboratorio.entradas_pulo} por pulo</div>`;
+  const W = 460, H = 230, m = { l: 190, r: 46, t: 6, b: 6 };
+  const s2 = svgBox(b, W, H);
+  const bh = (H - m.t - m.b) / order.length;
+  order.forEach((k, i) => {
+    const v = T.resumo[k].media, w = v / 0.6 * (W - m.l - m.r), y0 = m.t + i * bh + bh * 0.2;
+    el("text", { x: m.l - 8, y: y0 + bh * 0.45, "text-anchor": "end", class: "label" }, s2).textContent = k;
+    const h = bh * 0.6, r = Math.min(4, h / 2);
+    el("path", { d: `M${m.l},${y0}H${m.l + w - r}Q${m.l + w},${y0} ${m.l + w},${y0 + r}V${y0 + h - r}Q${m.l + w},${y0 + h} ${m.l + w - r},${y0 + h}H${m.l}Z`, class: "bar-trok" }, s2);
+    el("text", { x: m.l + w + 6, y: y0 + bh * 0.45, class: "label-strong" }, s2).textContent = num(v);
+  });
+}
+
+/* ---------------- Início ---------------- */
+buildSummary();
+segmented("seg-perc", LEVELS, "dificil", renderPerception); renderPerception("dificil");
+renderDuelStatic();
+segmented("seg-duel", LEVELS, "dificil", renderDuel); renderDuel("dificil");
+segmented("seg-strafe", ["normal", "expert"], "normal", renderStrafe); renderStrafe("normal");
+renderRoutes();
+renderTactical();
+</script>
