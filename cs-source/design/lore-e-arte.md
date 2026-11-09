@@ -26,11 +26,14 @@ Combat Arms e, em menor grau, a Umbrella: fachada limpa e corporativa, porões s
   (armas experimentais, máquinas) espalhada pelo mapa.
 
 Nome da corporação: o dono quer referência ao Combat Arms **ou** algo original com significado
-real, uma filosofia. Candidatos (conferir uso antes de fechar):
+real, uma filosofia. "Nexo" foi descartado (parece cópia do nome da corporação do CA). Candidatos (conferir uso antes de fechar):
 
 | Nome | Significado | Por que combina |
 |---|---|---|
-| **Nexo** | em português, "ligação, sentido"; ecoa a corporação do Combat Arms | o nome promete sentido e coerência; por dentro, nada faz sentido. Lema: "Tudo tem nexo." |
+| **Primum** | latim, "primeiro"; de *primum non nocere*, "antes de tudo, não causar dano" (juramento médico) | a empresa usa o lema da medicina e faz exatamente o contrário |
+| **Aletheia** | grego, "verdade" no sentido de "revelar o que está oculto" | a empresa da transparência é a que mais esconde |
+| **Mimesis** | grego, "imitação" | biotecnologia que imita a vida; os monstros são cópias que deram errado |
+| **Aude** | de *sapere aude*, "ouse saber" (Horácio, Kant) | ciência sem limite nenhum, o que leva ao desastre |
 | **Telos** | grego, "finalidade": a ideia de que tudo se justifica pelo fim | a corporação justifica qualquer experimento pelo objetivo final |
 | **Arkhé** | grego, "princípio, origem" de tudo | busca a origem da vida para reescrevê-la; os monstros são o "rascunho" |
 | **Prometeia** | Prometeu roubou o fogo dos deuses e pagou o preço | tecnologia que dá poder e cobra caro |
