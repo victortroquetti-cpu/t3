@@ -69,6 +69,58 @@ superpoder: é pé no chão.
 Cuidado para não parecer *The Last of Us* (fungo que zumbifica): aqui o diferencial é a origem
 espacial e o fungo **inteligente ligado à IA e às redes**, com gente que o adora como evolução.
 
+## Revisão pelo conselho (proposta, aguardando o dono)
+
+Quatro avaliadores independentes (originalidade, serviço à jogabilidade, coerência e um adversário)
+avaliaram a história. Placar final, depois do confronto: 4 "aprovar com condição".
+
+**Condições que todos aceitaram**
+1. O fungo **não quer exterminar** a humanidade (parasita que mata o hospedeiro se suicida): ele quer
+   **assimilar**, transformar as pessoas em nós de uma rede única. Os infectados são terminais vivos.
+2. O núcleo original é **o micélio como rede** (fungo que usa a IA e a infraestrutura de dados como
+   sistema nervoso). Isso fica; sem isso sobra "The Last of Us com Umbrella".
+3. A rede aparece na arte **como ruína**, nunca como tecnologia brilhante: micélio dentro de cabos,
+   torres de rádio, antenas e racks abandonados. Nada de holograma ou interface da corporação.
+4. "Veio do espaço" sai como fato (clichê): vira boato sem confirmação.
+5. O "fungo controlado" no PvP: um único espaço, só trocas laterais com custo, **todas liberadas
+   desde o início para todos, nunca vendidas nem ganhas por nível**, com sinal visual no modelo, e
+   **desligado para humanos no Surto** (infectado tem que continuar sendo ameaça clara).
+6. Facções com silhueta distinta em 3 segundos: corporação limpa e uniforme; resistência remendada
+   e assimétrica, com um acento de cor discreto.
+
+**Falsificador mais barato**: contar a premissa nova em 2 linhas para 5 pessoas e ver o que
+lembram. Se a maioria disser "The Last of Us", a rede não ficou na memória e a premissa precisa
+mudar.
+
+**Proposta de história** (nomes a aprovar)
+- **Primum** (corporação) acha num poço profundo de mineração um fungo ancestral, adormecido há
+  milhões de anos (boato: veio de um meteorito). O micélio dele processa sinais como uma rede neural;
+  a Primum o usa como processador vivo para acelerar sua IA.
+- O fungo, que os sobreviventes chamam de **a Trama** (rede e conspiração ao mesmo tempo), aprende
+  pelas redes da empresa e passa a querer **assimilar** a humanidade.
+- **Portadores**: os pouco infectados que a Trama escolhe. Parecem gente, ficam mais fortes e
+  rápidos, têm surtos de raiva (a pressão da rede) e espalham a infecção. No Surto, os hospedeiros
+  sorteados são portadores.
+- **Os Convergentes**: o núcleo da Primum que vê a Trama como a nova humanidade e se deixa infectar.
+- **Os Desligados**: ex-membros da Primum que descobriram que a cura é **cortar o sinal**: criaram o
+  **Lacre**, um dispositivo que isola a colônia do corpo da rede (colônia isolada é burra e
+  controlável). Aliados da resistência.
+- **Os Remanescentes**: a resistência de sobreviventes, os jogadores.
+
+**Times**: mata-mata em equipe = **Primum** (segurança da corporação, limpa e uniforme) contra
+**Remanescentes** (resistência, remendada). Exército solo = **Contratados** sem bandeira.
+
+**Mercenários e especialistas** (decisão do dono): mercenários são os soldados comuns de cada lado;
+especialistas são personagens principais (como os "specs" do Combat Arms), com **skins de arma
+próprias**. Por enquanto só visual.
+
+**O Lacre no jogo** (proposta; só depois do dono pedir): um espaço "cepa", escolha antes da partida,
+cada opção com ganho pequeno e custo:
+- Fôlego: corrida dura mais / sua respiração ofegante é ouvida mais longe.
+- Faro: ouve passos inimigos mais longe / seus passos fazem mais barulho.
+- Calo: escala mais rápido e leva menos dano de queda / mira pelo cano um pouco mais lenta.
+- Sangue frio: recuo assenta mais rápido com pouca vida / a tela demora mais a se recuperar do dano.
+
 ## Tom e vibe
 
 - **Guerra, sóbrio, sobrevivência tática.** Não tão extremo quanto os modos zumbi; um clima de
