@@ -93,6 +93,8 @@ A fazer, quando o dono pedir (melhor com o jogo aberto para testar):
 - dificuldade dinâmica (meio passo por rodada; só mira/reação);
 - modo zumbi/quarentena: infectados com NextBot (cerco, quebrar barricada) e humanos que trancam
   abrigos; relógio com alarme e abertura; grade trancável (ideia registrada na conversa).
+  Subgêneros (infecção, escape, base builder, survival, comandante de horda) e a linha do tempo
+  que o dono passou: `design/zumbi-referencias.md`. O dono ainda não escolheu qual vem primeiro.
 
 ## Ambiente da nuvem (por que algumas coisas não foram feitas aqui)
 
