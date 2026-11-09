@@ -43,7 +43,16 @@ TESTAR OS BOTS
   Ajustar os níveis sem recompilar: edite mod_trok\scripts\trok_bot_perfis.txt,
   rode trok_bot_perfis_recarregar e adicione os bots de novo.
 
-MOVIMENTAÇÃO (carrega sozinha: server.cfg roda "exec movimento")
+ARMAS (nasce com fuzil, pistola e pé de cabra; protótipo com modelos do CS:S)
+  Botão 2 (direito)            mira pelo cano (zoom, arma no centro, mais precisa)
+  Shift                        corre: arma abaixa e não atira
+  C                            caminha devagar e sem barulho de passo
+  Alinhar a mira de cada arma: trok_mira_ajuste "direita cima frente pitch yaw roll",
+                               depois trok_mira_imprimir e cole no script da arma
+  Todos os números: cfg\balanceamento.cfg, cfg\movimento.cfg e scripts\weapon_trok_*.txt
+  (se o teclado vier errado, rode exec config_default no console)
+
+MOVIMENTAÇÃO (carrega sozinha: server.cfg roda "exec balanceamento")
   Sprint (Shift) + agachar     desliza
   Segurar pular contra borda   escala (até ~80u)
   Ajuste ao vivo no console:   trok_pulo_altura, trok_deslizar_*, trok_escalar_*,

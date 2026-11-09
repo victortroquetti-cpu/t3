@@ -1,5 +1,10 @@
 # Armas, movimento e HUD
 
+> **No Trok já existe:** arma guiada por script (`shared/trok/weapon_trok_gun.*`, bloco `"Trok"`),
+> movimento próprio (`shared/trok/trok_gamemovement.cpp`), marcador de acerto
+> (`client/trok/hud_trok_hitmarker.cpp`). Onde está cada número: `cs-source/design/sistemas-jogabilidade.md`.
+> O resto deste arquivo é a referência geral do SDK.
+
 ## Armas
 
 Uma arma do HL2MP tem três partes:

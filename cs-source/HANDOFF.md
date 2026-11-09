@@ -83,9 +83,34 @@ Riscos para olhar no jogo:
   (deslizar ladeira abaixo pode ficar rápido demais).
 - Velocidades do HL2 (`hl2_normspeed` etc.) são do servidor e o sprint gasta energia do traje.
 
+### Armas, mira pelo cano, corrida e caminhada (nuvem, para testar no local)
+
+- Sistema de armas guiado por script: `shared/trok/weapon_trok_gun.*` + bloco `"Trok"` em
+  `scripts/weapon_trok_{fuzil,submetralhadora,pistola,escopeta}.txt` (modelos e sons de
+  protótipo do CS:S montado). Precisão por estado, dispersão por tiro seguido, recuo em
+  padrão, queda de dano, auto/semi, mira pelo cano com ajuste ao vivo (`trok_mira_ajuste`,
+  `trok_mira_imprimir`), peso da arma e lentidão mirando (aplicados na movimentação).
+- Correr (Shift) abaixa a arma e impede o tiro; caminhar (C) é silencioso (patch em
+  `UpdateStepSound`). Teclas em `cfg/config_default.cfg`.
+- Vida/colete (`trok_vida`, `trok_colete`) e armas iniciais (`trok_armas_iniciais`, patch em
+  `GiveDefaultItems`).
+- **Todos os números num lugar:** `cfg/balanceamento.cfg` + `cfg/movimento.cfg` + scripts das
+  armas. Guia de cada campo e de como medir no jogo de referência:
+  `design/sistemas-jogabilidade.md`. Assets gratuitos: `design/assets-gratuitos.md`.
+
+Riscos para olhar no jogo:
+- modelos do CS:S nas armas: sons de recarga podem ficar mudos (eventos de animação com
+  soundscript do CS:S); posição de mira padrão é chute;
+- se o `.wav` direto no `SoundData` não tocar, criar um soundscript do Trok com as entradas;
+- `mira_fov_arma` ainda não é aplicado (precisa de patch no ClientMode);
+- bots com armas do Trok: as consultas de arma do bot do HL2MP (`IsCombatWeapon`,
+  `EquipBestWeaponForThreat`) foram feitas para as armas do HL2; conferir se escolhem bem.
+
 **Tarefa do dono no local:** com o Combat Arms instalado, medir no jogo dele a velocidade de
 corrida, a altura do pulo e o tempo de deslize (cronometrar uma distância conhecida) e
-passar os números para o `cfg/movimento.cfg`. Só números; nada de arquivo do jogo.
+passar os números para o `cfg/movimento.cfg`; e das armas (cadência, tiros para matar perto
+e longe, abertura da mira, recuo) para os scripts `weapon_trok_*.txt`. Guia campo a campo em
+`design/sistemas-jogabilidade.md`. Só números; nada de arquivo do jogo.
 
 ## O que o simulador mostrou (para não refazer)
 

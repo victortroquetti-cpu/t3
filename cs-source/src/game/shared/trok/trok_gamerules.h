@@ -32,6 +32,10 @@ public:
 	virtual ~CTrokRules();
 
 	virtual const char *GetGameDescription( void );
+
+#ifndef CLIENT_DLL
+	virtual void PlayerSpawn( CBasePlayer *pPlayer );
+#endif
 };
 
 inline CTrokRules *TrokRules( void )

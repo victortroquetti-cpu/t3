@@ -112,10 +112,53 @@ index 30d2181..18f69f4 100644
  }
  
 diff --git a/src/game/server/hl2mp/hl2mp_player.cpp b/src/game/server/hl2mp/hl2mp_player.cpp
-index 9457928..ec10c29 100644
+index 9457928..11de3fc 100644
 --- a/src/game/server/hl2mp/hl2mp_player.cpp
 +++ b/src/game/server/hl2mp/hl2mp_player.cpp
-@@ -1414,6 +1414,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
+@@ -239,10 +239,42 @@ void CHL2MP_Player::GiveAllItems( void )
+ 	
+ }
+ 
++#ifdef TROK
++// cs-source/: armas com que se nasce (lista de entidades separadas por espaço).
++// Vazio = equipamento padrão do HL2MP.
++ConVar trok_armas_iniciais( "trok_armas_iniciais", "weapon_trok_fuzil weapon_trok_pistola weapon_crowbar", FCVAR_NOTIFY,
++	"Armas ao nascer (separadas por espaço). Vazio = as do HL2MP." );
++ConVar trok_municao_inicial( "trok_municao_inicial", "SMG1 180 Pistol 72 Buckshot 24", FCVAR_NOTIFY,
++	"Munição ao nascer: pares \"tipo quantidade\" (tipos do HL2MP: SMG1, Pistol, Buckshot, AR2, 357)." );
++#endif
++
+ void CHL2MP_Player::GiveDefaultItems( void )
+ {
+ 	EquipSuit();
+ 
++#ifdef TROK
++	if ( trok_armas_iniciais.GetString()[ 0 ] )
++	{
++		CUtlVector< CUtlString > ammo;
++		V_SplitString( trok_municao_inicial.GetString(), " ", ammo );
++		for ( int i = 0; i + 1 < ammo.Count(); i += 2 )
++			CBasePlayer::GiveAmmo( atoi( ammo[ i + 1 ] ), ammo[ i ] );
++
++		CUtlVector< CUtlString > weapons;
++		V_SplitString( trok_armas_iniciais.GetString(), " ", weapons );
++		CBaseCombatWeapon *pFirst = NULL;
++		FOR_EACH_VEC( weapons, i )
++		{
++			CBaseEntity *pEnt = GiveNamedItem( weapons[ i ] );
++			if ( !pFirst && pEnt )
++				pFirst = dynamic_cast< CBaseCombatWeapon * >( pEnt );
++		}
++		if ( pFirst )
++			Weapon_Switch( pFirst );
++		return;
++	}
++#endif
++
+ 	CBasePlayer::GiveAmmo( 255,	"Pistol");
+ 	CBasePlayer::GiveAmmo( 45,	"SMG1");
+ 	CBasePlayer::GiveAmmo( 1,	"grenade" );
+@@ -1414,6 +1446,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
  		}
  	}
  
@@ -134,6 +177,23 @@ index 9457928..ec10c29 100644
  	pSpot = pLastSpawnPoint;
  	// Randomize the start spot
  	for ( int i = random->RandomInt(1,5); i > 0; i-- )
+diff --git a/src/game/shared/baseplayer_shared.cpp b/src/game/shared/baseplayer_shared.cpp
+index abbd319..2b19606 100644
+--- a/src/game/shared/baseplayer_shared.cpp
++++ b/src/game/shared/baseplayer_shared.cpp
+@@ -533,6 +533,12 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
+ 	if ( GetMoveType() == MOVETYPE_NOCLIP || GetMoveType() == MOVETYPE_OBSERVER )
+ 		return;
+ 
++#ifdef TROK
++	// cs-source/: andar segurando +walk (C) não faz barulho de passo, como no CS e no CA.
++	if ( m_nButtons & IN_WALK )
++		return;
++#endif
++
+ 	if ( !sv_footsteps.GetFloat() )
+ 		return;
+ 
 diff --git a/src/game/shared/hl2/hl_gamemovement.cpp b/src/game/shared/hl2/hl_gamemovement.cpp
 index e54f63d..95c9f1d 100644
 --- a/src/game/shared/hl2/hl_gamemovement.cpp
@@ -148,6 +208,130 @@ index e54f63d..95c9f1d 100644
  	// Expose our interface.
  	static CHL2GameMovement g_GameMovement;
  	IGameMovement *g_pGameMovement = ( IGameMovement * )&g_GameMovement;
+diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
+index 9b83dce..a6cfe6c 100644
+--- a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
++++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
+@@ -19,6 +19,34 @@ FileWeaponInfo_t* CreateWeaponInfo()
+ CHL2MPSWeaponInfo::CHL2MPSWeaponInfo()
+ {
+ 	m_iPlayerDamage = 0;
++#ifdef TROK
++	m_bTrok = false;
++	m_flTrokRPM = 600.0f;
++	m_bTrokAuto = true;
++	m_iTrokPellets = 1;
++	m_iTrokDamage = 30;
++	m_flTrokFalloffStart = 800.0f;
++	m_flTrokFalloffEnd = 2500.0f;
++	m_flTrokFalloffMin = 0.6f;
++	m_flTrokSpreadStill = 0.5f;
++	m_flTrokSpreadMove = 4.0f;
++	m_flTrokSpreadAir = 8.0f;
++	m_flTrokSpreadCrouch = 0.75f;
++	m_flTrokSpreadADS = 0.4f;
++	m_flTrokSpreadPerShot = 0.35f;
++	m_flTrokSpreadMaxShots = 3.0f;
++	m_flTrokRecoveryRate = 8.0f;
++	m_flTrokKickUp = 0.8f;
++	m_flTrokKickSide = 0.4f;
++	m_flTrokADSFov = 0.0f;
++	m_flTrokADSTime = 0.15f;
++	m_vecTrokADSPos.Init( -3.0f, 1.0f, -1.5f );
++	m_angTrokADSAng.Init( 0.0f, 0.0f, 0.0f );
++	m_flTrokADSViewmodelFov = 0.0f;
++	m_flTrokADSMoveSpeed = 0.6f;
++	m_flTrokMoveSpeed = 1.0f;
++	Q_strncpy( m_szTrokAnim, "ar2", sizeof( m_szTrokAnim ) );
++#endif
+ }
+ 
+ 
+@@ -27,6 +55,43 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
+ 	BaseClass::Parse( pKeyValuesData, szWeaponName );
+ 
+ 	m_iPlayerDamage = pKeyValuesData->GetInt( "damage", 0 );
++
++#ifdef TROK
++	KeyValues *pTrok = pKeyValuesData->FindKey( "Trok" );
++	if ( pTrok )
++	{
++		m_bTrok = true;
++		m_flTrokRPM = pTrok->GetFloat( "tiros_por_minuto", m_flTrokRPM );
++		m_bTrokAuto = pTrok->GetInt( "automatica", m_bTrokAuto ? 1 : 0 ) != 0;
++		m_iTrokPellets = MAX( 1, pTrok->GetInt( "balas_por_tiro", m_iTrokPellets ) );
++		m_iTrokDamage = pTrok->GetInt( "dano", m_iTrokDamage );
++		m_flTrokFalloffStart = pTrok->GetFloat( "queda_inicio", m_flTrokFalloffStart );
++		m_flTrokFalloffEnd = pTrok->GetFloat( "queda_fim", m_flTrokFalloffEnd );
++		m_flTrokFalloffMin = pTrok->GetFloat( "queda_minimo", m_flTrokFalloffMin );
++		m_flTrokSpreadStill = pTrok->GetFloat( "dispersao_parado", m_flTrokSpreadStill );
++		m_flTrokSpreadMove = pTrok->GetFloat( "dispersao_andando", m_flTrokSpreadMove );
++		m_flTrokSpreadAir = pTrok->GetFloat( "dispersao_ar", m_flTrokSpreadAir );
++		m_flTrokSpreadCrouch = pTrok->GetFloat( "dispersao_agachado", m_flTrokSpreadCrouch );
++		m_flTrokSpreadADS = pTrok->GetFloat( "dispersao_mira", m_flTrokSpreadADS );
++		m_flTrokSpreadPerShot = pTrok->GetFloat( "dispersao_por_tiro", m_flTrokSpreadPerShot );
++		m_flTrokSpreadMaxShots = pTrok->GetFloat( "dispersao_tiros_max", m_flTrokSpreadMaxShots );
++		m_flTrokRecoveryRate = pTrok->GetFloat( "recuperacao", m_flTrokRecoveryRate );
++		m_flTrokKickUp = pTrok->GetFloat( "recuo_vertical", m_flTrokKickUp );
++		m_flTrokKickSide = pTrok->GetFloat( "recuo_lateral", m_flTrokKickSide );
++		m_flTrokADSFov = pTrok->GetFloat( "mira_fov", m_flTrokADSFov );
++		m_flTrokADSTime = pTrok->GetFloat( "mira_tempo", m_flTrokADSTime );
++		const char *pszPos = pTrok->GetString( "mira_posicao", NULL );
++		if ( pszPos )
++			sscanf( pszPos, "%f %f %f", &m_vecTrokADSPos.x, &m_vecTrokADSPos.y, &m_vecTrokADSPos.z );
++		const char *pszAng = pTrok->GetString( "mira_angulos", NULL );
++		if ( pszAng )
++			sscanf( pszAng, "%f %f %f", &m_angTrokADSAng.x, &m_angTrokADSAng.y, &m_angTrokADSAng.z );
++		m_flTrokADSViewmodelFov = pTrok->GetFloat( "mira_fov_arma", m_flTrokADSViewmodelFov );
++		m_flTrokADSMoveSpeed = pTrok->GetFloat( "mira_velocidade", m_flTrokADSMoveSpeed );
++		m_flTrokMoveSpeed = pTrok->GetFloat( "velocidade", m_flTrokMoveSpeed );
++		Q_strncpy( m_szTrokAnim, pTrok->GetString( "animacao", m_szTrokAnim ), sizeof( m_szTrokAnim ) );
++	}
++#endif
+ }
+ 
+ 
+diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.h b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
+index 2ec16dd..1cb581e 100644
+--- a/src/game/shared/hl2mp/hl2mp_weapon_parse.h
++++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
+@@ -29,6 +29,36 @@ public:
+ public:
+ 
+ 	int m_iPlayerDamage;
++
++#ifdef TROK
++	// cs-source/: bloco "Trok" do script da arma (shared/trok/weapon_trok_gun.cpp).
++	bool m_bTrok;					// a arma tem o bloco "Trok"
++	float m_flTrokRPM;				// tiros por minuto
++	bool m_bTrokAuto;				// automática (segura o gatilho) ou semi
++	int m_iTrokPellets;				// balas por tiro (escopeta > 1)
++	int m_iTrokDamage;				// dano por bala até o início da queda
++	float m_flTrokFalloffStart;		// u: começa a perder dano
++	float m_flTrokFalloffEnd;		// u: dano mínimo a partir daqui
++	float m_flTrokFalloffMin;		// fração do dano no fim da queda
++	float m_flTrokSpreadStill;		// graus (cone total) parado
++	float m_flTrokSpreadMove;		// graus correndo
++	float m_flTrokSpreadAir;		// graus no ar
++	float m_flTrokSpreadCrouch;		// multiplicador agachado
++	float m_flTrokSpreadADS;		// multiplicador mirando pelo cano
++	float m_flTrokSpreadPerShot;	// graus somados a cada tiro seguido
++	float m_flTrokSpreadMaxShots;	// teto do que os tiros seguidos somam
++	float m_flTrokRecoveryRate;		// graus/s que a dispersão extra cai sem atirar
++	float m_flTrokKickUp;			// recuo vertical por tiro (graus)
++	float m_flTrokKickSide;			// recuo lateral (graus, segue um padrão)
++	float m_flTrokADSFov;			// FOV mirando (0 = sem mira pelo cano)
++	float m_flTrokADSTime;			// s para entrar na mira
++	Vector m_vecTrokADSPos;			// mira pelo cano: deslocamento da arma (direita, cima, frente)
++	QAngle m_angTrokADSAng;			// mira pelo cano: rotação da arma (pitch, yaw, roll)
++	float m_flTrokADSViewmodelFov;	// FOV da arma na tela mirando (0 = não muda)
++	float m_flTrokADSMoveSpeed;		// multiplicador da velocidade andando mirando
++	float m_flTrokMoveSpeed;		// multiplicador da velocidade com a arma na mão (peso)
++	char m_szTrokAnim[ 16 ];		// animação do jogador: ar2, smg1, pistol, shotgun
++#endif
+ };
+ 
+ 
 diff --git a/src/vpc_scripts/default.vgc b/src/vpc_scripts/default.vgc
 index 2614d68..9954cc3 100644
 --- a/src/vpc_scripts/default.vgc

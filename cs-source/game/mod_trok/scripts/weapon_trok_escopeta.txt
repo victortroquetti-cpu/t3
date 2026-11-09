@@ -1,0 +1,72 @@
+// Trok: Escopeta. Modelo e som de PROTÓTIPO, do CS:S montado do jogo do jogador
+// (não vão no pacote). Os números do bloco "Trok" são pontos de partida: preencher com
+// a referência do Combat Arms no local (ver cs-source/design/sistemas-jogabilidade.md).
+
+WeaponData
+{
+	"printname"			"Escopeta"
+	"viewmodel"			"models/weapons/v_shot_m3super90.mdl"
+	"playermodel"		"models/weapons/w_shot_m3super90.mdl"
+	"anim_prefix"		"shotgun"
+	"bucket"			"3"
+	"bucket_position"	"0"
+
+	"clip_size"			"8"
+	"clip2_size"		"-1"
+	"default_clip"		"8"
+	"default_clip2"		"-1"
+
+	"primary_ammo"		"Buckshot"
+	"secondary_ammo"	"None"
+
+	"weight"			"3"
+	"item_flags"		"0"
+	"damage"			"18"
+
+	// Sistema de armas do Trok (shared/trok/weapon_trok_gun.cpp). Ângulos em graus,
+	// distâncias em u, tempos em s. Ajuste ao vivo da mira: trok_mira_ajuste / trok_mira_imprimir.
+	"Trok"
+	{
+		"tiros_por_minuto"		"70"
+		"automatica"		"0"
+		"balas_por_tiro"		"9"
+		"dano"		"18"
+		"queda_inicio"		"250"
+		"queda_fim"		"900"
+		"queda_minimo"		"0.25"
+		"dispersao_parado"		"6.0"
+		"dispersao_andando"		"7.5"
+		"dispersao_ar"		"10.0"
+		"dispersao_agachado"		"0.9"
+		"dispersao_mira"		"0.8"
+		"dispersao_por_tiro"		"0.0"
+		"dispersao_tiros_max"		"0.0"
+		"recuperacao"		"10"
+		"recuo_vertical"		"4.0"
+		"recuo_lateral"		"0.8"
+		"mira_fov"		"75"
+		"mira_tempo"		"0.2"
+		"mira_posicao"		"-3.0 1.0 -1.5"
+		"mira_angulos"		"0 0 0"
+		"mira_velocidade"		"0.7"
+		"velocidade"		"0.92"
+		"animacao"		"shotgun"
+	}
+
+	// Arquivos .wav direto (o CS:S montado tem esses sons).
+	SoundData
+	{
+		"single_shot"		"weapons/m3/m3-1.wav"
+		"empty"				"weapons/clipempty_rifle.wav"
+	}
+
+	TextureData
+	{
+		"weapon"		{ "font" "WeaponIcons"			"character" "b" }
+		"weapon_s"		{ "font" "WeaponIconsSelected"	"character" "b" }
+		"weapon_small"	{ "font" "WeaponIconsSmall"		"character" "b" }
+		"ammo"			{ "font" "WeaponIconsSmall"		"character" "r" }
+		"crosshair"		{ "font" "Crosshairs"			"character" "Q" }
+		"autoaim"		{ "file" "sprites/crosshairs" "x" "0" "y" "48" "width" "24" "height" "24" }
+	}
+}

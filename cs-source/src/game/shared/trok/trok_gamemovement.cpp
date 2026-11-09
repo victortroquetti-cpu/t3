@@ -23,6 +23,8 @@
 #include "hl_gamemovement.h"
 #include "in_buttons.h"
 #include "movevars_shared.h"
+// Peso da arma / lentidão da mira (shared/trok/weapon_trok_gun.cpp).
+float TrokWeapon_MoveSpeedScale( CBasePlayer *pPlayer );
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -55,6 +57,7 @@ class CTrokGameMovement : public CHL2GameMovement
 	typedef CHL2GameMovement BaseClass;
 
 public:
+	virtual void CheckParameters( void );
 	virtual void FullWalkMove( void );
 	virtual bool CheckJumpButton( void );
 
@@ -180,6 +183,23 @@ bool CTrokGameMovement::TryMantle( void )
 		SetGroundEntity( NULL );
 
 	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Peso da arma na mão e lentidão de mirar pelo cano (script da arma).
+//-----------------------------------------------------------------------------
+void CTrokGameMovement::CheckParameters( void )
+{
+	BaseClass::CheckParameters();
+
+	float flScale = TrokWeapon_MoveSpeedScale( player );
+	if ( flScale > 0.0f && flScale < 0.999f )
+	{
+		mv->m_flMaxSpeed *= flScale;
+		mv->m_flForwardMove *= flScale;
+		mv->m_flSideMove *= flScale;
+		mv->m_flUpMove *= flScale;
+	}
 }
 
 //-----------------------------------------------------------------------------
