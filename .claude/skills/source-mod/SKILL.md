@@ -16,6 +16,9 @@ conhecidos e pendências. Combinado com o dono: o que for difícil na nuvem e f�
 dele (compilar, abrir o jogo, gerar nav, testar em partida) não se força na nuvem; só se
 registra no HANDOFF.md.
 
+Modos zumbi: a referência de jogabilidade é a **quarentena do Combat Arms** e depois os
+**zumbis do Call of Duty**, nunca os modos zumbi do CS (ver `cs-source/design/zumbi-referencias.md`).
+
 ## Regra zero: só código legal
 
 - O código de jogo do CS:S (compra, bomba, movimento do CS, bots `CCSBot`) **não é público**.

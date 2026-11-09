@@ -1,5 +1,14 @@
 # Modo zumbi: referências de gênero
 
+> **Referência de jogabilidade do Trok (decisão do dono, 09/11/2026):**
+> 1. **Quarentena do Combat Arms**: modo principal.
+> 2. **Zumbis do Call of Duty**: o segundo modo, PvE em rodadas.
+>
+> Os modos zumbi da família CS (Plague, Reloaded, Escape, Riot, CS Online...) **não** são
+> referência de jogabilidade: o dono não gosta dela (zumbi esponja de bala que o humano só
+> empurra com coice). Eles servem, no máximo, como referência de infraestrutura (como organizar
+> classes, rodadas e configs).
+
 Linha do tempo que o dono passou (09/11/2026), de um vídeo com a história dos modos zumbi
 no CS e nos jogos em volta dele. Serve para escolher que tipo de modo zumbi o Trok vai ter.
 **Só referência de mecânica:** nada de nomes, mapas, modelos, sons ou código desses mods ou
@@ -56,7 +65,25 @@ Do estilo CS Online/Xtreme, entram na infecção como sistemas pequenos e separa
 zumbi com habilidade e barra de energia, coice das armas, caixas de suprimento, herói no fim
 da rodada.
 
-## Decisão pendente (do dono)
+## Decisão do dono (substitui a ordem acima)
 
-Confirmar a ordem acima (sugestão: infecção primeiro, porque escape e survival reaproveitam
-quase tudo dela).
+A ordem acima foi pensada a partir dos mods do CS e **fica só como registro**. Vale:
+
+1. **Quarentena** no estilo do Combat Arms (o que o dono descreveu: rodada com relógio, alarme
+   perto do fim, abrigos que abrem, humanos trancam grades, zumbis quebram para entrar; mapas
+   com caixas e parkour).
+2. **Zumbis no estilo Call of Duty** (PvE em rodadas cada vez mais difíceis).
+
+### O que é cada um, como mecânica de gênero (para fazer do nosso jeito)
+
+- **Quarentena (Combat Arms):** PvP de infecção com rodada curta e mapa pensado para fuga,
+  parkour e defesa em abrigos. Detalhes que o dono já deu estão na conversa e em
+  `HANDOFF.md`. Antes de implementar, confirmar com o dono as regras finas (quantos golpes
+  infectam, se humano mata zumbi, vida e velocidade do zumbi, o que acontece no fim da rodada).
+- **Zumbis do CoD:** PvE cooperativo em rodadas que ficam mais difíceis; pontos por acertos e
+  abates; comprar armas na parede e abrir áreas do mapa com pontos; caixa de arma aleatória;
+  máquinas de vantagens (perks); melhorar a arma; janelas com tábuas que os zumbis arrancam e
+  os jogadores repõem; energia do mapa; drops temporários (munição cheia, abate com um tiro,
+  pontos em dobro, bomba). Tudo com nomes, visual e números próprios do Trok.
+
+Nada de nomes, mapas, modelos ou sons do Combat Arms ou do Call of Duty.

@@ -1,5 +1,10 @@
 # Mods de zumbi da lista: o que baixar e o que aproveitar
 
+> **Atenção:** a referência de jogabilidade do Trok é a **quarentena do Combat Arms** e
+> depois os **zumbis do Call of Duty** (`zumbi-referencias.md`). O dono não gosta da
+> jogabilidade dos modos zumbi do CS (coice, zumbi esponja de bala). Esta análise serve só
+> para infraestrutura (como organizar classes, rodadas, configs) e para saber o que **evitar**.
+
 Análise (09/11/2026) da lista de mods e jogos de zumbi que o dono passou. O Trok vai ser
 diferente; daqui só sai **referência de mecânica**: regras, números de equilíbrio e ideias.
 
