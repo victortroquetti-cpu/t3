@@ -9,3 +9,7 @@ trok-ui/tags/build/
 trok-ui/tags/test/out/
 trok-ui/veiculos/build/
 trok-ui/veiculos/test/out/
+# CS:Source / Source SDK 2013 (cs-source/trok.py)
+cs-source/sdk/
+cs-source/refs/
+__pycache__/

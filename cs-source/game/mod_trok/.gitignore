@@ -1,0 +1,7 @@
+# Saídas do build e arquivos do jogo
+bin/
+custom/
+download/
+cfg/config.cfg
+*.cache
+*.log

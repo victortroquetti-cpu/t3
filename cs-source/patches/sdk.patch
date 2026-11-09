@@ -1,0 +1,56 @@
+diff --git a/src/game/server/hl2mp/hl2mp_client.cpp b/src/game/server/hl2mp/hl2mp_client.cpp
+index 30d2181..18f69f4 100644
+--- a/src/game/server/hl2mp/hl2mp_client.cpp
++++ b/src/game/server/hl2mp/hl2mp_client.cpp
+@@ -190,7 +190,12 @@ void GameStartFrame( void )
+ //=========================================================
+ void InstallGameRules()
+ {
++#ifdef TROK
++	// cs-source/: regras do mod Trok (shared/trok/trok_gamerules.cpp)
++	CreateGameRulesObject( "CTrokRules" );
++#else
+ 	// vanilla deathmatch
+ 	CreateGameRulesObject( "CHL2MPRules" );
++#endif
+ }
+ 
+diff --git a/src/vpc_scripts/default.vgc b/src/vpc_scripts/default.vgc
+index 2614d68..9954cc3 100644
+--- a/src/vpc_scripts/default.vgc
++++ b/src/vpc_scripts/default.vgc
+@@ -21,6 +21,7 @@ $Games
+ 	"PORTAL"
+ 	"SDK"
+ 	"TF"
++	"TROK"		// cs-source/ (mod Trok)
+ }
+ 
+ $Include "vpc_scripts\projects.vgc"
+diff --git a/src/vpc_scripts/projects.vgc b/src/vpc_scripts/projects.vgc
+index 2a62976..fc39b50 100644
+--- a/src/vpc_scripts/projects.vgc
++++ b/src/vpc_scripts/projects.vgc
+@@ -17,6 +17,7 @@ $Project "client"
+ {
+ 	"game\client\client_tf.vpc"			[$TF]
+ 	"game\client\client_hl2mp.vpc"		[$HL2MP]
++	"game\client\client_trok.vpc"		[$TROK]
+ }
+ 
+ $Project "fgdlib"
+@@ -52,12 +53,14 @@ $Project "server"
+ {
+ 	"game\server\server_tf.vpc"			[$TF]
+ 	"game\server\server_hl2mp.vpc"		[$HL2MP]
++	"game\server\server_trok.vpc"		[$TROK]
+ }
+ 
+ $Project "launcher_main"
+ {
+ 	"launcher_main\launcher_main_mod_hl2mp.vpc" [$HL2MP]
+ 	"launcher_main\launcher_main_mod_tf.vpc" [$TF]
++	"launcher_main\launcher_main_mod_trok.vpc" [$TROK]
+ }
+ 
+ $Project "mathlib"

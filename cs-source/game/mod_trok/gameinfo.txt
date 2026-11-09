@@ -1,0 +1,64 @@
+"GameInfo"
+{
+	game	"Trok"
+	title	"TROK"
+	type multiplayer_only
+	nomodels 0
+	nohimodel 1
+	nocrosshair 1
+	supportsvr	0
+
+	FileSystem
+	{
+		// Roda pelo Source SDK Base 2013 Multiplayer (o mesmo do mod_hl2mp).
+		SteamAppId				243750
+
+		// Ordem de busca: o que está mais acima ganha.
+		// Digite "path" no console para ver como o motor leu esta lista.
+		SearchPaths
+		{
+			// 1. Conteúdo extra do jogador (VPKs e pastas em custom/).
+			game+mod			mod_trok/custom/*
+
+			// 2. Os arquivos do mod (esta pasta).
+			mod+mod_write		|gameinfo_path|.
+			game+game_write		|gameinfo_path|.
+			default_write_path	|gameinfo_path|.
+			gamebin				|gameinfo_path|bin
+
+			// 3. Scripts, HUD e mapas do HL2MP, que o código do mod ainda usa.
+			//    Primeiro a pasta mod_hl2mp do SDK (ao lado desta), depois o
+			//    conteúdo do SDK Base. Fica ACIMA do CS:S de propósito: o CS:S
+			//    tem os próprios scripts/HudLayout.res e weapon_*.txt, que não
+			//    servem para o código do HL2MP. Quando o mod tiver os seus
+			//    (em mod_trok/scripts), esta parte pode sair.
+			game				|gameinfo_path|../mod_hl2mp
+			game+mod			|appid_243750|hl2mp/hl2mp_english.vpk
+			game+mod			|appid_243750|hl2mp/hl2mp_pak.vpk
+
+			// 4. Conteúdo do Counter-Strike: Source (appid 240): modelos,
+			//    materiais, sons e mapas. Precisa do CS:S instalado na Steam.
+			//    Montar é permitido; redistribuir esses arquivos, não.
+			game				|appid_240|cstrike/cstrike_pak.vpk
+			game				|appid_240|cstrike
+
+			// 5. Base do HL2 (texturas, sons e materiais compartilhados).
+			game				|appid_243750|hl2_complete/hl2_complete_textures.vpk
+			game				|appid_243750|hl2_complete/hl2_complete_sound_vo_english.vpk
+			game				|appid_243750|hl2_complete/hl2_complete_sound_misc.vpk
+			game				|appid_243750|hl2_complete/hl2_complete_misc.vpk
+			game				|appid_243750|hl2/hl2_textures.vpk
+			game				|appid_243750|hl2/hl2_sound_vo_english.vpk
+			game				|appid_243750|hl2/hl2_sound_misc.vpk
+			game				|appid_243750|hl2/hl2_misc.vpk
+			platform			|appid_243750|platform/platform_misc.vpk
+			game				|appid_243750|hl2mp
+			game				|appid_243750|hl2_complete
+			game				|appid_243750|hl2
+			platform			|appid_243750|platform
+
+			// 6. Arquivos baixados de servidores (sempre por último).
+			game+download		mod_trok/download
+		}
+	}
+}
