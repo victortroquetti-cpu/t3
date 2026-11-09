@@ -180,6 +180,15 @@ Rebuild, estilo Combat Arms, arcade e sem fotorrealismo):
 - **Mapa no estilo do CA que o dono já tem**: precisa virar BSP (Hammer). Medidas de pulo,
   escalada e vãos para construir: `design/medidas-mapas.md`. Gerar nav mesh para os bots.
 
+## Modo Surto (09/11, nuvem; nada testado no jogo)
+
+Infecção no estilo da quarentena do Combat Arms, com bots: tudo em `design/modo-surto.md`.
+Números em `cfg/surto.cfg` (vários marcados MEDIR para o Claude Code local acertar com o CA).
+Patches novos: gancho de dano e de tiro na cabeça em `player.cpp`, acesso ao time e estado
+preservado em `hl2mp_gamerules`. **Testar primeiro:** sorteio, virar zumbi no lugar, contagem e
+vitória, rodada nova com `CleanUpMap` (o estado `trok_surto_estado` está na lista de
+preservadas), empurrão por arma, bots zumbis caçando e humanos recuando.
+
 ## O que o simulador mostrou (para não refazer)
 
 - O bot padrão do HL2MP mira o centro exato: ~93% de acerto em alvo parado em **todos** os níveis,

@@ -26,6 +26,7 @@
 #include "hl2mp_gamerules.h"
 #include "weapon_parse.h"
 #include "trok/weapon_trok_gun.h"
+#include "trok/trok_surto.h"
 #include <vgui/ISurface.h>
 #include <vgui/IScheme.h>
 #include <vgui/ILocalize.h>
@@ -47,6 +48,7 @@ static const Color COR_ALIADO( 90, 162, 255, 255 );
 static const Color COR_INIMIGO( 255, 90, 90, 255 );
 static const Color COR_DESTAQUE_PADRAO( 242, 181, 68, 255 );
 static const Color COR_FUNDO( 11, 13, 16, 255 );
+static const Color COR_ZUMBI( 140, 224, 90, 255 );
 
 static const float UNIDADES_POR_METRO = 52.49f;
 static const int MAX_KILLFEED = 5;
@@ -81,6 +83,7 @@ private:
 	void WeaponDisplayName( const char *pszClassOrEventName, char *pszOut, int iOutSize );
 
 	void PaintTop( void );
+	void PaintSurtoTop( void );
 	void PaintKillfeed( void );
 	void PaintHealth( C_BasePlayer *pLocal );
 	void PaintAmmo( C_BasePlayer *pLocal );
@@ -429,6 +432,11 @@ void CHudTrok::PaintTop( void )
 	C_BasePlayer *pLocal = C_BasePlayer::GetLocalPlayer();
 	if ( !pLocal || !g_PR )
 		return;
+	if ( TrokSurto_Ativo() )
+	{
+		PaintSurtoTop();
+		return;
+	}
 
 	int iMine = 0, iTheirs = 0;
 	if ( HL2MPRules() && HL2MPRules()->IsTeamplay() )
@@ -494,6 +502,77 @@ void CHudTrok::PaintTop( void )
 	}
 }
 
+// Modo Surto: fase, relógio, quantos humanos e zumbis; avisos de alarme e abrigos; vencedor.
+void CHudTrok::PaintSurtoTop( void )
+{
+	CTrokSurtoEstado *pEstado = TrokSurto_Estado();
+	if ( !pEstado )
+		return;
+
+	const int cx = ScreenWidth() / 2;
+	const int y = S( 22 );
+	const float flLeft = MAX( 0.0f, pEstado->GetFimFase() - gpGlobals->curtime );
+	char szTime[ 16 ];
+	V_snprintf( szTime, sizeof( szTime ), "%d:%02d", (int)flLeft / 60, (int)flLeft % 60 );
+
+	// Relógio no meio
+	const int tw = TextWide( m_hScore, szTime ) + S( 28 );
+	surface()->DrawSetColor( Color( 11, 13, 16, 170 ) );
+	surface()->DrawFilledRect( cx - tw / 2, y, cx + tw / 2, y + S( 36 ) );
+	const bool bAlarme = pEstado->IsAlarme() && pEstado->GetFase() == SURTO_JOGO;
+	const bool bPisca = bAlarme && ( (int)( gpGlobals->curtime * 2.0f ) % 2 ) == 0;
+	Text( m_hScore, cx - TextWide( m_hScore, szTime ) / 2, y + S( 4 ), bPisca ? Accent() : COR_BRANCO, szTime );
+
+	// Contagem dos lados
+	char szNum[ 32 ];
+	V_snprintf( szNum, sizeof( szNum ), "%d HUMANOS", pEstado->GetHumanosVivos() );
+	TextRight( m_hText, cx - tw / 2 - S( 14 ), y + S( 10 ), COR_ALIADO, szNum );
+	V_snprintf( szNum, sizeof( szNum ), "%d ZUMBIS", pEstado->GetZumbisVivos() );
+	Text( m_hText, cx + tw / 2 + S( 14 ), y + S( 10 ), COR_ZUMBI, szNum );
+
+	// Linha de baixo: o que está acontecendo
+	const char *pszLinha = NULL;
+	Color colLinha = COR_CINZA;
+	if ( pEstado->GetFase() == SURTO_PREPARO )
+	{
+		pszLinha = "PREPARE-SE · OS INFECTADOS SERÃO SORTEADOS";
+		colLinha = Accent();
+	}
+	else if ( pEstado->GetFase() == SURTO_JOGO )
+	{
+		if ( pEstado->IsAbrigos() )
+		{
+			pszLinha = "ABRIGOS ABERTOS · FECHE AS GRADES";
+			colLinha = Accent();
+		}
+		else if ( bAlarme )
+		{
+			pszLinha = "ALARME · OS ABRIGOS VÃO ABRIR";
+			colLinha = Accent();
+		}
+		else
+		{
+			pszLinha = "SOBREVIVA ATÉ O FIM DO TEMPO";
+		}
+	}
+	if ( pszLinha )
+		Text( m_hSmall, cx - TextWide( m_hSmall, pszLinha ) / 2, y + S( 44 ), colLinha, pszLinha );
+
+	// Fim da rodada: vencedor no meio da tela
+	if ( pEstado->GetFase() == SURTO_FIM )
+	{
+		const bool bHumanos = pEstado->GetVencedor() == SURTO_HUMANOS;
+		const char *pszTitulo = bHumanos ? "HUMANOS SOBREVIVERAM" : "OS INFECTADOS VENCERAM";
+		const int ty = ScreenHeight() / 2 - S( 60 );
+		surface()->DrawSetColor( Color( 11, 13, 16, 170 ) );
+		surface()->DrawFilledRect( 0, ty - S( 16 ), ScreenWidth(), ty + S( 70 ) );
+		Text( m_hNum, cx - TextWide( m_hNum, pszTitulo ) / 2, ty, bHumanos ? COR_ALIADO : COR_ZUMBI, pszTitulo );
+		char szProx[ 48 ];
+		V_snprintf( szProx, sizeof( szProx ), "Nova rodada em %d", (int)ceilf( flLeft ) );
+		Text( m_hSmall, cx - TextWide( m_hSmall, szProx ) / 2, ty + surface()->GetFontTall( m_hNum ) + S( 6 ), COR_CINZA, szProx );
+	}
+}
+
 void CHudTrok::PaintKillfeed( void )
 {
 	const float flLife = trok_hud_killfeed_tempo.GetFloat();
@@ -545,7 +624,7 @@ void CHudTrok::PaintHealth( C_BasePlayer *pLocal )
 	const int x = S( 32 );
 	const int yBottom = ScreenHeight() - S( 32 );
 	const int iHealth = MAX( 0, pLocal->GetHealth() );
-	const bool bLow = iHealth <= 30;
+	const bool bLow = iHealth <= 30 && !TrokSurto_IsZumbi( pLocal );
 	const Color col = bLow ? COR_INIMIGO : COR_BRANCO;
 
 	char szHealth[ 16 ];
@@ -553,9 +632,12 @@ void CHudTrok::PaintHealth( C_BasePlayer *pLocal )
 	const int numTall = surface()->GetFontTall( m_hNum );
 	const int yNum = yBottom - S( 22 ) - numTall;
 	Text( m_hNum, x, yNum, col, szHealth );
-	Text( m_hSmall, x + TextWide( m_hNum, szHealth ) + S( 10 ), yNum + numTall - surface()->GetFontTall( m_hSmall ) - S( 6 ), COR_CINZA, "VIDA" );
+	const bool bZumbi = TrokSurto_IsZumbi( pLocal );
+	Text( m_hSmall, x + TextWide( m_hNum, szHealth ) + S( 10 ), yNum + numTall - surface()->GetFontTall( m_hSmall ) - S( 6 ),
+		bZumbi ? COR_ZUMBI : COR_CINZA, bZumbi ? "ZUMBI" : "VIDA" );
 
-	Bar( x, yBottom - S( 16 ), S( 240 ), S( 4 ), iHealth / (float)MAX( 100, iHealth ), col );
+	const int iMaxHealth = MAX( 1, pLocal->GetMaxHealth() );
+	Bar( x, yBottom - S( 16 ), S( 240 ), S( 4 ), iHealth / (float)MAX( iMaxHealth, iHealth ), bZumbi ? COR_ZUMBI : col );
 
 	// Fôlego da corrida (energia do traje do HL2): só aparece quando não está cheio.
 	C_BaseHLPlayer *pHL = dynamic_cast< C_BaseHLPlayer * >( pLocal );
@@ -679,7 +761,8 @@ void CHudTrok::PaintKillPopup( void )
 	const int iAlpha = flAge > 1.2f ? (int)( 255 * ( 1.6f - flAge ) / 0.4f ) : 255;
 	const int x = ScreenWidth() / 2 + S( 36 );
 	const int y = ScreenHeight() / 2 + S( 18 );
-	Text( m_hText, x, y, WithAlpha( Accent(), iAlpha ), m_bPopupHead ? "ABATE · CABEÇA" : "ABATE" );
+	const bool bInfectou = TrokSurto_IsZumbi( C_BasePlayer::GetLocalPlayer() );
+	Text( m_hText, x, y, WithAlpha( bInfectou ? COR_ZUMBI : Accent(), iAlpha ), bInfectou ? "INFECTOU" : ( m_bPopupHead ? "ABATE · CABEÇA" : "ABATE" ) );
 	Text( m_hSmall, x, y + surface()->GetFontTall( m_hText ), WithAlpha( COR_CINZA, iAlpha ), m_szPopupName );
 }
 
@@ -691,9 +774,11 @@ void CHudTrok::PaintDeath( C_BasePlayer *pLocal )
 
 	const int x = S( 64 );
 	int y = S( 64 );
+	C_BasePlayer *pKillerEnt = m_iKiller ? UTIL_PlayerByIndex( m_iKiller ) : NULL;
+	const bool bInfectado = TrokSurto_Ativo() && pLocal->GetTeamNumber() == TEAM_TROK_HUMANOS && pKillerEnt && TrokSurto_IsZumbi( pKillerEnt );
 	if ( m_iKiller )
 	{
-		Text( m_hSmall, x, y, COR_CINZA, "ABATIDO POR" );
+		Text( m_hSmall, x, y, bInfectado ? COR_ZUMBI : COR_CINZA, bInfectado ? "INFECTADO POR" : "ABATIDO POR" );
 		y += S( 18 );
 		wchar_t wsz[ 64 ];
 		V_UTF8ToUnicode( m_szKiller, wsz, sizeof( wsz ) );
@@ -773,11 +858,12 @@ void CHudTrok::PaintDeath( C_BasePlayer *pLocal )
 		Bar( x + S( 20 ), dy + S( 18 ), cw - S( 40 ), S( 4 ), iTaken / 100.0f, COR_INIMIGO );
 	}
 
-	// Renascer (HL2MP: qualquer botão depois da animação de morte).
+	// Renascer (HL2MP: qualquer botão depois da animação de morte). No Surto o servidor decide.
 	if ( gpGlobals->curtime - m_flDeathTime > 1.0f )
 	{
 		const char *pszHint = "CLIQUE PARA RENASCER";
-		Text( m_hText, w / 2 - TextWide( m_hText, pszHint ) / 2, h - S( 96 ), COR_BRANCO, pszHint );
+		if ( TrokSurto_Ativo() )
+			pszHint = ( pLocal->GetTeamNumber() == TEAM_TROK_HUMANOS ) ? "VOCÊ VAI LEVANTAR COMO ZUMBI" : "ESPERE A PRÓXIMA RODADA";
+		Text( m_hText, w / 2 - TextWide( m_hText, pszHint ) / 2, h - S( 96 ), bInfectado ? COR_ZUMBI : COR_BRANCO, pszHint );
 	}
-	NOTE_UNUSED( pLocal );
 }

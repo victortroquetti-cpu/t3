@@ -1,0 +1,47 @@
+// Trok: entidades do mod para o Hammer. Em Hammer > Tools > Options > Game Configurations,
+// adicione este arquivo junto do FGD do HL2MP (halflife2.fgd / hl2mp.fgd).
+
+@include "hl2mp.fgd"
+
+@PointClass base(Targetname) iconsprite("editor/logic_auto.vmt") = trok_surto_logica :
+	"Modo Surto: saídas da rodada para o mapa (alarme, abrigos, vencedor)."
+[
+	output OnPreparo(void) : "Rodada nova: preparo (todos humanos)."
+	output OnInicio(void) : "Infectados sorteados, relógio correndo."
+	output OnAlarme(void) : "Hora do alarme (trok_surto_alarme)."
+	output OnAbrigos(void) : "Abrigos abrem (trok_surto_abrigos). Ligue aqui as portas dos abrigos."
+	output OnHumanosVencem(void) : "Humanos sobreviveram."
+	output OnZumbisVencem(void) : "Infectados venceram."
+]
+
+@PointClass base(Targetname) size(-16 -16 0, 16 16 72) color(80 160 255) = info_trok_abrigo :
+	"Modo Surto: centro de um abrigo. Os bots humanos vão para cá quando os abrigos abrem."
+[
+	raio(float) : "Raio do abrigo (u)" : 300 : "Dentro deste raio o bot está no abrigo e fecha a grade mais perto."
+]
+
+@SolidClass base(Targetname, RenderFields) = func_trok_grade :
+	"Modo Surto: grade de abrigo. Humano aperta USAR para fechar/abrir; fechada é sólida e os " +
+	"infectados quebram batendo. Aberta fica translúcida (mostra onde fecha)."
+[
+	vida(integer) : "Vida" : 1500 : "Dano de garra que aguenta fechada."
+	inicio_fechada(choices) : "Começa fechada" : 0 =
+	[
+		0 : "Não"
+		1 : "Sim"
+	]
+	liberar_nos_abrigos(choices) : "Só pode ser usada depois que os abrigos abrem" : 1 =
+	[
+		0 : "Não (sempre)"
+		1 : "Sim"
+	]
+
+	input Liberar(void) : "Passa a poder ser fechada pelos humanos."
+	input Fechar(void) : "Fecha (e libera)."
+	input Abrir(void) : "Abre."
+
+	output OnFechada(void) : "Foi fechada."
+	output OnAberta(void) : "Foi aberta."
+	output OnGolpe(void) : "Um infectado bateu nela."
+	output OnQuebrada(void) : "Quebrou."
+]
