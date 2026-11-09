@@ -11,7 +11,7 @@ ou modo quando ele pedir.** Objetivos ditos de passagem são contexto, não tare
 
 ## Antes de tudo
 
-Leia `cs-source/HANDOFF.md`: estado atual, o que foi e o que não foi verificado, riscos
+Leia o `CLAUDE.md` da raiz (regras do dono e plano em fases) e o `cs-source/HANDOFF.md`: estado atual, o que foi e o que não foi verificado, riscos
 conhecidos e pendências. Combinado com o dono: o que for difícil na nuvem e fácil no PC
 dele (compilar, abrir o jogo, gerar nav, testar em partida) não se força na nuvem; só se
 registra no HANDOFF.md.

@@ -1,5 +1,9 @@
 # Passagem para o Claude Code local
 
+> **Comece pelo `CLAUDE.md` na raiz do repositório**: regras do dono e o plano de trabalho em
+> fases (fazer rodar, testar, medir no CA, mapa de teste, conteúdo próprio). Este arquivo é o
+> registro detalhado do que foi feito na nuvem.
+
 Registro do que foi feito na nuvem (sessão de 09/11/2026) e do que fica melhor no PC do
 dono, com Windows, Visual Studio, Steam e o jogo. Leia isto antes de continuar.
 
@@ -10,7 +14,11 @@ jogo, gerar nav, testar em partida, ver a tela) não se força na nuvem; só se 
 
 | O quê | Onde |
 |---|---|
+| Plano de trabalho e regras do dono | `CLAUDE.md` (raiz) |
 | Visão geral, setup, fluxo | `cs-source/README.md` |
+| Modos, Surto, lore e arte, conteúdo próprio | `cs-source/design/modos.md`, `modo-surto.md`, `lore-e-arte.md`, `conteudo-proprio.md` |
+| Interface (menu, HUD, placar, carregamento) | `cs-source/design/ui.md` |
+| Estudos das TCs com código aberto | `cs-source/design/estudo-neotokyo.md`, `estudo-da-momentum-ff.md` |
 | Skill do Claude para este mod | `.claude/skills/source-mod/` (SKILL.md + references/) |
 | Bots: pesquisa, desenho, números, fontes | `cs-source/design/bots.md` |
 | Código dos bots | `cs-source/src/game/server/trok/bot/` |
