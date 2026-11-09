@@ -110,6 +110,19 @@ usando a lista de ossos de wiki.facepunch.com/gmod/ValveBiped_Bones. **Não bast
 ossos precisa bater** (ou ajustar `$definebones` no QC). Ferramentas: Blender Source Tools e Crowbar.
 Animação de arma em 1ª pessoa não existe pronta e boa: vai ser feita à mão no Blender.
 
+**Fazer e editar animação (grátis):**
+- **Blender:** animação completa (keyframes, curvas, NLA, IK, retarget, limpeza de mocap). Exporta as
+  sequências em SMD pelo Blender Source Tools.
+- **Blender MCP:** roda Python no Blender e tira print da viewport.
+  - Rende bem no trabalho mecânico: retarget e renomear ossos, cortar, fazer loop, mudar velocidade, exportar
+    em lote e animações simples por código (balanço parado, chute do recuo, sacar e guardar a arma).
+  - Animação artística (recarga com os dedos, atuação) sai dura. Ela pede iteração com prints ou a mão do dono.
+- **Rokoko** (plano Starter grátis): texto vira movimento (clipes ilimitados, 5 importações por mês) e vídeo
+  vira mocap (cerca de 30 s por mês). Dá para filmar com o celular os movimentos do zumbi. Conferir os termos
+  de uso de cada plano.
+- **Não serve:** Cascadeur grátis (só uso não comercial e só exporta no formato dele, sem FBX). Os termos
+  grátis do DeepMotion são confusos.
+
 **Sem opção boa e grátis:** personagem militar realista e rigado com licença limpa. Caminho: base
 (MakeHuman, Mixamo ou Quaternius) mais equipamento próprio.
 
