@@ -83,6 +83,20 @@ index c07943c..928c2f9 100644
  DECLARE_HUD_MESSAGE( CHudBattery, Battery );
  
  //-----------------------------------------------------------------------------
+diff --git a/src/game/client/hl2/hud_damageindicator.cpp b/src/game/client/hl2/hud_damageindicator.cpp
+index b6d2a9b..668692a 100644
+--- a/src/game/client/hl2/hud_damageindicator.cpp
++++ b/src/game/client/hl2/hud_damageindicator.cpp
+@@ -70,7 +70,9 @@ private:
+ 	CMaterialReference m_WhiteAdditiveMaterial;
+ };
+ 
++#ifndef TROK // o HUD do Trok (client/trok/hud_trok.cpp) mostra a direção do dano e recebe a mensagem "Damage"
+ DECLARE_HUDELEMENT( CHudDamageIndicator );
++#endif
+ DECLARE_HUD_MESSAGE( CHudDamageIndicator, Damage );
+ 
+ enum
 diff --git a/src/game/client/hl2/hud_health.cpp b/src/game/client/hl2/hud_health.cpp
 index c25da7b..326a3df 100644
 --- a/src/game/client/hl2/hud_health.cpp

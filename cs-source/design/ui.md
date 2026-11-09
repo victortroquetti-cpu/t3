@@ -47,8 +47,13 @@ do servidor no mesmo visual (barra escondida = desconectado).
   (`trok_hud_mira 0` desliga); faca = ponto;
 - tela de morte: quem matou, arma, distância, vida dele, dano trocado nesta vida
   (evento novo `trok_dano`, com a parte do corpo, em `server/player.cpp` + `resource/modevents.res`).
-O HUD do HL2 (vida, colete, munição, energia, mortes, mira) sai por `#ifndef TROK`.
-Ficou de fora: minimapa (precisa de imagem de cada mapa), placar do TAB (próximo).
+- direção do dano: arco vermelho em volta da mira apontando para de onde veio (mensagem
+  "Damage" do servidor; o indicador do HL2 saiu);
+- vida baixa: bordas da tela avermelhando e pulsando (`trok_hud_vida_baixa`, fração da vida);
+- radar no canto superior esquerdo, girando com a visão: aliados sempre; inimigos (zumbis em
+  verde) quando estão à vista ou acabaram de acertar alguém (`trok_hud_radar`, `_alcance`).
+O HUD do HL2 (vida, colete, munição, energia, mortes, mira, indicador de dano) sai por `#ifndef TROK`.
+Minimapa com imagem do mapa: precisa de uma imagem de cada mapa (por enquanto é radar sem fundo).
 
 ## Ainda do GameUI (com cara de Source) e próximos passos
 

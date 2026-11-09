@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "hud.h"
 #include "hudelement.h"
+#include "hud_macros.h"
 #include "iclientmode.h"
 #include "ienginevgui.h"
 #include "c_playerresource.h"
@@ -40,6 +41,9 @@ using namespace vgui;
 
 static ConVar trok_hud( "trok_hud", "1", FCVAR_ARCHIVE, "Mostra o HUD do Trok." );
 static ConVar trok_hud_mira( "trok_hud_mira", "1", FCVAR_ARCHIVE, "Mira em cruz do HUD (0 = sem mira)." );
+static ConVar trok_hud_radar( "trok_hud_radar", "1", FCVAR_ARCHIVE, "Radar no canto superior esquerdo (aliados sempre; inimigos quando vistos ou atirando)." );
+static ConVar trok_hud_radar_alcance( "trok_hud_radar_alcance", "1600", FCVAR_ARCHIVE, "Alcance do radar (u) do centro até a borda." );
+static ConVar trok_hud_vida_baixa( "trok_hud_vida_baixa", "0.35", FCVAR_ARCHIVE, "Abaixo desta fração da vida a tela avermelha nas bordas (0 = desliga)." );
 static ConVar trok_hud_killfeed_tempo( "trok_hud_killfeed_tempo", "6", FCVAR_ARCHIVE, "Segundos que cada abate fica na lista." );
 
 static const Color COR_BRANCO( 236, 238, 241, 255 );
@@ -65,6 +69,7 @@ public:
 	virtual void Reset( void );
 	virtual bool ShouldDraw( void );
 	virtual void FireGameEvent( IGameEvent *event );
+	void MsgFunc_Damage( bf_read &msg );
 
 protected:
 	virtual void ApplySchemeSettings( IScheme *pScheme );
@@ -90,6 +95,11 @@ private:
 	void PaintCrosshair( C_BasePlayer *pLocal );
 	void PaintKillPopup( void );
 	void PaintDeath( C_BasePlayer *pLocal );
+	void PaintDamageDir( C_BasePlayer *pLocal );
+	void PaintVignette( C_BasePlayer *pLocal );
+	void PaintRadar( C_BasePlayer *pLocal );
+	void UpdateSpotted( C_BasePlayer *pLocal );
+	bool IsAlly( C_BasePlayer *pLocal, int iPlayer ) const;
 
 	HFont m_hNum, m_hScore, m_hText, m_hSmall;
 	float m_flScale;
@@ -126,9 +136,23 @@ private:
 	char m_szKillerWpn[ 48 ];
 	float m_flKillerDist;
 	float m_flDeathTime;
+
+	// Direção do dano (mensagem "Damage" do servidor: de onde veio)
+	struct DmgMark_t
+	{
+		Vector vecFrom;
+		float flTime;
+	};
+	DmgMark_t m_Dmg[ 4 ];
+	int m_iDmgNext;
+
+	// Radar: até quando cada inimigo aparece
+	float m_flSpotted[ MAX_PLAYERS + 1 ];
+	float m_flNextSpotCheck;
 };
 
 DECLARE_HUDELEMENT( CHudTrok );
+DECLARE_HUD_MESSAGE( CHudTrok, Damage );
 
 CHudTrok::CHudTrok( const char *pElementName ) : CHudElement( pElementName ), BaseClass( NULL, "HudTrok" )
 {
@@ -146,6 +170,7 @@ void CHudTrok::Init( void )
 {
 	ListenForGameEvent( "player_death" );
 	ListenForGameEvent( "trok_dano" );
+	HOOK_HUD_MESSAGE( CHudTrok, Damage );
 	Reset();
 }
 
@@ -169,6 +194,28 @@ void CHudTrok::Reset( void )
 	m_szKillerWpn[ 0 ] = 0;
 	m_flKillerDist = -1.0f;
 	m_flDeathTime = 0.0f;
+	for ( int i = 0; i < ARRAYSIZE( m_Dmg ); ++i )
+		m_Dmg[ i ].flTime = -100.0f;
+	m_iDmgNext = 0;
+	for ( int i = 0; i <= MAX_PLAYERS; ++i )
+		m_flSpotted[ i ] = 0.0f;
+	m_flNextSpotCheck = 0.0f;
+}
+
+void CHudTrok::MsgFunc_Damage( bf_read &msg )
+{
+	msg.ReadByte();		// colete
+	msg.ReadByte();		// dano
+	msg.ReadLong();		// tipos de dano
+	Vector vecFrom;
+	vecFrom.x = msg.ReadFloat();
+	vecFrom.y = msg.ReadFloat();
+	vecFrom.z = msg.ReadFloat();
+	if ( vecFrom == vec3_origin )
+		return; // queda e dano sem origem: só a vinheta
+	m_Dmg[ m_iDmgNext ].vecFrom = vecFrom;
+	m_Dmg[ m_iDmgNext ].flTime = gpGlobals->curtime;
+	m_iDmgNext = ( m_iDmgNext + 1 ) % ARRAYSIZE( m_Dmg );
 }
 
 void CHudTrok::ApplySchemeSettings( IScheme *pScheme )
@@ -331,6 +378,10 @@ void CHudTrok::FireGameEvent( IGameEvent *event )
 		const int iDano = event->GetInt( "dano" );
 		const bool bHead = event->GetInt( "parte" ) == HITGROUP_HEAD;
 
+		// Quem acerta alguém aparece no radar dos inimigos por um instante.
+		if ( iAtk > 0 && iAtk <= MAX_PLAYERS )
+			m_flSpotted[ iAtk ] = MAX( m_flSpotted[ iAtk ], gpGlobals->curtime + 2.0f );
+
 		if ( event->GetInt( "vida" ) <= 0 && bHead )
 		{
 			m_iHeadVictim = iVic;
@@ -421,6 +472,9 @@ void CHudTrok::Paint( void )
 	PaintKillfeed();
 	if ( bSpectator || !pLocal->IsAlive() )
 		return;
+	PaintVignette( pLocal );
+	PaintRadar( pLocal );
+	PaintDamageDir( pLocal );
 	PaintHealth( pLocal );
 	PaintAmmo( pLocal );
 	PaintCrosshair( pLocal );
@@ -776,6 +830,143 @@ void CHudTrok::PaintKillPopup( void )
 	const bool bInfectou = TrokSurto_IsZumbi( C_BasePlayer::GetLocalPlayer() );
 	Text( m_hText, x, y, WithAlpha( bInfectou ? COR_ZUMBI : Accent(), iAlpha ), bInfectou ? "INFECTOU" : ( m_bPopupHead ? "ABATE · CABEÇA" : "ABATE" ) );
 	Text( m_hSmall, x, y + surface()->GetFontTall( m_hText ), WithAlpha( COR_CINZA, iAlpha ), m_szPopupName );
+}
+
+bool CHudTrok::IsAlly( C_BasePlayer *pLocal, int iPlayer ) const
+{
+	if ( !g_PR || iPlayer <= 0 )
+		return false;
+	if ( !( HL2MPRules() && HL2MPRules()->IsTeamplay() ) )
+		return false;
+	return g_PR->GetTeam( iPlayer ) == pLocal->GetTeamNumber();
+}
+
+// Arco vermelho em volta da mira apontando para de onde veio o dano.
+void CHudTrok::PaintDamageDir( C_BasePlayer *pLocal )
+{
+	const int cx = ScreenWidth() / 2, cy = ScreenHeight() / 2;
+	const float R = (float)S( 118 );
+	QAngle angView = pLocal->EyeAngles();
+	angView.x = angView.z = 0.0f;
+	Vector fwd, right;
+	AngleVectors( angView, &fwd, &right, NULL );
+
+	for ( int k = 0; k < ARRAYSIZE( m_Dmg ); ++k )
+	{
+		const float flAge = gpGlobals->curtime - m_Dmg[ k ].flTime;
+		if ( flAge < 0.0f || flAge > 1.3f )
+			continue;
+		const int iAlpha = flAge < 0.8f ? 230 : (int)( 230 * ( 1.3f - flAge ) / 0.5f );
+		Vector rel = m_Dmg[ k ].vecFrom - pLocal->EyePosition();
+		rel.z = 0.0f;
+		const float a = atan2f( DotProduct( rel, right ), DotProduct( rel, fwd ) ); // 0 = frente, + = direita
+		surface()->DrawSetColor( Color( 255, 72, 60, iAlpha ) );
+		const float span = DEG2RAD( 20.0f );
+		const int iSeg = 10;
+		for ( int t = 0; t < 4; ++t )	// espessura
+		{
+			const float r = R + t;
+			for ( int sgm = 0; sgm < iSeg; ++sgm )
+			{
+				const float a0 = a - span + 2.0f * span * sgm / iSeg;
+				const float a1 = a - span + 2.0f * span * ( sgm + 1 ) / iSeg;
+				surface()->DrawLine( cx + (int)( sinf( a0 ) * r ), cy - (int)( cosf( a0 ) * r ),
+									 cx + (int)( sinf( a1 ) * r ), cy - (int)( cosf( a1 ) * r ) );
+			}
+		}
+	}
+}
+
+// Pouca vida: bordas da tela avermelhando, pulsando de leve.
+void CHudTrok::PaintVignette( C_BasePlayer *pLocal )
+{
+	const float flLimite = trok_hud_vida_baixa.GetFloat();
+	if ( flLimite <= 0.0f || TrokSurto_IsZumbi( pLocal ) )
+		return;
+	const float flFrac = pLocal->GetHealth() / (float)MAX( 1, pLocal->GetMaxHealth() );
+	if ( flFrac >= flLimite )
+		return;
+	const float k = 1.0f - flFrac / flLimite;
+	const int a = (int)( k * ( 95.0f + 25.0f * sinf( gpGlobals->curtime * 4.0f ) ) );
+	const int w = ScreenWidth(), h = ScreenHeight();
+	surface()->DrawSetColor( Color( 170, 20, 20, 255 ) );
+	surface()->DrawFilledRectFade( 0, 0, w, h / 4, a, 0, false );
+	surface()->DrawFilledRectFade( 0, h * 3 / 4, w, h, 0, a, false );
+	surface()->DrawFilledRectFade( 0, 0, w / 5, h, a, 0, true );
+	surface()->DrawFilledRectFade( w * 4 / 5, 0, w, h, 0, a, true );
+}
+
+// Inimigo visível (linha de visão livre) aparece no radar por um segundo.
+void CHudTrok::UpdateSpotted( C_BasePlayer *pLocal )
+{
+	if ( gpGlobals->curtime < m_flNextSpotCheck )
+		return;
+	m_flNextSpotCheck = gpGlobals->curtime + 0.2f;
+	const Vector eye = pLocal->EyePosition();
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		C_BasePlayer *p = UTIL_PlayerByIndex( i );
+		if ( !p || p == pLocal || p->IsDormant() || !p->IsAlive() || IsAlly( pLocal, i ) )
+			continue;
+		trace_t tr;
+		UTIL_TraceLine( eye, p->EyePosition(), MASK_VISIBLE, pLocal, COLLISION_GROUP_NONE, &tr );
+		if ( tr.fraction > 0.98f || tr.m_pEnt == p )
+			m_flSpotted[ i ] = MAX( m_flSpotted[ i ], gpGlobals->curtime + 1.0f );
+	}
+}
+
+// Radar que gira com a visão: aliados sempre, inimigos só quando vistos ou atirando.
+void CHudTrok::PaintRadar( C_BasePlayer *pLocal )
+{
+	if ( !trok_hud_radar.GetBool() || !g_PR )
+		return;
+	UpdateSpotted( pLocal );
+
+	const int size = S( 176 );
+	const int x0 = S( 32 ), y0 = S( 28 );
+	const int cx = x0 + size / 2, cy = y0 + size / 2;
+	const float flRange = MAX( 200.0f, trok_hud_radar_alcance.GetFloat() );
+
+	surface()->DrawSetColor( Color( 11, 13, 16, 150 ) );
+	surface()->DrawFilledRect( x0, y0, x0 + size, y0 + size );
+	surface()->DrawSetColor( Color( 255, 255, 255, 36 ) );
+	surface()->DrawOutlinedRect( x0, y0, x0 + size, y0 + size );
+	surface()->DrawSetColor( Color( 255, 255, 255, 14 ) );
+	surface()->DrawLine( cx, y0 + 4, cx, y0 + size - 4 );
+	surface()->DrawLine( x0 + 4, cy, x0 + size - 4, cy );
+
+	QAngle angView = pLocal->EyeAngles();
+	angView.x = angView.z = 0.0f;
+	Vector fwd, right;
+	AngleVectors( angView, &fwd, &right, NULL );
+
+	const int dot = MAX( 3, S( 4 ) );
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		C_BasePlayer *p = UTIL_PlayerByIndex( i );
+		if ( !p || p == pLocal || p->IsDormant() || !p->IsAlive() )
+			continue;
+		const bool bAlly = IsAlly( pLocal, i );
+		if ( !bAlly && gpGlobals->curtime > m_flSpotted[ i ] )
+			continue;
+		Vector rel = p->GetAbsOrigin() - pLocal->GetAbsOrigin();
+		const float rx = DotProduct( rel, right ) / flRange;
+		const float ry = DotProduct( rel, fwd ) / flRange;
+		if ( fabsf( rx ) > 1.0f || fabsf( ry ) > 1.0f )
+			continue;
+		const int px = cx + (int)( rx * ( size / 2 - dot ) );
+		const int py = cy - (int)( ry * ( size / 2 - dot ) );
+		Color col = bAlly ? COR_ALIADO : ( TrokSurto_IsZumbi( p ) ? COR_ZUMBI : COR_INIMIGO );
+		surface()->DrawSetColor( col );
+		surface()->DrawFilledRect( px - dot / 2, py - dot / 2, px + dot / 2 + 1, py + dot / 2 + 1 );
+	}
+
+	// Você: seta para a frente
+	const int t = S( 7 );
+	surface()->DrawSetColor( COR_BRANCO );
+	surface()->DrawLine( cx, cy - t, cx - t * 2 / 3, cy + t * 2 / 3 );
+	surface()->DrawLine( cx, cy - t, cx + t * 2 / 3, cy + t * 2 / 3 );
+	surface()->DrawLine( cx - t * 2 / 3, cy + t * 2 / 3, cx + t * 2 / 3, cy + t * 2 / 3 );
 }
 
 void CHudTrok::PaintDeath( C_BasePlayer *pLocal )
