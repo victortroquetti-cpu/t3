@@ -28,6 +28,8 @@ WeaponData
 	"Trok"
 	{
 		"tiros_por_minuto"		"800"
+		"empurrao"		"28"		// u/s por bala acertada no zumbi (modo Surto)
+		"segurar"		"0.08"		// fração da velocidade do zumbi que cada bala tira
 		"automatica"		"1"
 		"balas_por_tiro"		"1"
 		"dano"		"24"

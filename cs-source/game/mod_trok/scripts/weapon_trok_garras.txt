@@ -1,0 +1,35 @@
+// Trok: garras do zumbi (modo Surto). Dano, alcance e cadência nas ConVars trok_surto_garra_*.
+// Modelo de protótipo: a faca do CS:S montado (TROCAR por garras próprias; design/conteudo-proprio.md).
+
+WeaponData
+{
+	"printname"				"Garras"
+	"viewmodel"				"models/weapons/v_knife_t.mdl"
+	"playermodel"			"models/weapons/w_knife_t.mdl"
+	"anim_prefix"			"crowbar"
+	"bucket"				"0"
+	"bucket_position"		"1"
+
+	"clip_size"				"-1"
+	"primary_ammo"			"None"
+	"secondary_ammo"		"None"
+
+	"weight"				"0"
+	"item_flags"			"0"
+
+	SoundData
+	{
+		"single_shot"		"Trok.Garras.Erro"
+		"melee_miss"		"Trok.Garras.Erro"
+		"melee_hit"			"Trok.Garras.Acerto"
+		"melee_hit_world"	"Trok.Garras.Parede"
+	}
+
+	TextureData
+	{
+		"weapon"	{ "font" "WeaponIcons"			"character" "c" }
+		"weapon_s"	{ "font" "WeaponIconsSelected"	"character" "c" }
+		"ammo"		{ "font" "WeaponIcons"			"character" "c" }
+		"autoaim"	{ "file" "sprites/crosshairs" "x" "48" "y" "72" "width" "24" "height" "24" }
+	}
+}

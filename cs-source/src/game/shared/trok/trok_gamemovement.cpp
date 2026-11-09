@@ -23,6 +23,7 @@
 #include "hl_gamemovement.h"
 #include "in_buttons.h"
 #include "movevars_shared.h"
+#include "trok_surto.h"
 #ifdef CLIENT_DLL
 #include "c_hl2mp_player.h"
 #include "c_world.h"
@@ -357,7 +358,10 @@ bool CTrokGameMovement::CheckJumpButton( void )
 
 	float flGravity = GetCurrentGravity();
 	float flBaseMul = g_bMovementOptimizations ? 160.0f : sqrtf( 2.0f * flGravity * GAMEMOVEMENT_JUMP_HEIGHT );
-	float flWantMul = sqrtf( 2.0f * flGravity * MAX( 1.0f, trok_pulo_altura.GetFloat() ) );
+	float flHeight = MAX( 1.0f, trok_pulo_altura.GetFloat() );
+	if ( TrokSurto_IsZumbi( player ) )
+		flHeight *= MAX( 0.1f, trok_surto_zumbi_pulo.GetFloat() );
+	float flWantMul = sqrtf( 2.0f * flGravity * flHeight );
 	surfacedata_t *pSurface = player->GetSurfaceData();
 	float flGroundFactor = pSurface ? pSurface->game.jumpFactor : 1.0f;
 

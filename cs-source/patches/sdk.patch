@@ -927,10 +927,26 @@ index 5fad238..0bcf9d6 100644
  
  	CNetworkQAngle( m_angEyeAngles );
 diff --git a/src/game/server/player.cpp b/src/game/server/player.cpp
-index b8a0519..fb9fc7e 100644
+index b8a0519..06da424 100644
 --- a/src/game/server/player.cpp
 +++ b/src/game/server/player.cpp
-@@ -1658,6 +1658,22 @@ int CBasePlayer::OnTakeDamage_Alive( const CTakeDamageInfo &info )
+@@ -947,7 +947,15 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
+ 		case HITGROUP_GENERIC:
+ 			break;
+ 		case HITGROUP_HEAD:
++#ifdef TROK
++		{
++			extern bool TrokRules_IgnoresHeadshot( CBasePlayer *pVictim ); // trok/trok_gamerules.cpp
++			if ( !TrokRules_IgnoresHeadshot( this ) )
++				info.ScaleDamage( sk_player_head.GetFloat() );
++		}
++#else
+ 			info.ScaleDamage( sk_player_head.GetFloat() );
++#endif
+ 			break;
+ 		case HITGROUP_CHEST:
+ 			info.ScaleDamage( sk_player_chest.GetFloat() );
+@@ -1658,6 +1666,24 @@ int CBasePlayer::OnTakeDamage_Alive( const CTakeDamageInfo &info )
  
          gameeventmanager->FireEvent( event );
  	}
@@ -949,6 +965,8 @@ index b8a0519..fb9fc7e 100644
 +		pTrokDano->SetInt( "vida", MAX( 0, m_iHealth ) );
 +		gameeventmanager->FireEvent( pTrokDano );
 +	}
++	extern void TrokRules_OnPlayerDamaged( CBasePlayer *pVictim, const CTakeDamageInfo &info ); // trok/trok_gamerules.cpp
++	TrokRules_OnPlayerDamaged( this, info );
 +#endif
  	
  	// Insert a combat sound so that nearby NPCs hear battle
@@ -1055,11 +1073,39 @@ index e54f63d..95c9f1d 100644
  	// Expose our interface.
  	static CHL2GameMovement g_GameMovement;
  	IGameMovement *g_pGameMovement = ( IGameMovement * )&g_GameMovement;
+diff --git a/src/game/shared/hl2mp/hl2mp_gamerules.cpp b/src/game/shared/hl2mp/hl2mp_gamerules.cpp
+index 87a3cf6..b3f4953 100644
+--- a/src/game/shared/hl2mp/hl2mp_gamerules.cpp
++++ b/src/game/shared/hl2mp/hl2mp_gamerules.cpp
+@@ -92,6 +92,9 @@ static const char *s_PreserveEnts[] =
+ 	"ai_network",
+ 	"ai_hint",
+ 	"hl2mp_gamerules",
++#ifdef TROK
++	"trok_surto_estado",	// estado da rodada do modo Surto (sobrevive à limpeza entre rodadas)
++#endif
+ 	"team_manager",
+ 	"player_manager",
+ 	"env_soundscape",
+diff --git a/src/game/shared/hl2mp/hl2mp_gamerules.h b/src/game/shared/hl2mp/hl2mp_gamerules.h
+index 78da217..b4fa5da 100644
+--- a/src/game/shared/hl2mp/hl2mp_gamerules.h
++++ b/src/game/shared/hl2mp/hl2mp_gamerules.h
+@@ -155,6 +155,9 @@ public:
+ 	
+ private:
+ 	
++#ifdef TROK
++	friend class CTrokRules;	// o modo Surto liga os times (trok/trok_gamerules.cpp)
++#endif
+ 	CNetworkVar( bool, m_bTeamPlayEnabled );
+ 	CNetworkVar( float, m_flGameStartTime );
+ 	CUtlVector<EHANDLE> m_hRespawnableItemsAndWeapons;
 diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
-index 9b83dce..a6cfe6c 100644
+index 9b83dce..e837f7c 100644
 --- a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
 +++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
-@@ -19,6 +19,34 @@ FileWeaponInfo_t* CreateWeaponInfo()
+@@ -19,6 +19,36 @@ FileWeaponInfo_t* CreateWeaponInfo()
  CHL2MPSWeaponInfo::CHL2MPSWeaponInfo()
  {
  	m_iPlayerDamage = 0;
@@ -1090,11 +1136,13 @@ index 9b83dce..a6cfe6c 100644
 +	m_flTrokADSMoveSpeed = 0.6f;
 +	m_flTrokMoveSpeed = 1.0f;
 +	Q_strncpy( m_szTrokAnim, "ar2", sizeof( m_szTrokAnim ) );
++	m_flTrokKnockback = 30.0f;
++	m_flTrokStagger = 0.08f;
 +#endif
  }
  
  
-@@ -27,6 +55,43 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
+@@ -27,6 +57,45 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
  	BaseClass::Parse( pKeyValuesData, szWeaponName );
  
  	m_iPlayerDamage = pKeyValuesData->GetInt( "damage", 0 );
@@ -1105,6 +1153,8 @@ index 9b83dce..a6cfe6c 100644
 +	{
 +		m_bTrok = true;
 +		m_flTrokRPM = pTrok->GetFloat( "tiros_por_minuto", m_flTrokRPM );
++		m_flTrokKnockback = pTrok->GetFloat( "empurrao", m_flTrokKnockback );
++		m_flTrokStagger = pTrok->GetFloat( "segurar", m_flTrokStagger );
 +		m_bTrokAuto = pTrok->GetInt( "automatica", m_bTrokAuto ? 1 : 0 ) != 0;
 +		m_iTrokPellets = MAX( 1, pTrok->GetInt( "balas_por_tiro", m_iTrokPellets ) );
 +		m_iTrokDamage = pTrok->GetInt( "dano", m_iTrokDamage );
@@ -1139,10 +1189,10 @@ index 9b83dce..a6cfe6c 100644
  
  
 diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.h b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
-index 2ec16dd..1cb581e 100644
+index 2ec16dd..bb7ef56 100644
 --- a/src/game/shared/hl2mp/hl2mp_weapon_parse.h
 +++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
-@@ -29,6 +29,36 @@ public:
+@@ -29,6 +29,38 @@ public:
  public:
  
  	int m_iPlayerDamage;
@@ -1175,6 +1225,8 @@ index 2ec16dd..1cb581e 100644
 +	float m_flTrokADSMoveSpeed;		// multiplicador da velocidade andando mirando
 +	float m_flTrokMoveSpeed;		// multiplicador da velocidade com a arma na mão (peso)
 +	char m_szTrokAnim[ 16 ];		// animação do jogador: ar2, smg1, pistol, shotgun
++	float m_flTrokKnockback;		// u/s de empurrão por bala acertada (modo Surto: zumbis)
++	float m_flTrokStagger;			// fração da velocidade que cada bala tira do zumbi (o "segurar")
 +#endif
  };
  

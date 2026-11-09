@@ -29,6 +29,7 @@
 
 #include "weapon_trok_gun.h"
 #include "weapon_hl2mpbasebasebludgeon.h"
+#include "trok_surto.h"
 #ifdef CLIENT_DLL
 #include "prediction.h"
 #endif
@@ -589,6 +590,10 @@ float TrokWeapon_MoveSpeedScale( CBasePlayer *pPlayer )
 	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pWeapon );
 	if ( pGun )
 		return pGun->GetMoveSpeedScale();
+
+	// Garras do zumbi (modo Surto).
+	if ( pWeapon && FClassnameIs( pWeapon, "weapon_trok_garras" ) )
+		return trok_surto_zumbi_velocidade.GetFloat();
 
 	// Arma branca (pé de cabra/cassetete hoje; a faca do Trok depois).
 	if ( dynamic_cast< CBaseHL2MPBludgeonWeapon * >( pWeapon ) )

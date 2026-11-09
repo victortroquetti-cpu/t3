@@ -95,3 +95,79 @@
 // 		"wave"	"trok/passos/concreto_3.wav"
 // 	}
 // }
+
+// ---------------------------------------------------------------- Modo Surto
+"Trok.Garras.Erro"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_NORM"
+	"pitch"			"95,105"
+	"wave"			"npc/zombie/claw_miss1.wav"		// TROCAR (som do HL2)
+}
+
+"Trok.Garras.Acerto"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_NORM"
+	"pitch"			"95,105"
+	"wave"			"npc/zombie/claw_strike1.wav"	// TROCAR (som do HL2)
+}
+
+"Trok.Garras.Parede"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_NORM"
+	"wave"			"npc/zombie/claw_strike2.wav"	// TROCAR (som do HL2)
+}
+
+"Trok.Surto.Alarme"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_NONE"
+	"wave"			"ambient/alarms/alarm1.wav"		// TROCAR (som do HL2): toca para todos
+}
+
+"Trok.Surto.Virou"
+{
+	"channel"		"CHAN_VOICE"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_85dB"
+	"wave"			"npc/zombie/zombie_alert1.wav"	// TROCAR (som do HL2): humano virou zumbi
+}
+
+"Trok.Grade.Fecha"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_80dB"
+	"wave"			"doors/door_metal_gate_close1.wav"	// TROCAR (som do HL2)
+}
+
+"Trok.Grade.Abre"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_80dB"
+	"wave"			"doors/door_metal_gate_move1.wav"	// TROCAR (som do HL2)
+}
+
+"Trok.Grade.Golpe"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_80dB"
+	"pitch"			"95,105"
+	"wave"			"physics/metal/metal_grate_impact_hard1.wav"	// TROCAR (som do HL2)
+}
+
+"Trok.Grade.Quebra"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_90dB"
+	"wave"			"physics/metal/metal_box_break1.wav"	// TROCAR (som do HL2)
+}
