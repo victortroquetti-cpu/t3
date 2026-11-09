@@ -146,7 +146,7 @@ e longe, abertura da mira, recuo) para os scripts `weapon_trok_*.txt`. Guia camp
   5. bots: correções do `PathFollower` do NT;RE (vãos, quedas, desvio), penalidade em área onde
      travou, supressão, bots usando a mira;
   6. tamanho do jogador: HL2MP 72 em pé / 36 agachado, olho agachado 28; CS:S 62 / 45, olho agachado 47
-     `GetViewVectors` com as medidas do CS:S nos mapas do CS:S (ver estudo DA/Momentum 1.4).
+     (avaliar `GetViewVectors` com as medidas do CS:S nos mapas do CS:S (ver estudo DA/Momentum 1.4g).
 
 ## O que o simulador mostrou (para não refazer)
 
