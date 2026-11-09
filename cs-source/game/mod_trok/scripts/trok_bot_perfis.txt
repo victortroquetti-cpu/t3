@@ -1,0 +1,117 @@
+// Trok: perfis dos bots por nível (hl2mp_bot_difficulty 0..3).
+//
+// Edite e rode "trok_bot_perfis_recarregar" no console; vale para os bots
+// que nascerem depois (hl2mp_bot_kick all + hl2mp_bot_add para testar).
+// Campo que faltar usa o padrão do código (trok_bot_profile.cpp).
+// Cada bot ainda sorteia uma variação de até trok_bot_personalidade (12%).
+//
+// Percepção
+//   reacao_min / reacao_max   s entre perceber e reagir (humano: 0.2-0.3; fraco: 0.4+)
+//   ganho_percepcao           velocidade da barra de percepção (1 = médio)
+//   campo_visao               graus do campo total em que percebe movimento (periferia)
+//   audicao                   multiplicador do raio de passos (correndo ~1100u)
+// Mira
+//   mira_erro_inicial         graus de erro ao começar a mirar num alvo novo
+//   mira_erro_minimo          graus que sobram mesmo focado (nunca zero: não é aimbot)
+//   mira_meia_vida            s para o erro cair pela metade
+//   mira_rastreio             graus de erro a cada 100 graus/s de movimento do alvo
+//   mira_tremor_ferido        graus somados ao levar dano
+//   chance_cabeca             0..1 de mirar na cabeça (cai com a distância)
+//   giro_max                  graus/s máximos de giro da cabeça
+//   intervalo_rastreio        s entre reavaliações de para onde o alvo está indo
+// Movimento e tática
+//   strafe_min / strafe_max   s de cada lado do strafe em combate (0 = não faz strafe)
+//   chance_agachar            0..1 de agachar no tiroteio
+//   agressividade             0..1 (0 = segura lugares bons, 1 = caça)
+//   uso_tatico                0..1 (quanto escolhe lugares pela nota do mapa tático)
+
+"TrokBotPerfis"
+{
+	"facil"
+	{
+		"reacao_min"			"0.45"
+		"reacao_max"			"0.70"
+		"ganho_percepcao"		"0.60"
+		"campo_visao"			"100"
+		"audicao"				"0.6"
+		"mira_erro_inicial"		"9.0"
+		"mira_erro_minimo"		"2.5"
+		"mira_meia_vida"		"0.60"
+		"mira_rastreio"			"4.0"
+		"mira_tremor_ferido"	"6.0"
+		"chance_cabeca"			"0.05"
+		"giro_max"				"180"
+		"intervalo_rastreio"	"0.45"
+		"strafe_min"			"0"
+		"strafe_max"			"0"
+		"chance_agachar"		"0"
+		"agressividade"			"0.60"
+		"uso_tatico"			"0.10"
+	}
+
+	"normal"
+	{
+		"reacao_min"			"0.30"
+		"reacao_max"			"0.45"
+		"ganho_percepcao"		"0.85"
+		"campo_visao"			"110"
+		"audicao"				"0.8"
+		"mira_erro_inicial"		"6.0"
+		"mira_erro_minimo"		"1.5"
+		"mira_meia_vida"		"0.40"
+		"mira_rastreio"			"3.0"
+		"mira_tremor_ferido"	"4.0"
+		"chance_cabeca"			"0.15"
+		"giro_max"				"300"
+		"intervalo_rastreio"	"0.25"
+		"strafe_min"			"0.5"
+		"strafe_max"			"1.1"
+		"chance_agachar"		"0.05"
+		"agressividade"			"0.50"
+		"uso_tatico"			"0.40"
+	}
+
+	"dificil"
+	{
+		"reacao_min"			"0.22"
+		"reacao_max"			"0.32"
+		"ganho_percepcao"		"1.00"
+		"campo_visao"			"120"
+		"audicao"				"1.0"
+		"mira_erro_inicial"		"4.0"
+		"mira_erro_minimo"		"0.9"
+		"mira_meia_vida"		"0.28"
+		"mira_rastreio"			"2.0"
+		"mira_tremor_ferido"	"3.0"
+		"chance_cabeca"			"0.30"
+		"giro_max"				"450"
+		"intervalo_rastreio"	"0.15"
+		"strafe_min"			"0.35"
+		"strafe_max"			"0.8"
+		"chance_agachar"		"0.12"
+		"agressividade"			"0.50"
+		"uso_tatico"			"0.70"
+	}
+
+	"expert"
+	{
+		"reacao_min"			"0.17"
+		"reacao_max"			"0.25"
+		"ganho_percepcao"		"1.15"
+		"campo_visao"			"130"
+		"audicao"				"1.1"
+		"mira_erro_inicial"		"3.0"
+		"mira_erro_minimo"		"0.6"
+		"mira_meia_vida"		"0.20"
+		"mira_rastreio"			"1.5"
+		"mira_tremor_ferido"	"2.5"
+		"chance_cabeca"			"0.45"
+		"giro_max"				"600"
+		"intervalo_rastreio"	"0.10"
+		"strafe_min"			"0.25"
+		"strafe_max"			"0.6"
+		"chance_agachar"		"0.18"
+		"agressividade"			"0.50"
+		"uso_tatico"			"0.90"
+	}
+}

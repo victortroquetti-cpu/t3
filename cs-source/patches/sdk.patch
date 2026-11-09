@@ -1,3 +1,99 @@
+diff --git a/src/game/server/hl2mp/bot/behavior/hl2mp_bot_behavior.h b/src/game/server/hl2mp/bot/behavior/hl2mp_bot_behavior.h
+index d74717c..1607b3e 100644
+--- a/src/game/server/hl2mp/bot/behavior/hl2mp_bot_behavior.h
++++ b/src/game/server/hl2mp/bot/behavior/hl2mp_bot_behavior.h
+@@ -34,7 +34,11 @@ public:
+ 
+ 	virtual const char *GetName( void ) const	{ return "MainAction"; };
+ 
++#ifdef TROK
++protected:	// cs-source/: CTrokBotMainAction herda e troca Dodge
++#else
+ private:
++#endif
+ 	CountdownTimer m_reloadTimer;
+ 	mutable CountdownTimer m_aimAdjustTimer;
+ 	mutable float m_aimErrorRadius;
+@@ -61,7 +65,7 @@ private:
+ 														   const CKnownEntity *threat2 ) const;
+ 
+ 
+-	void Dodge( CHL2MPBot *me );
++	virtual void Dodge( CHL2MPBot *me );
+ 
+ 	IntervalTimer m_undergroundTimer;
+ 
+diff --git a/src/game/server/hl2mp/bot/behavior/hl2mp_bot_scenario_monitor.cpp b/src/game/server/hl2mp/bot/behavior/hl2mp_bot_scenario_monitor.cpp
+index 2cdd0fc..d6e5cf9 100644
+--- a/src/game/server/hl2mp/bot/behavior/hl2mp_bot_scenario_monitor.cpp
++++ b/src/game/server/hl2mp/bot/behavior/hl2mp_bot_scenario_monitor.cpp
+@@ -9,6 +9,9 @@
+ 
+ #include "bot/hl2mp_bot.h"
+ #include "bot/hl2mp_bot_manager.h"
++#ifdef TROK
++#include "bot/trok_bot.h"
++#endif
+ #include "bot/behavior/nav_entities/hl2mp_bot_nav_ent_destroy_entity.h"
+ #include "bot/behavior/nav_entities/hl2mp_bot_nav_ent_move_to.h"
+ #include "bot/behavior/nav_entities/hl2mp_bot_nav_ent_wait.h"
+@@ -55,6 +58,12 @@ Action< CHL2MPBot > *CHL2MPBotScenarioMonitor::InitialContainedAction( CHL2MPBot
+ // Returns Action specific to the scenario and my class
+ Action< CHL2MPBot > *CHL2MPBotScenarioMonitor::DesiredScenarioAndClassAction( CHL2MPBot *me )
+ {
++#ifdef TROK
++	// cs-source/: cérebro tático do Trok (segurar lugares estratégicos ou caçar)
++	if ( Action< CHL2MPBot > *pTrok = TrokBot_ScenarioAction( me ) )
++		return pTrok;
++#endif
++
+ 	return new CHL2MPBotSeekAndDestroy;
+ }
+ 
+diff --git a/src/game/server/hl2mp/bot/hl2mp_bot.cpp b/src/game/server/hl2mp/bot/hl2mp_bot.cpp
+index 45f331d..efe639a 100644
+--- a/src/game/server/hl2mp/bot/hl2mp_bot.cpp
++++ b/src/game/server/hl2mp/bot/hl2mp_bot.cpp
+@@ -18,6 +18,10 @@
+ #include "hl2mp/weapon_physcannon.h"
+ 
+ #include "bot/behavior/hl2mp_bot_behavior.h"
++#ifdef TROK
++#include "bot/trok_bot.h"
++#include "bot/trok_bot_main_action.h"
++#endif
+ 
+ ConVar hl2mp_bot_notice_gunfire_range( "hl2mp_bot_notice_gunfire_range", "3000", FCVAR_GAMEDLL );
+ ConVar hl2mp_bot_notice_quiet_gunfire_range( "hl2mp_bot_notice_quiet_gunfire_range", "500", FCVAR_GAMEDLL );
+@@ -436,7 +440,11 @@ static ConCommand hl2mp_bot_warp_team_to_me( "hl2mp_bot_warp_team_to_me", CMD_Bo
+ 
+ 
+ //-----------------------------------------------------------------------------------------------------
++#ifdef TROK
++IMPLEMENT_INTENTION_INTERFACE( CHL2MPBot, CTrokBotMainAction );
++#else
+ IMPLEMENT_INTENTION_INTERFACE( CHL2MPBot, CHL2MPBotMainAction );
++#endif
+ 
+ 
+ //-----------------------------------------------------------------------------------------------------
+@@ -594,9 +602,16 @@ void CHL2MPBot::PressSpecialFireButton( float duration )
+ //-----------------------------------------------------------------------------------------------------
+ CHL2MPBot::CHL2MPBot()
+ {
++#ifdef TROK
++	// cs-source/: percepção, mira, giro e pulo dos bots do Trok (server/trok/bot/)
++	m_body = TrokBot_CreateBody( this );
++	m_locomotor = TrokBot_CreateLocomotion( this );
++	m_vision = TrokBot_CreateVision( this );
++#else
+ 	m_body = new CHL2MPBotBody( this );
+ 	m_locomotor = new CHL2MPBotLocomotion( this );
+ 	m_vision = new CHL2MPBotVision( this );
++#endif
+ 	ALLOCATE_INTENTION_INTERFACE( CHL2MPBot );
+ 
+ 	m_spawnArea = NULL;
 diff --git a/src/game/server/hl2mp/hl2mp_client.cpp b/src/game/server/hl2mp/hl2mp_client.cpp
 index 30d2181..18f69f4 100644
 --- a/src/game/server/hl2mp/hl2mp_client.cpp

@@ -98,3 +98,24 @@ Para um modo novo, o ponto natural é o `ScenarioMonitor`: ele escolhe a ação 
 
 Todos pedem `sv_cheats 1`. Para inspecionar um padrão: veja como `server/tf/bot/behavior/` faz
 missões e esquadrões (`tf_bot_squad`), e como `refs/zmr-game` faz IA de zumbi num mod MP.
+
+## Bots do Trok (já implementado)
+
+Código em `cs-source/src/game/server/trok/bot/`; desenho, números e fontes em `cs-source/design/bots.md`.
+O patch troca, com `#ifdef TROK`, as peças do `CHL2MPBot` (construtor e `IMPLEMENT_INTENTION_INTERFACE`
+em `hl2mp_bot.cpp`), torna `CHL2MPBotMainAction::Dodge` virtual/protegido e chama
+`TrokBot_ScenarioAction` no `CHL2MPBotScenarioMonitor`.
+
+| Peça | Arquivo | Ponto de extensão |
+|---|---|---|
+| Perfil (nível + personalidade) | `trok_bot_profile.*`, `game/mod_trok/scripts/trok_bot_perfis.txt` | `TrokBot_GetProfile( me )` em qualquer lugar |
+| Percepção | `trok_bot_vision.*` (`IsVisibleEntityNoticed`, `GetMinRecognizeTime`, `SetFieldOfView`) | `NoteGunfire`, `NoteNoise` para estímulos novos |
+| Giro / pulo agachado | `trok_bot_body.cpp` | `GetMaxHeadAngularVelocity`, `ClimbUpToLedge` |
+| Mira, strafe, audição | `trok_bot_main_action.*` | `SelectTargetPoint`, `Dodge`, `ShouldAttack` |
+| Mapa tático | `trok_bot_tactical.*` | `TrokTacticalMap().GetArea/GetRegion/FindHoldArea` |
+| Cérebro e segurar posição | `trok_bot_behaviors.cpp` | `TrokBot_ScenarioAction`: modo novo = ação nova aqui |
+
+Cuidados ao mexer:
+- `IsVisibleEntityNoticed` é chamado de vários lugares (via `IsAbleToSee`), então o acumulador é por tempo, não por chamada.
+- Consultas (`ShouldAttack`, `SelectTargetPoint`...) são respondidas pela ação mais funda primeiro; hoje só a ação raiz responde a elas no HL2MP. Confira com `grep` antes de contar com isso.
+- Equilíbrio: dificuldade nunca dá informação (posição sem ver) nem dano extra.
