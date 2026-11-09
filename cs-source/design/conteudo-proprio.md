@@ -4,6 +4,8 @@ Decisão do dono (09/11/2026): **tem que ser outro jogo.** Sons, animações, mo
 próprios. Estilo: sucessor de alma do Combat Arms, arcade, moderno, sem fotorrealismo, visual
 bonito e iluminação boa sem exagero. Referência de nível de acabamento: NEOTOKYO Rebuild.
 
+**Direção de arte e lore** (o que criar e com que cara): `design/lore-e-arte.md`.
+
 O código já está pronto para a troca: cada item abaixo diz **onde** se troca. Quando tudo
 estiver trocado, o CS:S sai do `gameinfo.txt` e o Trok roda só com o Source SDK Base 2013
 (grátis para qualquer um na Steam).
