@@ -226,7 +226,7 @@ void CTrokLoading::Paint( void )
 	// Marca
 	surface()->DrawSetColor( acc );
 	surface()->DrawFilledRect( S( 64 ), S( 48 ), S( 64 ) + S( 8 ), S( 48 ) + S( 26 ) );
-	Text( m_hLogo, S( 84 ), S( 44 ), colText, "TROK" );
+	Text( m_hLogo, S( 84 ), S( 44 ), colText, "REARMED" );
 
 	wchar_t wszInfo[ 512 ] = L"";
 	if ( m_pInfo )
@@ -258,7 +258,7 @@ void CTrokLoading::Paint( void )
 	const int iMapTall = surface()->GetFontTall( m_hMap );
 	const int yMap = h - S( 128 ) - iMapTall;
 	Text( m_hSmall, x, yMap - S( 22 ), acc, szMap[ 0 ] ? "PRÓXIMA PARTIDA" : "CARREGANDO" );
-	Text( m_hMap, x, yMap, colText, szMap[ 0 ] ? szMap : "TROK" );
+	Text( m_hMap, x, yMap, colText, szMap[ 0 ] ? szMap : "REARMED" );
 
 	// Dica
 	{

@@ -98,7 +98,7 @@ CTrokRules::~CTrokRules()
 
 const char *CTrokRules::GetGameDescription( void )
 {
-	return "Trok";
+	return "Rearmed"; // nome provisório do jogo (design/lore-e-arte.md)
 }
 
 #ifndef CLIENT_DLL

@@ -1,7 +1,7 @@
 "GameInfo"
 {
-	game	"Trok"
-	title	"TROK"
+	game	"Rearmed"
+	title	"REARMED"
 	type multiplayer_only
 	nomodels 0
 	nohimodel 1

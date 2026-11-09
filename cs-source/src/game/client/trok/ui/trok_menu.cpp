@@ -568,7 +568,7 @@ void CTrokMenu::RunRoot( void )
 
 	// Marca
 	Rect( x0, S( 48 ), S( 10 ), S( 34 ), acc );
-	TextSpaced( m_hLogo, x0 + S( 24 ), S( 46 ), COR_TEXTO, "TROK", S( 9 ) );
+	TextSpaced( m_hLogo, x0 + S( 24 ), S( 46 ), COR_TEXTO, "REARMED", S( 9 ) );
 
 	// Jogador (canto superior direito)
 	{

@@ -5,9 +5,9 @@ interface, textos. Referências são só inspiração de tom: nada de nomes, log
 
 ## Nome
 
-Favoritos do dono: **Rearmed**, **Re:Combat**, **Overrun** (decisão pendente). Proposta para
-combinar: o jogo se chama **Rearmed** (ou Re:Combat) e o modo de infecção passa a se chamar
-**Overrun** (hoje "Surto" no código). Conferir disponibilidade (Steam, Google, INPI) antes de fechar.
+- Jogo: **Rearmed** (provisório; já é o que aparece na tela), com um complemento a escolher.
+- Modo de infecção: **Surto** (decisão do dono: fica Surto).
+- Nomes internos do código continuam "trok" (pastas, ConVars, arquivos); não aparecem para o jogador.
 
 ## Premissa
 
@@ -25,8 +25,17 @@ Combat Arms e, em menor grau, a Umbrella: fachada limpa e corporativa, porões s
 - **Futuro (estilo zumbis do CoD)**: quebra de contenção em ondas, com tecnologia da corporação
   (armas experimentais, máquinas) espalhada pelo mapa.
 
-Nomes candidatos para a corporação (originais; conferir uso): **Vantrex**, **Kyron Industries**,
-**Aethon Dynamics**, **Veyra Systems**, **Halcyon Biotech**.
+Nome da corporação: o dono quer referência ao Combat Arms **ou** algo original com significado
+real, uma filosofia. Candidatos (conferir uso antes de fechar):
+
+| Nome | Significado | Por que combina |
+|---|---|---|
+| **Nexo** | em português, "ligação, sentido"; ecoa a corporação do Combat Arms | o nome promete sentido e coerência; por dentro, nada faz sentido. Lema: "Tudo tem nexo." |
+| **Telos** | grego, "finalidade": a ideia de que tudo se justifica pelo fim | a corporação justifica qualquer experimento pelo objetivo final |
+| **Arkhé** | grego, "princípio, origem" de tudo | busca a origem da vida para reescrevê-la; os monstros são o "rascunho" |
+| **Prometeia** | Prometeu roubou o fogo dos deuses e pagou o preço | tecnologia que dá poder e cobra caro |
+| **Kairos** | grego, "o momento certo" | lema "O futuro não espera"; pressa que gera o desastre |
+| **Armis** | latim, "pelas armas" | eco de "Arms"; empresa nascida da indústria militar |
 
 ## Tom e vibe
 

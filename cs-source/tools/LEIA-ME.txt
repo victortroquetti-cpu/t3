@@ -1,75 +1,52 @@
-TROK (mod de Source SDK 2013 Multiplayer) - versão de teste dos bots
-=====================================================================
+REARMED (nome provisório) - mod de Source SDK 2013 Multiplayer - versão de teste
+==================================================================================
 
 O QUE PRECISA ESTAR INSTALADO NA STEAM
   - Source SDK Base 2013 Multiplayer  (Biblioteca > Ferramentas)
-  - Counter-Strike: Source            (modelos, sons e mapas do CS:S)
+  - Counter-Strike: Source            (modelos, sons e mapas usados como provisórios)
 
 INSTALAR
   1. Feche a Steam.
   2. Copie a pasta "mod_trok" deste zip para:
        C:\Program Files (x86)\Steam\steamapps\sourcemods\
      (se a pasta "sourcemods" não existir, crie)
-  3. Abra a Steam. "Trok" aparece na Biblioteca. Rode.
+  3. Abra a Steam. "Rearmed" aparece na Biblioteca. Rode.
 
-TESTAR OS BOTS
-  No menu do jogo, abra o console (habilite em Opções > Teclado > Avançado).
-
-    map dm_lockdown
-    exec bots
-
-  Mapas do CS:S também abrem (map de_dust2, cs_office...). Neles os jogadores
-  nascem nos spawns de TR e CT. Bots precisam de nav mesh:
-
+JOGAR
+  Menu > JOGAR > escolha o modo, o mapa, a dificuldade, os bots e os estilos > INICIAR.
+    EQUIPE         mata-mata em equipe: meta de abates do time
+    EXÉRCITO SOLO  todos contra todos
+    SURTO          infecção: sobreviva até o fim do tempo (alarme e abrigos no fim)
+  Os bots precisam de nav mesh. Se ficarem parados: console (tecla ' ao lado do 1),
     nav_generate        (espere terminar; o mapa reinicia)
-    nav_analyze         (luz, visibilidade e esconderijos: deixa os bots bem melhores)
-    exec bots
+    nav_analyze         (opcional: deixa os bots bem melhores)
 
-  Comandos úteis (mire num bot e use nb_select antes dos de depuração):
-    trok_bot_estilos_info          nível e estilo de cada bot
-    trok_bot_estilo ancora         força um estilo nos próximos bots
-                                   (equilibrado, entry, lurker, ancora, suporte)
-    hl2mp_bot_difficulty 0..3      fácil, normal, difícil, expert (próximos bots)
-    hl2mp_bot_add / hl2mp_bot_kick all
-    nb_debug BEHAVIOR              o que o bot está fazendo
-    trok_bot_debug_percepcao 1     barra de percepção do bot sobre cada inimigo
-    trok_bot_debug_mira 1          onde ele mira e o erro em graus
-    trok_bot_tatico_mostrar 2000   pinta o chão pela nota tática (verde = bom para segurar)
+CONTROLES (se vierem errados: exec config_default no console)
+  Botão 2 (direito)            mira pelo cano
+  Shift                        corre (arma abaixa e não atira)
+  C                            caminha sem barulho de passo
+  Segurar pular contra borda   escala
+  Pular e apertar outra direção logo em seguida: vira no ar (caixa a caixa)
+  E (usar)                     no Surto: fecha e abre as grades dos abrigos
+  TAB                          placar (K/D, e no Surto infecções e zumbis abatidos)
 
-  Comparar com o bot padrão do HL2MP (liga/desliga cada parte):
-    trok_bot_mira_humana 0, trok_bot_ritmo_tiro 0, trok_bot_tatica 0,
-    trok_bot_faixa 0, trok_bot_rota_variedade 0, trok_bot_checar_cantos 0
-
-  Ajustar os níveis sem recompilar: edite mod_trok\scripts\trok_bot_perfis.txt,
-  rode trok_bot_perfis_recarregar e adicione os bots de novo.
-
-ARMAS (nasce com fuzil, pistola e pé de cabra; protótipo com modelos do CS:S)
-  Botão 2 (direito)            mira pelo cano (zoom, arma no centro, mais precisa)
-  Shift                        corre: arma abaixa e não atira
-  C                            caminha devagar e sem barulho de passo
+NÚMEROS (tudo sem recompilar)
+  cfg\movimento.cfg            velocidade, pulo, escalada, controle no ar
+  cfg\balanceamento.cfg        vida, dano por parte do corpo, armas iniciais, recuo
+  cfg\equipe.cfg, solo.cfg, surto.cfg   regras de cada modo
+  scripts\weapon_trok_*.txt    cada arma (cadência, dano, dispersão, mira, empurrão no zumbi)
   Alinhar a mira de cada arma: trok_mira_ajuste "direita cima frente pitch yaw roll",
                                depois trok_mira_imprimir e cole no script da arma
-  Todos os números: cfg\balanceamento.cfg, cfg\movimento.cfg e scripts\weapon_trok_*.txt
-  (se o teclado vier errado, rode exec config_default no console)
 
-MOVIMENTAÇÃO (carrega sozinha: server.cfg roda "exec balanceamento")
-  Sprint (Shift) + agachar     desliza
-  Segurar pular contra borda   escala (até ~80u)
-  Ajuste ao vivo no console:   trok_pulo_altura, trok_deslizar_*, trok_escalar_*,
-                               hl2_normspeed, hl2_sprintspeed (valores em cfg\movimento.cfg)
-
-MARCADOR DE ACERTO
-  Aparece no centro ao acertar alguém; vermelho e maior no abate.
-  trok_hitmarker 0 desliga; trok_hitmarker_som / trok_hitmarker_som_abate trocam o som.
-
-ALTERNATIVA (sem a pasta sourcemods)
-  mod_trok.exe / mod_trok_win64.exe, ao lado da pasta mod_trok, abrem o mod
-  direto (precisa da Steam aberta).
+DEPURAR BOTS (mire num bot e use nb_select antes)
+  nb_debug BEHAVIOR              o que o bot está fazendo
+  trok_bot_estilos_info          nível e estilo de cada bot
+  trok_bot_debug_percepcao 1     barra de percepção sobre cada inimigo
 
 ESTADO
-  Primeira versão compilada. Ainda não foi testada em partida: anote o que
-  parecer estranho (bot travado, olhando para o lado errado, atirando demais
-  ou de menos) e, se der, o que aparece em nb_debug BEHAVIOR na hora.
+  Compilado, ainda não testado em partida. Anote o que parecer estranho (menu fora
+  do lugar, fonte errada, bot travado, algo que trava) e mande print se der.
 
-O conteúdo do CS:S é montado do jogo instalado; ele não vem neste zip.
+O conteúdo do CS:S e do HL2 é montado dos jogos instalados; ele não vem neste zip.
 Código do mod sob a licença do Source 1 SDK (LICENSE_SOURCE_SDK.txt).
+Créditos de terceiros: mod_trok\CREDITOS.txt.
