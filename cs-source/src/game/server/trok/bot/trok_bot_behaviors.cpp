@@ -998,6 +998,37 @@ private:
 static ConVar trok_bot_zumbi_faro( "trok_bot_zumbi_faro", "1", FCVAR_CHEAT,
 	"Zumbis sem ninguém à vista vão na direção aproximada do humano mais perto (erro de ~300u, atualizado a cada 4 s)." );
 
+static ConVar trok_bot_zumbi_grupo( "trok_bot_zumbi_grupo", "3", FCVAR_CHEAT,
+	"Zumbis esperam juntar este tanto perto de um abrigo trancado antes de atacar a grade." );
+static ConVar trok_bot_zumbi_grupo_espera( "trok_bot_zumbi_grupo_espera", "10", FCVAR_CHEAT,
+	"Segundos máximos esperando o grupo antes de atacar o abrigo mesmo assim." );
+
+// Abrigo (info_trok_abrigo) em que a posição está, ou NULL.
+static CBaseEntity *AbrigoDe( const Vector &pos )
+{
+	CUtlVector< CBaseEntity * > abrigos;
+	TrokSurto_Abrigos( &abrigos );
+	FOR_EACH_VEC( abrigos, i )
+	{
+		const float r = TrokSurto_AbrigoRaio( abrigos[ i ] );
+		if ( ( abrigos[ i ]->GetAbsOrigin() - pos ).LengthSqr() < r * r )
+			return abrigos[ i ];
+	}
+	return NULL;
+}
+
+static int ZumbisPerto( const Vector &pos, float flRaio )
+{
+	int n = 0;
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CBasePlayer *p = UTIL_PlayerByIndex( i );
+		if ( p && p->IsAlive() && TrokSurto_IsZumbi( p ) && ( p->GetAbsOrigin() - pos ).LengthSqr() < flRaio * flRaio )
+			++n;
+	}
+	return n;
+}
+
 static CBasePlayer *NearestLivingHuman( CHL2MPBot *me )
 {
 	CBasePlayer *pBest = NULL;
@@ -1051,6 +1082,26 @@ public:
 		// Humano à vista: persegue e golpeia.
 		const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat( true );
 		CBaseEntity *pTarget = ( threat && threat->GetEntity() && threat->GetEntity()->IsAlive() ) ? threat->GetEntity() : NULL;
+
+		// Humano trancado num abrigo: espera juntar o grupo a uma distância antes de ir na grade
+		// (atacar um por um só dá abate de graça para quem está dentro).
+		CBaseEntity *pAlvoHumano = ( pTarget && TrokSurto_IsHumano( pTarget ) ) ? pTarget : NearestLivingHuman( me );
+		CBaseEntity *pAbrigo = pAlvoHumano ? AbrigoDe( pAlvoHumano->GetAbsOrigin() ) : NULL;
+		CBaseEntity *pGradeAbrigo = pAbrigo ? TrokSurto_GradeMaisPerto( pAbrigo->GetAbsOrigin(), TrokSurto_AbrigoRaio( pAbrigo ) + 200.0f, true ) : NULL;
+		if ( pGradeAbrigo && !me->IsRangeLessThan( pGradeAbrigo->WorldSpaceCenter(), 450.0f ) && me->IsRangeLessThan( pGradeAbrigo->WorldSpaceCenter(), 1100.0f ) )
+		{
+			if ( !m_groupTimer.HasStarted() )
+				m_groupTimer.Start( trok_bot_zumbi_grupo_espera.GetFloat() );
+			if ( !m_groupTimer.IsElapsed() && ZumbisPerto( me->GetAbsOrigin(), 600.0f ) < trok_bot_zumbi_grupo.GetInt() )
+			{
+				me->GetBodyInterface()->AimHeadTowards( pGradeAbrigo->WorldSpaceCenter(), IBody::INTERESTING, 0.5f, NULL, "Esperando o grupo" );
+				return Continue();
+			}
+		}
+		else if ( !pGradeAbrigo )
+		{
+			m_groupTimer.Invalidate();
+		}
 		if ( pTarget && TrokSurto_IsHumano( pTarget ) )
 		{
 			m_chase.Update( me, pTarget, cost );
@@ -1114,6 +1165,7 @@ private:
 	PathFollower m_path;
 	Vector m_vecGoal;
 	CountdownTimer m_goalTimer;
+	CountdownTimer m_groupTimer;
 	unsigned int m_nSeed;
 };
 

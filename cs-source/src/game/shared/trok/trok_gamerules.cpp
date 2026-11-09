@@ -47,6 +47,8 @@ ConVar trok_surto_regen_espera( "trok_surto_regen_espera", "3", FCVAR_NOTIFY, "S
 ConVar trok_surto_zumbi_sem_critico( "trok_surto_zumbi_sem_critico", "1", FCVAR_NOTIFY, "Zumbi não leva o multiplicador de tiro na cabeça." );
 ConVar trok_surto_empurrao( "trok_surto_empurrao", "1", FCVAR_NOTIFY, "Multiplica o empurrão e o 'segurar' das armas nos zumbis (0 = desliga)." );
 ConVar trok_surto_empurrao_max( "trok_surto_empurrao_max", "450", FCVAR_NOTIFY, "Velocidade horizontal máxima (u/s) que o empurrão pode dar." );
+ConVar trok_surto_zumbi_folego( "trok_surto_zumbi_folego", "2", FCVAR_NOTIFY, "Fôlego do zumbi correndo, em vezes o do humano (CA: o dobro)." );
+ConVar trok_surto_assistir( "trok_surto_assistir", "3", FCVAR_NOTIFY, "Segundos depois de morrer (sem virar zumbi) para passar a assistir os vivos." );
 ConVar trok_surto_cor_zumbi( "trok_surto_cor_zumbi", "150 225 140", FCVAR_NOTIFY, "Tom do zumbi enquanto não há modelo próprio (R G B)." );
 #endif
 
@@ -63,7 +65,11 @@ CTrokRules::CTrokRules()
 		m_bNaRodada[ i ] = false;
 		m_flUltimoDano[ i ] = -100.0f;
 		m_flProxRegen[ i ] = 0.0f;
+		m_flMorte[ i ] = 0.0f;
+		m_iRodadaInfec[ i ] = 0;
+		m_iRodadaZumbis[ i ] = 0;
 	}
+	m_flUltimoThink = 0.0f;
 	if ( m_bSurto )
 	{
 		// Surto é sempre em times (humanos x zumbis) e lê os números do cfg do modo.
@@ -269,6 +275,8 @@ void CTrokRules::SurtoThink( void )
 		}
 
 		SurtoRegenerar();
+		SurtoFolegoZumbi();
+		SurtoEspectadores();
 
 		if ( iHumanos == 0 )
 			SurtoFim( SURTO_ZUMBIS );
@@ -310,10 +318,13 @@ void CTrokRules::SurtoPreparo( void )
 		m_vecMorte[ i ] = vec3_invalid;
 		m_bHospedeiro[ i ] = false;
 		m_bNaRodada[ i ] = false;
+		m_iRodadaInfec[ i ] = 0;
+		m_iRodadaZumbis[ i ] = 0;
 
 		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
 		if ( !IsPlaying( pPlayer ) )
 			continue;
+		SurtoTirarDeEspectador( pPlayer );
 		SurtoTrocarTime( pPlayer, TEAM_TROK_HUMANOS );
 		if ( pPlayer->GetActiveWeapon() )
 			pPlayer->GetActiveWeapon()->Holster();
@@ -324,6 +335,9 @@ void CTrokRules::SurtoPreparo( void )
 	pEstado->m_iFase = SURTO_PREPARO;
 	pEstado->m_flFimFase = gpGlobals->curtime + MAX( 1.0f, trok_surto_preparo.GetFloat() );
 	pEstado->m_iVencedor = SURTO_NINGUEM;
+	pEstado->m_iDestaque = 0;
+	pEstado->m_iDestaqueTipo = SURTO_DESTAQUE_NENHUM;
+	pEstado->m_iDestaqueValor = 0;
 	pEstado->m_bAlarme = false;
 	pEstado->m_bAbrigos = false;
 	TrokSurto_DispararMapa( 0 );
@@ -382,6 +396,7 @@ void CTrokRules::SurtoVirarZumbi( CBasePlayer *pPlayer, bool bHospedeiro )
 	}
 	else
 	{
+		SurtoTirarDeEspectador( pPlayer );
 		if ( pPlayer->GetActiveWeapon() )
 			pPlayer->GetActiveWeapon()->Holster();
 		pPlayer->RemoveAllItems( true );
@@ -403,6 +418,27 @@ void CTrokRules::SurtoFim( int iVencedor )
 	CTeam *pTeam = GetGlobalTeam( iVencedor == SURTO_HUMANOS ? TEAM_TROK_HUMANOS : TEAM_TROK_ZUMBIS );
 	if ( pTeam )
 		pTeam->AddScore( 1 );
+
+	// Sobreviventes e destaque da rodada (quem mais infectou ou mais abateu zumbis).
+	int iBest = 0, iBestVal = 0, iBestTipo = SURTO_DESTAQUE_NENHUM;
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
+		if ( !IsPlaying( pPlayer ) )
+			continue;
+		if ( iVencedor == SURTO_HUMANOS && pPlayer->IsAlive() && pPlayer->GetTeamNumber() == TEAM_TROK_HUMANOS )
+			pEstado->m_aSobreviveu.Set( i, pEstado->m_aSobreviveu[ i ] + 1 );
+		const int iVal = ( iVencedor == SURTO_HUMANOS ) ? m_iRodadaZumbis[ i ] : m_iRodadaInfec[ i ];
+		if ( iVal > iBestVal )
+		{
+			iBestVal = iVal;
+			iBest = i;
+			iBestTipo = ( iVencedor == SURTO_HUMANOS ) ? SURTO_DESTAQUE_ZUMBIS : SURTO_DESTAQUE_INFECCOES;
+		}
+	}
+	pEstado->m_iDestaque = iBest;
+	pEstado->m_iDestaqueTipo = iBestTipo;
+	pEstado->m_iDestaqueValor = iBestVal;
 
 	TrokSurto_DispararMapa( iVencedor == SURTO_HUMANOS ? 4 : 5 );
 }
@@ -435,6 +471,63 @@ void CTrokRules::SurtoRegenerar( void )
 	}
 }
 
+// Morto que não vai virar zumbi passa a assistir quem está vivo (câmera atrás de alguém).
+void CTrokRules::SurtoEspectadores( void )
+{
+	const float flEspera = MAX( 0.5f, trok_surto_assistir.GetFloat() );
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
+		if ( !IsPlaying( pPlayer ) || pPlayer->IsAlive() || pPlayer->IsObserver() || m_flVirar[ i ] > 0.0f )
+			continue;
+		if ( gpGlobals->curtime - m_flMorte[ i ] < flEspera )
+			continue;
+		if ( pPlayer->StartObserverMode( OBS_MODE_CHASE ) )
+		{
+			// De preferência alguém do próprio time.
+			CBasePlayer *pAlvo = NULL;
+			for ( int j = 1; j <= gpGlobals->maxClients && !pAlvo; ++j )
+			{
+				CBasePlayer *p = UTIL_PlayerByIndex( j );
+				if ( p && p != pPlayer && p->IsAlive() && p->GetTeamNumber() == pPlayer->GetTeamNumber() )
+					pAlvo = p;
+			}
+			for ( int j = 1; j <= gpGlobals->maxClients && !pAlvo; ++j )
+			{
+				CBasePlayer *p = UTIL_PlayerByIndex( j );
+				if ( p && p != pPlayer && p->IsAlive() )
+					pAlvo = p;
+			}
+			if ( pAlvo )
+				pPlayer->SetObserverTarget( pAlvo );
+		}
+	}
+}
+
+void CTrokRules::SurtoTirarDeEspectador( CBasePlayer *pPlayer )
+{
+	if ( pPlayer->IsObserver() && pPlayer->GetTeamNumber() != TEAM_SPECTATOR )
+		pPlayer->StopObserverMode();
+}
+
+// Fôlego do zumbi: devolve parte do gasto da corrida (o HL2MP gasta 25/s correndo).
+void CTrokRules::SurtoFolegoZumbi( void )
+{
+	const float flNow = gpGlobals->curtime;
+	const float dt = clamp( flNow - m_flUltimoThink, 0.0f, 0.5f );
+	m_flUltimoThink = flNow;
+	const float flMult = MAX( 1.0f, trok_surto_zumbi_folego.GetFloat() );
+	if ( dt <= 0.0f || flMult <= 1.0f )
+		return;
+	const float flRefund = 25.0f * ( 1.0f - 1.0f / flMult ) * dt;
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CHL2_Player *pHL2 = dynamic_cast< CHL2_Player * >( UTIL_PlayerByIndex( i ) );
+		if ( pHL2 && pHL2->IsAlive() && pHL2->GetTeamNumber() == TEAM_TROK_ZUMBIS && pHL2->IsSprinting() )
+			pHL2->SuitPower_Charge( flRefund );
+	}
+}
+
 //-----------------------------------------------------------------------------
 // Morte, dano, itens
 //-----------------------------------------------------------------------------
@@ -447,6 +540,25 @@ void CTrokRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info
 		return;
 
 	const int i = pVictim->entindex();
+	m_flMorte[ i ] = gpGlobals->curtime;
+
+	// Estatísticas: infecção (zumbi matou humano) e zumbi abatido (humano matou zumbi).
+	CBasePlayer *pAttacker = ToBasePlayer( info.GetAttacker() );
+	if ( pAttacker && pAttacker != pVictim )
+	{
+		const int a = pAttacker->entindex();
+		if ( pAttacker->GetTeamNumber() == TEAM_TROK_ZUMBIS && pVictim->GetTeamNumber() == TEAM_TROK_HUMANOS )
+		{
+			pEstado->m_aInfeccoes.Set( a, pEstado->m_aInfeccoes[ a ] + 1 );
+			++m_iRodadaInfec[ a ];
+		}
+		else if ( pAttacker->GetTeamNumber() == TEAM_TROK_HUMANOS && pVictim->GetTeamNumber() == TEAM_TROK_ZUMBIS )
+		{
+			pEstado->m_aZumbisAbatidos.Set( a, pEstado->m_aZumbisAbatidos[ a ] + 1 );
+			++m_iRodadaZumbis[ a ];
+		}
+	}
+
 	if ( pVictim->GetTeamNumber() == TEAM_TROK_HUMANOS )
 	{
 		// Humano que morre na rodada (garra, queda, o que for) levanta zumbi.

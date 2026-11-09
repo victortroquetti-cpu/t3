@@ -11,6 +11,7 @@
 #include "c_playerresource.h"
 #include "c_team.h"
 #include "hl2mp_gamerules.h"
+#include "trok/trok_surto.h"
 #include <game/client/iviewport.h>
 #include <vgui/ISurface.h>
 #include <vgui/IScheme.h>
@@ -164,14 +165,26 @@ int CTrokScoreboard::PaintTeam( int x, int y, int w, int iTeam, const char *pszT
 	surface()->DrawSetColor( colTeam );
 	surface()->DrawFilledRect( x, y, x + w, y + S( 3 ) );
 
-	// Colunas (da direita para a esquerda)
+	// Colunas (da direita para a esquerda). K/D como no Combat Arms; no Surto, mais
+	// infecções e zumbis abatidos.
+	CTrokSurtoEstado *pSurto = TrokSurto_Ativo() ? TrokSurto_Estado() : NULL;
+	const int iCol = S( 82 );
 	const int xPing = x + w - S( 18 );
-	const int xMortes = xPing - S( 90 );
-	const int xAbates = xMortes - S( 90 );
+	const int xZumbis = pSurto ? xPing - iCol : xPing;
+	const int xInfec = pSurto ? xZumbis - iCol : xPing;
+	const int xKD = ( pSurto ? xInfec : xPing ) - iCol;
+	const int xMortes = xKD - iCol;
+	const int xAbates = xMortes - iCol;
 	const int hy = y + S( 16 );
 	Text( m_hHeading, x + S( 18 ), hy - S( 4 ), colTeam, pszTitle );
 	TextRight( m_hSmall, xAbates, hy, COR_TEXTO3, "ABATES" );
 	TextRight( m_hSmall, xMortes, hy, COR_TEXTO3, "MORTES" );
+	TextRight( m_hSmall, xKD, hy, COR_TEXTO3, "K/D" );
+	if ( pSurto )
+	{
+		TextRight( m_hSmall, xInfec, hy, COR_TEXTO3, "INFECÇÕES" );
+		TextRight( m_hSmall, xZumbis, hy, COR_TEXTO3, "ZUMBIS" );
+	}
 	TextRight( m_hSmall, xPing, hy, COR_TEXTO3, "PING" );
 
 	int ry = y + S( 3 ) + iHead;
@@ -207,6 +220,15 @@ int CTrokScoreboard::PaintTeam( int x, int y, int w, int iTeam, const char *pszT
 		TextRight( m_hBody, xAbates, ty, COR_TEXTO, sz );
 		V_snprintf( sz, sizeof( sz ), "%d", g_PR->GetDeaths( i ) );
 		TextRight( m_hBody, xMortes, ty, COR_TEXTO2, sz );
+		V_snprintf( sz, sizeof( sz ), "%.2f", g_PR->GetPlayerScore( i ) / (float)MAX( 1, g_PR->GetDeaths( i ) ) );
+		TextRight( m_hBody, xKD, ty, COR_TEXTO, sz );
+		if ( pSurto )
+		{
+			V_snprintf( sz, sizeof( sz ), "%d", pSurto->GetInfeccoes( i ) );
+			TextRight( m_hBody, xInfec, ty, COR_TEXTO2, sz );
+			V_snprintf( sz, sizeof( sz ), "%d", pSurto->GetZumbisAbatidos( i ) );
+			TextRight( m_hBody, xZumbis, ty, COR_TEXTO2, sz );
+		}
 		if ( g_PR->IsFakePlayer( i ) )
 			V_strncpy( sz, "—", sizeof( sz ) );
 		else
@@ -241,7 +263,7 @@ void CTrokScoreboard::Paint( void )
 
 	// Cabeçalho
 	const Color acc = Accent();
-	Text( m_hSmall, x, y, acc, bTeams ? "MATA-MATA EM EQUIPE" : "MATA-MATA" );
+	Text( m_hSmall, x, y, acc, TrokSurto_Ativo() ? "SURTO" : ( bTeams ? "MATA-MATA EM EQUIPE" : "MATA-MATA" ) );
 	char szMap[ 128 ] = "";
 	if ( engine->GetLevelName() )
 	{
@@ -286,7 +308,14 @@ void CTrokScoreboard::Paint( void )
 
 	y += S( 88 );
 
-	if ( bTeams )
+	if ( TrokSurto_Ativo() )
+	{
+		// No Surto os lados mudam durante a rodada: nomes fixos.
+		const int iRows = MAX( 1, ( sh - y - S( 120 ) ) / 2 / S( 34 ) );
+		y += PaintTeam( x, y, w, TEAM_TROK_HUMANOS, "HUMANOS", COR_ALIADO, iRows ) + S( 16 );
+		y += PaintTeam( x, y, w, TEAM_TROK_ZUMBIS, "INFECTADOS", Color( 140, 224, 90, 255 ), iRows ) + S( 16 );
+	}
+	else if ( bTeams )
 	{
 		const int iRows = MAX( 1, ( sh - y - S( 120 ) ) / 2 / S( 34 ) );
 		y += PaintTeam( x, y, w, iMyTeam, "SEU TIME", COR_ALIADO, iRows ) + S( 16 );

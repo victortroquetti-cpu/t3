@@ -28,6 +28,12 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokSurtoEstado, DT_TrokSurtoEstado )
 	RecvPropBool( RECVINFO( m_bAbrigos ) ),
 	RecvPropInt( RECVINFO( m_iHumanos ) ),
 	RecvPropInt( RECVINFO( m_iZumbis ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aInfeccoes ), RecvPropInt( RECVINFO( m_aInfeccoes[ 0 ] ) ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aZumbisAbatidos ), RecvPropInt( RECVINFO( m_aZumbisAbatidos[ 0 ] ) ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aSobreviveu ), RecvPropInt( RECVINFO( m_aSobreviveu[ 0 ] ) ) ),
+	RecvPropInt( RECVINFO( m_iDestaque ) ),
+	RecvPropInt( RECVINFO( m_iDestaqueTipo ) ),
+	RecvPropInt( RECVINFO( m_iDestaqueValor ) ),
 #else
 	SendPropInt( SENDINFO( m_iFase ), 3, SPROP_UNSIGNED ),
 	SendPropFloat( SENDINFO( m_flFimFase ), 0, SPROP_NOSCALE ),
@@ -36,6 +42,12 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokSurtoEstado, DT_TrokSurtoEstado )
 	SendPropBool( SENDINFO( m_bAbrigos ) ),
 	SendPropInt( SENDINFO( m_iHumanos ), 7, SPROP_UNSIGNED ),
 	SendPropInt( SENDINFO( m_iZumbis ), 7, SPROP_UNSIGNED ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aInfeccoes ), SendPropInt( SENDINFO_ARRAY( m_aInfeccoes ), 10, SPROP_UNSIGNED ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aZumbisAbatidos ), SendPropInt( SENDINFO_ARRAY( m_aZumbisAbatidos ), 10, SPROP_UNSIGNED ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aSobreviveu ), SendPropInt( SENDINFO_ARRAY( m_aSobreviveu ), 8, SPROP_UNSIGNED ) ),
+	SendPropInt( SENDINFO( m_iDestaque ), 7, SPROP_UNSIGNED ),
+	SendPropInt( SENDINFO( m_iDestaqueTipo ), 2, SPROP_UNSIGNED ),
+	SendPropInt( SENDINFO( m_iDestaqueValor ), 8, SPROP_UNSIGNED ),
 #endif
 END_NETWORK_TABLE()
 
@@ -50,6 +62,15 @@ CTrokSurtoEstado::CTrokSurtoEstado()
 	m_bAbrigos = false;
 	m_iHumanos = 0;
 	m_iZumbis = 0;
+	for ( int i = 0; i <= MAX_PLAYERS; ++i )
+	{
+		m_aInfeccoes.Set( i, 0 );
+		m_aZumbisAbatidos.Set( i, 0 );
+		m_aSobreviveu.Set( i, 0 );
+	}
+	m_iDestaque = 0;
+	m_iDestaqueTipo = SURTO_DESTAQUE_NENHUM;
+	m_iDestaqueValor = 0;
 	s_hEstado = this;
 }
 

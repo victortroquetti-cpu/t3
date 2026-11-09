@@ -567,6 +567,18 @@ void CHudTrok::PaintSurtoTop( void )
 		surface()->DrawSetColor( Color( 11, 13, 16, 170 ) );
 		surface()->DrawFilledRect( 0, ty - S( 16 ), ScreenWidth(), ty + S( 70 ) );
 		Text( m_hNum, cx - TextWide( m_hNum, pszTitulo ) / 2, ty, bHumanos ? COR_ALIADO : COR_ZUMBI, pszTitulo );
+		// Destaque da rodada
+		if ( pEstado->GetDestaque() > 0 && g_PR && g_PR->IsConnected( pEstado->GetDestaque() ) )
+		{
+			char szDest[ 160 ];
+			const int v = pEstado->GetDestaqueValor();
+			if ( pEstado->GetDestaqueTipo() == SURTO_DESTAQUE_INFECCOES )
+				V_snprintf( szDest, sizeof( szDest ), "DESTAQUE: %s · %d %s", g_PR->GetPlayerName( pEstado->GetDestaque() ), v, v == 1 ? "infecção" : "infecções" );
+			else
+				V_snprintf( szDest, sizeof( szDest ), "DESTAQUE: %s · %d %s", g_PR->GetPlayerName( pEstado->GetDestaque() ), v, v == 1 ? "zumbi abatido" : "zumbis abatidos" );
+			Text( m_hText, cx - TextWide( m_hText, szDest ) / 2, ty - S( 34 ), Accent(), szDest );
+		}
+
 		char szProx[ 48 ];
 		V_snprintf( szProx, sizeof( szProx ), "Nova rodada em %d", (int)ceilf( flLeft ) );
 		Text( m_hSmall, cx - TextWide( m_hSmall, szProx ) / 2, ty + surface()->GetFontTall( m_hNum ) + S( 6 ), COR_CINZA, szProx );

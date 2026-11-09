@@ -28,6 +28,13 @@ enum TrokSurtoFase_t
 	SURTO_FIM,			// mostra o vencedor, depois rodada nova
 };
 
+enum TrokSurtoDestaque_t
+{
+	SURTO_DESTAQUE_NENHUM = 0,
+	SURTO_DESTAQUE_INFECCOES,		// zumbi que mais infectou na rodada
+	SURTO_DESTAQUE_ZUMBIS,			// humano que mais abateu zumbis na rodada
+};
+
 enum TrokSurtoVencedor_t
 {
 	SURTO_NINGUEM = 0,
@@ -56,6 +63,14 @@ public:
 	int GetHumanosVivos( void ) const { return m_iHumanos; }
 	int GetZumbisVivos( void ) const { return m_iZumbis; }
 
+	// Estatísticas do mapa (por índice de jogador) e destaque da última rodada.
+	int GetInfeccoes( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aInfeccoes[ i ] : 0; }
+	int GetZumbisAbatidos( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aZumbisAbatidos[ i ] : 0; }
+	int GetSobreviveu( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aSobreviveu[ i ] : 0; }
+	int GetDestaque( void ) const { return m_iDestaque; }
+	int GetDestaqueTipo( void ) const { return m_iDestaqueTipo; }		// TrokSurtoDestaque_t
+	int GetDestaqueValor( void ) const { return m_iDestaqueValor; }
+
 	CNetworkVar( int, m_iFase );
 	CNetworkVar( float, m_flFimFase );		// curtime em que a fase acaba
 	CNetworkVar( int, m_iVencedor );
@@ -63,6 +78,12 @@ public:
 	CNetworkVar( bool, m_bAbrigos );
 	CNetworkVar( int, m_iHumanos );
 	CNetworkVar( int, m_iZumbis );
+	CNetworkArray( int, m_aInfeccoes, MAX_PLAYERS + 1 );
+	CNetworkArray( int, m_aZumbisAbatidos, MAX_PLAYERS + 1 );
+	CNetworkArray( int, m_aSobreviveu, MAX_PLAYERS + 1 );
+	CNetworkVar( int, m_iDestaque );
+	CNetworkVar( int, m_iDestaqueTipo );
+	CNetworkVar( int, m_iDestaqueValor );
 };
 
 CTrokSurtoEstado *TrokSurto_Estado( void );

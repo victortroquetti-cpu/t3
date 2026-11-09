@@ -15,7 +15,7 @@ bots prontos e espertos para o modo. Tudo foi feito na nuvem e **nada foi testad
 | Vencer | humanos: sobreviver até o fim ou destruir todos os infectados; infectados: infectar todos (wiki) | igual; zumbi morto fica morto (`trok_surto_zumbi_renasce 0`) |
 | Recuperação | 10% da vida a cada 3 s parado, para ao se mexer ou levar dano (wiki; outra fonte diz 1 s) | `trok_surto_regen*` |
 | Crítico | infectado não leva crítico (PCInvasion) | `trok_surto_zumbi_sem_critico 1` |
-| Vida / fôlego | mais vida e o dobro de fôlego (PCInvasion) | vida por ConVar; **fôlego em dobro ainda não** |
+| Vida / fôlego | mais vida e o dobro de fôlego (PCInvasion) | vida por ConVar; `trok_surto_zumbi_folego 2` |
 | Alarme / abrigos | relato do dono (mapa estilo "Overdose"): alarme faltando 1:20, abrigos abrem faltando 1:00, humanos trancam grades, zumbis quebram | `trok_surto_alarme 80`, `trok_surto_abrigos 60`, entidades abaixo |
 | Tiro segura e empurra | pedido do dono | campos `empurrao` e `segurar` no bloco "Trok" de cada arma (escopeta segura mais) |
 
@@ -57,6 +57,18 @@ Fontes (a rede da nuvem bloqueia o wiki; resumo vindo da busca):
   abrigos abrem, vai ao `info_trok_abrigo` mais perto e fecha a grade quando há zumbi vindo. Em
   luta, recua atirando, troca de lado e pula quando o zumbi encosta (`trok_bot_recuo_dist`).
 - Bot que vira hospedeiro vivo recomeça o cérebro como zumbi.
+- Humano trancado num abrigo: os zumbis bots esperam juntar `trok_bot_zumbi_grupo` (3) a uma
+  distância da grade, até `trok_bot_zumbi_grupo_espera` (10 s), e atacam juntos.
+
+## Placar e rodada
+
+- TAB com K/D (abates / mortes) como no Combat Arms; no Surto, mais INFECÇÕES e ZUMBIS
+  (abatidos) por jogador, no mapa todo, e os lados com nomes fixos (HUMANOS / INFECTADOS).
+- Fim da rodada: destaque (quem mais infectou, se os zumbis venceram; quem mais abateu zumbis,
+  se os humanos venceram). Sobreviventes da rodada contam em `m_aSobreviveu`.
+- Morto que não vai levantar zumbi passa a assistir os vivos (câmera atrás de alguém do próprio
+  time) depois de `trok_surto_assistir` segundos.
+- Zumbi correndo gasta metade do fôlego (`trok_surto_zumbi_folego 2`).
 
 ## Como testar (local)
 
@@ -71,7 +83,7 @@ Fontes (a rede da nuvem bloqueia o wiki; resumo vindo da busca):
 
 - Modelo, animações e sons de zumbi próprios (hoje: modelo do Combine com tom verde, faca do CS:S
   como garras, sons do HL2). Ver `design/conteudo-proprio.md`.
-- Fôlego em dobro do zumbi, habilidades de infectado, pontuação própria do modo.
+- Habilidades de infectado, pontos/XP por rodada (progressão).
 - Mapa no estilo do Overdose com abrigos e grades (Hammer, `design/medidas-mapas.md`).
 - Bot humano usando grade sem abrigo marcado; zumbi esperando agrupar antes de atacar abrigo.
 - Depois: modo zumbis no estilo CoD (PvE em rodadas), que é outro modo.

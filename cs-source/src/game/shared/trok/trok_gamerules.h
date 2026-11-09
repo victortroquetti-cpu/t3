@@ -59,6 +59,9 @@ private:
 	void SurtoTrocarTime( CBasePlayer *pPlayer, int iTeam );
 	void SurtoContar( int &iHumanos, int &iZumbis );
 	void SurtoRegenerar( void );
+	void SurtoEspectadores( void );
+	void SurtoFolegoZumbi( void );
+	void SurtoTirarDeEspectador( CBasePlayer *pPlayer );
 
 	bool m_bSurto;
 	CHandle< CTrokSurtoEstado > m_hEstado;
@@ -69,6 +72,10 @@ private:
 	bool m_bNaRodada[ MAX_PLAYERS + 1 ];			// estava no jogo quando a rodada começou
 	float m_flUltimoDano[ MAX_PLAYERS + 1 ];
 	float m_flProxRegen[ MAX_PLAYERS + 1 ];
+	float m_flMorte[ MAX_PLAYERS + 1 ];			// quando morreu (para ir assistir)
+	int m_iRodadaInfec[ MAX_PLAYERS + 1 ];			// infecções nesta rodada
+	int m_iRodadaZumbis[ MAX_PLAYERS + 1 ];			// zumbis abatidos nesta rodada
+	float m_flUltimoThink;
 #endif
 };
 
