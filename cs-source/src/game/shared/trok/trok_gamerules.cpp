@@ -11,6 +11,8 @@
 	#include "weapon_hl2mpbase.h"
 	#include "hl2mp_weapon_parse.h"
 	#include "trok/weapon_trok_gun.h"
+	#include "NextBot/NextBotInterface.h"
+	#include "NextBot/NextBotIntentionInterface.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -136,6 +138,11 @@ void CTrokRules::SurtoTrocarTime( CBasePlayer *pPlayer, int iTeam )
 	CHL2MP_Player *pHL2MP = dynamic_cast< CHL2MP_Player * >( pPlayer );
 	if ( pHL2MP )
 		pHL2MP->SetPlayerTeamModel();
+
+	// Bot que muda de lado (hospedeiro sorteado vivo) recomeça o cérebro como zumbi/humano.
+	INextBot *pBot = pPlayer->MyNextBotPointer();
+	if ( pBot && pBot->GetIntentionInterface() )
+		pBot->GetIntentionInterface()->Reset();
 }
 
 void CTrokRules::SurtoAplicarHumano( CBasePlayer *pPlayer )

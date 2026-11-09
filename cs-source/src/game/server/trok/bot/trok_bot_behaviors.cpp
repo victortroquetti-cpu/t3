@@ -28,6 +28,8 @@
 #include "nav_area.h"
 #include "NextBot/Path/NextBotPathFollow.h"
 #include "NextBot/Path/NextBotChasePath.h"
+#include "trok/trok_surto.h"
+#include "trok/trok_surto_mapa.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -990,6 +992,240 @@ private:
 };
 
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Modo Surto (design/modo-surto.md)
+//-----------------------------------------------------------------------------
+static ConVar trok_bot_zumbi_faro( "trok_bot_zumbi_faro", "1", FCVAR_CHEAT,
+	"Zumbis sem ninguém à vista vão na direção aproximada do humano mais perto (erro de ~300u, atualizado a cada 4 s)." );
+
+static CBasePlayer *NearestLivingHuman( CHL2MPBot *me )
+{
+	CBasePlayer *pBest = NULL;
+	float flBest = FLT_MAX;
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CBasePlayer *p = UTIL_PlayerByIndex( i );
+		if ( !p || !p->IsAlive() || !TrokSurto_IsHumano( p ) )
+			continue;
+		const float d = me->GetRangeSquaredTo( p );
+		if ( d < flBest )
+		{
+			flBest = d;
+			pBest = p;
+		}
+	}
+	return pBest;
+}
+
+// Zumbi: caça o humano mais perto. Cada zumbi tem sua preferência de rota (custo com
+// variedade e penalidade de rota do time), então eles chegam por lados diferentes (cerco).
+// Grade fechada no caminho: bate até quebrar.
+class CTrokBotZumbi : public Action< CHL2MPBot >
+{
+public:
+	CTrokBotZumbi() : m_chase( ChasePath::LEAD_SUBJECT ), m_vecGoal( vec3_invalid ) {}
+
+	virtual ActionResult< CHL2MPBot > OnStart( CHL2MPBot *me, Action< CHL2MPBot > *priorAction )
+	{
+		m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
+		m_nSeed = (unsigned int)me->entindex() * 2654435761u + (unsigned int)( gpGlobals->curtime * 10.0f );
+		return Continue();
+	}
+
+	virtual ActionResult< CHL2MPBot > Update( CHL2MPBot *me, float interval )
+	{
+		if ( !TrokSurto_IsZumbi( me ) )
+			return Done( "Não é mais zumbi" );
+
+		CTrokBotPathCost cost( me, m_nSeed );
+
+		// Grade fechada encostada: quebra.
+		CBaseEntity *pGrade = TrokSurto_GradeMaisPerto( me->WorldSpaceCenter(), 110.0f, true );
+		if ( pGrade )
+		{
+			me->GetBodyInterface()->AimHeadTowards( pGrade->WorldSpaceCenter(), IBody::IMPORTANT, 0.3f, NULL, "Quebrar a grade" );
+			me->PressFireButton( 0.1f );
+			return Continue();
+		}
+
+		// Humano à vista: persegue e golpeia.
+		const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat( true );
+		CBaseEntity *pTarget = ( threat && threat->GetEntity() && threat->GetEntity()->IsAlive() ) ? threat->GetEntity() : NULL;
+		if ( pTarget && TrokSurto_IsHumano( pTarget ) )
+		{
+			m_chase.Update( me, pTarget, cost );
+			if ( me->IsRangeLessThan( pTarget, 90.0f ) )
+			{
+				me->GetBodyInterface()->AimHeadTowards( pTarget->WorldSpaceCenter(), IBody::IMPORTANT, 0.2f, NULL, "Golpear" );
+				me->PressFireButton( 0.1f );
+			}
+			// Humano em cima de caixa, perto: pula atrás (zumbi pula mais alto).
+			const float flUp = pTarget->GetAbsOrigin().z - me->GetAbsOrigin().z;
+			if ( flUp > 30.0f && me->IsRangeLessThan( pTarget, 160.0f ) && me->GetLocomotionInterface()->IsOnGround() )
+				me->PressJumpButton( 0.1f );
+			return Continue();
+		}
+
+		// Ninguém à vista: vai para onde o faro manda (direção aproximada do humano mais perto).
+		if ( m_goalTimer.IsElapsed() || m_vecGoal == vec3_invalid )
+		{
+			m_goalTimer.Start( RandomFloat( 3.0f, 5.0f ) );
+			CBasePlayer *pHuman = trok_bot_zumbi_faro.GetBool() ? NearestLivingHuman( me ) : NULL;
+			if ( pHuman )
+			{
+				Vector vecGoal = pHuman->GetAbsOrigin() + Vector( RandomFloat( -300.0f, 300.0f ), RandomFloat( -300.0f, 300.0f ), 0.0f );
+				CNavArea *pArea = TheNavMesh->GetNearestNavArea( vecGoal, true, 600.0f );
+				m_vecGoal = pArea ? pArea->GetCenter() : pHuman->GetAbsOrigin();
+			}
+			else
+			{
+				CNavArea *pArea = TheNavMesh->GetNavAreaCount() ? TheNavMesh->GetNavAreaByID( RandomInt( 1, TheNavMesh->GetNavAreaCount() ) ) : NULL;
+				m_vecGoal = pArea ? pArea->GetCenter() : me->GetAbsOrigin();
+			}
+			m_path.Compute( me, m_vecGoal, cost );
+		}
+		if ( m_path.IsValid() )
+			m_path.Update( me );
+		else
+			m_goalTimer.Invalidate();
+		return Continue();
+	}
+
+	virtual EventDesiredResult< CHL2MPBot > OnStuck( CHL2MPBot *me )
+	{
+		me->PressJumpButton( 0.1f );
+		m_goalTimer.Invalidate();
+		m_nSeed = m_nSeed * 1664525u + 1013904223u; // tenta outra rota
+		return TryContinue();
+	}
+
+	virtual EventDesiredResult< CHL2MPBot > OnMoveToFailure( CHL2MPBot *me, const Path *path, MoveToFailureType reason )
+	{
+		m_goalTimer.Invalidate();
+		return TryContinue();
+	}
+
+	virtual QueryResultType ShouldRetreat( const INextBot *me ) const { return ANSWER_NO; }
+	virtual QueryResultType ShouldHurry( const INextBot *me ) const { return ANSWER_YES; }
+	virtual const char *GetName( void ) const { return "SurtoZumbi"; }
+
+private:
+	ChasePath m_chase;
+	PathFollower m_path;
+	Vector m_vecGoal;
+	CountdownTimer m_goalTimer;
+	unsigned int m_nSeed;
+};
+
+// Humano: no preparo e na rodada segura lugares difíceis de alcançar (mapa tático);
+// quando os abrigos abrem, vai para o abrigo mais perto e fecha a grade quando há zumbi
+// por perto. O recuo atirando ("dar olé") fica no Dodge da ação principal.
+class CTrokBotSobreviver : public Action< CHL2MPBot >
+{
+public:
+	CTrokBotSobreviver() : m_hAbrigo( NULL ), m_bNoAbrigo( false ) {}
+
+	virtual ActionResult< CHL2MPBot > OnStart( CHL2MPBot *me, Action< CHL2MPBot > *priorAction )
+	{
+		m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
+		return Continue();
+	}
+
+	virtual ActionResult< CHL2MPBot > Update( CHL2MPBot *me, float interval )
+	{
+		if ( !TrokSurto_IsHumano( me ) )
+			return Done( "Não é mais humano" );
+
+		CTrokSurtoEstado *pEstado = TrokSurto_Estado();
+		if ( pEstado && pEstado->IsAbrigos() )
+			return UpdateAbrigo( me );
+
+		// Antes dos abrigos: um lugar alto/difícil, por um tempo; depois troca.
+		TrokTacticalMap().Update();
+		if ( TrokTacticalMap().IsReady() && m_holdTimer.IsElapsed() )
+		{
+			m_holdTimer.Start( 6.0f );
+			return SuspendFor( new CTrokBotHoldSpot( RandomFloat( 25.0f, 45.0f ) ), "Segurar lugar difícil de alcançar" );
+		}
+		return Continue();
+	}
+
+	ActionResult< CHL2MPBot > UpdateAbrigo( CHL2MPBot *me )
+	{
+		if ( !m_hAbrigo.Get() )
+		{
+			CUtlVector< CBaseEntity * > abrigos;
+			TrokSurto_Abrigos( &abrigos );
+			float flBest = FLT_MAX;
+			FOR_EACH_VEC( abrigos, i )
+			{
+				const float d = me->GetRangeSquaredTo( abrigos[ i ] );
+				if ( d < flBest )
+				{
+					flBest = d;
+					m_hAbrigo = abrigos[ i ];
+				}
+			}
+			if ( !m_hAbrigo.Get() )
+				return Continue(); // mapa sem abrigo marcado: segue segurando lugar
+		}
+
+		CBaseEntity *pAbrigo = m_hAbrigo.Get();
+		const float flRaio = TrokSurto_AbrigoRaio( pAbrigo );
+		m_bNoAbrigo = me->IsRangeLessThan( pAbrigo, flRaio );
+
+		if ( !m_bNoAbrigo )
+		{
+			if ( m_repathTimer.IsElapsed() )
+			{
+				m_repathTimer.Start( 1.0f );
+				CTrokBotPathCost cost( me, (unsigned int)me->entindex() * 2246822519u );
+				m_path.Compute( me, pAbrigo->GetAbsOrigin(), cost );
+			}
+			m_path.Update( me );
+			return Continue();
+		}
+
+		// Dentro: fecha a grade aberta mais perto se tem zumbi vindo (ou logo ao chegar).
+		CBaseEntity *pGrade = TrokSurto_GradeMaisPerto( me->WorldSpaceCenter(), 220.0f, false );
+		if ( pGrade && m_useTimer.IsElapsed() )
+		{
+			const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat( false );
+			const bool bZumbiPerto = threat && threat->GetEntity() && me->IsRangeLessThan( threat->GetLastKnownPosition(), 1400.0f );
+			if ( bZumbiPerto || !m_bFechouAoChegar )
+			{
+				me->GetBodyInterface()->AimHeadTowards( pGrade->WorldSpaceCenter(), IBody::CRITICAL, 0.5f, NULL, "Fechar a grade" );
+				if ( me->IsRangeLessThan( pGrade->WorldSpaceCenter(), 110.0f ) )
+				{
+					me->PressUseButton( 0.1f );
+					m_useTimer.Start( 1.0f );
+					m_bFechouAoChegar = true;
+				}
+				else if ( m_repathTimer.IsElapsed() )
+				{
+					m_repathTimer.Start( 0.5f );
+					CTrokBotPathCost cost( me, (unsigned int)me->entindex() );
+					m_path.Compute( me, pGrade->WorldSpaceCenter(), cost );
+				}
+				if ( m_path.IsValid() && !me->IsRangeLessThan( pGrade->WorldSpaceCenter(), 110.0f ) )
+					m_path.Update( me );
+			}
+		}
+		return Continue();
+	}
+
+	virtual const char *GetName( void ) const { return "SurtoSobreviver"; }
+
+private:
+	CHandle< CBaseEntity > m_hAbrigo;
+	bool m_bNoAbrigo;
+	bool m_bFechouAoChegar = false;
+	PathFollower m_path;
+	CountdownTimer m_holdTimer;
+	CountdownTimer m_repathTimer;
+	CountdownTimer m_useTimer;
+};
+
 class CTrokBotBrain : public Action< CHL2MPBot >
 {
 public:
@@ -998,6 +1234,12 @@ public:
 	virtual ActionResult< CHL2MPBot > Update( CHL2MPBot *me, float interval )
 	{
 		const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
+
+		// Modo Surto: zumbi caça; humano sobrevive.
+		if ( TrokSurto_IsZumbi( me ) )
+			return SuspendFor( new CTrokBotZumbi, "Zumbi" );
+		if ( TrokSurto_IsHumano( me ) )
+			return SuspendFor( new CTrokBotSobreviver, "Sobreviver" );
 
 		// Ao nascer: um instante olhando em volta, cada um com seu tempo.
 		if ( m_bFirst )

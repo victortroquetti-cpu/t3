@@ -10,6 +10,7 @@
 #include "hl2mp_player.h"
 #include "NextBotUtil.h"
 #include "trok/weapon_trok_gun.h"
+#include "trok/trok_surto.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -525,6 +526,9 @@ void CTrokBotMainAction::UpdateSuppression( CHL2MPBot *me )
 	me->PressFireButton( 0.1f );
 }
 
+static ConVar trok_bot_recuo_dist( "trok_bot_recuo_dist", "380", FCVAR_CHEAT,
+	"Modo Surto: humano recua atirando quando um zumbi chega mais perto que isto (u)." );
+
 void CTrokBotMainAction::Dodge( CHL2MPBot *me )
 {
 	const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
@@ -540,6 +544,28 @@ void CTrokBotMainAction::Dodge( CHL2MPBot *me )
 		m_iStrafeDir = 0;
 		m_combatPhase = PHASE_MOVE;
 		m_phaseTimer.Invalidate();
+		return;
+	}
+
+	// Modo Surto: zumbi chegando perto, recua atirando e troca de lado ("dar olé");
+	// colado, pula para escapar por cima.
+	if ( threat && TrokSurto_IsZumbi( threat->GetEntity() ) && flRange < trok_bot_recuo_dist.GetFloat() &&
+		 profile.flStrafeMax > 0.0f )
+	{
+		me->PressBackwardButton( 0.15f );
+		if ( m_strafeTimer.IsElapsed() )
+		{
+			m_strafeTimer.Start( RandomFloat( 0.4f, 0.9f ) );
+			m_iStrafeDir = ( m_iStrafeDir == 1 ) ? -1 : 1;
+		}
+		if ( m_iStrafeDir > 0 )
+			me->PressRightButton( 0.15f );
+		else
+			me->PressLeftButton( 0.15f );
+		if ( flRange < 150.0f && me->GetLocomotionInterface()->IsOnGround() && RandomFloat() < 0.15f )
+			me->PressJumpButton( 0.1f );
+		m_combatPhase = PHASE_MOVE;
+		m_bFireWindowOpen = true;
 		return;
 	}
 
