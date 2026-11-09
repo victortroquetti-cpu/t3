@@ -364,19 +364,42 @@ REFS = [
      "Zombie Riot (fork 1.9.1b, sem licença declarada): survival em ondas com bots no CS:S"),
     ("zombie-escape-amxx", "https://github.com/z0h1r-LK/Zombie_Escape",
      "Zombie Escape para CS 1.6 (GPLv3, base Zombie Plague 5.0): regras do modo fuga"),
+    # Mods do SDK com a MESMA licença do Trok (Source 1 SDK): código pode ser reaproveitado
+    # com crédito no CREDITOS.txt. Arte, modelos e sons deles não. Só o código é baixado.
+    ("neotokyo-rebuild", "https://github.com/NeotokyoRebuild/neo",
+     "NEOTOKYO Rebuild: SDK 2013 MP 2025 (a nossa base); bots NextBot, menu próprio, mira, inclinar",
+     ["src/game", "src/public/GameUI", "src/common/GameUI"]),
+    ("double-action", "https://github.com/BSVino/DoubleAction",
+     "Double Action: Boogaloo: movimento acrobático, viewmodel, bots, menu próprio",
+     ["mp/src/game"]),
+    ("momentum-mod", "https://github.com/momentum-mod/game",
+     "Momentum Mod (código congelado em 2025): movimento estilo CS/HL, UI própria",
+     ["mp/src/game"]),
+    ("fortress-forever", "https://github.com/fortressforever/fortressforever",
+     "Fortress Forever (SDK 2006): classes e modos; referência antiga",
+     ["game_shared", "cl_dll", "dlls"]),
 ]
 
 
 def cmd_refs():
     base = os.path.join(ROOT, "refs")
     os.makedirs(base, exist_ok=True)
-    for name, url, what in REFS:
+    for ref in REFS:
+        name, url, what = ref[:3]
+        sparse = ref[3] if len(ref) > 3 else None
         dst = os.path.join(base, name)
         if os.path.isdir(os.path.join(dst, ".git")):
             print("ok      refs/%s" % name)
             continue
         print("baixando refs/%s: %s" % (name, what))
-        rc = subprocess.run(["git", "clone", "-q", "--depth", "1", url, dst]).returncode
+        if sparse:
+            # Sem arte: só as pastas de código.
+            rc = subprocess.run(["git", "clone", "-q", "--depth", "1", "--filter=blob:none",
+                                 "--sparse", url, dst]).returncode
+            if rc == 0:
+                rc = subprocess.run(["git", "-C", dst, "sparse-checkout", "set"] + sparse).returncode
+        else:
+            rc = subprocess.run(["git", "clone", "-q", "--depth", "1", url, dst]).returncode
         if rc != 0:
             print("aviso: não consegui baixar %s" % url)
 
