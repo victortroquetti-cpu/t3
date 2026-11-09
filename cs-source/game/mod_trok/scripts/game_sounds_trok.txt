@@ -1,0 +1,97 @@
+// Trok: todos os sons do jogo por nome. Carregado a cada mapa (patch em
+// shared/SoundEmitterSystem.cpp). Para trocar um som, aponte o "wave" para o arquivo
+// novo em mod_trok/sound/trok/... (WAV 44,1 kHz 16 bits; ver design/conteudo-proprio.md).
+// Hoje os tiros ainda usam os sons do CS:S montado: são os primeiros a trocar.
+//
+// Prefixos do "wave": ")" = som posicional em estéreo (tiros), "^" = muda com a distância.
+// Um nome que já existe no HL2 (ex.: "Default.StepLeft", passos) é SOBRESCRITO por este
+// arquivo: é assim que os passos, dor e morte do HL2 viram do Trok.
+
+// ---------------------------------------------------------------- Armas: tiro
+"Trok.Fuzil.Tiro"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_GUNFIRE"
+	"pitch"			"97,103"
+	"wave"			")weapons/ak47/ak47-1.wav"		// TROCAR: sound/trok/armas/fuzil_tiro.wav
+}
+
+"Trok.Submetralhadora.Tiro"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_GUNFIRE"
+	"pitch"			"97,103"
+	"wave"			")weapons/mp5navy/mp5-1.wav"	// TROCAR: sound/trok/armas/submetralhadora_tiro.wav
+}
+
+"Trok.Pistola.Tiro"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_GUNFIRE"
+	"pitch"			"97,103"
+	"wave"			")weapons/glock/glock18-1.wav"	// TROCAR: sound/trok/armas/pistola_tiro.wav
+}
+
+"Trok.Escopeta.Tiro"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_GUNFIRE"
+	"pitch"			"97,103"
+	"wave"			")weapons/m3/m3-1.wav"			// TROCAR: sound/trok/armas/escopeta_tiro.wav
+}
+
+// ---------------------------------------------------------------- Armas: sem munição
+"Trok.Fuzil.Vazia"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_NORM"
+	"wave"			"weapons/clipempty_rifle.wav"	// TROCAR
+}
+
+"Trok.Submetralhadora.Vazia"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_NORM"
+	"wave"			"weapons/clipempty_rifle.wav"	// TROCAR
+}
+
+"Trok.Escopeta.Vazia"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_NORM"
+	"wave"			"weapons/clipempty_rifle.wav"	// TROCAR
+}
+
+"Trok.Pistola.Vazia"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_NORM"
+	"wave"			"weapons/clipempty_pistol.wav"	// TROCAR
+}
+
+// ---------------------------------------------------------------- Passos (sobrescrever o HL2)
+// Os passos vêm das superfícies (scripts/surfaceproperties.txt do HL2): cada superfície
+// aponta para nomes como "Default.StepLeft", "Concrete.StepLeft", "Metal.StepLeft"...
+// Quando houver passos próprios, crie aqui um bloco com o MESMO nome, por exemplo:
+//
+// "Concrete.StepLeft"
+// {
+// 	"channel"		"CHAN_BODY"
+// 	"volume"		"0.6"
+// 	"soundlevel"	"SNDLVL_NORM"
+// 	"pitch"			"95,105"
+// 	"rndwave"
+// 	{
+// 		"wave"	"trok/passos/concreto_1.wav"
+// 		"wave"	"trok/passos/concreto_2.wav"
+// 		"wave"	"trok/passos/concreto_3.wav"
+// 	}
+// }

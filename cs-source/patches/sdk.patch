@@ -953,6 +953,27 @@ index b8a0519..fb9fc7e 100644
  	
  	// Insert a combat sound so that nearby NPCs hear battle
  	if ( attacker->IsNPC() )
+diff --git a/src/game/shared/SoundEmitterSystem.cpp b/src/game/shared/SoundEmitterSystem.cpp
+index 2c93c49..77acc5c 100644
+--- a/src/game/shared/SoundEmitterSystem.cpp
++++ b/src/game/shared/SoundEmitterSystem.cpp
+@@ -271,6 +271,16 @@ public:
+ 		char maptmp[256];
+ 		const char *pszCleanMapName = GetCleanMapName( mapname, maptmp );
+ 
++#ifdef TROK
++		// Sons do Trok por nome (scripts/game_sounds_trok.txt): trocar um som = trocar o
++		// arquivo que o nome aponta. Também pode sobrescrever nomes do HL2 (passos, dor...).
++		// Antes dos sons do mapa, que ainda podem sobrescrever estes.
++		if ( filesystem->FileExists( "scripts/game_sounds_trok.txt", "GAME" ) )
++		{
++			soundemitterbase->AddSoundOverrides( "scripts/game_sounds_trok.txt", true );
++		}
++#endif
++
+ 		// Load in any map specific overrides
+ 		char scriptfile[ 512 ];
+ #if defined( TF_CLIENT_DLL ) || defined( TF_DLL )
 diff --git a/src/game/shared/baseplayer_shared.cpp b/src/game/shared/baseplayer_shared.cpp
 index abbd319..2b19606 100644
 --- a/src/game/shared/baseplayer_shared.cpp

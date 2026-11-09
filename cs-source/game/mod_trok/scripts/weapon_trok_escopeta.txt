@@ -56,8 +56,8 @@ WeaponData
 	// Arquivos .wav direto (o CS:S montado tem esses sons).
 	SoundData
 	{
-		"single_shot"		"weapons/m3/m3-1.wav"
-		"empty"				"weapons/clipempty_rifle.wav"
+		"single_shot"		"Trok.Escopeta.Tiro"
+		"empty"				"Trok.Escopeta.Vazia"
 	}
 
 	TextureData

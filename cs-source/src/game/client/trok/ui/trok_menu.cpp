@@ -42,6 +42,10 @@ static ConVar trok_ui_bots_dificuldade( "trok_ui_bots_dificuldade", "1", FCVAR_A
 static ConVar trok_ui_bots_por_time( "trok_ui_bots_por_time", "5", FCVAR_ARCHIVE, "Menu: últimos bots por time." );
 static ConVar trok_ui_bots_estilos( "trok_ui_bots_estilos", "31", FCVAR_ARCHIVE, "Menu: estilos marcados (bits: equilibrado, entry, lurker, ancora, suporte)." );
 static ConVar trok_ui_mapa( "trok_ui_mapa", "", FCVAR_ARCHIVE, "Menu: último mapa escolhido." );
+// Sons do menu por caminho (no menu não há mapa carregado, então não dá para usar os nomes do
+// game_sounds_trok.txt). TROCAR por sound/trok/ui/... quando houver sons próprios.
+static ConVar trok_ui_som_clique( "trok_ui_som_clique", "ui/buttonclick.wav", FCVAR_ARCHIVE, "Som do clique no menu (dentro de sound/). Vazio = sem som." );
+static ConVar trok_ui_som_passar( "trok_ui_som_passar", "ui/buttonrollover.wav", FCVAR_ARCHIVE, "Som ao passar o mouse num item do menu. Vazio = sem som." );
 
 static CDllDemandLoader g_TrokGameUIDLL( "GameUI" );
 
@@ -338,8 +342,8 @@ void CTrokMenu::OnMousePressed( MouseCode code )
 		return;
 	m_bClickHandled = false;
 	Run( MODE_CLICK );
-	if ( m_bClickHandled )
-		surface()->PlaySound( "ui/buttonclick.wav" );
+	if ( m_bClickHandled && trok_ui_som_clique.GetString()[ 0 ] )
+		surface()->PlaySound( trok_ui_som_clique.GetString() );
 }
 
 void CTrokMenu::OnRelayedKey( KeyCode code )
@@ -515,8 +519,8 @@ void CTrokMenu::Paint( void )
 {
 	m_iHoverId = -1;
 	Run( MODE_PAINT );
-	if ( m_iHoverId != -1 && m_iHoverId != m_iLastHoverId )
-		surface()->PlaySound( "ui/buttonrollover.wav" );
+	if ( m_iHoverId != -1 && m_iHoverId != m_iLastHoverId && trok_ui_som_passar.GetString()[ 0 ] )
+		surface()->PlaySound( trok_ui_som_passar.GetString() );
 	m_iLastHoverId = m_iHoverId;
 }
 

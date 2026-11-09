@@ -79,6 +79,10 @@ entidade).
 
 ## Modelos e sons de protótipo
 
+Plano para trocar tudo por conteúdo próprio: `design/conteudo-proprio.md`. Os sons das armas já
+passam por nomes do Trok (`scripts/game_sounds_trok.txt`).
+
+
 As armas usam modelos e sons do **CS:S montado** (do jogo instalado do jogador; não vão no
 pacote). Pendências que só se resolvem olhando o jogo:
 - sons de recarga e de manuseio vêm de eventos de animação dos modelos do CS:S, com nomes
