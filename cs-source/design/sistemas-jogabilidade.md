@@ -66,10 +66,14 @@ entidade).
   para `mira_posicao`/`mira_angulos`, a dispersão multiplica por `dispersao_mira`, o recuo cai
   30%, o jogador anda a `mira_velocidade`. Sensibilidade do mouse escala com o zoom
   (`zoom_sensitivity_ratio` no `config_default.cfg`). Correr ou recarregar sai da mira.
-  O campo `mira_fov_arma` (FOV da arma na tela mirando) é lido do script, mas **ainda não é
-  aplicado**: precisa de um patch no ClientMode (pendência).
-- **Recuo:** o chute vai no `ViewPunch` do jogador, que move também a direção do tiro; volta
-  sozinho. Não há "subida permanente" da câmera como no CS:GO (pendência, se quiserem).
+  `mira_fov_arma` (FOV da arma na tela mirando) é aplicado pelo `ClientModeShared::GetViewModelFOV`
+  (patch). Mirando, o atraso da arma ao virar e o deslocamento pelo pitch somem (patch em
+  `CBaseViewModel::CalcViewModelLag`): a alça fica no centro olhando para cima ou para baixo.
+- **Recuo:** `trok_recuo_fixo` (padrão 0,5) é a parte que **fica** na mira (sobe e não volta,
+  como no CoD: o jogador puxa para baixo); o resto é o chute (`ViewPunch`) que volta sozinho. A parte
+  fixa mexe nos ângulos de visão do jogador local uma vez por tiro previsto; bots levam o chute inteiro.
+- **Arma na tela andando:** balanço leve em "oito" pela distância percorrida (parado contra a parede
+  não balança), quase nada mirando (`trok_arma_balanco`, cliente).
 - **Dano:** calculado pela distância até onde a mira aponta no momento do tiro; partes do
   corpo multiplicam pelos `sk_player_*`.
 

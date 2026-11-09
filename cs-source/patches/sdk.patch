@@ -25,6 +25,28 @@ index 7b47d82..a8a98d9 100644
  #if defined( REPLAY_ENABLED )
  	if ( !g_pEngineReplay || !g_pEngineReplay->IsSupportedModAndPlatform() )
  		return false;
+diff --git a/src/game/client/clientmode_shared.cpp b/src/game/client/clientmode_shared.cpp
+index 54933d2..d7c4528 100644
+--- a/src/game/client/clientmode_shared.cpp
++++ b/src/game/client/clientmode_shared.cpp
+@@ -986,9 +986,17 @@ void ClientModeShared::Layout()
+ 	}
+ }
+ 
++#ifdef TROK
++float TrokWeapon_ViewmodelFOV( float flDefault ); // shared/trok/weapon_trok_gun.cpp
++#endif
++
+ float ClientModeShared::GetViewModelFOV( void )
+ {
++#ifdef TROK
++	return TrokWeapon_ViewmodelFOV( v_viewmodel_fov.GetFloat() );
++#else
+ 	return v_viewmodel_fov.GetFloat();
++#endif
+ }
+ 
+ class CHudChat;
 diff --git a/src/game/client/hl2/hud_ammo.cpp b/src/game/client/hl2/hud_ammo.cpp
 index 2d948cf..d8a2c60 100644
 --- a/src/game/client/hl2/hud_ammo.cpp
@@ -931,6 +953,34 @@ index abbd319..2b19606 100644
  	if ( !sv_footsteps.GetFloat() )
  		return;
  
+diff --git a/src/game/shared/baseviewmodel_shared.cpp b/src/game/shared/baseviewmodel_shared.cpp
+index 936f26d..913890a 100644
+--- a/src/game/shared/baseviewmodel_shared.cpp
++++ b/src/game/shared/baseviewmodel_shared.cpp
+@@ -460,6 +460,10 @@ float g_fMaxViewModelLag = 1.5f;
+ 
+ ConVar sv_viewmodel_lag_do_angles( "sv_viewmodel_lag_do_angles", "1", FCVAR_CHEAT | FCVAR_REPLICATED );
+ 
++#ifdef TROK
++float TrokWeapon_ViewmodelLagScale( CBaseCombatWeapon *pWeapon ); // shared/trok/weapon_trok_gun.cpp
++#endif
++
+ void CBaseViewModel::CalcViewModelLag( Vector& origin, QAngle& angles, QAngle& original_angles )
+ {
+ 	Vector vOriginalOrigin = origin;
+@@ -516,6 +520,12 @@ void CBaseViewModel::CalcViewModelLag( Vector& origin, QAngle& angles, QAngle& o
+ 		VectorMA( origin, -pitch * 0.03f,		right,	origin );
+ 		VectorMA( origin, -pitch * 0.02f,		up,		origin);
+ 	}
++
++#ifdef TROK
++	// Mirando pelo cano, atraso e deslocamento pelo pitch somem (alça no centro).
++	const float flTrokLag = TrokWeapon_ViewmodelLagScale( GetOwningWeapon() );
++	origin = vOriginalOrigin + ( origin - vOriginalOrigin ) * flTrokLag;
++#endif
+ }
+ 
+ //-----------------------------------------------------------------------------
 diff --git a/src/game/shared/gamemovement.cpp b/src/game/shared/gamemovement.cpp
 index 4b79f72..24c3b3a 100644
 --- a/src/game/shared/gamemovement.cpp

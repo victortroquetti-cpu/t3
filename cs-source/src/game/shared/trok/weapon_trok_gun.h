@@ -64,6 +64,8 @@ private:
 	CNetworkVar( bool, m_bWasSprinting );
 
 	float m_flViewmodelSprint;					// só cliente: 0 = normal, 1 = correndo
+	float m_flBobPhase;							// só cliente: fase do passo (anda com a distância, não com o tempo)
+	float m_flBobAmount;						// só cliente: força do balanço (sobe com a velocidade)
 	float m_flViewmodelADS;						// só cliente: 0 = quadril, 1 = mira
 
 	CWeaponTrokGun( const CWeaponTrokGun & );

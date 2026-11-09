@@ -29,10 +29,19 @@
 
 #include "weapon_trok_gun.h"
 #include "weapon_hl2mpbasebasebludgeon.h"
+#ifdef CLIENT_DLL
+#include "prediction.h"
+#endif
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+
+ConVar trok_recuo_fixo( "trok_recuo_fixo", "0.5", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Fração do recuo que fica na mira (sobe e não volta; o jogador puxa para baixo). 0 = só o chute que volta." );
+#ifdef CLIENT_DLL
+ConVar trok_arma_balanco( "trok_arma_balanco", "1", FCVAR_ARCHIVE, "Balanço da arma na tela andando (0 = parada)." );
+#endif
 
 ConVar trok_arma_correndo_atraso( "trok_arma_correndo_atraso", "0.2", FCVAR_REPLICATED,
 	"Segundos depois de parar de correr até poder atirar." );
@@ -166,6 +175,8 @@ CWeaponTrokGun::CWeaponTrokGun()
 	m_flSprintEndTime = 0.0f;
 	m_bWasSprinting = false;
 	m_flViewmodelSprint = 0.0f;
+	m_flBobPhase = 0.0f;
+	m_flBobAmount = 0.0f;
 	m_flViewmodelADS = 0.0f;
 	m_bFiresUnderwater = false;
 }
@@ -331,7 +342,27 @@ void CWeaponTrokGun::PrimaryAttack( void )
 	float flUp = info.m_flTrokKickUp * ( 1.0f + 0.1f * MIN( m_iShotsInRow.Get(), 10 ) ) * flADSKick;
 	float flSide = info.m_flTrokKickSide * sinf( m_iShotsInRow * 0.9f ) * flADSKick +
 		SharedRandomFloat( "TrokGunKick", -0.25f, 0.25f ) * info.m_flTrokKickSide;
-	pPlayer->ViewPunch( QAngle( -flUp, flSide, 0.0f ) );
+
+	// Parte do recuo fica na mira (sobe e não volta, como no CoD: o jogador puxa para
+	// baixo) e parte é o chute que volta sozinho. A parte que fica mexe nos ângulos de
+	// visão do jogador local, uma vez por tiro previsto (receita do NEOTOKYO Rebuild e do
+	// Double Action); bots recebem o chute inteiro (a mira deles já compensa).
+	float flFixo = clamp( trok_recuo_fixo.GetFloat(), 0.0f, 1.0f );
+#ifdef GAME_DLL
+	if ( pPlayer->IsBot() )
+		flFixo = 0.0f;
+#endif
+	pPlayer->ViewPunch( QAngle( -flUp * ( 1.0f - flFixo ), flSide * ( 1.0f - flFixo ), 0.0f ) );
+#ifdef CLIENT_DLL
+	if ( flFixo > 0.0f && prediction->IsFirstTimePredicted() && pPlayer->IsLocalPlayer() )
+	{
+		QAngle angView;
+		engine->GetViewAngles( angView );
+		angView.x = MAX( angView.x - flUp * flFixo, -89.0f );
+		angView.y += flSide * flFixo;
+		engine->SetViewAngles( angView );
+	}
+#endif
 
 	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
 	if ( !info.m_bTrokAuto )
@@ -439,11 +470,37 @@ void CWeaponTrokGun::AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin,
 	Vector forward, right, up;
 	AngleVectors( angles, &forward, &right, &up );
 
+	// Passo: a fase anda com a distância percorrida (parado contra a parede não balança).
+	CBasePlayer *pOwner = GetPlayerOwner();
+	float flSpeed = 0.0f;
+	bool bOnGround = false;
+	if ( pOwner )
+	{
+		flSpeed = pOwner->GetAbsVelocity().Length2D();
+		bOnGround = pOwner->GetGroundEntity() != NULL;
+	}
+	m_flBobPhase += flSpeed * gpGlobals->frametime * ( 2.0f * M_PI / 160.0f ); // um ciclo a cada ~160u (dois passos)
+	if ( m_flBobPhase > 2.0f * M_PI * 100.0f )
+		m_flBobPhase -= 2.0f * M_PI * 100.0f;
+	const float flBobTarget = bOnGround ? clamp( flSpeed / 220.0f, 0.0f, 1.0f ) : 0.0f;
+	m_flBobAmount = Approach( flBobTarget, m_flBobAmount, gpGlobals->frametime * 4.0f );
+
+	// Andando: balanço leve em "oito", quase nada mirando, nada correndo (o sprint tem o dele).
+	if ( m_flBobAmount > 0.0f && trok_arma_balanco.GetFloat() > 0.0f )
+	{
+		const float k = m_flBobAmount * trok_arma_balanco.GetFloat() * ( 1.0f - m_flViewmodelSprint ) * ( 1.0f - 0.9f * m_flViewmodelADS );
+		const float s1 = sinf( m_flBobPhase );
+		const float s2 = sinf( m_flBobPhase * 2.0f );
+		origin += k * ( 0.45f * s1 * right - 0.35f * fabsf( s1 ) * up + 0.15f * s2 * forward );
+		angles.z += k * 0.8f * s1;
+		angles.x += k * 0.5f * fabsf( s2 );
+	}
+
 	// Correndo: arma desce e gira para o lado, com um balanço no ritmo da passada.
 	if ( m_flViewmodelSprint > 0.0f )
 	{
 		float b = SimpleSpline( m_flViewmodelSprint );
-		float flStep = sinf( gpGlobals->curtime * 13.0f );
+		float flStep = sinf( m_flBobPhase * 2.0f );
 		origin += b * ( -4.0f * up + 1.5f * right + 1.2f * flStep * up );
 		angles.x += b * ( 14.0f + 2.0f * flStep );
 		angles.y += b * 18.0f;
@@ -496,6 +553,32 @@ float CWeaponTrokGun::GetMoveSpeedScale( void ) const
 	const CHL2MPSWeaponInfo &info = Info();
 	return info.m_flTrokMoveSpeed * ( m_bADS ? info.m_flTrokADSMoveSpeed : 1.0f );
 }
+
+// Atraso da arma ao virar e deslocamento pelo pitch (CBaseViewModel::CalcViewModelLag):
+// some mirando, para a alça ficar no centro olhando para cima ou para baixo.
+float TrokWeapon_ViewmodelLagScale( CBaseCombatWeapon *pWeapon )
+{
+#ifdef CLIENT_DLL
+	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pWeapon );
+	if ( pGun )
+		return 1.0f - SimpleSpline( pGun->GetADSBlend() );
+#endif
+	NOTE_UNUSED( pWeapon );
+	return 1.0f;
+}
+
+#ifdef CLIENT_DLL
+// FOV da arma na tela (ClientModeShared::GetViewModelFOV): mirando, vai para o
+// mira_fov_arma do script (0 = não muda).
+float TrokWeapon_ViewmodelFOV( float flDefault )
+{
+	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+	CWeaponTrokGun *pGun = pPlayer ? dynamic_cast< CWeaponTrokGun * >( pPlayer->GetActiveWeapon() ) : NULL;
+	if ( !pGun || pGun->Info().m_flTrokADSViewmodelFov <= 0.0f )
+		return flDefault;
+	return Lerp( SimpleSpline( pGun->GetADSBlend() ), flDefault, pGun->Info().m_flTrokADSViewmodelFov );
+}
+#endif
 
 ConVar trok_faca_velocidade( "trok_faca_velocidade", "1.0", FCVAR_REPLICATED | FCVAR_NOTIFY,
 	"Multiplicador de velocidade com arma branca (faca) na mão. O Combat Arms corre mais com a faca." );
