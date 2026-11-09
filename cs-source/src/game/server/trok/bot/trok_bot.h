@@ -34,6 +34,9 @@ CHL2MPBotVision		*TrokBot_CreateVision( INextBot *bot );
 // Ação do cenário (patch em CHL2MPBotScenarioMonitor). NULL = comportamento do HL2MP.
 Action< CHL2MPBot > *TrokBot_ScenarioAction( CHL2MPBot *me );
 
+// Uma ação de combate (peek) está movendo o bot: o strafe da ação raiz para.
+void TrokBot_SetCombatMoveOwned( CHL2MPBot *me, bool bOwned );
+
 // Perfil do bot (nível + personalidade), sempre válido.
 const TrokBotProfile_t &TrokBot_GetProfile( const CHL2MPBot *me );
 

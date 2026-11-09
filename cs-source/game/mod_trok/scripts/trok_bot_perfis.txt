@@ -24,6 +24,8 @@
 // Movimento e tática
 //   strafe_min / strafe_max   s de cada lado do strafe em combate (0 = não faz strafe)
 //   chance_agachar            0..1 de agachar no tiroteio
+//   disciplina_tiro           0..1 de cada ciclo de tiro, de média/longa distância, ser "para, atira
+//                             em rajada, volta a andar" (contra-strafe) em vez de spray andando
 //   agressividade             0..1 (0 = segura lugares bons, 1 = caça)
 //   uso_tatico                0..1 (quanto escolhe lugares pela nota do mapa tático)
 
@@ -33,13 +35,13 @@
 	{
 		"reacao_min"			"0.45"
 		"reacao_max"			"0.70"
-		"ganho_percepcao"		"0.60"
+		"ganho_percepcao"		"0.70"
 		"campo_visao"			"100"
 		"audicao"				"0.6"
-		"mira_erro_inicial"		"9.0"
-		"mira_erro_minimo"		"2.5"
+		"mira_erro_inicial"		"7.0"
+		"mira_erro_minimo"		"2.0"
 		"mira_precisao_alvo"	"1.00"
-		"mira_meia_vida"		"0.60"
+		"mira_meia_vida"		"0.50"
 		"mira_rastreio"			"4.0"
 		"mira_tremor_ferido"	"6.0"
 		"chance_cabeca"			"0.05"
@@ -48,6 +50,7 @@
 		"strafe_min"			"0"
 		"strafe_max"			"0"
 		"chance_agachar"		"0"
+		"disciplina_tiro"		"0"
 		"agressividade"			"0.60"
 		"uso_tatico"			"0.10"
 	}
@@ -71,6 +74,7 @@
 		"strafe_min"			"0.5"
 		"strafe_max"			"1.1"
 		"chance_agachar"		"0.05"
+		"disciplina_tiro"		"0.50"
 		"agressividade"			"0.50"
 		"uso_tatico"			"0.40"
 	}
@@ -94,6 +98,7 @@
 		"strafe_min"			"0.35"
 		"strafe_max"			"0.8"
 		"chance_agachar"		"0.12"
+		"disciplina_tiro"		"0.80"
 		"agressividade"			"0.50"
 		"uso_tatico"			"0.70"
 	}
@@ -117,6 +122,7 @@
 		"strafe_min"			"0.25"
 		"strafe_max"			"0.6"
 		"chance_agachar"		"0.18"
+		"disciplina_tiro"		"0.95"
 		"agressividade"			"0.50"
 		"uso_tatico"			"0.90"
 	}

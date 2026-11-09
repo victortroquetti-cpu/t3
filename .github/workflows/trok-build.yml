@@ -1,0 +1,74 @@
+# Compila o mod Trok (cs-source/) no Windows e entrega a pasta do mod em um .zip.
+#
+# Roda sozinho a cada push que mexe em cs-source/ e pode ser disparado à mão
+# (Actions > "Trok: build Windows" > Run workflow). O .zip fica em
+# Actions > a execução > Artifacts > trok-mod-windows.
+name: "Trok: build Windows"
+
+on:
+  push:
+    paths:
+      - "cs-source/**"
+      - ".github/workflows/trok-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Baixar o SDK, aplicar o patch e gerar os projetos
+        shell: pwsh
+        run: python cs-source/trok.py setup
+
+      - name: Gerar trok.sln (VPC da Valve)
+        shell: cmd
+        working-directory: cs-source/sdk/src
+        run: createtrok.bat
+
+      - name: Listar configurações da solução
+        shell: pwsh
+        working-directory: cs-source/sdk/src
+        run: |
+          $sln = Get-Content trok.sln
+          $start = ($sln | Select-String "SolutionConfigurationPlatforms").LineNumber
+          $sln[$start..($start + 8)]
+
+      - name: Compilar (Release x64)
+        shell: cmd
+        working-directory: cs-source/sdk/src
+        run: msbuild trok.sln /m /nologo /v:minimal /p:Configuration=Release /p:Platform=x64
+
+      - name: Compilar (Release Win32)
+        shell: cmd
+        working-directory: cs-source/sdk/src
+        continue-on-error: true
+        run: msbuild trok.sln /m /nologo /v:minimal /p:Configuration=Release /p:Platform=Win32
+
+      - name: Montar a pasta do mod
+        shell: pwsh
+        run: |
+          $out = "dist/mod_trok"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          # Base do HL2MP (scripts, HUD, cfg e mapas do SDK) e por cima os arquivos do Trok.
+          Copy-Item -Recurse -Force cs-source/sdk/game/mod_hl2mp/* $out
+          Copy-Item -Recurse -Force cs-source/sdk/game/mod_trok/* $out
+          Copy-Item -Force cs-source/sdk/LICENSE "$out/LICENSE_SOURCE_SDK.txt"
+          Copy-Item -Force cs-source/sdk/thirdpartylegalnotices.txt $out
+          Get-ChildItem cs-source/sdk/game -Filter "mod_trok*.exe" | Copy-Item -Destination dist/
+          Copy-Item -Force cs-source/tools/LEIA-ME.txt dist/
+          Get-ChildItem -Recurse dist | Select-Object FullName, Length | Format-Table -AutoSize
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trok-mod-windows
+          path: dist/
+          if-no-files-found: error

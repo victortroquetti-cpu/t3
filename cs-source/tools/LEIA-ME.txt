@@ -1,0 +1,56 @@
+TROK (mod de Source SDK 2013 Multiplayer) - versão de teste dos bots
+=====================================================================
+
+O QUE PRECISA ESTAR INSTALADO NA STEAM
+  - Source SDK Base 2013 Multiplayer  (Biblioteca > Ferramentas)
+  - Counter-Strike: Source            (modelos, sons e mapas do CS:S)
+
+INSTALAR
+  1. Feche a Steam.
+  2. Copie a pasta "mod_trok" deste zip para:
+       C:\Program Files (x86)\Steam\steamapps\sourcemods\
+     (se a pasta "sourcemods" não existir, crie)
+  3. Abra a Steam. "Trok" aparece na Biblioteca. Rode.
+
+TESTAR OS BOTS
+  No menu do jogo, abra o console (habilite em Opções > Teclado > Avançado).
+
+    map dm_lockdown
+    exec bots
+
+  Mapas do CS:S também abrem (map de_dust2, cs_office...). Neles os jogadores
+  nascem nos spawns de TR e CT. Bots precisam de nav mesh:
+
+    nav_generate        (espere terminar; o mapa reinicia)
+    nav_analyze         (luz, visibilidade e esconderijos: deixa os bots bem melhores)
+    exec bots
+
+  Comandos úteis (mire num bot e use nb_select antes dos de depuração):
+    trok_bot_estilos_info          nível e estilo de cada bot
+    trok_bot_estilo ancora         força um estilo nos próximos bots
+                                   (equilibrado, entry, lurker, ancora, suporte)
+    hl2mp_bot_difficulty 0..3      fácil, normal, difícil, expert (próximos bots)
+    hl2mp_bot_add / hl2mp_bot_kick all
+    nb_debug BEHAVIOR              o que o bot está fazendo
+    trok_bot_debug_percepcao 1     barra de percepção do bot sobre cada inimigo
+    trok_bot_debug_mira 1          onde ele mira e o erro em graus
+    trok_bot_tatico_mostrar 2000   pinta o chão pela nota tática (verde = bom para segurar)
+
+  Comparar com o bot padrão do HL2MP (liga/desliga cada parte):
+    trok_bot_mira_humana 0, trok_bot_ritmo_tiro 0, trok_bot_tatica 0,
+    trok_bot_faixa 0, trok_bot_rota_variedade 0, trok_bot_checar_cantos 0
+
+  Ajustar os níveis sem recompilar: edite mod_trok\scripts\trok_bot_perfis.txt,
+  rode trok_bot_perfis_recarregar e adicione os bots de novo.
+
+ALTERNATIVA (sem a pasta sourcemods)
+  mod_trok.exe / mod_trok_win64.exe, ao lado da pasta mod_trok, abrem o mod
+  direto (precisa da Steam aberta).
+
+ESTADO
+  Primeira versão compilada. Ainda não foi testada em partida: anote o que
+  parecer estranho (bot travado, olhando para o lado errado, atirando demais
+  ou de menos) e, se der, o que aparece em nb_debug BEHAVIOR na hora.
+
+O conteúdo do CS:S é montado do jogo instalado; ele não vem neste zip.
+Código do mod sob a licença do Source 1 SDK (LICENSE_SOURCE_SDK.txt).

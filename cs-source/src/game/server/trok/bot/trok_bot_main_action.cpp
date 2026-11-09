@@ -17,6 +17,10 @@ static ConVar trok_bot_mira_humana( "trok_bot_mira_humana", "1", FCVAR_CHEAT,
 	"Mira com erro humano (foco que melhora com o tempo). 0 = mira do HL2MP." );
 static ConVar trok_bot_audicao( "trok_bot_audicao", "1", FCVAR_CHEAT,
 	"Bots ouvem passos de quem corre por perto e viram para o barulho." );
+static ConVar trok_bot_ritmo_tiro( "trok_bot_ritmo_tiro", "1", FCVAR_CHEAT,
+	"Bots atiram em rajadas parados (contra-strafe) a média e longa distância, conforme a disciplina do nível." );
+static ConVar trok_bot_checar_cantos( "trok_bot_checar_cantos", "1", FCVAR_CHEAT,
+	"Bots olham, em ordem, os cantos de onde alguém pode aparecer enquanto andam (encounter spots do nav_analyze)." );
 static ConVar trok_bot_debug_mira( "trok_bot_debug_mira", "0", FCVAR_CHEAT,
 	"Mostra o ponto de mira e o erro atual do bot escolhido com nb_select." );
 
@@ -25,6 +29,29 @@ static ConVar trok_bot_debug_mira( "trok_bot_debug_mira", "0", FCVAR_CHEAT,
 // Raio (u) em que se ouvem passos de quem corre / anda rápido. Agachado ou andando devagar não faz barulho.
 #define HEAR_RUN_RANGE			1100.0f
 #define HEAR_JOG_RANGE			600.0f
+// Até esta distância, spray andando é o normal (todo mundo faz).
+#define CLOSE_FIGHT_RANGE		450.0f
+
+// Movimento de combate controlado por uma ação (ex.: peek do CTrokBotFight):
+// o strafe da ação raiz fica parado para não brigar com ela.
+static bool s_bCombatMoveOwned[ MAX_PLAYERS + 1 ];
+
+void TrokBot_SetCombatMoveOwned( CHL2MPBot *me, bool bOwned )
+{
+	int i = me->entindex();
+	if ( i > 0 && i <= MAX_PLAYERS )
+		s_bCombatMoveOwned[ i ] = bOwned;
+}
+
+static bool IsCombatMoveOwned( CHL2MPBot *me )
+{
+	int i = me->entindex();
+	return i > 0 && i <= MAX_PLAYERS && s_bCombatMoveOwned[ i ];
+}
+
+// Onde cada bot morreu da última vez (posição de quem matou).
+struct DeathMemory_t { Vector killerPos; float flTime; };
+static DeathMemory_t s_deathMemory[ MAX_PLAYERS + 1 ];
 
 CTrokBotMainAction::CTrokBotMainAction()
 {
@@ -40,15 +67,31 @@ CTrokBotMainAction::CTrokBotMainAction()
 	m_flLastInjured = -100.0f;
 	m_flThreatSeenSince = 0.0f;
 	m_iStrafeDir = 0;
+	m_iLastStrafeDir = 1;
+	m_combatPhase = PHASE_MOVE;
+	m_bDisciplinedCycle = true;
+	m_bFireWindowOpen = true;
+	m_pCornerArea = NULL;
+	m_pCornerPrevArea = NULL;
+	m_iCornerSpot = 0;
 }
 
 //-----------------------------------------------------------------------------
 ActionResult< CHL2MPBot > CTrokBotMainAction::Update( CHL2MPBot *me, float interval )
 {
+	// O HL2MP decide o tiro (e aperta o gatilho) dentro do Update; o ritmo de
+	// tiro solta o gatilho fora da janela de rajada.
 	ActionResult< CHL2MPBot > result = BaseClass::Update( me, interval );
+
+	UpdateFireWindow( me );
+	if ( !m_bFireWindowOpen )
+		me->ReleaseFireButton();
 
 	if ( trok_bot_audicao.GetBool() )
 		ListenForFootsteps( me );
+
+	if ( trok_bot_checar_cantos.GetBool() )
+		CheckCorners( me );
 
 	// Avisa o time onde está o inimigo que ele está vendo (o "call" do CS).
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat( true );
@@ -187,6 +230,15 @@ EventDesiredResult< CHL2MPBot > CTrokBotMainAction::OnKilled( CHL2MPBot *me, con
 {
 	TrokBot_NoteDeath( me );
 	TrokBot_ReleaseGoal( me );
+	TrokBot_SetCombatMoveOwned( me, false );
+
+	// Lembra de onde veio o tiro que o matou: na próxima vida, pré-mira esse lugar.
+	int i = me->entindex();
+	if ( i > 0 && i <= MAX_PLAYERS && info.GetAttacker() && info.GetAttacker() != me )
+	{
+		s_deathMemory[ i ].killerPos = info.GetAttacker()->GetAbsOrigin();
+		s_deathMemory[ i ].flTime = gpGlobals->curtime;
+	}
 	TrokBot_ReleaseHold( me );
 	return BaseClass::OnKilled( me, info );
 }
@@ -318,48 +370,131 @@ Vector CTrokBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBase
 }
 
 //-----------------------------------------------------------------------------
-// Strafe em combate
+// Ritmo de combate: strafe, contra-strafe e rajadas
 //-----------------------------------------------------------------------------
+
+// Distância até o alvo visível atual (ou -1 se não há).
+static float VisibleThreatRange( CHL2MPBot *me, const CKnownEntity **ppThreat = NULL )
+{
+	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
+	if ( ppThreat )
+		*ppThreat = threat;
+	if ( !threat || !threat->GetEntity() || !threat->IsVisibleRecently() )
+		return -1.0f;
+	return me->GetRangeTo( threat->GetLastKnownPosition() );
+}
+
+// Decide se o gatilho pode ficar apertado agora.
+//   Perto (< 450u) ou ciclo "indisciplinado": spray à vontade (andando).
+//   Média/longa distância e ciclo disciplinado: atira só na fase de rajada,
+//   parado; rajada de 0,6-1 s até 1200u, 0,3-0,5 s mais longe (valores
+//   escolhidos no simulador tools/botsim: rajadas longas ganham mais duelos).
+void CTrokBotMainAction::UpdateFireWindow( CHL2MPBot *me )
+{
+	const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
+	float flRange = VisibleThreatRange( me );
+
+	if ( !trok_bot_ritmo_tiro.GetBool() || flRange < 0.0f || flRange < CLOSE_FIGHT_RANGE ||
+		 !m_bDisciplinedCycle || profile.flDisciplina <= 0.0f || CHL2MPBot::IsBludgeon( me->GetActiveWeapon() ) )
+	{
+		m_bFireWindowOpen = true;
+		return;
+	}
+
+	m_bFireWindowOpen = ( m_combatPhase == PHASE_BURST );
+}
+
 void CTrokBotMainAction::Dodge( CHL2MPBot *me )
 {
 	const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
 
-	if ( profile.flStrafeMax <= 0.0f || me->HasAttribute( CHL2MPBot::DISABLE_DODGE ) )
-		return;
+	const CKnownEntity *threat = NULL;
+	float flRange = VisibleThreatRange( me, &threat );
 
-	if ( !me->IsCombatWeapon( MY_CURRENT_GUN ) )
-		return;
+	bool bFighting = flRange >= 0.0f && me->IsCombatWeapon( MY_CURRENT_GUN ) && !CHL2MPBot::IsBludgeon( me->GetActiveWeapon() ) &&
+		me->IsLineOfFireClear( threat->GetLastKnownPosition() );
 
-	if ( me->GetIntentionInterface()->ShouldHurry( me ) == ANSWER_YES )
-		return;
-
-	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
-	if ( !threat || !threat->IsVisibleRecently() || !me->IsLineOfFireClear( threat->GetLastKnownPosition() ) )
+	if ( !bFighting || me->HasAttribute( CHL2MPBot::DISABLE_DODGE ) )
 	{
 		m_iStrafeDir = 0;
+		m_combatPhase = PHASE_MOVE;
+		m_phaseTimer.Invalidate();
 		return;
 	}
 
-	if ( m_strafeTimer.IsElapsed() )
+	// Uma ação (peek) está movendo o bot: não mexe nos pés, só no ritmo do tiro.
+	bool bMoveOwned = IsCombatMoveOwned( me );
+	bool bCanStrafe = profile.flStrafeMax > 0.0f && !bMoveOwned &&
+		me->GetIntentionInterface()->ShouldHurry( me ) != ANSWER_YES;
+
+	bool bRhythm = trok_bot_ritmo_tiro.GetBool() && flRange >= CLOSE_FIGHT_RANGE && profile.flDisciplina > 0.0f;
+
+	if ( m_phaseTimer.IsElapsed() )
 	{
-		// Troca de lado quase sempre; às vezes para um instante para atirar
-		// parado (mais preciso), como um jogador faz.
-		float flRoll = RandomFloat();
-		if ( flRoll < 0.2f )
-			m_iStrafeDir = 0;
-		else if ( m_iStrafeDir == 0 || flRoll < 0.85f )
+		switch ( m_combatPhase )
+		{
+		case PHASE_MOVE:
+			if ( bRhythm && m_bDisciplinedCycle )
+			{
+				// Contra-strafe: um toque para o lado oposto para parar rápido.
+				m_combatPhase = PHASE_STOP;
+				m_phaseTimer.Start( 0.08f );
+				m_iStrafeDir = 0;
+				break;
+			}
+			// sem ritmo: continua strafe (troca de lado como antes)
+			m_phaseTimer.Start( RandomFloat( profile.flStrafeMin, MAX( profile.flStrafeMin, profile.flStrafeMax ) ) );
 			m_iStrafeDir = ( m_iStrafeDir == 1 ) ? -1 : 1;
+			if ( RandomFloat() < 0.2f )
+				m_iStrafeDir = 0;
+			m_bDisciplinedCycle = RandomFloat() < profile.flDisciplina;
+			break;
 
-		float flDuration = RandomFloat( profile.flStrafeMin, profile.flStrafeMax );
-		if ( m_iStrafeDir == 0 )
-			flDuration *= 0.5f;
-		m_strafeTimer.Start( flDuration );
+		case PHASE_STOP:
+		{
+			m_combatPhase = PHASE_BURST;
+			// Rajada: mais curta quanto mais longe (tiro a tiro de longe).
+			// Valores escolhidos no simulador (tools/botsim): rajadas longas e pouco
+			// tempo andando ganham mais duelos que rajadas curtas.
+			float flBurst = ( flRange < 1200.0f ) ? RandomFloat( 0.6f, 1.0f ) : RandomFloat( 0.3f, 0.5f );
+			m_phaseTimer.Start( flBurst );
+			m_iStrafeDir = 0;
+			if ( RandomFloat() < profile.flChanceAgachar )
+				me->PressCrouchButton( flBurst + 0.3f );
+			break;
+		}
 
-		if ( RandomFloat() < profile.flChanceAgachar )
-			me->PressCrouchButton( RandomFloat( 0.4f, 1.0f ) );
+		case PHASE_BURST:
+			// Recupera a mira (o recuo assenta) antes de voltar a andar.
+			m_combatPhase = PHASE_RECOVER;
+			m_phaseTimer.Start( ( flRange < 1200.0f ) ? RandomFloat( 0.05f, 0.1f ) : RandomFloat( 0.1f, 0.2f ) );
+			break;
+
+		case PHASE_RECOVER:
+		default:
+			m_combatPhase = PHASE_MOVE;
+			m_bDisciplinedCycle = RandomFloat() < profile.flDisciplina;
+			// Lado novo, segmento curto em luta de longe (sai da mira e volta).
+			m_iStrafeDir = ( m_iLastStrafeDir == 1 ) ? -1 : 1;
+			m_phaseTimer.Start( RandomFloat( profile.flStrafeMin, MAX( profile.flStrafeMin, profile.flStrafeMax ) ) * 0.3f );
+			break;
+		}
 	}
 
-	if ( m_iStrafeDir == 0 )
+	// Contra-strafe: toque no lado oposto ao último movimento.
+	if ( m_combatPhase == PHASE_STOP )
+	{
+		if ( !bMoveOwned )
+		{
+			if ( m_iLastStrafeDir < 0 )
+				me->PressRightButton( 0.08f );
+			else
+				me->PressLeftButton( 0.08f );
+		}
+		return;
+	}
+
+	if ( m_combatPhase != PHASE_MOVE || !bCanStrafe || m_iStrafeDir == 0 )
 		return;
 
 	Vector forward;
@@ -382,8 +517,97 @@ void CTrokBotMainAction::Dodge( CHL2MPBot *me )
 		return;
 	}
 
+	m_iLastStrafeDir = m_iStrafeDir;
 	if ( m_iStrafeDir < 0 )
 		me->PressLeftButton();
 	else
 		me->PressRightButton();
+}
+
+//-----------------------------------------------------------------------------
+// Checar cantos
+//-----------------------------------------------------------------------------
+
+// Andando sem inimigo à vista: olha, em ordem, os pontos de onde alguém pode
+// aparecer no trecho que está cruzando (encounter spots do nav_analyze, os
+// mesmos que os bots do CS usavam). Sem esses dados, olha os esconderijos da
+// área seguinte. E se lembra de onde levou o tiro que o matou na última vida.
+void CTrokBotMainAction::CheckCorners( CHL2MPBot *me )
+{
+	if ( !m_cornerTimer.IsElapsed() )
+		return;
+
+	const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
+	m_cornerTimer.Start( RandomFloat( 0.45f, 0.8f ) );
+
+	if ( me->GetVisionInterface()->GetPrimaryKnownThreat( true ) )
+		return;
+
+	Vector velocity = me->GetAbsVelocity();
+	velocity.z = 0.0f;
+	if ( velocity.Length() < 60.0f )
+		return;
+
+	// Bot pouco tático esquece de checar às vezes.
+	if ( RandomFloat() > 0.35f + 0.65f * profile.flUsoTatico )
+		return;
+
+	// Memória da última morte: se está perto de onde veio o tiro, olha para lá.
+	int iMe = me->entindex();
+	if ( iMe > 0 && iMe <= MAX_PLAYERS && gpGlobals->curtime - s_deathMemory[ iMe ].flTime < 90.0f &&
+		 me->IsRangeLessThan( s_deathMemory[ iMe ].killerPos, 1800.0f ) && RandomFloat() < 0.5f &&
+		 me->GetVisionInterface()->IsLineOfSightClear( s_deathMemory[ iMe ].killerPos + Vector( 0, 0, HumanEyeHeight ) ) )
+	{
+		me->GetBodyInterface()->AimHeadTowards( s_deathMemory[ iMe ].killerPos + Vector( 0, 0, HumanEyeHeight - 8.0f ),
+			IBody::INTERESTING, 0.8f, NULL, "Pré-mirando onde morreu" );
+		return;
+	}
+
+	CNavArea *area = me->GetLastKnownArea();
+	if ( !area )
+		return;
+
+	if ( area != m_pCornerArea )
+	{
+		m_pCornerPrevArea = m_pCornerArea;
+		m_pCornerArea = area;
+		m_iCornerSpot = 0;
+	}
+
+	// Próxima área na direção do movimento.
+	Vector dir = velocity;
+	dir.NormalizeInPlace();
+	float flAhead = 0.5f * MAX( area->GetSizeX(), area->GetSizeY() ) + 60.0f;
+	CNavArea *next = TheNavMesh->GetNearestNavArea( me->GetAbsOrigin() + flAhead * dir, false, 200.0f );
+
+	Vector lookAt;
+	bool bHave = false;
+
+	if ( m_pCornerPrevArea && next && next != area )
+	{
+		SpotEncounter *encounter = area->GetSpotEncounter( m_pCornerPrevArea, next );
+		if ( encounter && m_iCornerSpot < encounter->spots.Count() )
+		{
+			HidingSpot *spot = encounter->spots[ m_iCornerSpot ].spot;
+			++m_iCornerSpot;
+			if ( spot )
+			{
+				lookAt = spot->GetPosition() + Vector( 0, 0, HumanEyeHeight - 8.0f );
+				bHave = true;
+			}
+		}
+	}
+
+	if ( !bHave && next && next != area )
+	{
+		const HidingSpotVector *spots = next->GetHidingSpots();
+		if ( spots && spots->Count() )
+		{
+			lookAt = ( *spots )[ RandomInt( 0, spots->Count() - 1 ) ]->GetPosition() + Vector( 0, 0, HumanEyeHeight - 8.0f );
+			bHave = true;
+		}
+	}
+
+	if ( bHave )
+		me->GetBodyInterface()->AimHeadTowards( lookAt, IBody::INTERESTING, 0.6f, NULL, "Checando canto" );
 }

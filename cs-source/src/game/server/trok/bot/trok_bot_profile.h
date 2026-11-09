@@ -57,6 +57,7 @@ struct TrokBotProfile_t
 	float	flStrafeMin;			// s: duração mínima de um "lado" do strafe em combate
 	float	flStrafeMax;
 	float	flChanceAgachar;		// 0..1: chance de agachar no meio do tiroteio
+	float	flDisciplina;			// 0..1: chance de cada ciclo de tiro seguir o ritmo (parar e atirar em rajada) em vez de spray andando
 	float	flAgressividade;		// 0..1: 0 = segura posição boa, 1 = caça o inimigo
 	float	flUsoTatico;			// 0..1: quanto usa o mapa tático (lugares seguros, entradas)
 

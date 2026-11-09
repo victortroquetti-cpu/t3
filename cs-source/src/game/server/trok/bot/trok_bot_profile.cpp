@@ -78,11 +78,11 @@ static ConVar trok_bot_personalidade( "trok_bot_personalidade", "0.12", FCVAR_GA
 // Base: tempo de reação visual humano ~0.2-0.3 s; jogadores fracos passam de 0.4 s.
 static const TrokBotProfile_t s_DefaultProfiles[ TROK_BOT_LEVELS ] =
 {
-	//  nível      reação         perc  campo  aud   erro0  erroMin precAlvo meiaV  rastr  ferido cabeça giro  interv  strafe      agach  agress tático
-	{ "facil",    0.45f, 0.70f,   0.60f, 100,  0.6f,  9.0f,  2.5f,   1.00f,  0.60f, 4.0f,  6.0f,  0.05f, 400,  0.40f,  0.0f, 0.0f, 0.00f, 0.60f, 0.10f },
-	{ "normal",   0.30f, 0.45f,   0.85f, 110,  0.8f,  6.0f,  1.5f,   0.75f,  0.40f, 3.0f,  4.0f,  0.15f, 600,  0.20f,  0.5f, 1.1f, 0.05f, 0.50f, 0.40f },
-	{ "dificil",  0.22f, 0.32f,   1.00f, 120,  1.0f,  4.0f,  0.9f,   0.60f,  0.28f, 2.0f,  3.0f,  0.30f, 800,  0.12f,  0.35f, 0.8f, 0.12f, 0.50f, 0.70f },
-	{ "expert",   0.17f, 0.25f,   1.15f, 130,  1.1f,  3.0f,  0.6f,   0.50f,  0.20f, 1.5f,  2.5f,  0.45f, 950,  0.08f,  0.25f, 0.6f, 0.18f, 0.50f, 0.90f },
+	//  nível      reação         perc  campo  aud   erro0  erroMin precAlvo meiaV  rastr  ferido cabeça giro  interv  strafe      agach  discipl agress tático
+	{ "facil",    0.45f, 0.70f,   0.70f, 100,  0.6f,  7.0f,  2.0f,   1.00f,  0.50f, 4.0f,  6.0f,  0.05f, 400,  0.40f,  0.0f, 0.0f, 0.00f, 0.00f, 0.60f, 0.10f },
+	{ "normal",   0.30f, 0.45f,   0.85f, 110,  0.8f,  6.0f,  1.5f,   0.75f,  0.40f, 3.0f,  4.0f,  0.15f, 600,  0.20f,  0.5f, 1.1f, 0.05f, 0.50f, 0.50f, 0.40f },
+	{ "dificil",  0.22f, 0.32f,   1.00f, 120,  1.0f,  4.0f,  0.9f,   0.60f,  0.28f, 2.0f,  3.0f,  0.30f, 800,  0.12f,  0.35f, 0.8f, 0.12f, 0.80f, 0.50f, 0.70f },
+	{ "expert",   0.17f, 0.25f,   1.15f, 130,  1.1f,  3.0f,  0.6f,   0.50f,  0.20f, 1.5f,  2.5f,  0.45f, 950,  0.08f,  0.25f, 0.6f, 0.18f, 0.95f, 0.50f, 0.90f },
 };
 
 static TrokBotProfile_t s_Profiles[ TROK_BOT_LEVELS ];
@@ -131,6 +131,7 @@ void TrokBot_ReloadProfiles( void )
 		ReadFloat( pLevel, "strafe_min", &p.flStrafeMin );
 		ReadFloat( pLevel, "strafe_max", &p.flStrafeMax );
 		ReadFloat( pLevel, "chance_agachar", &p.flChanceAgachar );
+		ReadFloat( pLevel, "disciplina_tiro", &p.flDisciplina );
 		ReadFloat( pLevel, "agressividade", &p.flAgressividade );
 		ReadFloat( pLevel, "uso_tatico", &p.flUsoTatico );
 	}

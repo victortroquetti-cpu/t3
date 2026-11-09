@@ -27,6 +27,7 @@
 #include "trok_bot_team.h"
 #include "nav_area.h"
 #include "NextBot/Path/NextBotPathFollow.h"
+#include "NextBot/Path/NextBotChasePath.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -35,6 +36,365 @@ static ConVar trok_bot_tatica( "trok_bot_tatica", "1", FCVAR_GAMEDLL,
 	"Bots usam o mapa tático (segurar lugares estratégicos). 0 = só caçar, como o HL2MP." );
 static ConVar trok_bot_tatica_raio( "trok_bot_tatica_raio", "2500", FCVAR_GAMEDLL,
 	"Distância máxima (u) até o lugar estratégico que o bot vai segurar." );
+
+//-----------------------------------------------------------------------------
+// Procurar: o inimigo sumiu. Vai até onde ele foi visto por último e confere
+// os esconderijos em volta, em vez de esquecer (como o bot padrão faz).
+class CTrokBotSearch : public Action< CHL2MPBot >
+{
+public:
+	CTrokBotSearch( const Vector &pos ) : m_pos( pos ), m_bArrived( false ) {}
+
+	virtual ActionResult< CHL2MPBot > OnStart( CHL2MPBot *me, Action< CHL2MPBot > *priorAction )
+	{
+		m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
+		m_giveUpTimer.Start( 15.0f );
+		return Continue();
+	}
+
+	virtual ActionResult< CHL2MPBot > Update( CHL2MPBot *me, float interval )
+	{
+		if ( me->GetVisionInterface()->GetPrimaryKnownThreat( true ) )
+			return Done( "Achou" );
+		if ( m_giveUpTimer.IsElapsed() )
+			return Done( "Desistiu de procurar" );
+
+		const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
+
+		if ( !m_bArrived )
+		{
+			if ( ( me->GetAbsOrigin() - m_pos ).Length2D() < 100.0f )
+			{
+				m_bArrived = true;
+				m_searchTimer.Start( RandomFloat( 4.0f, 7.0f ) );
+				CollectSpots();
+				return Continue();
+			}
+			if ( !m_path.IsValid() && m_repathTimer.IsElapsed() )
+			{
+				m_repathTimer.Start( 1.0f );
+				CTrokBotPathCost cost( me, (unsigned int)me->entindex() * 2246822519u );
+				if ( !m_path.Compute( me, m_pos, cost ) )
+					return Done( "Sem caminho até onde ele sumiu" );
+			}
+			m_path.Update( me );
+			if ( profile.flAgressividade < 0.5f && me->IsRangeLessThan( m_pos, 600.0f ) )
+				me->PressWalkButton( 0.3f );		// chega quieto
+			return Continue();
+		}
+
+		if ( m_searchTimer.IsElapsed() )
+			return Done( "Ninguém aqui" );
+
+		if ( m_lookTimer.IsElapsed() )
+		{
+			m_lookTimer.Start( RandomFloat( 0.6f, 1.0f ) );
+			Vector lookAt;
+			if ( m_spots.Count() )
+			{
+				lookAt = m_spots[ RandomInt( 0, m_spots.Count() - 1 ) ] + Vector( 0, 0, HumanEyeHeight - 12.0f );
+			}
+			else
+			{
+				QAngle angles( RandomFloat( -8.0f, 8.0f ), me->EyeAngles().y + RandomFloat( -160.0f, 160.0f ), 0.0f );
+				Vector forward;
+				AngleVectors( angles, &forward );
+				lookAt = me->EyePosition() + 600.0f * forward;
+			}
+			me->GetBodyInterface()->AimHeadTowards( lookAt, IBody::INTERESTING, 0.9f, NULL, "Procurando" );
+		}
+		return Continue();
+	}
+
+	virtual const char *GetName( void ) const { return "Procurar"; }
+
+private:
+	void CollectSpots( void )
+	{
+		m_spots.RemoveAll();
+		CNavArea *area = TheNavMesh->GetNearestNavArea( m_pos, false, 300.0f );
+		if ( !area )
+			return;
+
+		struct Collect
+		{
+			Vector center; CUtlVector< Vector > *out;
+			bool operator()( CNavArea *other )
+			{
+				if ( ( other->GetCenter() - center ).LengthSqr() > 700.0f * 700.0f )
+					return true;
+				const HidingSpotVector *spots = other->GetHidingSpots();
+				FOR_EACH_VEC( *spots, i )
+				{
+					if ( out->Count() >= 12 )
+						return false;
+					out->AddToTail( ( *spots )[ i ]->GetPosition() );
+				}
+				return true;
+			}
+		} collect = { m_pos, &m_spots };
+
+		collect( area );
+		area->ForAllPotentiallyVisibleAreas( collect );
+	}
+
+	Vector m_pos;
+	bool m_bArrived;
+	CUtlVector< Vector > m_spots;
+	PathFollower m_path;
+	CountdownTimer m_repathTimer;
+	CountdownTimer m_giveUpTimer;
+	CountdownTimer m_searchTimer;
+	CountdownTimer m_lookTimer;
+};
+
+//-----------------------------------------------------------------------------
+// Combate: substitui o CHL2MPBotAttack do HL2MP (que só corria para cima).
+//   - peek: com cobertura a até ~150u (lado ou trás), alterna esconder e sair
+//     para atirar; o ritmo de rajada da ação raiz acontece na saída;
+//   - recarrega atrás da cobertura, não no aberto;
+//   - sem cobertura: luta no lugar com strafe e avança se estiver longe demais;
+//   - inimigo sumiu: vai procurar onde ele foi visto (CTrokBotSearch);
+//   - segurando posição (âncora): não avança e respeita a emboscada.
+static bool FindCoverNear( CHL2MPBot *me, CBaseEntity *threat, const Vector &threatEye, Vector *pCover )
+{
+	Vector origin = me->GetAbsOrigin();
+	Vector toThreat = threatEye - origin;
+	toThreat.z = 0.0f;
+	toThreat.NormalizeInPlace();
+	Vector side( -toThreat.y, toThreat.x, 0.0f );
+
+	const Vector dirs[] =
+	{
+		side, -side,
+		( side - toThreat ).Normalized(), ( -side - toThreat ).Normalized(),
+		-toThreat,
+	};
+	const float radii[] = { 56.0f, 96.0f, 144.0f };
+
+	CTraceFilterSkipTwoEntities filter( me, threat, COLLISION_GROUP_NONE );
+	CTraceFilterSimple moveFilter( me, COLLISION_GROUP_PLAYER_MOVEMENT );
+
+	for ( int r = 0; r < ARRAYSIZE( radii ); ++r )
+	{
+		for ( int d = 0; d < ARRAYSIZE( dirs ); ++d )
+		{
+			Vector candidate = origin + radii[ r ] * dirs[ d ];
+			CNavArea *area = TheNavMesh->GetNavArea( candidate + Vector( 0, 0, 32 ), 120.0f );
+			if ( !area )
+				continue;
+			candidate.z = area->GetZ( candidate );
+
+			trace_t tr;
+			UTIL_TraceHull( origin + Vector( 0, 0, StepHeight ), candidate + Vector( 0, 0, StepHeight ),
+				Vector( -16, -16, 0 ), Vector( 16, 16, 36 ), MASK_PLAYERSOLID, &moveFilter, &tr );
+			if ( tr.DidHit() || me->GetLocomotionInterface()->HasPotentialGap( origin, candidate ) )
+				continue;
+
+			// Cobertura de verdade: em pé, ali, não dá para ver o olho do inimigo.
+			UTIL_TraceLine( candidate + Vector( 0, 0, 64 ), threatEye, MASK_SHOT, &filter, &tr );
+			if ( !tr.DidHit() )
+				continue;
+
+			*pCover = candidate;
+			return true;
+		}
+	}
+	return false;
+}
+
+class CTrokBotFight : public Action< CHL2MPBot >
+{
+public:
+	CTrokBotFight( bool bHold = false ) : m_bHold( bHold ), m_state( OPEN ), m_bHasCover( false ), m_bOpened( false ), m_chasePath( ChasePath::LEAD_SUBJECT ) {}
+
+	virtual ActionResult< CHL2MPBot > OnStart( CHL2MPBot *me, Action< CHL2MPBot > *priorAction )
+	{
+		m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
+		m_peekPos = me->GetAbsOrigin();
+		return Continue();
+	}
+
+	virtual ActionResult< CHL2MPBot > Update( CHL2MPBot *me, float interval )
+	{
+		const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
+		if ( !threat || !threat->GetEntity() || threat->IsObsolete() )
+			return Done( "Sem inimigo" );
+
+		me->EquipBestWeaponForThreat( threat );
+		const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
+		CBaseEntity *pThreat = threat->GetEntity();
+		Vector threatEye = pThreat->EyePosition();
+		float flRange = me->GetRangeTo( threat->GetLastKnownPosition() );
+
+		// Sumiu de vista.
+		if ( !threat->IsVisibleRecently() )
+		{
+			if ( m_bHold )
+			{
+				if ( threat->GetTimeSinceLastSeen() > 3.0f )
+					return Done( "Inimigo sumiu; volta a segurar" );
+			}
+			else if ( threat->GetTimeSinceLastSeen() > 1.5f )
+			{
+				return ChangeTo( new CTrokBotSearch( threat->GetLastKnownPosition() ), "Procurar onde ele sumiu" );
+			}
+		}
+
+		CBaseCombatWeapon *pWeapon = me->GetActiveWeapon();
+		CBaseHL2MPCombatWeapon *pHL2MPWeapon = dynamic_cast< CBaseHL2MPCombatWeapon * >( pWeapon );
+
+		// Arma branca / curta distância: vai para cima.
+		if ( !m_bHold && ( CHL2MPBot::IsBludgeon( pWeapon ) || ( pHL2MPWeapon && me->IsCloseRange( pHL2MPWeapon ) ) ) )
+		{
+			Own( me, false );
+			CTrokBotPathCost cost( me, (unsigned int)me->entindex() );
+			m_chasePath.Update( me, pThreat, cost );
+			return Continue();
+		}
+
+		// Âncora em emboscada: parado e quieto até a ação raiz liberar o tiro.
+		if ( m_bHold && profile.bEmboscada && !m_bOpened )
+		{
+			Own( me, true );
+			if ( me->GetIntentionInterface()->ShouldAttack( me, threat ) != ANSWER_NO )
+				m_bOpened = true;
+			return Continue();
+		}
+
+		// Procura cobertura perto de vez em quando (o lugar muda).
+		if ( m_coverTimer.IsElapsed() && m_state == OPEN )
+		{
+			m_coverTimer.Start( 1.0f );
+			m_bHasCover = FindCoverNear( me, pThreat, threatEye, &m_cover );
+			if ( m_bHasCover )
+				m_peekPos = me->GetAbsOrigin();
+		}
+
+		// Recarregar atrás da cobertura.
+		bool bLowClip = pWeapon && pWeapon->UsesClipsForAmmo1() && pWeapon->Clip1() < MAX( 1, pWeapon->GetMaxClip1() / 4 ) &&
+			me->GetAmmoCount( pWeapon->GetPrimaryAmmoType() ) > 0;
+		if ( bLowClip && m_bHasCover && m_state != RELOAD && profile.flUsoTatico >= 0.3f )
+		{
+			m_state = RELOAD;
+			m_stateTimer.Start( 3.5f );
+		}
+
+		bool bPeekStyle = m_bHasCover && flRange >= 400.0f && profile.flUsoTatico >= 0.35f && profile.iEstilo != TROK_ESTILO_ENTRY;
+		if ( m_state == OPEN && bPeekStyle )
+		{
+			m_state = PEEK_OUT;
+			m_stateTimer.Start( RandomFloat( 0.7f, 1.4f ) );
+		}
+
+		switch ( m_state )
+		{
+		case RELOAD:
+			Own( me, true );
+			if ( MoveTo( me, m_cover ) )
+				me->PressReloadButton( 0.2f );
+			if ( ( pWeapon && pWeapon->Clip1() >= pWeapon->GetMaxClip1() ) || m_stateTimer.IsElapsed() )
+			{
+				m_state = PEEK_OUT;
+				m_stateTimer.Start( RandomFloat( 0.7f, 1.4f ) );
+			}
+			return Continue();
+
+		case PEEK_OUT:
+			// Fora da cobertura: o ritmo de rajada da ação raiz cuida do tiro.
+			Own( me, true );
+			MoveTo( me, m_peekPos );
+			if ( m_stateTimer.IsElapsed() )
+			{
+				m_state = HIDE;
+				m_stateTimer.Start( RandomFloat( 0.35f, 0.9f ) * ( 1.5f - profile.flAgressividade ) );
+			}
+			return Continue();
+
+		case HIDE:
+			Own( me, true );
+			MoveTo( me, m_cover );
+			if ( m_stateTimer.IsElapsed() )
+			{
+				m_state = PEEK_OUT;
+				m_stateTimer.Start( RandomFloat( 0.7f, 1.4f ) );
+			}
+			return Continue();
+
+		case OPEN:
+		default:
+			break;
+		}
+
+		// Sem cobertura: luta no lugar (strafe e rajadas da ação raiz) e avança se precisar.
+		Own( me, false );
+		if ( m_bHold )
+			return Continue();
+
+		bool bTooFar = flRange > 1.3f * MAX( 400.0f, me->GetDesiredAttackRange() );
+		bool bNoShot = !me->IsLineOfFireClear( threat->GetLastKnownPosition() );
+		bool bClose = profile.iEstilo == TROK_ESTILO_ENTRY || ( profile.flDisciplina <= 0.0f && flRange > 900.0f );	// entry empurra; fácil chega perto
+		if ( bTooFar || bNoShot || bClose )
+		{
+			if ( m_repathTimer.IsElapsed() )
+			{
+				m_repathTimer.Start( RandomFloat( 0.4f, 0.7f ) );
+				CTrokBotPathCost cost( me, (unsigned int)me->entindex() * 3266489917u );
+				m_path.Compute( me, threat->GetLastKnownPosition(), cost );
+			}
+			m_path.Update( me );
+		}
+		return Continue();
+	}
+
+	virtual ActionResult< CHL2MPBot > OnSuspend( CHL2MPBot *me, Action< CHL2MPBot > *interruptingAction )
+	{
+		Own( me, false );
+		return Continue();
+	}
+
+	virtual void OnEnd( CHL2MPBot *me, Action< CHL2MPBot > *nextAction )
+	{
+		Own( me, false );
+	}
+
+	virtual const char *GetName( void ) const
+	{
+		switch ( m_state )
+		{
+		case PEEK_OUT: return "Combate(peek)";
+		case HIDE: return "Combate(cobertura)";
+		case RELOAD: return "Combate(recarregando)";
+		default: return m_bHold ? "Combate(segurando)" : "Combate";
+		}
+	}
+
+private:
+	enum State_t { OPEN, PEEK_OUT, HIDE, RELOAD };
+
+	void Own( CHL2MPBot *me, bool bOwned ) { TrokBot_SetCombatMoveOwned( me, bOwned ); }
+
+	// Passos curtos (até ~150u) direto, sem caminho. true = chegou.
+	bool MoveTo( CHL2MPBot *me, const Vector &pos )
+	{
+		if ( ( me->GetAbsOrigin() - pos ).Length2D() < 14.0f )
+			return true;
+		me->GetLocomotionInterface()->Approach( pos );
+		return false;
+	}
+
+	bool m_bHold;
+	State_t m_state;
+	bool m_bHasCover;
+	bool m_bOpened;
+	Vector m_cover;
+	Vector m_peekPos;
+	ChasePath m_chasePath;
+	PathFollower m_path;
+	CountdownTimer m_coverTimer;
+	CountdownTimer m_stateTimer;
+	CountdownTimer m_repathTimer;
+};
 
 //-----------------------------------------------------------------------------
 class CTrokBotHoldSpot : public Action< CHL2MPBot >
@@ -104,6 +464,13 @@ public:
 						return Done( "Colega precisa de apoio" );
 				}
 			}
+		}
+
+		// Inimigo à vista: luta daqui (peek da posição, sem avançar).
+		{
+			const CKnownEntity *visible = me->GetVisionInterface()->GetPrimaryKnownThreat( true );
+			if ( visible && visible->GetEntity() && me->IsRangeLessThan( visible->GetEntity(), 2500.0f ) )
+				return SuspendFor( new CTrokBotFight( true ), "Combate segurando posição" );
 		}
 
 		// Vigia as entradas da região (por onde o inimigo vai aparecer),
@@ -293,8 +660,8 @@ public:
 			return Done( "Tempo de caçada acabou" );
 
 		const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
-		if ( threat && me->IsRangeLessThan( threat->GetLastKnownPosition(), 1000.0f ) )
-			return SuspendFor( new CHL2MPBotAttack, "Atacar inimigo" );
+		if ( threat && ( threat->IsVisibleRecently() || me->IsRangeLessThan( threat->GetLastKnownPosition(), 1000.0f ) ) )
+			return SuspendFor( new CTrokBotFight, "Combate" );
 
 		const TrokBotProfile_t &profile = TrokBot_GetProfile( me );
 
@@ -565,8 +932,8 @@ public:
 			return Done( "Tempo acompanhando acabou" );
 
 		const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
-		if ( threat && me->IsRangeLessThan( threat->GetLastKnownPosition(), 1000.0f ) )
-			return SuspendFor( new CHL2MPBotAttack, "Atacar inimigo" );
+		if ( threat && ( threat->IsVisibleRecently() || me->IsRangeLessThan( threat->GetLastKnownPosition(), 1000.0f ) ) )
+			return SuspendFor( new CTrokBotFight, "Combate" );
 
 		// Colega lutando: volta para o cérebro, que manda apoiar.
 		CUtlVector< TrokBotIntel_t > intel;

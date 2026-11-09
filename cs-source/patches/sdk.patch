@@ -111,6 +111,29 @@ index 30d2181..18f69f4 100644
 +#endif
  }
  
+diff --git a/src/game/server/hl2mp/hl2mp_player.cpp b/src/game/server/hl2mp/hl2mp_player.cpp
+index 9457928..ec10c29 100644
+--- a/src/game/server/hl2mp/hl2mp_player.cpp
++++ b/src/game/server/hl2mp/hl2mp_player.cpp
+@@ -1414,6 +1414,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
+ 		}
+ 	}
+ 
++#ifdef TROK
++	// cs-source/: mapas do CS:S só têm spawns de TR e CT (server/trok/trok_cs_compat.cpp).
++	if ( gEntList.FindEntityByClassname( NULL, pSpawnpointName ) == NULL )
++	{
++		const char *pszCS = ( GetTeamNumber() == TEAM_REBELS ) ? "info_player_counterterrorist" : "info_player_terrorist";
++		if ( !HL2MPRules()->IsTeamplay() && random->RandomInt( 0, 1 ) )
++			pszCS = "info_player_counterterrorist";
++		if ( gEntList.FindEntityByClassname( NULL, pszCS ) )
++			pSpawnpointName = pszCS;
++	}
++#endif
++
+ 	pSpot = pLastSpawnPoint;
+ 	// Randomize the start spot
+ 	for ( int i = random->RandomInt(1,5); i > 0; i-- )
 diff --git a/src/vpc_scripts/default.vgc b/src/vpc_scripts/default.vgc
 index 2614d68..9954cc3 100644
 --- a/src/vpc_scripts/default.vgc

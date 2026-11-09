@@ -209,7 +209,7 @@ float CTrokBotVision::ComputeGain( CBaseEntity *subject, Awareness_t &state ) co
 	CBaseCombatCharacter *pCombat = subject->MyCombatCharacterPointer();
 	CNavArea *pArea = pCombat ? pCombat->GetLastKnownArea() : NULL;
 	if ( pArea )
-		flLightFactor = 0.35f + 0.65f * clamp( pArea->GetLightIntensity( subject->GetAbsOrigin() ), 0.0f, 1.0f );
+		flLightFactor = 0.45f + 0.55f * clamp( pArea->GetLightIntensity( subject->GetAbsOrigin() ), 0.0f, 1.0f );
 
 	// 6) Estado do bot: em alerta (ouviu tiro/passos, está lutando) presta mais atenção.
 	float flAlertFactor = IsAlert() ? 1.4f : 1.0f;

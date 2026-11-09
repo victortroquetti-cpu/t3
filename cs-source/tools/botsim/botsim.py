@@ -43,10 +43,10 @@ DEF_FOV = 90.0             # FOV do jogador, copiado para a visão a cada update
 
 # ---------------------------------------------------------------- Trok (perfis)
 TROK = {
-    "facil":   dict(rmin=0.45, rmax=0.70, gain=0.60, fov=100, e0=9.0, emin=2.5, prec=1.00, hl=0.60, track=4.0, head=0.05, turn=400, interval=0.40, smin=0.0, smax=0.0, crouch=0.0),
-    "normal":  dict(rmin=0.30, rmax=0.45, gain=0.85, fov=110, e0=6.0, emin=1.5, prec=0.75, hl=0.40, track=3.0, head=0.15, turn=600, interval=0.20, smin=0.5, smax=1.1, crouch=0.05),
-    "dificil": dict(rmin=0.22, rmax=0.32, gain=1.00, fov=120, e0=4.0, emin=0.9, prec=0.60, hl=0.28, track=2.0, head=0.30, turn=800, interval=0.12, smin=0.35, smax=0.8, crouch=0.12),
-    "expert":  dict(rmin=0.17, rmax=0.25, gain=1.15, fov=130, e0=3.0, emin=0.6, prec=0.50, hl=0.20, track=1.5, head=0.45, turn=950, interval=0.08, smin=0.25, smax=0.6, crouch=0.18),
+    "facil":   dict(rmin=0.45, rmax=0.70, gain=0.70, fov=100, e0=7.0, emin=2.0, prec=1.00, hl=0.50, track=4.0, head=0.05, turn=400, interval=0.40, smin=0.0, smax=0.0, crouch=0.0, disc=0.0),
+    "normal":  dict(rmin=0.30, rmax=0.45, gain=0.85, fov=110, e0=6.0, emin=1.5, prec=0.75, hl=0.40, track=3.0, head=0.15, turn=600, interval=0.20, smin=0.5, smax=1.1, crouch=0.05, disc=0.50),
+    "dificil": dict(rmin=0.22, rmax=0.32, gain=1.00, fov=120, e0=4.0, emin=0.9, prec=0.60, hl=0.28, track=2.0, head=0.30, turn=800, interval=0.12, smin=0.35, smax=0.8, crouch=0.12, disc=0.80),
+    "expert":  dict(rmin=0.17, rmax=0.25, gain=1.15, fov=130, e0=3.0, emin=0.6, prec=0.50, hl=0.20, track=1.5, head=0.45, turn=950, interval=0.08, smin=0.25, smax=0.6, crouch=0.18, disc=0.95),
 }
 PERSONALITY = 0.12         # trok_bot_personalidade
 PERCEP_BASE = 6.0          # trok_bot_percepcao_base
@@ -114,7 +114,7 @@ def trok_gain(p, sc, rng_noise):
     mf = 1.35 if s > 200 else (1.0 if s > 80 else 0.6)
     if sc["crouch"]:
         mf *= 0.75
-    lf = 0.35 + 0.65 * sc["light"]
+    lf = 0.45 + 0.55 * sc["light"]
     return PERCEP_BASE * p["gain"] * af * rf * ef * mf * lf * rng_noise
 
 
@@ -315,6 +315,221 @@ def run_duel(rng, n=600):
                         sem_acerto=round(1 - len(firsts) / n, 3),
                         acertos_por_s=[round(10 * x / per_bin_n, 3) for x in per_bin],
                     )
+            out.append(row)
+    return out
+
+
+# ============================================================== 2b. disciplina de tiro
+
+# Armas no estilo do CS (como as do mod vão ser): andando, a precisão cai muito,
+# e tiros seguidos abrem a mira (recuo). As do HL2MP não têm isso; por isso este
+# teste é separado do duelo acima.
+CS_SPREAD_STILL = 0.4      # graus (meio cone) parado
+CS_SPREAD_MOVING = 3.0     # graus extras correndo (a partir de 150u/s)
+CS_RECOIL_STEP = 0.35      # graus por tiro seguido
+CS_RECOIL_MAX = 3.0
+CS_RECOIL_TAU = 0.25       # s para o recuo assentar
+
+
+BODY_DAMAGE = 34.0         # 3 tiros no corpo matam
+HEAD_DAMAGE = 100.0        # cabeça mata
+MAX_FIGHT = 6.0
+
+
+class Shooter:
+    """Um lado do duelo. mode: padrao | trok_antigo (spray com strafe) | trok_novo (contra-strafe + rajada)."""
+
+    def __init__(self, rng, mode, level, dist):
+        self.rng, self.mode, self.dist = rng, mode, dist
+        self.trok = mode != "padrao"
+        if self.trok:
+            self.p = trok_profile(rng, level)
+            self.p["disc"] = TROK[level]["disc"] if mode == "trok_novo" else 0.0
+            self.head_speed, self.track_iv = self.p["turn"], self.p["interval"]
+            self.aim_head = rng.random() < self.p["head"] * max(0.3, min(1.0, 1.0 - (dist - 600.0) / 1400.0 * 0.7))
+            self.e0 = self.p["e0"] * rng.uniform(0.7, 1.3) * (1.0 + FLICK / 90.0)
+            self.phase, self.wobble = rng.uniform(0, 2 * math.pi), rng.uniform(0, 2 * math.pi)
+        else:
+            self.head_speed, self.track_iv = DEF_HEAD_SPEED, DEF_TRACK_INTERVAL[level]
+            self.aim_head = False
+        self.react = (trok_reaction(rng, self.p) if self.trok else DEF_RECOGNIZE[level])
+        self.head_yaw = -FLICK
+        self.look_y = self.look_v = self.look_z = 0.0
+        self.next_track = self.next_fire = self.next_update = 0.0
+        self.y = rng.uniform(-60, 60)
+        self.v = 0.0
+        self.desire = rng.choice((-1, 1))
+        self.last_dir = self.desire
+        self.combat = "move"
+        self.phase_until = 0.0
+        self.disciplined = True
+        self.fire_open = True
+        self.recoil = 0.0
+        self.hp = 100.0
+        self.shots = self.hits = self.moving_shots = 0
+
+    def think(self, t):
+        if t < self.next_update:
+            return
+        self.next_update = t + UPDATE
+        rng, p = self.rng, getattr(self, "p", None)
+        if self.mode == "padrao":
+            r = rng.randint(0, 100)
+            self.desire = -1 if r < 33 else (1 if r > 66 else 0)
+            self.fire_open = True
+            return
+        rhythm = self.mode == "trok_novo" and self.dist >= 450 and p["disc"] > 0
+        if t >= self.phase_until:
+            if self.combat == "move":
+                if rhythm and self.disciplined:
+                    self.combat, self.phase_until, self.desire = "stop", t + 0.08, 0
+                else:
+                    self.desire = -1 if self.desire == 1 else 1
+                    if rng.random() < 0.2 or p["smax"] <= 0:
+                        self.desire = 0
+                    self.phase_until = t + (rng.uniform(p["smin"], max(p["smin"], p["smax"])) if p["smax"] > 0 else 1.0)
+                    self.disciplined = rng.random() < p["disc"]
+            elif self.combat == "stop":
+                self.combat = "burst"
+                self.phase_until = t + (rng.uniform(BURST_MID[0], BURST_MID[1]) if self.dist < 1200 else rng.uniform(BURST_LONG[0], BURST_LONG[1]))
+            elif self.combat == "burst":
+                self.combat = "recover"
+                self.phase_until = t + (rng.uniform(RECOVER_MID[0], RECOVER_MID[1]) if self.dist < 1200 else rng.uniform(RECOVER_LONG[0], RECOVER_LONG[1]))
+            else:
+                self.combat = "move"
+                self.disciplined = rng.random() < p["disc"]
+                self.desire = -1 if self.last_dir == 1 else 1
+                self.phase_until = t + rng.uniform(p["smin"], max(p["smin"], p["smax"])) * MOVE_SCALE
+        if self.desire != 0:
+            self.last_dir = self.desire
+        self.fire_open = (not rhythm) or (not self.disciplined) or self.combat == "burst"
+
+    def move(self):
+        if self.mode != "padrao" and self.combat == "stop":
+            target_v = -self.last_dir * 190.0
+        elif self.mode == "padrao" or self.combat == "move":
+            target_v = self.desire * 190.0
+        else:
+            target_v = 0.0
+        acc = 1900.0 * TICK
+        if target_v == 0.0:
+            self.v *= max(0.0, 1.0 - 4.0 * TICK)
+            self.v -= math.copysign(min(abs(self.v), 400.0 * TICK), self.v)
+        else:
+            self.v += max(-acc, min(acc, target_v - self.v))
+        if self.mode != "padrao" and self.combat in ("stop", "burst", "recover") and abs(self.v) < 25.0:
+            self.v = 0.0
+        self.y += self.v * TICK
+
+    def aim_and_fire(self, t, other):
+        dist, rng = self.dist, self.rng
+        rel_y, rel_v = other.y - self.y, other.v - self.v
+        if t >= self.next_track:
+            if self.trok:
+                p = self.p
+                half_w = math.degrees(math.atan(BODY_HALF_W / dist))
+                floor = min(p["emin"], p["prec"] * half_w)
+                hl = max(0.05, p["hl"]) * (0.6 + 0.2 * math.log2(1.0 + self.e0 / max(0.05, half_w)))
+                err = floor + (self.e0 - floor) * 0.5 ** (t / hl)
+                err += p["track"] * math.degrees(abs(rel_v) / dist) / 100.0
+                if abs(self.v) > 120.0:
+                    err *= 1.25
+                phi = self.phase + 0.9 * math.sin(1.3 * t + self.wobble)
+                off = math.tan(math.radians(err)) * dist
+                want = rel_y + off * math.cos(phi)
+                self.look_z = (HEAD_ABOVE if self.aim_head else 6.0) + 0.6 * off * math.sin(phi)
+            else:
+                want, self.look_z = rel_y, 0.0
+            iv = max(self.track_iv, TICK)
+            self.look_v = (want - self.look_y) / iv + rel_v
+            self.next_track = t + rng.uniform(0.8, 1.2) * iv
+        self.look_y += self.look_v * TICK
+        desired = yaw_of(self.look_y, dist)
+        diff = ang_diff(desired, self.head_yaw)
+        dot = math.cos(math.radians(diff))
+        rate = self.head_speed
+        if dot > 0.7:
+            k = 1.0 + (dot - 0.7) / 0.3 * (0.02 - 1.0)
+            rate *= math.sin(1.57 * k)
+        if t < 0.25:
+            rate *= t / 0.25
+        self.head_yaw += max(-rate * TICK, min(rate * TICK, diff))
+        self.recoil *= math.exp(-TICK / CS_RECOIL_TAU)
+
+        if t < self.react:
+            return
+        on_target = math.cos(math.radians(ang_diff(desired, self.head_yaw))) > 0.98
+        if not (on_target and self.fire_open and t >= self.next_fire):
+            return
+        self.next_fire = t + FIRE_INTERVAL
+        self.shots += 1
+        self.moving_shots += 1 if abs(self.v) > 30.0 else 0
+        spread = CS_SPREAD_STILL + CS_SPREAD_MOVING * min(1.0, abs(self.v) / 150.0) + self.recoil
+        self.recoil = min(CS_RECOIL_MAX, self.recoil + CS_RECOIL_STEP)
+        r = spread * math.sqrt(rng.random())
+        th = rng.uniform(0, 2 * math.pi)
+        lateral = dist * math.tan(math.radians(self.head_yaw + r * math.cos(th) - yaw_of(rel_y, dist)))
+        vertical = self.look_z + dist * math.tan(math.radians(r * math.sin(th)))
+        if (lateral ** 2 + (vertical - HEAD_ABOVE) ** 2) <= HEAD_R ** 2:
+            other.hp -= HEAD_DAMAGE
+            self.hits += 1
+        elif abs(lateral) <= BODY_HALF_W and abs(vertical) <= BODY_HALF_H:
+            other.hp -= BODY_DAMAGE
+            self.hits += 1
+
+
+# Ritmo do Trok (iguais aos de CTrokBotMainAction::Dodge)
+BURST_MID, BURST_LONG = (0.6, 1.0), (0.3, 0.5)
+RECOVER_MID, RECOVER_LONG = (0.05, 0.1), (0.1, 0.2)
+MOVE_SCALE = 0.3
+
+
+def fight(rng, mode, level, dist, ref_level="normal"):
+    """Bot (mode, level) contra o jogador de referência: spray fazendo ADAD, mira de nível normal."""
+    a = Shooter(rng, mode, level, dist)
+    b = Shooter(rng, "trok_antigo", ref_level, dist)
+    t = 0.0
+    while t < MAX_FIGHT:
+        for s in (a, b):
+            s.think(t)
+            s.move()
+        a.aim_and_fire(t, b)
+        b.aim_and_fire(t, a)
+        if a.hp <= 0 or b.hp <= 0:
+            break
+        t += TICK
+    if b.hp <= 0 and a.hp > 0:
+        result = "vitoria"
+    elif a.hp <= 0 and b.hp > 0:
+        result = "derrota"
+    else:
+        result = "empate"
+    return result, t, a
+
+
+def run_discipline(rng, n=1500):
+    out = []
+    for dist in (800, 1500):
+        for level in ("normal", "expert"):
+            row = dict(dist=dist, nivel=level, res={})
+            for mode in ("padrao", "trok_antigo", "trok_novo"):
+                wins = losses = 0
+                ttk = []
+                S = H = M = 0
+                for _ in range(n):
+                    res, t, a = fight(rng, mode, level, dist)
+                    wins += res == "vitoria"
+                    losses += res == "derrota"
+                    if res == "vitoria":
+                        ttk.append(t)
+                    S += a.shots; H += a.hits; M += a.moving_shots
+                ttk.sort()
+                row["res"][mode] = dict(
+                    vitoria=round(wins / n, 3), derrota=round(losses / n, 3),
+                    ttk=round(ttk[len(ttk) // 2], 2) if ttk else None,
+                    acerto=round(H / S, 3) if S else 0.0,
+                    tiros_andando=round(M / S, 3) if S else 0.0,
+                )
             out.append(row)
     return out
 
@@ -745,6 +960,7 @@ def main():
         semente=SEED,
         percepcao=run_perception(rng),
         duelo=run_duel(rng),
+        disciplina=run_discipline(rng),
         strafe=run_strafe(rng),
         rotas=run_routes(rng),
         tatico=run_tactical(),

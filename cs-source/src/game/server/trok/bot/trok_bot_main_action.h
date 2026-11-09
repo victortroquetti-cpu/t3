@@ -44,6 +44,8 @@ protected:
 
 private:
 	void ListenForFootsteps( CHL2MPBot *me );
+	void CheckCorners( CHL2MPBot *me );
+	void UpdateFireWindow( CHL2MPBot *me );
 
 	// Mira (estado de um "engajamento" com o alvo atual).
 	mutable CHandle< CBaseEntity > m_hAimSubject;
@@ -60,7 +62,21 @@ private:
 	float m_flRetargetUntil;				// depois de derrubar o alvo, um instante até atirar no próximo
 
 	int m_iStrafeDir;						// -1 esquerda, 0 parado, 1 direita
+	int m_iLastStrafeDir;
 	CountdownTimer m_strafeTimer;
+
+	// Ritmo de tiro: anda (sem atirar) -> contra-strafe -> rajada parado -> recupera.
+	enum CombatPhase_t { PHASE_MOVE, PHASE_STOP, PHASE_BURST, PHASE_RECOVER };
+	CombatPhase_t m_combatPhase;
+	CountdownTimer m_phaseTimer;
+	bool m_bDisciplinedCycle;				// este ciclo segue o ritmo (senão: spray andando)
+	bool m_bFireWindowOpen;
+
+	// Checar cantos.
+	CNavArea *m_pCornerArea;
+	CNavArea *m_pCornerPrevArea;
+	int m_iCornerSpot;
+	CountdownTimer m_cornerTimer;
 
 	CountdownTimer m_listenTimer;
 	CountdownTimer m_intelTimer;
