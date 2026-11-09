@@ -1,0 +1,247 @@
+//=============================================================================
+// Trok: movimentação (roda igual no servidor e no cliente: predição).
+//
+// Substitui o CHL2GameMovement do HL2MP (patch em hl_gamemovement.cpp troca o
+// objeto global pelo nosso com #ifdef TROK). Tudo aqui é sem estado guardado
+// entre ticks: depende só da posição, velocidade, botões e traços, então o
+// cliente prevê exatamente o que o servidor faz, sem variável de rede nova.
+//
+//   Pulo:     altura ajustável (trok_pulo_altura; HL2 = 21u, CS:S ~45u) e
+//             sem o empurrão para frente do HL2 (o "bunny hop" acelerado).
+//   Deslizar: correndo rápido, apertar agachar dá um impulso e quase não se
+//             perde velocidade enquanto ela for alta; acaba sozinho quando cai.
+//             Só reinicia correndo de novo (recarga natural, sem cronômetro).
+//   Escalar:  segurando pular e andando contra uma borda (até
+//             trok_escalar_altura_max acima dos pés) com espaço em cima, o
+//             jogador sobe e passa por cima (mantle). Funciona do chão e no ar.
+//
+// Todos os números são ConVars replicadas: dá para ajustar no console com o
+// jogo aberto (sv_cheats não é preciso; são do servidor).
+//=============================================================================
+
+#include "cbase.h"
+#include "hl_gamemovement.h"
+#include "in_buttons.h"
+#include "movevars_shared.h"
+
+// memdbgon must be the last include file in a .cpp file!!!
+#include "tier0/memdbgon.h"
+
+extern bool g_bMovementOptimizations;
+
+ConVar trok_pulo_altura( "trok_pulo_altura", "21", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Altura do pulo em pé (u). HL2 = 21, CS:S ~45. O pulo agachado alcança ~36u a mais." );
+ConVar trok_pulo_impulso_frente( "trok_pulo_impulso_frente", "0", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"1 = mantém o empurrão para frente do HL2 ao pular (permite ganhar velocidade pulando)." );
+
+ConVar trok_deslizar( "trok_deslizar", "1", FCVAR_REPLICATED | FCVAR_NOTIFY, "Deslizar ao agachar correndo." );
+ConVar trok_deslizar_vel_min( "trok_deslizar_vel_min", "240", FCVAR_REPLICATED, "Velocidade (u/s) mínima para começar a deslizar (só correndo)." );
+ConVar trok_deslizar_impulso( "trok_deslizar_impulso", "1.25", FCVAR_REPLICATED, "Multiplica a velocidade ao começar a deslizar." );
+ConVar trok_deslizar_vel_max( "trok_deslizar_vel_max", "400", FCVAR_REPLICATED, "Velocidade máxima no começo do deslize." );
+ConVar trok_deslizar_atrito( "trok_deslizar_atrito", "0.15", FCVAR_REPLICATED, "Fração do atrito normal durante o deslize." );
+ConVar trok_deslizar_vel_fim( "trok_deslizar_vel_fim", "160", FCVAR_REPLICATED, "Abaixo desta velocidade o deslize acaba (atrito volta ao normal)." );
+
+ConVar trok_escalar( "trok_escalar", "1", FCVAR_REPLICATED | FCVAR_NOTIFY, "Escalar bordas segurando pular contra elas." );
+ConVar trok_escalar_altura_max( "trok_escalar_altura_max", "80", FCVAR_REPLICATED, "Altura máxima (u, acima dos pés) de uma borda escalável." );
+ConVar trok_escalar_vel_frente( "trok_escalar_vel_frente", "140", FCVAR_REPLICATED, "Velocidade para frente ao passar por cima da borda." );
+
+// Distância à frente em que procuramos a parede e a borda.
+#define MANTLE_PROBE		24.0f
+#define MANTLE_LEDGE_DEPTH	20.0f
+#define MANTLE_EXTRA		6.0f	// sobe um pouco acima da borda para passar limpo
+
+class CTrokGameMovement : public CHL2GameMovement
+{
+	typedef CHL2GameMovement BaseClass;
+
+public:
+	virtual void FullWalkMove( void );
+	virtual bool CheckJumpButton( void );
+
+private:
+	bool IsDucked( void ) const;
+	bool IsSliding( void ) const;
+	void TryStartSlide( void );
+	bool TryMantle( void );
+};
+
+bool CTrokGameMovement::IsDucked( void ) const
+{
+	return ( player->GetFlags() & FL_DUCKING ) || player->m_Local.m_bDucking;
+}
+
+bool CTrokGameMovement::IsSliding( void ) const
+{
+	return trok_deslizar.GetBool() && player->GetGroundEntity() != NULL && IsDucked() &&
+		mv->m_vecVelocity.Length2D() > trok_deslizar_vel_fim.GetFloat();
+}
+
+//-----------------------------------------------------------------------------
+// Deslizar
+//-----------------------------------------------------------------------------
+void CTrokGameMovement::TryStartSlide( void )
+{
+	if ( !trok_deslizar.GetBool() || player->GetGroundEntity() == NULL || IsDucked() )
+		return;
+
+	bool bDuckPressed = ( mv->m_nButtons & IN_DUCK ) && !( mv->m_nOldButtons & IN_DUCK );
+	if ( !bDuckPressed )
+		return;
+
+	float flSpeed = mv->m_vecVelocity.Length2D();
+	if ( flSpeed < trok_deslizar_vel_min.GetFloat() )
+		return;
+
+	float flNew = MIN( flSpeed * trok_deslizar_impulso.GetFloat(), trok_deslizar_vel_max.GetFloat() );
+	if ( flNew <= flSpeed )
+		return;
+
+	float flScale = flNew / flSpeed;
+	mv->m_vecVelocity.x *= flScale;
+	mv->m_vecVelocity.y *= flScale;
+}
+
+//-----------------------------------------------------------------------------
+// Escalar (mantle)
+//-----------------------------------------------------------------------------
+bool CTrokGameMovement::TryMantle( void )
+{
+	if ( !trok_escalar.GetBool() || !( mv->m_nButtons & IN_JUMP ) || mv->m_flForwardMove <= 0.0f )
+		return false;
+
+	if ( player->GetMoveType() != MOVETYPE_WALK || player->GetWaterLevel() >= WL_Waist )
+		return false;
+
+	QAngle yaw( 0.0f, mv->m_vecViewAngles.y, 0.0f );
+	Vector forward;
+	AngleVectors( yaw, &forward );
+
+	const Vector &origin = mv->GetAbsOrigin();
+	bool bDucked = IsDucked();
+	trace_t tr;
+
+	// 1) Tem parede logo à frente?
+	TracePlayerBBox( origin, origin + MANTLE_PROBE * forward, PlayerSolidMask(), COLLISION_GROUP_PLAYER_MOVEMENT, tr );
+	if ( tr.fraction >= 1.0f || tr.startsolid )
+		return false;
+
+	// 2) Onde está o topo da borda? Desce um raio de cima, um pouco além da parede.
+	float flMaxHeight = trok_escalar_altura_max.GetFloat();
+	Vector top = origin + ( MANTLE_PROBE + MANTLE_LEDGE_DEPTH ) * forward;
+	Vector start = top + Vector( 0, 0, flMaxHeight + 2.0f );
+	float flStep = sv_stepsize.GetFloat();
+	Vector end = top + Vector( 0, 0, flStep );
+	UTIL_TraceLine( start, end, PlayerSolidMask(), mv->m_nPlayerHandle.Get(), COLLISION_GROUP_PLAYER_MOVEMENT, &tr );
+	if ( tr.startsolid || tr.fraction >= 1.0f || tr.plane.normal.z < 0.7f )
+		return false;
+
+	float flHeight = tr.endpos.z - origin.z;
+	if ( flHeight <= flStep || flHeight > flMaxHeight )
+		return false;
+
+	// Do chão, bordas que um pulo normal já alcança ficam com o pulo normal.
+	if ( player->GetGroundEntity() != NULL && flHeight <= trok_pulo_altura.GetFloat() )
+		return false;
+
+	// 3) Cabe o jogador em cima? (em pé, ou agachado se já estiver agachado)
+	Vector landing = tr.endpos + Vector( 0, 0, 1.0f );
+	trace_t room;
+	TracePlayerBBox( landing, landing, PlayerSolidMask(), COLLISION_GROUP_PLAYER_MOVEMENT, room );
+	if ( room.startsolid || room.allsolid )
+	{
+		if ( !bDucked )
+			return false;
+		Vector duckMins = GetPlayerMins( true ), duckMaxs = GetPlayerMaxs( true );
+		Ray_t ray;
+		ray.Init( landing, landing, duckMins, duckMaxs );
+		UTIL_TraceRay( ray, PlayerSolidMask(), mv->m_nPlayerHandle.Get(), COLLISION_GROUP_PLAYER_MOVEMENT, &room );
+		if ( room.startsolid || room.allsolid )
+			return false;
+	}
+
+	// 4) Sobe o necessário para passar a borda (a cada tick, recalculado:
+	//    conforme sobe, a velocidade pedida cai e a subida fica suave).
+	float flRise = flHeight + MANTLE_EXTRA;
+	float flNeeded = sqrtf( 2.0f * GetCurrentGravity() * flRise );
+	if ( mv->m_vecVelocity.z < flNeeded )
+		mv->m_vecVelocity.z = flNeeded;
+
+	float flForward = DotProduct( mv->m_vecVelocity, forward );
+	if ( flForward < trok_escalar_vel_frente.GetFloat() )
+	{
+		Vector side = mv->m_vecVelocity - flForward * forward;
+		side.z = 0.0f;
+		Vector newVel = trok_escalar_vel_frente.GetFloat() * forward + 0.3f * side;
+		mv->m_vecVelocity.x = newVel.x;
+		mv->m_vecVelocity.y = newVel.y;
+	}
+
+	if ( player->GetGroundEntity() != NULL )
+		SetGroundEntity( NULL );
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+void CTrokGameMovement::FullWalkMove( void )
+{
+	TryStartSlide();
+	TryMantle();
+
+	// Deslize: depois do movimento normal, devolve a parte da velocidade que o
+	// atrito tirou (fica só trok_deslizar_atrito dela). Determinístico: o
+	// cliente prevê igual ao servidor.
+	bool bSliding = IsSliding();
+	float flSpeedBefore = mv->m_vecVelocity.Length2D();
+
+	BaseClass::FullWalkMove();
+
+	if ( bSliding && player->GetGroundEntity() != NULL )
+	{
+		float flSpeedAfter = mv->m_vecVelocity.Length2D();
+		if ( flSpeedAfter > 1.0f && flSpeedAfter < flSpeedBefore )
+		{
+			float flKept = flSpeedBefore - ( flSpeedBefore - flSpeedAfter ) * trok_deslizar_atrito.GetFloat();
+			float flScale = flKept / flSpeedAfter;
+			mv->m_vecVelocity.x *= flScale;
+			mv->m_vecVelocity.y *= flScale;
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Pulo: altura própria e sem o empurrão para frente do HL2.
+//-----------------------------------------------------------------------------
+bool CTrokGameMovement::CheckJumpButton( void )
+{
+	Vector before = mv->m_vecVelocity;
+
+	if ( !BaseClass::CheckJumpButton() )
+		return false;
+
+	float flGravity = GetCurrentGravity();
+	float flBaseMul = g_bMovementOptimizations ? 160.0f : sqrtf( 2.0f * flGravity * GAMEMOVEMENT_JUMP_HEIGHT );
+	float flWantMul = sqrtf( 2.0f * flGravity * MAX( 1.0f, trok_pulo_altura.GetFloat() ) );
+	surfacedata_t *pSurface = player->GetSurfaceData();
+	float flGroundFactor = pSurface ? pSurface->game.jumpFactor : 1.0f;
+
+	float flDelta = flGroundFactor * ( flWantMul - flBaseMul );
+	mv->m_vecVelocity.z += flDelta;
+	mv->m_outJumpVel.z += flDelta;
+
+	if ( !trok_pulo_impulso_frente.GetBool() )
+	{
+		mv->m_vecVelocity.x = before.x;
+		mv->m_vecVelocity.y = before.y;
+	}
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// O objeto global de movimento do jogo (o patch desliga o do HL2 com #ifdef TROK).
+//-----------------------------------------------------------------------------
+static CTrokGameMovement g_GameMovement;
+IGameMovement *g_pGameMovement = ( IGameMovement * )&g_GameMovement;
+
+EXPOSE_SINGLE_INTERFACE_GLOBALVAR( CGameMovement, IGameMovement, INTERFACENAME_GAMEMOVEMENT, g_GameMovement );

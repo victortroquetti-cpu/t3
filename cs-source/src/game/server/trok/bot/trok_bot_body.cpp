@@ -26,8 +26,9 @@ static ConVar trok_bot_pulo_agachado( "trok_bot_pulo_agachado", "1", FCVAR_CHEAT
 static ConVar trok_bot_faixa( "trok_bot_faixa", "1", FCVAR_CHEAT,
 	"Bots andam numa faixa própria do corredor (oscilando devagar), não todos na linha do meio." );
 
-// Altura (u) a partir da qual vale agachar no pulo: o pulo em pé do HL2 sobe ~45u.
-#define TROK_PLAIN_JUMP_HEIGHT 40.0f
+// Altura do pulo em pé (trok_gamemovement.cpp; HL2 = 21u). Acima dela, o bot
+// agacha no ar (pulo agachado) e segura o pulo (o escalar do Trok termina a subida).
+extern ConVar trok_pulo_altura;
 
 //-----------------------------------------------------------------------------
 class CTrokBotBody : public CHL2MPBotBody
@@ -114,11 +115,13 @@ public:
 		if ( !trok_bot_pulo_agachado.GetBool() )
 			return;
 
-		// Pulo agachado: no ar, subindo para uma borda alta, segura o agachar.
-		if ( IsClimbingUpToLedge() && !IsOnGround() && m_flLedgeHeight > TROK_PLAIN_JUMP_HEIGHT )
+		// Borda acima do pulo em pé: no ar, agacha (pulo agachado) e segura o
+		// pulo andando para frente, o que aciona o escalar do Trok.
+		if ( IsClimbingUpToLedge() && !IsOnGround() && m_flLedgeHeight > trok_pulo_altura.GetFloat() - 1.0f )
 		{
 			CHL2MPBot *me = static_cast< CHL2MPBot * >( GetBot() );
 			me->PressCrouchButton( 0.3f );
+			me->PressJumpButton( 0.1f );
 		}
 	}
 

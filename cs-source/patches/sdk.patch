@@ -134,6 +134,20 @@ index 9457928..ec10c29 100644
  	pSpot = pLastSpawnPoint;
  	// Randomize the start spot
  	for ( int i = random->RandomInt(1,5); i > 0; i-- )
+diff --git a/src/game/shared/hl2/hl_gamemovement.cpp b/src/game/shared/hl2/hl_gamemovement.cpp
+index e54f63d..95c9f1d 100644
+--- a/src/game/shared/hl2/hl_gamemovement.cpp
++++ b/src/game/shared/hl2/hl_gamemovement.cpp
+@@ -1194,7 +1194,8 @@ bool CHL2GameMovement::CanAccelerate()
+ }
+ 
+ 
+-#ifndef PORTAL	// Portal inherits from this but needs to declare it's own global interface
++// cs-source/: o Trok declara o próprio objeto de movimento (shared/trok/trok_gamemovement.cpp).
++#if !defined( PORTAL ) && !defined( TROK )	// Portal inherits from this but needs to declare it's own global interface
+ 	// Expose our interface.
+ 	static CHL2GameMovement g_GameMovement;
+ 	IGameMovement *g_pGameMovement = ( IGameMovement * )&g_GameMovement;
 diff --git a/src/vpc_scripts/default.vgc b/src/vpc_scripts/default.vgc
 index 2614d68..9954cc3 100644
 --- a/src/vpc_scripts/default.vgc

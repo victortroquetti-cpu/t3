@@ -43,6 +43,16 @@ TESTAR OS BOTS
   Ajustar os níveis sem recompilar: edite mod_trok\scripts\trok_bot_perfis.txt,
   rode trok_bot_perfis_recarregar e adicione os bots de novo.
 
+MOVIMENTAÇÃO (carrega sozinha: server.cfg roda "exec movimento")
+  Sprint (Shift) + agachar     desliza
+  Segurar pular contra borda   escala (até ~80u)
+  Ajuste ao vivo no console:   trok_pulo_altura, trok_deslizar_*, trok_escalar_*,
+                               hl2_normspeed, hl2_sprintspeed (valores em cfg\movimento.cfg)
+
+MARCADOR DE ACERTO
+  Aparece no centro ao acertar alguém; vermelho e maior no abate.
+  trok_hitmarker 0 desliga; trok_hitmarker_som / trok_hitmarker_som_abate trocam o som.
+
 ALTERNATIVA (sem a pasta sourcemods)
   mod_trok.exe / mod_trok_win64.exe, ao lado da pasta mod_trok, abrem o mod
   direto (precisa da Steam aberta).

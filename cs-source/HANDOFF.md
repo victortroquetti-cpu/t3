@@ -65,6 +65,28 @@ jogo, gerar nav, testar em partida, ver a tela) não se força na nuvem; só se 
 - **CSO2 / Combat Arms:** o dono gosta dos modos zumbi/quarentena desses jogos. Mecânicas podem
   inspirar; nomes, mapas, modelos e sons desses jogos não entram no mod (combinado e registrado na skill).
 
+## Movimentação e HUD (feitos na nuvem, testar no local)
+
+- `shared/trok/trok_gamemovement.cpp` substitui o objeto de movimento do HL2 (patch em
+  `hl_gamemovement.cpp`). Pulo com altura própria (`trok_pulo_altura`; o HL2 pula só **21u**),
+  sem o empurrão de bunny hop do HL2, deslizar (sprint + agachar) e escalar (segurar pular
+  contra borda até 80u). Tudo sem estado entre ticks, então a predição do cliente bate com o
+  servidor sem variável de rede nova. Números em `cfg/movimento.cfg` (o `server.cfg` executa).
+- Os bots seguram pulo e agacham no ar ao subir bordas acima do pulo em pé, e usam o escalar.
+- `client/trok/hud_trok_hitmarker.cpp`: marcador de acerto e de abate pelo evento `player_hurt`.
+- Medidas para mapas (pulo, escalada, vãos, portas, queda, nav para bots): `design/medidas-mapas.md`.
+
+Riscos para olhar no jogo:
+- Escalar: pode "colar" em paredes altas lisas se o raio achar topo em objeto fino (ajustar
+  `trok_escalar_altura_max` ou exigir profundidade maior de topo).
+- Deslizar: a velocidade devolvida depois do atrito também anula parte da aceleração em rampas
+  (deslizar ladeira abaixo pode ficar rápido demais).
+- Velocidades do HL2 (`hl2_normspeed` etc.) são do servidor e o sprint gasta energia do traje.
+
+**Tarefa do dono no local:** com o Combat Arms instalado, medir no jogo dele a velocidade de
+corrida, a altura do pulo e o tempo de deslize (cronometrar uma distância conhecida) e
+passar os números para o `cfg/movimento.cfg`. Só números; nada de arquivo do jogo.
+
 ## O que o simulador mostrou (para não refazer)
 
 - O bot padrão do HL2MP mira o centro exato: ~93% de acerto em alvo parado em **todos** os níveis,
@@ -87,6 +109,8 @@ equilibrado), memória do time (avisos, apoio, ângulos, rotas, perigo), varieda
 destinos, hesitação ao nascer, faixa no corredor.
 
 A fazer, quando o dono pedir (melhor com o jogo aberto para testar):
+- sistema de armas próprio: precisão estilo CS (parado/andando/pulando), recuo com padrão,
+  dano por parte do corpo e queda de dano, mira pelo cano (ADS); scripts editáveis;
 - som pela distância de caminho no nav (hoje é linha reta, com parede abafando);
 - recuo por arma e controle de spray (quando o mod tiver armas próprias);
 - granadas/utilitários;
