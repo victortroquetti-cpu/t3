@@ -85,8 +85,11 @@ avaliaram a história. Placar final, depois do confronto: 4 "aprovar com condiç
 5. O "fungo controlado" no PvP: um único espaço, só trocas laterais com custo, **todas liberadas
    desde o início para todos, nunca vendidas nem ganhas por nível**, com sinal visual no modelo, e
    **desligado para humanos no Surto** (infectado tem que continuar sendo ameaça clara).
-6. Facções com silhueta distinta em 3 segundos: corporação limpa e uniforme; resistência remendada
-   e assimétrica, com um acento de cor discreto.
+6. Facções com silhueta distinta em 3 segundos: a corporação usa **uniforme padronizado** (todos
+   iguais, limpos); os Remanescentes são **sobreviventes táticos de verdade** (gente boa, bem
+   treinada, equipamento tático real), mas **sem uniforme único**: cada um monta o próprio kit,
+   com faixas, remendos e peças de origens diferentes. "Assimétrico" aqui é só isso (equipamento
+   variado de pessoa para pessoa), **não** mutação. Mais um acento de cor discreto por lado.
 
 **Falsificador mais barato**: contar a premissa nova em 2 linhas para 5 pessoas e ver o que
 lembram. Se a maioria disser "The Last of Us", a rede não ficou na memória e a premissa precisa
@@ -108,7 +111,7 @@ mudar.
 - **Os Remanescentes**: a resistência de sobreviventes, os jogadores.
 
 **Times**: mata-mata em equipe = **Primum** (segurança da corporação, limpa e uniforme) contra
-**Remanescentes** (resistência, remendada). Exército solo = **Contratados** sem bandeira.
+**Remanescentes** (resistência: sobreviventes táticos, bem treinados, cada um com seu kit). Exército solo = **Contratados** sem bandeira.
 
 **Mercenários e especialistas** (decisão do dono): mercenários são os soldados comuns de cada lado;
 especialistas são personagens principais (como os "specs" do Combat Arms), com **skins de arma
