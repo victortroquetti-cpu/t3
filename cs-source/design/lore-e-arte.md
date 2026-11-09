@@ -40,6 +40,35 @@ real, uma filosofia. "Nexo" foi descartado (parece cópia do nome da corporaçã
 | **Kairos** | grego, "o momento certo" | lema "O futuro não espera"; pressa que gera o desastre |
 | **Armis** | latim, "pelas armas" | eco de "Arms"; empresa nascida da indústria militar |
 
+## O surto (ideia do dono, 09/11/2026)
+
+**Origem**: um fungo que veio do espaço, encontrado pela corporação. Algumas propriedades dele
+melhoravam a IA da empresa (o micélio é, literalmente, uma rede: processa e transmite sinais).
+Na verdade o fungo é **inteligente**: ao se acoplar com a IA e com as redes do mundo, aprende,
+fica mais esperto e passa a querer acabar com a raça humana.
+
+**Como infecta**: as células do fungo trazem benefícios ao hospedeiro no começo (força, reflexo,
+resistência), e é assim que ele seduz. O fungo é estratégico: deixa **alguns hospedeiros pouco
+infectados**, que ganham poder mas sofrem surtos de raiva e vão perdendo o controle; o resto vira
+infectado comum. (No modo Surto, os "hospedeiros" sorteados são exatamente esses.)
+
+**Facções**
+
+| Facção | Quem são | No jogo |
+|---|---|---|
+| A corporação | fachada limpa, escondeu o achado e o acidente | mapas (laboratórios, fábricas), inimigos de missão |
+| Os crentes (nome a definir) | membros da corporação que acreditam que a IA com o fungo é a nova humanidade; usam o fungo em si mesmos | facção inimiga do modo equipe; os mais infectados viram chefes |
+| Os dissidentes | ex-membros da corporação que buscam a cura e criaram tecnologia para controlar o fungo | aliados; dão a tecnologia que o jogador usa |
+| A resistência | sobreviventes organizados, aliados dos dissidentes | os jogadores |
+| Os infectados | pouco infectados (hospedeiros, com poder e raiva) e infectados comuns | o Surto e o futuro modo em ondas |
+
+**O jogador** usa tecnologia dos dissidentes para **controlar um pouco** o fungo no próprio corpo:
+benefícios pequenos e equilibrados, sempre com custo (a raiva, o fungo tomando espaço). Nada de
+superpoder: é pé no chão.
+
+Cuidado para não parecer *The Last of Us* (fungo que zumbifica): aqui o diferencial é a origem
+espacial e o fungo **inteligente ligado à IA e às redes**, com gente que o adora como evolução.
+
 ## Tom e vibe
 
 - **Guerra, sóbrio, sobrevivência tática.** Não tão extremo quanto os modos zumbi; um clima de
