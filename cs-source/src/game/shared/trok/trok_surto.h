@@ -91,7 +91,19 @@ bool TrokSurto_Ativo( void );					// existe estado e a fase não é DESLIGADO
 bool TrokSurto_IsZumbi( const CBaseEntity *pEnt );	// jogador no time dos zumbis, com o modo ativo
 bool TrokSurto_IsHumano( const CBaseEntity *pEnt );
 
+// Modos do Trok (trok_modo): equipe (mata-mata em equipe), solo (exército solo, todos contra
+// todos) e surto (infecção). Vale no próximo mapa.
+enum TrokModo_t
+{
+	TROK_MODO_EQUIPE = 0,
+	TROK_MODO_SOLO,
+	TROK_MODO_SURTO,
+};
+int TrokModo( void );
+
 extern ConVar trok_modo;
+extern ConVar trok_renascer_tempo;
+extern ConVar trok_protecao;
 extern ConVar trok_surto_zumbi_pulo;
 extern ConVar trok_surto_zumbi_velocidade;
 

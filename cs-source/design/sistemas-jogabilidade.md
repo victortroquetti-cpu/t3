@@ -18,6 +18,7 @@ nada de modelos, sons, texturas, mapas ou dados extraídos do jogo.
 | Teclas padrão | `game/mod_trok/cfg/config_default.cfg` | Shift corre, C caminha quieto, botão 2 mira |
 | Bots | `game/mod_trok/scripts/trok_bot_perfis.txt` | reação, mira, percepção, estilo (ver `design/bots.md`) |
 | Marcador de acerto | ConVars `trok_hitmarker_*` (cliente) | duração, tamanho, sons |
+| Modos equipe e solo | `game/mod_trok/cfg/equipe.cfg` e `solo.cfg` | meta de abates, tempo, renascer, proteção ao nascer (ver `design/modos.md`) |
 | Modo Surto (infecção) | `game/mod_trok/cfg/surto.cfg` + `empurrao`/`segurar` nas armas | tempos da rodada, hospedeiros, vida e regeneração do zumbi, garras, empurrão (ver `design/modo-surto.md`) |
 
 ## Campos do bloco "Trok" das armas

@@ -311,6 +311,11 @@ void CWeaponTrokGun::PrimaryAttack( void )
 
 	m_bTriggerHeld = true;
 
+#ifdef GAME_DLL
+	extern void TrokRules_OnPlayerFired( CBasePlayer *pPlayer ); // trok/trok_gamerules.cpp: acaba a proteção de nascimento
+	TrokRules_OnPlayerFired( pPlayer );
+#endif
+
 	WeaponSound( SINGLE );
 	pPlayer->DoMuzzleFlash();
 	SendWeaponAnim( ACT_VM_PRIMARYATTACK );

@@ -41,8 +41,11 @@ public:
 	virtual float FlPlayerFallDamage( CBasePlayer *pPlayer );
 	virtual bool CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pItem );
 	virtual bool ClientCommand( CBaseEntity *pEdict, const CCommand &args );
+	virtual bool FPlayerCanTakeDamage( CBasePlayer *pPlayer, CBaseEntity *pAttacker, const CTakeDamageInfo &info );
+	virtual CBaseEntity *GetPlayerSpawnSpot( CBasePlayer *pPlayer );
 
 	bool IsSurto( void ) const { return m_bSurto; }
+	void OnPlayerFired( CBasePlayer *pPlayer );		// atirou: acaba a proteção de nascimento
 
 	// Chamados por código da Valve (patches/sdk.patch):
 	void OnPlayerDamaged( CBasePlayer *pVictim, const CTakeDamageInfo &info );	// player.cpp, depois do dano
@@ -62,6 +65,12 @@ private:
 	void SurtoEspectadores( void );
 	void SurtoFolegoZumbi( void );
 	void SurtoTirarDeEspectador( CBasePlayer *pPlayer );
+	void ModoThink( void );
+	void SetProtegido( CBasePlayer *pPlayer, float flAte );
+	float SpawnScore( CBasePlayer *pPlayer, CBaseEntity *pSpot );
+
+	int m_iModo;
+	float m_flProtegido[ MAX_PLAYERS + 1 ];
 
 	bool m_bSurto;
 	CHandle< CTrokSurtoEstado > m_hEstado;

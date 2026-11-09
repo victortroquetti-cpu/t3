@@ -479,6 +479,15 @@ void CHudTrok::Paint( void )
 	PaintAmmo( pLocal );
 	PaintCrosshair( pLocal );
 	PaintKillPopup();
+
+	// Proteção de nascimento (equipe e solo)
+	C_HL2MP_Player *pHL2MP = dynamic_cast< C_HL2MP_Player * >( pLocal );
+	if ( pHL2MP && pHL2MP->m_flTrokProtegidoAte > gpGlobals->curtime )
+	{
+		char szProt[ 32 ];
+		V_snprintf( szProt, sizeof( szProt ), "PROTEGIDO %d", (int)ceilf( pHL2MP->m_flTrokProtegidoAte - gpGlobals->curtime ) );
+		Text( m_hSmall, ScreenWidth() / 2 - TextWide( m_hSmall, szProt ) / 2, ScreenHeight() / 2 + S( 70 ), Accent(), szProt );
+	}
 }
 
 void CHudTrok::PaintTop( void )
@@ -506,13 +515,21 @@ void CHudTrok::PaintTop( void )
 	}
 	else
 	{
-		// Sem times: você contra o melhor dos outros.
+		// Sem times (exército solo): você contra o melhor dos outros, e sua posição.
 		iMine = g_PR->GetPlayerScore( pLocal->entindex() );
+		int iPos = 1, iTotal = 1;
 		for ( int i = 1; i <= gpGlobals->maxClients; ++i )
 		{
-			if ( i != pLocal->entindex() && g_PR->IsConnected( i ) )
-				iTheirs = MAX( iTheirs, g_PR->GetPlayerScore( i ) );
+			if ( i == pLocal->entindex() || !g_PR->IsConnected( i ) || g_PR->GetTeam( i ) == TEAM_SPECTATOR )
+				continue;
+			iTheirs = MAX( iTheirs, g_PR->GetPlayerScore( i ) );
+			++iTotal;
+			if ( g_PR->GetPlayerScore( i ) > iMine )
+				++iPos;
 		}
+		char szPos[ 32 ];
+		V_snprintf( szPos, sizeof( szPos ), "%dº DE %d", iPos, iTotal );
+		Text( m_hText, ScreenWidth() / 2 - TextWide( m_hText, szPos ) / 2, S( 22 ) + S( 60 ), iPos == 1 ? Accent() : COR_CINZA, szPos );
 	}
 
 	static ConVarRef s_fraglimit( "mp_fraglimit" );
@@ -1064,7 +1081,10 @@ void CHudTrok::PaintDeath( C_BasePlayer *pLocal )
 	// Renascer (HL2MP: qualquer botão depois da animação de morte). No Surto o servidor decide.
 	if ( gpGlobals->curtime - m_flDeathTime > 1.0f )
 	{
-		const char *pszHint = "CLIQUE PARA RENASCER";
+		char szRenascer[ 48 ];
+		const float flFalta = m_flDeathTime + trok_renascer_tempo.GetFloat() - gpGlobals->curtime;
+		V_snprintf( szRenascer, sizeof( szRenascer ), "RENASCENDO EM %d", MAX( 0, (int)ceilf( flFalta ) ) );
+		const char *pszHint = szRenascer;
 		if ( TrokSurto_Ativo() )
 			pszHint = ( pLocal->GetTeamNumber() == TEAM_TROK_HUMANOS ) ? "VOCÊ VAI LEVANTAR COMO ZUMBI" : "ESPERE A PRÓXIMA RODADA";
 		Text( m_hText, w / 2 - TextWide( m_hText, pszHint ) / 2, h - S( 96 ), bInfectado ? COR_ZUMBI : COR_BRANCO, pszHint );

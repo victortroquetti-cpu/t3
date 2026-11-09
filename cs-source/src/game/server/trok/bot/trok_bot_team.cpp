@@ -25,6 +25,8 @@ static ConVar trok_bot_rota_colegas( "trok_bot_rota_colegas", "0.6", FCVAR_CHEAT
 // Mata-mata sem time: ninguém é colega.
 static bool HasTeammates( int iTeam )
 {
+	if ( !HL2MPRules() || !HL2MPRules()->IsTeamplay() )
+		return false; // exército solo: todos contra todos
 	return iTeam == TEAM_COMBINE || iTeam == TEAM_REBELS;
 }
 

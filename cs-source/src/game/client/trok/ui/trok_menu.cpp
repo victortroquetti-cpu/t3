@@ -42,7 +42,7 @@ static ConVar trok_ui_bots_dificuldade( "trok_ui_bots_dificuldade", "1", FCVAR_A
 static ConVar trok_ui_bots_por_time( "trok_ui_bots_por_time", "5", FCVAR_ARCHIVE, "Menu: últimos bots por time." );
 static ConVar trok_ui_bots_estilos( "trok_ui_bots_estilos", "31", FCVAR_ARCHIVE, "Menu: estilos marcados (bits: equilibrado, entry, lurker, ancora, suporte)." );
 static ConVar trok_ui_mapa( "trok_ui_mapa", "", FCVAR_ARCHIVE, "Menu: último mapa escolhido." );
-static ConVar trok_ui_modo( "trok_ui_modo", "0", FCVAR_ARCHIVE, "Menu: modo escolhido (0 = mata-mata em equipe, 1 = Surto)." );
+static ConVar trok_ui_modo( "trok_ui_modo", "0", FCVAR_ARCHIVE, "Menu: modo escolhido (0 = mata-mata em equipe, 1 = exército solo, 2 = Surto)." );
 // Sons do menu por caminho (no menu não há mapa carregado, então não dá para usar os nomes do
 // game_sounds_trok.txt). TROCAR por sound/trok/ui/... quando houver sons próprios.
 static ConVar trok_ui_som_clique( "trok_ui_som_clique", "ui/buttonclick.wav", FCVAR_ARCHIVE, "Som do clique no menu (dentro de sound/). Vazio = sem som." );
@@ -713,11 +713,13 @@ void CTrokMenu::RunPlay( void )
 
 		Label( ix, y, "MODO" );
 		{
-			const char *pszModos[] = { "MATA-MATA EM EQUIPE", "SURTO" };
-			const char *pszDesc[] = { "Os bots completam os times.", "Infecção: sobreviva até o fim do tempo. Os bots viram zumbis com você." };
-			const int iModo = clamp( trok_ui_modo.GetInt(), 0, 1 );
-			const int mw = ( iw - S( 6 ) ) / 2;
-			for ( int i = 0; i < 2; ++i )
+			const char *pszModos[] = { "EQUIPE", "EXÉRCITO SOLO", "SURTO" };
+			const char *pszDesc[] = { "Mata-mata em equipe: o time que chegar primeiro na meta de abates vence.",
+									  "Todos contra todos: quem chegar primeiro na meta de abates vence.",
+									  "Infecção: sobreviva até o fim do tempo. Os bots viram zumbis com você." };
+			const int iModo = clamp( trok_ui_modo.GetInt(), 0, 2 );
+			const int mw = ( iw - S( 12 ) ) / 3;
+			for ( int i = 0; i < 3; ++i )
 			{
 				if ( BoxButton( ix + i * ( mw + S( 6 ) ), y + S( 18 ), mw, S( 36 ), m_hButton, pszModos[ i ], i == iModo, i == iModo ) )
 					trok_ui_modo.SetValue( i );
@@ -738,7 +740,7 @@ void CTrokMenu::RunPlay( void )
 		Text( m_hBody, ix, y + S( 66 ), COR_TEXTO2, s_pszNivelDescricao[ iNivel ] );
 		y += S( 92 );
 
-		Label( ix, y, trok_ui_modo.GetInt() == 1 ? "BOTS (METADE DO TOTAL)" : "BOTS POR TIME" );
+		Label( ix, y, trok_ui_modo.GetInt() == 0 ? "BOTS POR TIME" : "BOTS (METADE DO TOTAL)" );
 		const int bs = S( 34 );
 		const int iCount = clamp( trok_ui_bots_por_time.GetInt(), 1, 16 );
 		if ( BoxButton( ix, y + S( 18 ), bs, bs, m_hButton, "−", false, false ) )
@@ -873,9 +875,9 @@ void CTrokMenu::StartBotGame( void )
 	// "fill": a cota conta o jogador, então os dois times ficam com iPorTime cada.
 	char szCmd[ 1024 ];
 	V_snprintf( szCmd, sizeof( szCmd ),
-		"progress_enable; mp_teamplay 1; trok_modo %s; hl2mp_bot_difficulty %d; trok_bot_estilo \"\"; trok_bot_estilos \"%s\"; "
+		"progress_enable; trok_modo %s; hl2mp_bot_difficulty %d; trok_bot_estilo \"\"; trok_bot_estilos \"%s\"; "
 		"hl2mp_bot_quota %d; hl2mp_bot_quota_mode fill; maxplayers %d; map %s\n",
-		trok_ui_modo.GetInt() == 1 ? "surto" : "tdm", iNivel, szEstilos, iPorTime * 2, MIN( 32, iPorTime * 2 + 2 ), pszMap );
+		( trok_ui_modo.GetInt() == 2 ) ? "surto" : ( trok_ui_modo.GetInt() == 1 ? "solo" : "equipe" ), iNivel, szEstilos, iPorTime * 2, MIN( 32, iPorTime * 2 + 2 ), pszMap );
 	engine->ClientCmd_Unrestricted( szCmd );
 }
 

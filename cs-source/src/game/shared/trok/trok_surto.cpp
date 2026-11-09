@@ -9,8 +9,22 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar trok_modo( "trok_modo", "tdm", FCVAR_REPLICATED | FCVAR_NOTIFY,
-	"Modo de jogo do próximo mapa: tdm (mata-mata) ou surto (infecção, sucessor da quarentena)." );
+ConVar trok_modo( "trok_modo", "equipe", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Modo de jogo do próximo mapa: equipe (mata-mata em equipe), solo (exército solo, todos contra todos) ou surto (infecção)." );
+ConVar trok_renascer_tempo( "trok_renascer_tempo", "5", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Equipe e solo: segundos morto até renascer sozinho (com contagem na tela)." );
+ConVar trok_protecao( "trok_protecao", "3", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Equipe e solo: segundos de proteção ao nascer (acaba antes se atirar)." );
+
+int TrokModo( void )
+{
+	const char *psz = trok_modo.GetString();
+	if ( !V_stricmp( psz, "surto" ) )
+		return TROK_MODO_SURTO;
+	if ( !V_stricmp( psz, "solo" ) || !V_stricmp( psz, "ffa" ) )
+		return TROK_MODO_SOLO;
+	return TROK_MODO_EQUIPE; // "equipe", "tdm" e qualquer outro
+}
 
 ConVar trok_surto_zumbi_pulo( "trok_surto_zumbi_pulo", "1.5", FCVAR_REPLICATED | FCVAR_NOTIFY, "Multiplica a altura do pulo dos zumbis." );
 ConVar trok_surto_zumbi_velocidade( "trok_surto_zumbi_velocidade", "1.1", FCVAR_REPLICATED | FCVAR_NOTIFY, "Multiplica a velocidade dos zumbis (com as garras na mão)." );

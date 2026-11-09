@@ -55,7 +55,8 @@ ConVar trok_surto_cor_zumbi( "trok_surto_cor_zumbi", "150 225 140", FCVAR_NOTIFY
 CTrokRules::CTrokRules()
 {
 #ifndef CLIENT_DLL
-	m_bSurto = !V_stricmp( trok_modo.GetString(), "surto" );
+	m_iModo = TrokModo();
+	m_bSurto = ( m_iModo == TROK_MODO_SURTO );
 	m_flSurtoTick = 0.0f;
 	for ( int i = 0; i <= MAX_PLAYERS; ++i )
 	{
@@ -66,15 +67,27 @@ CTrokRules::CTrokRules()
 		m_flUltimoDano[ i ] = -100.0f;
 		m_flProxRegen[ i ] = 0.0f;
 		m_flMorte[ i ] = 0.0f;
+		m_flProtegido[ i ] = 0.0f;
 		m_iRodadaInfec[ i ] = 0;
 		m_iRodadaZumbis[ i ] = 0;
 	}
 	m_flUltimoThink = 0.0f;
-	if ( m_bSurto )
+	if ( m_iModo == TROK_MODO_SURTO )
 	{
 		// Surto é sempre em times (humanos x zumbis) e lê os números do cfg do modo.
 		m_bTeamPlayEnabled = true;
 		engine->ServerCommand( "exec surto.cfg\n" );
+	}
+	else if ( m_iModo == TROK_MODO_SOLO )
+	{
+		// Exército solo: todos contra todos.
+		m_bTeamPlayEnabled = false;
+		engine->ServerCommand( "exec solo.cfg\n" );
+	}
+	else
+	{
+		m_bTeamPlayEnabled = true;
+		engine->ServerCommand( "exec equipe.cfg\n" );
 	}
 #endif
 }
@@ -111,7 +124,14 @@ void CTrokRules::PlayerSpawn( CBasePlayer *pPlayer )
 	pPlayer->SetHealth( iHealth );
 	pPlayer->SetArmorValue( MAX( 0, trok_colete.GetInt() ) );
 
-	if ( !m_bSurto || pPlayer->GetTeamNumber() == TEAM_SPECTATOR )
+	if ( !m_bSurto )
+	{
+		// Equipe e solo: proteção ao nascer.
+		if ( pPlayer->GetTeamNumber() != TEAM_SPECTATOR )
+			SetProtegido( pPlayer, gpGlobals->curtime + MAX( 0.0f, trok_protecao.GetFloat() ) );
+		return;
+	}
+	if ( pPlayer->GetTeamNumber() == TEAM_SPECTATOR )
 		return;
 
 	const int i = pPlayer->entindex();
@@ -193,8 +213,131 @@ void CTrokRules::Think( void )
 {
 	BaseClass::Think();
 
-	if ( m_bSurto && !g_fGameOver )
+	if ( g_fGameOver )
+		return;
+	if ( m_bSurto )
 		SurtoThink();
+	else
+		ModoThink();
+}
+
+//-----------------------------------------------------------------------------
+// Equipe e solo (como o Combat Arms): renasce sozinho depois da contagem, nasce
+// protegido por uns segundos (acaba se atirar) e longe dos inimigos.
+//-----------------------------------------------------------------------------
+void CTrokRules::ModoThink( void )
+{
+	const float flNow = gpGlobals->curtime;
+	const float flTempo = MAX( 0.0f, trok_renascer_tempo.GetFloat() );
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
+		if ( !IsPlaying( pPlayer ) )
+			continue;
+
+		if ( !pPlayer->IsAlive() && !pPlayer->IsObserver() && m_flMorte[ i ] > 0.0f && flNow - m_flMorte[ i ] >= flTempo )
+		{
+			m_flMorte[ i ] = 0.0f;
+			respawn( pPlayer, false );
+			continue;
+		}
+
+		if ( m_flProtegido[ i ] > 0.0f && ( flNow >= m_flProtegido[ i ] || !pPlayer->IsAlive() ) )
+			SetProtegido( pPlayer, 0.0f );
+	}
+}
+
+void CTrokRules::SetProtegido( CBasePlayer *pPlayer, float flAte )
+{
+	const int i = pPlayer->entindex();
+	m_flProtegido[ i ] = flAte;
+	CHL2MP_Player *pHL2MP = dynamic_cast< CHL2MP_Player * >( pPlayer );
+	if ( pHL2MP )
+		pHL2MP->m_flTrokProtegidoAte = flAte;
+	// Os outros veem o protegido translúcido.
+	if ( flAte > gpGlobals->curtime )
+	{
+		pPlayer->SetRenderMode( kRenderTransAlpha );
+		pPlayer->SetRenderColorA( 130 );
+	}
+	else
+	{
+		pPlayer->SetRenderColorA( 255 );
+		pPlayer->SetRenderMode( kRenderNormal );
+	}
+}
+
+void CTrokRules::OnPlayerFired( CBasePlayer *pPlayer )
+{
+	if ( pPlayer && m_flProtegido[ pPlayer->entindex() ] > 0.0f )
+		SetProtegido( pPlayer, 0.0f );
+}
+
+bool CTrokRules::FPlayerCanTakeDamage( CBasePlayer *pPlayer, CBaseEntity *pAttacker, const CTakeDamageInfo &info )
+{
+	if ( !m_bSurto && pPlayer && m_flProtegido[ pPlayer->entindex() ] > gpGlobals->curtime &&
+		 pAttacker && pAttacker->IsPlayer() && pAttacker != pPlayer )
+		return false;
+	return BaseClass::FPlayerCanTakeDamage( pPlayer, pAttacker, info );
+}
+
+// Nota de um ponto de nascimento: longe do inimigo vivo mais perto, e pior se algum
+// inimigo enxerga o ponto.
+float CTrokRules::SpawnScore( CBasePlayer *pPlayer, CBaseEntity *pSpot )
+{
+	const Vector spot = pSpot->GetAbsOrigin() + Vector( 0, 0, 64 );
+	float flNearest = 4000.0f;
+	bool bVisto = false;
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CBasePlayer *p = UTIL_PlayerByIndex( i );
+		if ( !p || p == pPlayer || !p->IsAlive() || p->GetTeamNumber() == TEAM_SPECTATOR )
+			continue;
+		if ( IsTeamplay() && p->GetTeamNumber() == pPlayer->GetTeamNumber() )
+			continue;
+		const float d = ( p->GetAbsOrigin() - pSpot->GetAbsOrigin() ).Length();
+		flNearest = MIN( flNearest, d );
+		if ( !bVisto && d < 2500.0f )
+		{
+			trace_t tr;
+			UTIL_TraceLine( p->EyePosition(), spot, MASK_VISIBLE, p, COLLISION_GROUP_NONE, &tr );
+			bVisto = tr.fraction > 0.99f;
+		}
+	}
+	return flNearest - ( bVisto ? 1500.0f : 0.0f ) + RandomFloat( 0.0f, 200.0f );
+}
+
+CBaseEntity *CTrokRules::GetPlayerSpawnSpot( CBasePlayer *pPlayer )
+{
+	if ( m_bSurto )
+		return BaseClass::GetPlayerSpawnSpot( pPlayer );
+
+	// Sorteia alguns pontos válidos pelo próprio HL2MP e fica com o mais seguro.
+	CBaseEntity *pBest = NULL;
+	float flBest = -FLT_MAX;
+	for ( int k = 0; k < 6; ++k )
+	{
+		CBaseEntity *pSpot = pPlayer->EntSelectSpawnPoint();
+		if ( !pSpot )
+			continue;
+		const float flScore = SpawnScore( pPlayer, pSpot );
+		if ( flScore > flBest )
+		{
+			flBest = flScore;
+			pBest = pSpot;
+		}
+	}
+	if ( !pBest )
+		return BaseClass::GetPlayerSpawnSpot( pPlayer );
+
+	// O mesmo que CGameRules::GetPlayerSpawnSpot faz com o ponto escolhido.
+	pPlayer->SetLocalOrigin( pBest->GetAbsOrigin() + Vector( 0, 0, 1 ) );
+	pPlayer->SetAbsVelocity( vec3_origin );
+	pPlayer->SetLocalAngles( pBest->GetLocalAngles() );
+	pPlayer->m_Local.m_vecPunchAngle = vec3_angle;
+	pPlayer->m_Local.m_vecPunchAngleVel = vec3_angle;
+	pPlayer->SnapEyeAngles( pBest->GetLocalAngles() );
+	return pBest;
 }
 
 void CTrokRules::SurtoContar( int &iHumanos, int &iZumbis )
@@ -534,13 +677,13 @@ void CTrokRules::SurtoFolegoZumbi( void )
 void CTrokRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 {
 	BaseClass::PlayerKilled( pVictim, info );
+	m_flMorte[ pVictim->entindex() ] = gpGlobals->curtime;
 
 	CTrokSurtoEstado *pEstado = m_hEstado.Get();
 	if ( !m_bSurto || !pEstado || pEstado->GetFase() != SURTO_JOGO )
 		return;
 
 	const int i = pVictim->entindex();
-	m_flMorte[ i ] = gpGlobals->curtime;
 
 	// Estatísticas: infecção (zumbi matou humano) e zumbi abatido (humano matou zumbi).
 	CBasePlayer *pAttacker = ToBasePlayer( info.GetAttacker() );
@@ -580,6 +723,10 @@ bool CTrokRules::FPlayerCanRespawn( CBasePlayer *pPlayer )
 		// Na rodada e no fim, quem renasce é o diretor (virar zumbi); no preparo, normal.
 		if ( pEstado && ( pEstado->GetFase() == SURTO_JOGO || pEstado->GetFase() == SURTO_FIM ) )
 			return false;
+	}
+	else if ( gpGlobals->curtime - m_flMorte[ pPlayer->entindex() ] < trok_renascer_tempo.GetFloat() )
+	{
+		return false; // a contagem ainda não acabou (o ModoThink renasce sozinho no fim)
 	}
 	return BaseClass::FPlayerCanRespawn( pPlayer );
 }
@@ -662,6 +809,12 @@ void TrokRules_OnPlayerDamaged( CBasePlayer *pVictim, const CTakeDamageInfo &inf
 {
 	if ( TrokRules() )
 		TrokRules()->OnPlayerDamaged( pVictim, info );
+}
+
+void TrokRules_OnPlayerFired( CBasePlayer *pPlayer )
+{
+	if ( TrokRules() )
+		TrokRules()->OnPlayerFired( pPlayer );
 }
 
 bool TrokRules_IgnoresHeadshot( CBasePlayer *pVictim )
