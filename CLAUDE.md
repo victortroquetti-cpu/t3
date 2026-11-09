@@ -34,6 +34,8 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
      Rebuild, Double Action, Momentum e Fortress Forever usam a Source 1 SDK License; dar crédito
      em `game/mod_trok/CREDITOS.txt`); nunca a arte deles.
    - Código vazado (CS:GO/TF2 2020, kisak-strike e parecidos): **proibido**.
+   - **O repositório é público:** asset que proíbe redistribuir o arquivo cru (Mixamo, Pixabay, lojas
+     como CGTrader/Fab/Unity) fica **fora do git**; só o compilado vai no pacote. Ver `design/catalogo-assets.md`.
 3. **Mudanças em arquivo da Valve** sempre com `#ifdef TROK`. Depois de mexer: `python cs-source/trok.py save-patch`.
 4. **Números em cfg ou script, não no código.** Ajuste de jogabilidade não deve precisar recompilar.
 5. **Decisões já tomadas:**
@@ -130,7 +132,9 @@ Depois, nav mesh. O dono tem um mapa parecido com os do CA: ajudar a trazer para
 
 ### Fase 5: conteúdo próprio
 Seguir `cs-source/design/conteudo-proprio.md` (inventário do que ainda é do CS:S e do HL2, e onde
-trocar) com a direção de `cs-source/design/lore-e-arte.md`. O último passo é tirar o CS:S do
+trocar) com a direção de `cs-source/design/lore-e-arte.md`. O que baixar (armas, explosivos, personagens,
+zumbis, animações, sons, UI) e o código aberto que serve (inclusive o do TF2, que veio no SDK):
+`cs-source/design/catalogo-assets.md`. O último passo é tirar o CS:S do
 `gameinfo.txt`.
 
 ### Depois
