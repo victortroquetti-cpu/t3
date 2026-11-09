@@ -39,7 +39,13 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
 5. **Decisões já tomadas:**
    - o modo de infecção se chama **Surto**;
    - **sem deslize** de CoD (`trok_deslizar 0`);
-   - visual **sóbrio de guerra / sobrevivência tática**, jogabilidade arcade. Ver `cs-source/design/lore-e-arte.md`.
+   - visual **sóbrio de guerra / sobrevivência tática**, jogabilidade arcade. Ver `cs-source/design/lore-e-arte.md`;
+   - **humano não tem poderes** (nada de habilidade especial, nem por item); **poderes só dos zumbis**;
+   - facções: **Mercenários** (vendidos à ganância, a serviço da corporação) contra **Remanescentes**
+     (sobreviventes táticos bem treinados, cada um com seu kit); **Especialistas** = elite dos
+     sobreviventes, com skins de arma próprias (só visual por enquanto);
+   - tecnologia/fungo controlado = **itens raros** no futuro, sem exagero; **equipamentos ainda não**;
+   - nome do jogo provisório **Rearmed** (complemento e nome da corporação ainda em aberto).
 
 ## Ler primeiro (nesta ordem)
 
