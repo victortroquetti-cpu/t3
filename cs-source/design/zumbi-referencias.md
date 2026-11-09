@@ -38,7 +38,25 @@ jogos entra no Trok.
 - **Ideias do dono já registradas:** o relógio com alarme e a abertura de abrigos e a grade
   trancável que os zumbis quebram (estilo quarentena) encaixam em **Infecção** e em **Escape**.
 
+## O que é bom para o Trok no Source (análise de 09/11/2026)
+
+Critério principal: mod novo começa com poucos jogadores, então o modo tem que ser divertido
+com bots e com 2 a 6 pessoas.
+
+| Ordem | Modo | Por quê |
+|---|---|---|
+| 1 | **Infecção** com bots dos dois lados | Base dos outros; rodadas/times já existem; bots humanos já defendem em equipe; mapa tático já acha defesas. Falta o cérebro do zumbi (perseguir, cercar por rotas diferentes, quebrar barricada). |
+| 2 | **Quarentena** (alarme, abrigos, grades) | Variante da infecção; são entidades de mapa com outputs, que o Source faz bem. |
+| 3 | **Survival** (ondas de NPC) | Joga sozinho ou com amigos; NPC NextBot não ocupa vaga (zumbis do TF2 no SDK, `refs/zmr-game` como referência). |
+| depois | Escape | Muito trabalho de mapa e precisa de muita gente. |
+| depois | Base Builder | Depende de humanos construindo; bot construindo é difícil. |
+| depois | Comandante de horda | Interface de RTS; o mais caro. |
+
+Do estilo CS Online/Xtreme, entram na infecção como sistemas pequenos e separados: classes de
+zumbi com habilidade e barra de energia, coice das armas, caixas de suprimento, herói no fim
+da rodada.
+
 ## Decisão pendente (do dono)
 
-Qual subgênero vem primeiro. Sugestão técnica: **Infecção**, porque é a base dos outros (rodada,
-times, conversão, classes). Escape e Survival reaproveitam quase tudo dela.
+Confirmar a ordem acima (sugestão: infecção primeiro, porque escape e survival reaproveitam
+quase tudo dela).
