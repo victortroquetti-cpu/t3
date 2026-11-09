@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "trok": {
+      "command": "python",
+      "args": ["cs-source/tools/mcp/trok_mcp.py"]
+    }
+  }
+}

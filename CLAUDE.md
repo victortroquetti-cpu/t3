@@ -45,7 +45,9 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
      (sobreviventes táticos bem treinados, cada um com seu kit); **Especialistas** = elite dos
      sobreviventes, com skins de arma próprias (só visual por enquanto);
    - tecnologia/fungo controlado = **itens raros** no futuro, sem exagero; **equipamentos ainda não**;
-   - nome do jogo provisório **Rearmed** (complemento e nome da corporação ainda em aberto).
+   - nome do jogo provisório **Rearmed** (complemento e nome da corporação ainda em aberto);
+   - **vai ter killstreak** (série de abates), como no Combat Arms, porém mais moderno. As
+     recompensas e os números ainda não foram definidos: perguntar ao dono antes de fazer.
 
 ## Ler primeiro (nesta ordem)
 
@@ -68,6 +70,11 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
 - Para só jogar: o zip do último build em GitHub Actions > "Trok: build Windows" > Artifacts.
 
 ### Fase 1: fazer rodar (prioridade máxima)
+Use o servidor MCP **`trok`** (`.mcp.json` na raiz; guia em `cs-source/tools/mcp/LEIA-ME.md`): ele abre
+o jogo, roda comandos, lê o console e os erros, tira print da tela e começa partida com bots. Comece
+pela ferramenta `diagnostico`. Ele ainda não foi testado com o jogo real: se o `-netconport` não
+funcionar, use RCON ou só o `console.log` (`-condebug`), como o guia explica.
+
 Abrir com `-dev -console -novid` e consertar na ordem em que aparecer:
 1. **Abre sem travar.** O menu próprio aparece e as fontes Barlow carregam (`TrokScheme.res`).
    Se a fonte cair na padrão, conferir o nome da família no Windows.
@@ -145,6 +152,7 @@ fazer sem ele pedir):
 | no jogo: `trok_modo equipe\|solo\|surto` e `map X` | trocar de modo (vale no próximo mapa) |
 | `exec bots`, `hl2mp_bot_add`, `trok_bot_estilos_info` | bots |
 | `nb_select`, `nb_debug BEHAVIOR` | depurar bots |
+| MCP `trok`: `diagnostico`, `jogo_abrir`, `partida_teste`, `erros`, `print_tela`, `estado`, `cvar` | o agente abre e testa o jogo sozinho |
 
 ## Git
 

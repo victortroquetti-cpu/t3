@@ -210,6 +210,17 @@ preservadas), empurrão por arma, bots zumbis caçando e humanos recuando.
   jogador de referência que atira andando.
 - Fácil de longe ainda é fraco (a 800u, parado, ~1 em 4 duelos sem acerto em 3 s). É ajuste de perfil, se o dono quiser.
 
+## Ferramenta de teste: MCP `trok`
+
+`cs-source/tools/mcp/trok_mcp.py` (guia em `tools/mcp/LEIA-ME.md`; `.mcp.json` na raiz). Deixa o agente
+abrir o jogo, rodar comandos, ler console e erros, tirar print, começar partida com bots e compilar
+modelo e mapa. Testado só com um jogo falso; falta confirmar o `-netconport` no SDK de 2025.
+
+## Decisões novas do dono (ainda sem código)
+
+- **Killstreak** como no Combat Arms, porém mais moderno. Recompensas, números e se vale em todos os
+  modos: perguntar ao dono antes de fazer.
+
 ## Pendências (backlog dos bots)
 
 Feito: percepção gradual, mira humana, giro, pulo agachado, strafe/ritmo de tiro, contra-strafe,
