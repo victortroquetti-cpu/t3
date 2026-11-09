@@ -72,6 +72,11 @@ jogo, gerar nav, testar em partida, ver a tela) não se força na nuvem; só se 
   sem o empurrão de bunny hop do HL2, deslizar (sprint + agachar) e escalar (segurar pular
   contra borda até 80u). Tudo sem estado entre ticks, então a predição do cliente bate com o
   servidor sem variável de rede nova. Números em `cfg/movimento.cfg` (o `server.cfg` executa).
+- Fluidez (pedido: "no CA pulamos entre caixas, de um lado pro outro, principalmente com faca"):
+  `trok_ar_controle` (controle no ar; Source = 30, padrão do mod 60), `trok_faca_velocidade`
+  (arma branca na mão corre mais; 1.12), e `sv_accelerate`/`sv_airaccelerate`/`sv_friction` no
+  `cfg/movimento.cfg`. Medir no CA: quanto dá para virar no meio de um pulo entre caixas e quanto
+  mais rápido se corre de faca.
 - Os bots seguram pulo e agacham no ar ao subir bordas acima do pulo em pé, e usam o escalar.
 - `client/trok/hud_trok_hitmarker.cpp`: marcador de acerto e de abate pelo evento `player_hurt`.
 - Medidas para mapas (pulo, escalada, vãos, portas, queda, nav para bots): `design/medidas-mapas.md`.

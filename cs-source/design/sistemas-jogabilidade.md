@@ -13,7 +13,7 @@ nada de modelos, sons, texturas, mapas ou dados extraídos do jogo.
 | Sistema | Arquivo | O que tem |
 |---|---|---|
 | Vida, colete, dano por parte do corpo, armas iniciais | `game/mod_trok/cfg/balanceamento.cfg` | `trok_vida`, `trok_colete`, `sk_player_*`, `trok_armas_iniciais`, `trok_municao_inicial` |
-| Movimento | `game/mod_trok/cfg/movimento.cfg` | velocidades (andar/correr/sprint), pulo, deslizar, escalar, gravidade, aceleração |
+| Movimento | `game/mod_trok/cfg/movimento.cfg` | velocidades (andar/correr/sprint), pulo, deslizar, escalar, gravidade, aceleração, controle no ar (`trok_ar_controle`), velocidade com faca (`trok_faca_velocidade`) |
 | Cada arma | `game/mod_trok/scripts/weapon_trok_*.txt`, bloco `"Trok"` | cadência, auto/semi, dano e queda, dispersão por estado, recuo, mira pelo cano, peso |
 | Teclas padrão | `game/mod_trok/cfg/config_default.cfg` | Shift corre, C caminha quieto, botão 2 mira |
 | Bots | `game/mod_trok/scripts/trok_bot_perfis.txt` | reação, mira, percepção, estilo (ver `design/bots.md`) |
@@ -48,6 +48,11 @@ entidade).
 - **Corrida (Shift):** é o sprint do HL2 (gasta energia do traje). Correndo acima de
   `trok_arma_correndo_vel`, a arma do Trok abaixa (animação procedural: desce, gira e balança
   no ritmo da passada) e não atira. Ao parar, espera `trok_arma_correndo_atraso`.
+- **Fluidez (caixas, troca de lado):** `trok_ar_controle` é quanto o jogador consegue mudar a
+  direção no ar (o Source limita a 30 u/s; mais alto = curva no meio do pulo). `sv_accelerate` e
+  `sv_friction` deixam o arranque e a troca de lado no chão mais secos. Com arma branca na mão a
+  velocidade multiplica por `trok_faca_velocidade` (armas do Trok usam o campo `velocidade`).
+  Pular de novo no tique em que encosta no chão não perde velocidade (o atrito só entra depois).
 - **Caminhar (C):** `+walk` anda devagar (`hl2_walkspeed`) e **não faz barulho de passo**
   (patch em `CBasePlayer::UpdateStepSound`). Os bots também não ouvem (só ouvem acima de ~160 u/s).
 - **Mira pelo cano:** botão 2 alterna. FOV vai para `mira_fov` em `mira_tempo`, a arma vai

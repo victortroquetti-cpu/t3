@@ -28,6 +28,7 @@
 #endif
 
 #include "weapon_trok_gun.h"
+#include "weapon_hl2mpbasebasebludgeon.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -486,8 +487,19 @@ float CWeaponTrokGun::GetMoveSpeedScale( void ) const
 	return info.m_flTrokMoveSpeed * ( m_bADS ? info.m_flTrokADSMoveSpeed : 1.0f );
 }
 
+ConVar trok_faca_velocidade( "trok_faca_velocidade", "1.0", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Multiplicador de velocidade com arma branca (faca) na mão. O Combat Arms corre mais com a faca." );
+
 float TrokWeapon_MoveSpeedScale( CBasePlayer *pPlayer )
 {
-	CWeaponTrokGun *pGun = pPlayer ? dynamic_cast< CWeaponTrokGun * >( pPlayer->GetActiveWeapon() ) : NULL;
-	return pGun ? pGun->GetMoveSpeedScale() : 1.0f;
+	CBaseCombatWeapon *pWeapon = pPlayer ? pPlayer->GetActiveWeapon() : NULL;
+	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pWeapon );
+	if ( pGun )
+		return pGun->GetMoveSpeedScale();
+
+	// Arma branca (pé de cabra/cassetete hoje; a faca do Trok depois).
+	if ( dynamic_cast< CBaseHL2MPBludgeonWeapon * >( pWeapon ) )
+		return trok_faca_velocidade.GetFloat();
+
+	return 1.0f;
 }

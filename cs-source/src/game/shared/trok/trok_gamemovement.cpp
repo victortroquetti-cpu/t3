@@ -23,7 +23,7 @@
 #include "hl_gamemovement.h"
 #include "in_buttons.h"
 #include "movevars_shared.h"
-// Peso da arma / lentidão da mira (shared/trok/weapon_trok_gun.cpp).
+// Peso da arma / lentidão da mira / faca mais leve (shared/trok/weapon_trok_gun.cpp).
 float TrokWeapon_MoveSpeedScale( CBasePlayer *pPlayer );
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -43,6 +43,10 @@ ConVar trok_deslizar_vel_max( "trok_deslizar_vel_max", "400", FCVAR_REPLICATED, 
 ConVar trok_deslizar_atrito( "trok_deslizar_atrito", "0.15", FCVAR_REPLICATED, "Fração do atrito normal durante o deslize." );
 ConVar trok_deslizar_vel_fim( "trok_deslizar_vel_fim", "160", FCVAR_REPLICATED, "Abaixo desta velocidade o deslize acaba (atrito volta ao normal)." );
 
+ConVar trok_ar_controle( "trok_ar_controle", "30", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Controle no ar: velocidade (u/s) que o jogador consegue impor no ar a cada direção. Source/CS = 30 "
+	"(quase nada sem técnica de strafe); mais alto = muda de direção no meio do pulo, como no Combat Arms." );
+
 ConVar trok_escalar( "trok_escalar", "1", FCVAR_REPLICATED | FCVAR_NOTIFY, "Escalar bordas segurando pular contra elas." );
 ConVar trok_escalar_altura_max( "trok_escalar_altura_max", "80", FCVAR_REPLICATED, "Altura máxima (u, acima dos pés) de uma borda escalável." );
 ConVar trok_escalar_vel_frente( "trok_escalar_vel_frente", "140", FCVAR_REPLICATED, "Velocidade para frente ao passar por cima da borda." );
@@ -58,6 +62,7 @@ class CTrokGameMovement : public CHL2GameMovement
 
 public:
 	virtual void CheckParameters( void );
+	virtual float GetAirSpeedCap( void ) { return MAX( 0.0f, trok_ar_controle.GetFloat() ); }
 	virtual void FullWalkMove( void );
 	virtual bool CheckJumpButton( void );
 
@@ -193,7 +198,7 @@ void CTrokGameMovement::CheckParameters( void )
 	BaseClass::CheckParameters();
 
 	float flScale = TrokWeapon_MoveSpeedScale( player );
-	if ( flScale > 0.0f && flScale < 0.999f )
+	if ( flScale > 0.0f && fabsf( flScale - 1.0f ) > 0.001f )
 	{
 		mv->m_flMaxSpeed *= flScale;
 		mv->m_flForwardMove *= flScale;
