@@ -33,6 +33,23 @@ Tela inicial, Jogar contra bots, Arsenal, Configurações, Carregando, HUD, Plac
   `maxplayers` e `map`). Últimas escolhas ficam em `trok_ui_*` (salvas no config);
 - fontes em `resource/TrokScheme.res` (não mexe no ClientScheme do HL2MP).
 
+`src/game/client/trok/ui/trok_loading.cpp`: tela de carregamento (receita do NT;RE,
+`neo_loading.cpp`): `SetLoadingBackgroundDialog`, o `LoadingDialog` do GameUI sai da tela e o
+painel lê a barra e o texto dele. Nome do mapa, dica sorteada, barra fina; desconexão e erro
+do servidor no mesmo visual (barra escondida = desconectado).
+
+`src/game/client/trok/hud_trok.cpp`: HUD do concept, um painel só:
+- vida + fôlego (energia do sprint, só aparece quando não está cheia);
+- munição: pente / reserva, uma marca por bala, nome da arma (do script) e AUTO/SEMI;
+- placar e tempo no topo, cores relativas (seu time azul); `mp_fraglimit` vira "N PARA VENCER";
+- lista de abates com marca CABEÇA; aviso "ABATE" perto da mira;
+- mira em cruz que abre com a dispersão real da arma e some mirando ou correndo
+  (`trok_hud_mira 0` desliga); faca = ponto;
+- tela de morte: quem matou, arma, distância, vida dele, dano trocado nesta vida
+  (evento novo `trok_dano`, com a parte do corpo, em `server/player.cpp` + `resource/modevents.res`).
+O HUD do HL2 (vida, colete, munição, energia, mortes, mira) sai por `#ifndef TROK`.
+Ficou de fora: minimapa (precisa de imagem de cada mapa), placar do TAB (próximo).
+
 ## Ainda do GameUI (com cara de Source) e próximos passos
 
 1. **Testar no jogo** (nada foi visto rodando): fontes carregando (nome da família no Windows), escala,
@@ -41,12 +58,10 @@ Tela inicial, Jogar contra bots, Arsenal, Configurações, Carregando, HUD, Plac
    (`OpenOptionsDialog`, `OpenServerBrowser`, `OpenCreateMultiplayerGameDialog`). Próximo: opções
    próprias (receita do NT;RE em `neo_root_settings.cpp`: cópia das ConVars, salvar/descartar,
    teclas por `kb_act.lst`).
-3. Tela de carregamento: `SetLoadingBackgroundDialog` + ler a barra e o texto do `LoadingDialog`
-   escondido (NT;RE `neo_loading.cpp`).
+3. Tela de carregamento: feita; falta a arte de cada mapa no fundo.
 4. Mapa de fundo: fazer um `background01.bsp` próprio (câmera lenta) e o `chapterbackgrounds.txt`.
 5. Arsenal e Perfil (concepts prontos): precisam de sistema de loadout no servidor (hoje é
    `trok_armas_iniciais`).
-6. HUD, placar e tela de morte dos concepts: base `CTrokHudElement` (NT;RE `neo_hud_childelement`),
-   HUD do HL2 desligado por `#ifndef TROK` nos `DECLARE_HUDELEMENT`, placar como `IViewPortPanel`.
+6. Placar do TAB como `IViewPortPanel` (NT;RE `neo_scoreboard.cpp`), minimapa.
 7. Para portar mais widgets prontos (tabelas, campos de texto, rolagem), o NeoUI do NT;RE
    (`neo_ui.cpp`, ~3700 linhas, mesma licença) é o atalho; o menu atual não depende dele.

@@ -209,6 +209,11 @@ bool CWeaponTrokGun::IsOwnerSprinting( void ) const
 	return pPlayer->GetAbsVelocity().Length2D() > trok_arma_correndo_vel.GetFloat();
 }
 
+bool CWeaponTrokGun::IsAutomatic( void ) const
+{
+	return Info().m_bTrokAuto;
+}
+
 float CWeaponTrokGun::CurrentSpreadDegrees( void ) const
 {
 	const CHL2MPSWeaponInfo &info = Info();

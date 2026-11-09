@@ -13,8 +13,8 @@
 // O desenho é imediato: Run() desenha (MODE_PAINT) e trata o clique (MODE_CLICK)
 // com o mesmo código, então o que se vê é exatamente onde se clica.
 //
-// Ainda do GameUI (pendências em HANDOFF.md): opções, lista de servidores, criar
-// servidor, tela de carregamento e caixas de confirmação.
+// Ainda do GameUI (pendências em design/ui.md): opções, lista de servidores, criar
+// servidor e caixas de confirmação. A tela de carregamento é trok_loading.cpp.
 //=============================================================================
 
 #include "cbase.h"
@@ -186,6 +186,8 @@ private:
 };
 
 static CTrokMenu *g_pTrokMenu = NULL;
+
+void TrokLoading_Create( IGameUI *pGameUI ); // trok_loading.cpp
 
 //-----------------------------------------------------------------------------
 CTrokMenuInput::CTrokMenuInput( CTrokMenu *pMenu ) : BaseClass( pMenu, "TrokMenuInput" ), m_pMenu( pMenu )
@@ -874,7 +876,10 @@ void TrokMenu_Create()
 	CTrokMenu *pMenu = new CTrokMenu();
 	IGameUI *pGameUI = pMenu->GetGameUI();
 	if ( pGameUI )
+	{
 		pGameUI->SetMainMenuOverride( pMenu->GetVPanel() );
+		TrokLoading_Create( pGameUI );
+	}
 	else
 		Warning( "Trok: GameUI não encontrado; o menu próprio não foi registrado.\n" );
 }

@@ -126,6 +126,13 @@ e longe, abertura da mira, recuo) para os scripts `weapon_trok_*.txt`. Guia camp
   `design/ui.md`. **Testar primeiro:** se as fontes carregam (nome da família no Windows; se não,
   o VGUI cai numa fonte padrão), escala em 1080p/1440p, ESC dentro da partida, foco do teclado
   depois de fechar o diálogo de opções.
+- **HUD e tela de carregamento** dos concepts: `client/trok/hud_trok.cpp` e
+  `client/trok/ui/trok_loading.cpp` (detalhes em `design/ui.md`). O HUD do HL2 sai por
+  `#ifndef TROK` (vida, colete, munição, energia, mortes, mira). Evento novo `trok_dano`
+  (`server/player.cpp`, `resource/modevents.res`, que agora é uma cópia do HL2MP + o nosso: se o
+  SDK mudar o dele, copiar de novo). **Testar:** tela de carregamento entrando por "Jogar" e por
+  servidor (e um kick/servidor cheio para ver a mensagem), lista de abates, tela de morte com bot,
+  mira abrindo ao andar/atirar e sumindo na mira e na corrida.
 - **Escadas dos mapas do CS:S** (pincéis `CONTENTS_LADDER`): o movimento do HL2 só tratava
   `func_useableladder`. `CTrokGameMovement` agora usa as duas (`LadderMove`, `OnLadder`,
   `FullLadderMove`) e liga o ajuste de escada do CS:S (`sv_ladder_dampen`, `sv_ladder_angle`)
@@ -136,7 +143,8 @@ e longe, abertura da mira, recuo) para os scripts `weapon_trok_*.txt`. Guia camp
 - Estudos completos (código com a mesma licença, pode ser reaproveitado com crédito):
   `design/estudo-neotokyo.md` e `design/estudo-da-momentum-ff.md`. Backlog que saiu deles, por
   ganho:
-  1. deslize com estado em rede e recarga (hoje dá para encadear deslize→pulo→pouso agachado);
+  1. deslize: **desligado** (`trok_deslizar 0`) por decisão do dono, que não quer o deslize "try hard"
+     do CoD; se voltar algum dia, com estado em rede e recarga (hoje encadeia sem limite);
   2. "lurch" do Momentum (troca de direção logo depois do pulo, sem ganhar velocidade) + tempo de
      coyote + teto de velocidade no pulo (Fortress Forever);
   3. `GetViewModelFOV` por arma (fecha `mira_fov_arma`) e balanço da arma ao andar; o

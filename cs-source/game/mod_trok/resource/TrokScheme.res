@@ -32,6 +32,26 @@ Scheme
 		{
 			"1"	{ "name" "Barlow Condensed SemiBold" "tall" "12" "weight" "400" "antialias" "1" }
 		}
+		"TrokLoadingMap"
+		{
+			"1"	{ "name" "Barlow Condensed" "tall" "58" "weight" "700" "antialias" "1" }
+		}
+		"TrokHudNumber"
+		{
+			"1"	{ "name" "Barlow Condensed" "tall" "29" "weight" "700" "antialias" "1" "dropshadow" "1" }
+		}
+		"TrokHudScore"
+		{
+			"1"	{ "name" "Barlow Condensed" "tall" "20" "weight" "700" "antialias" "1" "dropshadow" "1" }
+		}
+		"TrokHudText"
+		{
+			"1"	{ "name" "Barlow Condensed SemiBold" "tall" "10" "weight" "400" "antialias" "1" "dropshadow" "1" }
+		}
+		"TrokHudSmall"
+		{
+			"1"	{ "name" "Barlow Medium" "tall" "8" "weight" "400" "antialias" "1" "dropshadow" "1" }
+		}
 		"TrokBody"
 		{
 			"1"	{ "name" "Barlow" "tall" "10" "weight" "400" "antialias" "1" }
