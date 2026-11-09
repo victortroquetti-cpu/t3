@@ -27,16 +27,17 @@ jogo, gerar nav, testar em partida, ver a tela) não se força na nuvem; só se 
 | `trok.py setup/gen/check/save-patch/status/refs` | rodam do zero no Linux |
 | Sintaxe e tipos de todo o código do mod e dos arquivos da Valve com patch (g++ -fsyntax-only, -Wall) | passam sem aviso |
 | VPC da Valve lendo nossos `.vpc` gerados (`server_trok.vpc`, `client_trok.vpc`, `launcher_main_mod_trok.vpc`) e criando `trok.sln` | **passou** no Windows do GitHub Actions |
-| Compilação com MSVC (link incluso) | **não verificado**: o 1º build automático falhou no nome da plataforma (`x64` em vez de `win64`), já corrigido; o resultado da compilação de verdade está no próximo build |
+| Compilação com MSVC (link incluso) | **passou** (GitHub Actions, build nº 2, Release win64): `client.dll` e `server.dll` em `mod_trok/bin/x64/`, pacote `trok-mod-windows` com 57 arquivos |
 | Mod rodando no jogo, bots em partida | **não verificado** (precisa da Steam) |
 | Simulador | roda (`python3 -I cs-source/tools/botsim/botsim.py`); é modelo das decisões, não o jogo |
 
 ## Primeiro no local (nesta ordem)
 
-1. `python cs-source/trok.py setup`, depois `cs-source\sdk\src\createtrok.bat`, abrir `trok.sln`,
-   compilar **Release | win64**. Corrigir os erros do MSVC que aparecerem (o g++ não pega tudo:
-   avisos tratados como erro, conversões, `min`/`max` do Windows). Depois de mexer em arquivo da
-   Valve: `python cs-source/trok.py save-patch`.
+1. Já compila: o build automático no Windows passou. Para desenvolver no local:
+   `python cs-source/trok.py setup`, `cs-source\sdk\src\createtrok.bat`, abrir `trok.sln`,
+   **Release | win64** (só existe essa plataforma). Ou baixar o pacote pronto do último build
+   em Actions > "Trok: build Windows" > Artifacts. Depois de mexer em arquivo da Valve:
+   `python cs-source/trok.py save-patch`.
 2. Rodar o mod (o projeto `Client (Trok)` já vem com as opções de execução, ou
    `cs-source/sdk/game/mod_trok.exe`). Precisa do Source SDK Base 2013 Multiplayer e do CS:S.
 3. Teste básico: `map dm_lockdown`, `exec bots`, `trok_bot_estilos_info`, `nb_select` + `nb_debug BEHAVIOR`.
