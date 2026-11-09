@@ -23,6 +23,13 @@
 #include "hl_gamemovement.h"
 #include "in_buttons.h"
 #include "movevars_shared.h"
+#ifdef CLIENT_DLL
+#include "c_hl2mp_player.h"
+#include "c_world.h"
+#else
+#include "hl2mp_player.h"
+#include "world.h"
+#endif
 // Peso da arma / lentidão da mira / faca mais leve (shared/trok/weapon_trok_gun.cpp).
 float TrokWeapon_MoveSpeedScale( CBasePlayer *pPlayer );
 
@@ -47,6 +54,16 @@ ConVar trok_ar_controle( "trok_ar_controle", "30", FCVAR_REPLICATED | FCVAR_NOTI
 	"Controle no ar: velocidade (u/s) que o jogador consegue impor no ar a cada direção. Source/CS = 30 "
 	"(quase nada sem técnica de strafe); mais alto = muda de direção no meio do pulo, como no Combat Arms." );
 
+// Fluidez de pulo (ideias do Momentum Mod e do Fortress Forever, ver design/estudo-da-momentum-ff.md):
+ConVar trok_pulo_virada( "trok_pulo_virada", "0.6", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Logo depois do pulo, apertar uma direção nova gira a velocidade para ela (0 = desliga, 1 = forte). Nunca acelera." );
+ConVar trok_pulo_virada_tempo( "trok_pulo_virada_tempo", "0.5", FCVAR_REPLICATED, "Janela (s) depois do pulo em que a virada funciona; enfraquece até o fim." );
+ConVar trok_pulo_coyote( "trok_pulo_coyote", "0.12", FCVAR_REPLICATED, "Ainda dá para pular este tempo (s) depois de sair da borda andando." );
+ConVar trok_pulo_antecipado( "trok_pulo_antecipado", "0.12", FCVAR_REPLICATED, "Apertar pular até este tempo (s) antes de pousar já pula ao pousar." );
+ConVar trok_pulo_teto( "trok_pulo_teto", "1.4", FCVAR_REPLICATED,
+	"Ao pular, velocidade acima de N x a máxima perde parte do excesso (contra bunny hop). 0 = sem teto." );
+ConVar trok_pulo_teto_duro( "trok_pulo_teto_duro", "1.7", FCVAR_REPLICATED, "Teto absoluto (x velocidade máxima) ao pular." );
+
 ConVar trok_escalar( "trok_escalar", "1", FCVAR_REPLICATED | FCVAR_NOTIFY, "Escalar bordas segurando pular contra elas." );
 ConVar trok_escalar_altura_max( "trok_escalar_altura_max", "80", FCVAR_REPLICATED, "Altura máxima (u, acima dos pés) de uma borda escalável." );
 ConVar trok_escalar_vel_frente( "trok_escalar_vel_frente", "140", FCVAR_REPLICATED, "Velocidade para frente ao passar por cima da borda." );
@@ -65,6 +82,7 @@ public:
 	virtual float GetAirSpeedCap( void ) { return MAX( 0.0f, trok_ar_controle.GetFloat() ); }
 	virtual void FullWalkMove( void );
 	virtual bool CheckJumpButton( void );
+	virtual void AirMove( void );
 
 	// Escadas: o HL2 só conhece func_useableladder; as escadas dos mapas do CS:S são
 	// pincéis com CONTENTS_LADDER, tratadas pelo CGameMovement. Usa as duas.
@@ -74,6 +92,9 @@ public:
 
 private:
 	bool OnHL2Ladder( void );
+	CHL2MP_Player *TrokPlayer( void ) const { return dynamic_cast< CHL2MP_Player * >( player ); }
+	void ApplyJumpTurn( void );
+	void CapJumpSpeed( void );
 	bool IsDucked( void ) const;
 	bool IsSliding( void ) const;
 	void TryStartSlide( void );
@@ -259,6 +280,15 @@ void CTrokGameMovement::CheckParameters( void )
 //-----------------------------------------------------------------------------
 void CTrokGameMovement::FullWalkMove( void )
 {
+	CHL2MP_Player *pTrok = TrokPlayer();
+	if ( pTrok )
+	{
+		if ( player->GetGroundEntity() != NULL )
+			pTrok->m_flTrokGroundTime = gpGlobals->curtime;
+		else if ( ( mv->m_nButtons & IN_JUMP ) && !( mv->m_nOldButtons & IN_JUMP ) )
+			pTrok->m_flTrokJumpPressTime = gpGlobals->curtime;
+	}
+
 	TryStartSlide();
 	TryMantle();
 
@@ -288,10 +318,42 @@ void CTrokGameMovement::FullWalkMove( void )
 //-----------------------------------------------------------------------------
 bool CTrokGameMovement::CheckJumpButton( void )
 {
+	CHL2MP_Player *pTrok = TrokPlayer();
+	const float flNow = gpGlobals->curtime;
+	const bool bFreshPress = ( mv->m_nButtons & IN_JUMP ) && !( mv->m_nOldButtons & IN_JUMP );
+
+	// Pulo antecipado: apertou no ar pouco antes de pousar e ainda segura.
+	if ( pTrok && player->GetGroundEntity() != NULL && ( mv->m_nButtons & IN_JUMP ) && ( mv->m_nOldButtons & IN_JUMP ) &&
+		 flNow - pTrok->m_flTrokJumpPressTime <= trok_pulo_antecipado.GetFloat() &&
+		 pTrok->m_flTrokJumpPressTime > pTrok->m_flTrokJumpTime )
+	{
+		mv->m_nOldButtons &= ~IN_JUMP;
+	}
+
+	// Pulo atrasado ("coyote"): saiu da borda andando há um instante, sem ter pulado.
+	bool bCoyote = false;
+	if ( pTrok && player->GetGroundEntity() == NULL && bFreshPress && player->GetWaterLevel() < WL_Waist &&
+		 player->GetMoveType() == MOVETYPE_WALK && mv->m_vecVelocity.z <= 0.0f &&
+		 flNow - pTrok->m_flTrokGroundTime <= trok_pulo_coyote.GetFloat() &&
+		 pTrok->m_flTrokJumpTime < pTrok->m_flTrokGroundTime )
+	{
+		bCoyote = true;
+		mv->m_vecVelocity.z = 0.0f;
+#ifdef CLIENT_DLL
+		player->SetGroundEntity( GetClientWorldEntity() );
+#else
+		player->SetGroundEntity( GetWorldEntity() );
+#endif
+	}
+
 	Vector before = mv->m_vecVelocity;
 
 	if ( !BaseClass::CheckJumpButton() )
+	{
+		if ( bCoyote )
+			player->SetGroundEntity( NULL );
 		return false;
+	}
 
 	float flGravity = GetCurrentGravity();
 	float flBaseMul = g_bMovementOptimizations ? 160.0f : sqrtf( 2.0f * flGravity * GAMEMOVEMENT_JUMP_HEIGHT );
@@ -309,7 +371,97 @@ bool CTrokGameMovement::CheckJumpButton( void )
 		mv->m_vecVelocity.y = before.y;
 	}
 
+	CapJumpSpeed();
+
+	if ( pTrok )
+		pTrok->m_flTrokJumpTime = flNow;
+
 	return true;
+}
+
+// Teto de velocidade no pulo (Fortress Forever, CFFGameMovement::CheckJumpButton):
+// acima de N x a máxima, só parte do excesso sobra; e há um teto duro.
+void CTrokGameMovement::CapJumpSpeed( void )
+{
+	const float flSoft = trok_pulo_teto.GetFloat();
+	if ( flSoft <= 0.0f )
+		return;
+	const float flMax = MAX( 1.0f, player->MaxSpeed() );
+	const float flSpeed = mv->m_vecVelocity.Length2D();
+	const float flSoftCap = flSoft * flMax;
+	if ( flSpeed <= flSoftCap )
+		return;
+	float flNew = flSoftCap + ( flSpeed - flSoftCap ) * 0.65f;
+	flNew = MIN( flNew, MAX( flSoft, trok_pulo_teto_duro.GetFloat() ) * flMax );
+	const float flScale = flNew / flSpeed;
+	mv->m_vecVelocity.x *= flScale;
+	mv->m_vecVelocity.y *= flScale;
+}
+
+//-----------------------------------------------------------------------------
+// Virada logo depois do pulo ("lurch" do Momentum Mod, PerformLurchChecks): ao
+// apertar uma direção nova até trok_pulo_virada_tempo depois do pulo, a velocidade
+// gira para ela, mais forte no começo. Nunca aumenta a velocidade. É o "caixa a
+// caixa, de um lado pro outro". Vale para bots também (eles apertam as mesmas teclas).
+//-----------------------------------------------------------------------------
+void CTrokGameMovement::AirMove( void )
+{
+	ApplyJumpTurn();
+	BaseClass::AirMove();
+}
+
+void CTrokGameMovement::ApplyJumpTurn( void )
+{
+	CHL2MP_Player *pTrok = TrokPlayer();
+	const float flStrength = trok_pulo_virada.GetFloat();
+	const float flWindow = trok_pulo_virada_tempo.GetFloat();
+	if ( !pTrok || flStrength <= 0.0f || flWindow <= 0.0f )
+		return;
+
+	const float flElapsed = gpGlobals->curtime - pTrok->m_flTrokJumpTime;
+	if ( flElapsed < 0.0f || flElapsed > flWindow )
+		return;
+
+	const int iDirs = IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT;
+	const int iPressed = ( mv->m_nOldButtons ^ mv->m_nButtons ) & mv->m_nButtons;
+	if ( !( iPressed & iDirs ) )
+		return;
+
+	Vector forward, right;
+	AngleVectors( mv->m_vecViewAngles, &forward, &right, NULL );
+	forward.z = right.z = 0.0f;
+	VectorNormalize( forward );
+	VectorNormalize( right );
+	Vector wishdir = forward * mv->m_flForwardMove + right * mv->m_flSideMove;
+	wishdir.z = 0.0f;
+	if ( wishdir.Length2D() < 0.1f )
+		return;
+	VectorNormalize( wishdir );
+
+	const float flSpeed = mv->m_vecVelocity.Length2D();
+	if ( flSpeed < 1.0f )
+		return;
+	Vector cur( mv->m_vecVelocity.x, mv->m_vecVelocity.y, 0.0f );
+	cur /= flSpeed;
+
+	// Mais forte no começo da janela.
+	const float flAmt = clamp( ( flWindow - flElapsed ) / ( flWindow * 0.6f ), 0.0f, 1.0f );
+	const float flPush = flStrength * player->MaxSpeed() * flAmt;
+
+	Vector turn = ( cur + ( wishdir * 1.5f - cur ) * 0.7f ) - cur;
+	turn.z = 0.0f;
+	if ( turn.Length2D() < 0.001f )
+		return;
+	VectorNormalize( turn );
+
+	Vector vNew = cur * flSpeed + turn * flPush;
+	vNew.z = 0.0f;
+	const float flNew = vNew.Length2D();
+	if ( flNew > flSpeed )
+		vNew *= flSpeed / flNew;
+
+	mv->m_vecVelocity.x = vNew.x;
+	mv->m_vecVelocity.y = vNew.y;
 }
 
 //-----------------------------------------------------------------------------

@@ -53,6 +53,13 @@ entidade).
   `sv_friction` deixam o arranque e a troca de lado no chão mais secos. Com arma branca na mão a
   velocidade multiplica por `trok_faca_velocidade` (armas do Trok usam o campo `velocidade`).
   Pular de novo no tique em que encosta no chão não perde velocidade (o atrito só entra depois).
+  Extras do pulo (Momentum Mod / Fortress Forever, previstos em rede):
+  `trok_pulo_virada` (até `trok_pulo_virada_tempo` depois do pulo, apertar outra direção gira a
+  velocidade para ela sem acelerar: o "caixa a caixa"), `trok_pulo_coyote` (pula um instante depois
+  de sair da borda), `trok_pulo_antecipado` (apertou um pouco antes de pousar, pula ao pousar),
+  `trok_pulo_teto`/`_duro` (corta o excesso de velocidade ao pular: nada de bunny hop infinito).
+  Os bots usam o mesmo movimento, então ganham tudo isso também.
+  Deslize: desligado (`trok_deslizar 0`), decisão do dono.
 - **Caminhar (C):** `+walk` anda devagar (`hl2_walkspeed`) e **não faz barulho de passo**
   (patch em `CBasePlayer::UpdateStepSound`). Os bots também não ouvem (só ouvem acima de ~160 u/s).
 - **Mira pelo cano:** botão 2 alterna. FOV vai para `mira_fov` em `mira_tempo`, a arma vai

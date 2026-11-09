@@ -89,6 +89,65 @@ index 416c930..bb82548 100644
  
  #define SUITPOWER_INIT -1
  
+diff --git a/src/game/client/hl2mp/c_hl2mp_player.cpp b/src/game/client/hl2mp/c_hl2mp_player.cpp
+index 367a616..44591db 100644
+--- a/src/game/client/hl2mp/c_hl2mp_player.cpp
++++ b/src/game/client/hl2mp/c_hl2mp_player.cpp
+@@ -35,6 +35,11 @@ BEGIN_RECV_TABLE_NOBASE( C_HL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+ 
+ 	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
+ 	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),
++#ifdef TROK
++	RecvPropFloat( RECVINFO( m_flTrokJumpTime ) ),
++	RecvPropFloat( RECVINFO( m_flTrokGroundTime ) ),
++	RecvPropFloat( RECVINFO( m_flTrokJumpPressTime ) ),
++#endif
+ END_RECV_TABLE()
+ 
+ // all players except the local player
+@@ -59,6 +64,11 @@ END_RECV_TABLE()
+ 
+ BEGIN_PREDICTION_DATA( C_HL2MP_Player )
+ 	DEFINE_PRED_FIELD( m_fIsWalking, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
++#ifdef TROK
++	DEFINE_PRED_FIELD( m_flTrokJumpTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
++	DEFINE_PRED_FIELD( m_flTrokGroundTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
++	DEFINE_PRED_FIELD( m_flTrokJumpPressTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
++#endif
+ 
+ 	// misyl: Ammo is server side entities in HL2MP. Not catastrophic to error about.
+ 	// Just let the server stomp all over us.
+@@ -102,6 +112,11 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100
+ 
+ C_HL2MP_Player::C_HL2MP_Player() : m_PlayerAnimState( this ), m_iv_angEyeAngles( "C_HL2MP_Player::m_iv_angEyeAngles" )
+ {
++#ifdef TROK
++	m_flTrokJumpTime = -100.0f;
++	m_flTrokGroundTime = -100.0f;
++	m_flTrokJumpPressTime = -100.0f;
++#endif
+ 	m_iIDEntIndex = 0;
+ 	m_iSpawnInterpCounterCache = 0;
+ 
+diff --git a/src/game/client/hl2mp/c_hl2mp_player.h b/src/game/client/hl2mp/c_hl2mp_player.h
+index bac7584..5a27262 100644
+--- a/src/game/client/hl2mp/c_hl2mp_player.h
++++ b/src/game/client/hl2mp/c_hl2mp_player.h
+@@ -120,6 +120,14 @@ public:
+ 
+ 	virtual void PostThink( void );
+ 
++#ifdef TROK
++public:
++	// Tempos do movimento do Trok (ver hl2mp_player.h), previstos.
++	float m_flTrokJumpTime;
++	float m_flTrokGroundTime;
++	float m_flTrokJumpPressTime;
++#endif
++
+ private:
+ 	
+ 	C_HL2MP_Player( const C_HL2MP_Player & );
 diff --git a/src/game/client/hl2mp/hud_deathnotice.cpp b/src/game/client/hl2mp/hud_deathnotice.cpp
 index 400fcf0..92dc8bd 100644
 --- a/src/game/client/hl2mp/hud_deathnotice.cpp
@@ -719,10 +778,34 @@ index 30d2181..18f69f4 100644
  }
  
 diff --git a/src/game/server/hl2mp/hl2mp_player.cpp b/src/game/server/hl2mp/hl2mp_player.cpp
-index 9457928..11de3fc 100644
+index 9457928..42ffd74 100644
 --- a/src/game/server/hl2mp/hl2mp_player.cpp
 +++ b/src/game/server/hl2mp/hl2mp_player.cpp
-@@ -239,10 +239,42 @@ void CHL2MP_Player::GiveAllItems( void )
+@@ -54,6 +54,11 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+ 
+ 	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
+ 	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
++#ifdef TROK
++	SendPropFloat( SENDINFO( m_flTrokJumpTime ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokGroundTime ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokJumpPressTime ), 0, SPROP_NOSCALE ),
++#endif
+ 
+ END_SEND_TABLE()
+ 
+@@ -143,6 +148,11 @@ const char *g_ppszRandomCombineModels[] =
+ CHL2MP_Player::CHL2MP_Player() : m_PlayerAnimState( this )
+ {
+ 	m_angEyeAngles.Init();
++#ifdef TROK
++	m_flTrokJumpTime = -100.0f;
++	m_flTrokGroundTime = -100.0f;
++	m_flTrokJumpPressTime = -100.0f;
++#endif
+ 
+ 	m_iLastWeaponFireUsercmd = 0;
+ 
+@@ -239,10 +249,42 @@ void CHL2MP_Player::GiveAllItems( void )
  	
  }
  
@@ -765,7 +848,7 @@ index 9457928..11de3fc 100644
  	CBasePlayer::GiveAmmo( 255,	"Pistol");
  	CBasePlayer::GiveAmmo( 45,	"SMG1");
  	CBasePlayer::GiveAmmo( 1,	"grenade" );
-@@ -1414,6 +1446,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
+@@ -1414,6 +1456,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
  		}
  	}
  
@@ -784,6 +867,26 @@ index 9457928..11de3fc 100644
  	pSpot = pLastSpawnPoint;
  	// Randomize the start spot
  	for ( int i = random->RandomInt(1,5); i > 0; i-- )
+diff --git a/src/game/server/hl2mp/hl2mp_player.h b/src/game/server/hl2mp/hl2mp_player.h
+index 5fad238..0bcf9d6 100644
+--- a/src/game/server/hl2mp/hl2mp_player.h
++++ b/src/game/server/hl2mp/hl2mp_player.h
+@@ -143,6 +143,15 @@ public:
+ 
+ 	bool IsThreatAimingTowardMe( CBaseEntity* threat, float cosTolerance = 0.8f ) const;
+ 	bool IsThreatFiringAtMe( CBaseEntity* threat ) const;
++
++#ifdef TROK
++	// Tempos do movimento do Trok (shared/trok/trok_gamemovement.cpp), previstos no cliente:
++	// último pulo (virada logo depois do pulo), último tique no chão (pulo atrasado na borda)
++	// e último aperto de pular no ar (pulo adiantado antes de pousar).
++	CNetworkVar( float, m_flTrokJumpTime );
++	CNetworkVar( float, m_flTrokGroundTime );
++	CNetworkVar( float, m_flTrokJumpPressTime );
++#endif
+ private:
+ 
+ 	CNetworkQAngle( m_angEyeAngles );
 diff --git a/src/game/server/player.cpp b/src/game/server/player.cpp
 index b8a0519..fb9fc7e 100644
 --- a/src/game/server/player.cpp
