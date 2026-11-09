@@ -62,9 +62,8 @@ infectado comum. (No modo Surto, os "hospedeiros" sorteados são exatamente esse
 | A resistência | sobreviventes organizados, aliados dos dissidentes | os jogadores |
 | Os infectados | pouco infectados (hospedeiros, com poder e raiva) e infectados comuns | o Surto e o futuro modo em ondas |
 
-**O jogador** usa tecnologia dos dissidentes para **controlar um pouco** o fungo no próprio corpo:
-benefícios pequenos e equilibrados, sempre com custo (a raiva, o fungo tomando espaço). Nada de
-superpoder: é pé no chão.
+**O jogador**: na história, a tecnologia dos dissidentes controla um pouco o fungo; no jogo isso
+vira, no máximo, itens raros sem exagero. Humano não tem poder; poder é coisa de infectado.
 
 Cuidado para não parecer *The Last of Us* (fungo que zumbifica): aqui o diferencial é a origem
 espacial e o fungo **inteligente ligado à IA e às redes**, com gente que o adora como evolução.
@@ -125,7 +124,11 @@ mudar.
 
 **Tecnologia e fungo controlado no jogo** (decisão do dono): **não** vira sistema de escolha
 nem espaço de "cepa". Serão **itens raros** que dão algum benefício a mais justamente por serem
-raros. **Ainda não**: equipamentos ficam para depois.
+raros, **sem exagero**. **Ainda não**: equipamentos ficam para depois.
+
+**Humanos não têm poderes.** Nada de habilidade especial (ouvir mais longe, fôlego extra, visão,
+etc.) para jogador humano, nem por item. **Poderes são só dos zumbis** (os infectados e os
+portadores do Surto).
 
 ## Tom e vibe
 
