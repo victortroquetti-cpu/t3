@@ -42,16 +42,11 @@ jobs:
           $start = ($sln | Select-String "SolutionConfigurationPlatforms").LineNumber
           $sln[$start..($start + 8)]
 
-      - name: Compilar (Release x64)
+      # O VPC gera só a plataforma "win64" (64 bits) no SDK 2013 atual.
+      - name: Compilar (Release win64)
         shell: cmd
         working-directory: cs-source/sdk/src
-        run: msbuild trok.sln /m /nologo /v:minimal /p:Configuration=Release /p:Platform=x64
-
-      - name: Compilar (Release Win32)
-        shell: cmd
-        working-directory: cs-source/sdk/src
-        continue-on-error: true
-        run: msbuild trok.sln /m /nologo /v:minimal /p:Configuration=Release /p:Platform=Win32
+        run: msbuild trok.sln /m /nologo /v:minimal /p:Configuration=Release /p:Platform=win64
 
       - name: Montar a pasta do mod
         shell: pwsh

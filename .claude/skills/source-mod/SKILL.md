@@ -9,6 +9,13 @@ O objetivo do dono é uma **conversão total**: refazer vários sistemas do jogo
 (IA dos bots, modos de jogo, recursos de FPS moderno). **Só implemente sistema
 ou modo quando ele pedir.** Objetivos ditos de passagem são contexto, não tarefa.
 
+## Antes de tudo
+
+Leia `cs-source/HANDOFF.md`: estado atual, o que foi e o que não foi verificado, riscos
+conhecidos e pendências. Combinado com o dono: o que for difícil na nuvem e fácil no PC
+dele (compilar, abrir o jogo, gerar nav, testar em partida) não se força na nuvem; só se
+registra no HANDOFF.md.
+
 ## Regra zero: só código legal
 
 - O código de jogo do CS:S (compra, bomba, movimento do CS, bots `CCSBot`) **não é público**.

@@ -19,6 +19,8 @@ ligadas. Os sistemas novos entram em `src/game/*/trok/` conforme forem pedidos.
 
 O código de jogo do CS:S não é público. Código vazado (2020) não pode ser usado; ver a skill.
 
+Estado do trabalho, riscos e pendências: [`HANDOFF.md`](HANDOFF.md).
+
 ## Requisitos
 
 - **Para compilar:** Python 3.13+, git e
