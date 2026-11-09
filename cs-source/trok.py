@@ -339,6 +339,18 @@ def cmd_check():
         files = [os.path.join(MOD, f.replace("\\", os.sep)) for f in mod_files(side) if f.endswith(".cpp")]
         files += [os.path.join("..", "shared", MOD, f.replace("\\", os.sep))
                   for f in mod_files("shared") if f.endswith(".cpp")]
+        # Arquivos da Valve que o sdk.patch altera (só os .cpp deste lado ou do shared).
+        patch = os.path.join(ROOT, "patches", "sdk.patch")
+        if os.path.isfile(patch):
+            for line in open(patch, encoding="utf-8", errors="replace"):
+                if not line.startswith("+++ b/src/game/") or not line.rstrip().endswith(".cpp"):
+                    continue
+                rel = line[len("+++ b/src/game/"):].strip()
+                top, rest = rel.split("/", 1)
+                if top == side:
+                    files.append(rest)
+                elif top == "shared":
+                    files.append(os.path.join("..", "shared", rest))
         for f in files:
             args = [cxx] + (CHECK_COMMON + " " + CHECK_SIDE[side]).split() + ["-w", f]
             rc = subprocess.run(args, cwd=cwd).returncode
