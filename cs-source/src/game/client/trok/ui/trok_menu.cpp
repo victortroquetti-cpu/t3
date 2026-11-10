@@ -13,8 +13,9 @@
 // O desenho é imediato: Run() desenha (MODE_PAINT) e trata o clique (MODE_CLICK)
 // com o mesmo código, então o que se vê é exatamente onde se clica.
 //
-// Ainda do GameUI (pendências em design/ui.md): opções, lista de servidores, criar
-// servidor e caixas de confirmação. A tela de carregamento é trok_loading.cpp.
+// CONFIGURAÇÕES é própria (abas Jogo, Vídeo, Áudio e Controles, mais abaixo). Ainda do
+// GameUI (pendências em design/ui.md): lista de servidores, criar servidor e caixas de
+// confirmação. A tela de carregamento é trok_loading.cpp.
 //=============================================================================
 
 #include "cbase.h"
@@ -25,6 +26,9 @@
 #include "tier1/interface.h"
 #include "tier1/strtools.h"
 #include "steam/steam_api.h"
+#include "materialsystem/imaterialsystem.h"
+#include "materialsystem/materialsystem_config.h"
+#include "inputsystem/iinputsystem.h"
 #include <vgui/ISurface.h>
 #include <vgui/IVGui.h>
 #include <vgui/IScheme.h>
@@ -104,6 +108,7 @@ public:
 		SetSize( 1, 1 );
 	}
 	virtual void OnKeyCodeTyped( KeyCode code );
+	virtual void OnKeyCodePressed( KeyCode code );
 private:
 	CTrokMenu *m_pMenu;
 };
@@ -115,7 +120,7 @@ class CTrokMenu : public Panel
 {
 	DECLARE_CLASS_SIMPLE( CTrokMenu, Panel );
 public:
-	enum State_t { STATE_ROOT = 0, STATE_PLAY };
+	enum State_t { STATE_ROOT = 0, STATE_PLAY, STATE_OPTIONS };
 
 	CTrokMenu();
 	virtual ~CTrokMenu();
@@ -124,6 +129,10 @@ public:
 	State_t GetState( void ) const { return m_eState; }
 	bool IsShown( void ) { return ipanel()->IsFullyVisible( GetVPanel() ); }
 	void OnRelayedKey( KeyCode code );
+	bool IsCapturingKey( void ) const { return m_eState == STATE_OPTIONS && m_iCapture >= 0; }
+	void CaptureButton( ButtonCode_t code );
+	// A tecla capturada também chega depois como "digitada": não pode virar ESC/Enter do menu.
+	bool SwallowTyped( KeyCode code ) { const bool b = ( code == m_eSwallowTyped ); m_eSwallowTyped = BUTTON_CODE_INVALID; return b; }
 
 protected:
 	virtual void ApplySchemeSettings( IScheme *pScheme );
@@ -132,6 +141,7 @@ protected:
 	virtual void Paint( void );
 	virtual void OnCursorMoved( int x, int y );
 	virtual void OnMousePressed( MouseCode code );
+	virtual void OnMouseWheeled( int delta );
 	virtual void OnScreenSizeChanged( int iOldWide, int iOldTall );
 
 private:
@@ -163,7 +173,16 @@ private:
 	void RunBackground( void );
 	void RunRoot( void );
 	void RunPlay( void );
+	void RunOptions( void );
 	void RunBottomBar( void );
+
+	// Configurações: uma linha por opção (rótulo à esquerda, controle à direita)
+	void OptHeader( int x, int &y, int w, const char *pszText );
+	void OptSlider( int x, int &y, int w, const char *pszLabel, const char *pszCvar, float flMin, float flMax, float flStep, const char *pszFormat );
+	void OptToggle( int x, int &y, int w, const char *pszLabel, const char *pszCvar );
+	bool OptCycle( int x, int &y, int w, const char *pszLabel, const char *pszValue, int &iDir );
+	void OptBind( int x, int &y, int w, int iIndex );
+	void BuildVideoModes( void );
 
 	// Ações
 	void Command( const char *pszGameUICommand );
@@ -182,6 +201,17 @@ private:
 	int m_iHoverId, m_iLastHoverId;
 
 	HFont m_hLogo, m_hTitle, m_hItem, m_hHeading, m_hButton, m_hBody, m_hSmall;
+
+	// Configurações
+	int m_iOptTab;
+	int m_iCapture;			// índice da ação esperando tecla (-1 = nenhuma)
+	bool m_bOptDirty;		// mudou algo: grava o config.cfg ao sair da tela
+	struct VideoMode_t { int w, h; };
+	CUtlVector< VideoMode_t > m_VideoModes;
+	int m_iVideoMode;		// resolução escolhida (ainda não aplicada)
+	bool m_bVideoWindowed;	// modo escolhido (ainda não aplicado)
+	bool m_bVideoPending;
+	ButtonCode_t m_eSwallowTyped;
 
 	// Jogar contra bots
 	CUtlVector< CUtlString > m_Maps;
@@ -210,7 +240,19 @@ void CTrokMenuInput::OnKeyCodeTyped( KeyCode code )
 {
 	if ( code <= KEY_NONE )
 		return; // teclas multimídia chegam como KEY_NONE (nota do NT;RE)
+	if ( m_pMenu->IsCapturingKey() || m_pMenu->SwallowTyped( code ) )
+		return; // tratada no OnKeyCodePressed (que também recebe Shift, Ctrl e Alt)
 	m_pMenu->OnRelayedKey( code );
+}
+
+void CTrokMenuInput::OnKeyCodePressed( KeyCode code )
+{
+	if ( code > KEY_NONE && m_pMenu->IsCapturingKey() )
+	{
+		m_pMenu->CaptureButton( code );
+		return;
+	}
+	BaseClass::OnKeyCodePressed( code );
 }
 
 //-----------------------------------------------------------------------------
@@ -229,6 +271,13 @@ CTrokMenu::CTrokMenu() : BaseClass( NULL, "TrokMenu" )
 	m_hLogo = m_hTitle = m_hItem = m_hHeading = m_hButton = m_hBody = m_hSmall = INVALID_FONT;
 	m_iMap = 0;
 	m_bMapsBuilt = false;
+	m_iOptTab = 0;
+	m_iCapture = -1;
+	m_bOptDirty = false;
+	m_iVideoMode = 0;
+	m_bVideoWindowed = false;
+	m_bVideoPending = false;
+	m_eSwallowTyped = BUTTON_CODE_INVALID;
 
 	SetProportional( false );
 	SetPaintBackgroundEnabled( false );
@@ -314,6 +363,16 @@ void CTrokMenu::OnThink( void )
 
 void CTrokMenu::SetState( State_t eState )
 {
+	if ( m_eState == STATE_OPTIONS && eState != STATE_OPTIONS )
+	{
+		m_iCapture = -1;
+		m_bVideoPending = false;
+		if ( m_bOptDirty )
+			engine->ClientCmd_Unrestricted( "host_writeconfig\n" ); // grava as escolhas no config.cfg
+		m_bOptDirty = false;
+	}
+	if ( eState == STATE_OPTIONS && m_eState != STATE_OPTIONS )
+		BuildVideoModes();
 	m_eState = eState;
 	m_iLastHoverId = -1;
 	if ( eState == STATE_PLAY )
@@ -339,6 +398,11 @@ void CTrokMenu::OnCursorMoved( int x, int y )
 
 void CTrokMenu::OnMousePressed( MouseCode code )
 {
+	if ( IsCapturingKey() )
+	{
+		CaptureButton( code ); // MouseCode é um ButtonCode_t
+		return;
+	}
 	if ( code != MOUSE_LEFT )
 		return;
 	m_bClickHandled = false;
@@ -347,8 +411,19 @@ void CTrokMenu::OnMousePressed( MouseCode code )
 		surface()->PlaySound( trok_ui_som_clique.GetString() );
 }
 
+void CTrokMenu::OnMouseWheeled( int delta )
+{
+	if ( IsCapturingKey() )
+		CaptureButton( delta > 0 ? MOUSE_WHEEL_UP : MOUSE_WHEEL_DOWN );
+}
+
 void CTrokMenu::OnRelayedKey( KeyCode code )
 {
+	if ( code == KEY_ESCAPE && IsCapturingKey() )
+	{
+		m_iCapture = -1;
+		return;
+	}
 	if ( code == KEY_ESCAPE && m_eState != STATE_ROOT )
 	{
 		SetState( STATE_ROOT );
@@ -534,6 +609,7 @@ void CTrokMenu::Run( Mode_t eMode )
 	switch ( m_eState )
 	{
 	case STATE_PLAY: RunPlay(); break;
+	case STATE_OPTIONS: RunOptions(); break;
 	default: RunRoot(); break;
 	}
 
@@ -600,7 +676,7 @@ void CTrokMenu::RunRoot( void )
 			Command( "ResumeGame" );
 		y += S( 6 );
 		if ( MenuItem( 2, x0, y, "02", "CONFIGURAÇÕES", NULL, false ) )
-			Command( "OpenOptionsDialog" );
+			SetState( STATE_OPTIONS );
 		if ( MenuItem( 3, x0, y, "03", "DESCONECTAR", NULL, false ) )
 			Command( "Disconnect" );
 		if ( MenuItem( 4, x0, y, "04", "SAIR", NULL, false ) )
@@ -616,7 +692,7 @@ void CTrokMenu::RunRoot( void )
 		if ( MenuItem( 3, x0, y, "03", "CRIAR PARTIDA", NULL, false ) )
 			Command( "OpenCreateMultiplayerGameDialog" );
 		if ( MenuItem( 4, x0, y, "04", "CONFIGURAÇÕES", NULL, false ) )
-			Command( "OpenOptionsDialog" );
+			SetState( STATE_OPTIONS );
 		if ( MenuItem( 5, x0, y, "05", "SAIR", NULL, false ) )
 			engine->ClientCmd_Unrestricted( "quit\n" );
 
@@ -790,9 +866,411 @@ void CTrokMenu::RunBottomBar( void )
 	int x = m_iWide - S( 56 ) - S( 300 );
 	if ( m_eState == STATE_PLAY )
 		KeyHint( x, ty, "ENTER", "Iniciar" );
+	else if ( IsCapturingKey() )
+		KeyHint( x, ty, "TECLA", "Definir" );
 	else
 		KeyHint( x, ty, "CLIQUE", "Selecionar" );
-	KeyHint( x, ty, "ESC", m_eState == STATE_ROOT && InGame() ? "Continuar" : "Voltar" );
+	KeyHint( x, ty, "ESC", IsCapturingKey() ? "Cancelar" : ( m_eState == STATE_ROOT && InGame() ? "Continuar" : "Voltar" ) );
+}
+
+//-----------------------------------------------------------------------------
+// Configurações (substitui a janela de opções do motor)
+//-----------------------------------------------------------------------------
+
+// Ações que dá para trocar de tecla. Comandos iguais aos do cfg/config_default.cfg.
+struct TrokBind_t { const char *pszLabel; const char *pszCmd; };
+static const TrokBind_t s_Binds[] = {
+	{ "Andar para frente", "+forward" },	{ "Andar para trás", "+back" },
+	{ "Andar para a esquerda", "+moveleft" }, { "Andar para a direita", "+moveright" },
+	{ "Pular / escalar", "+jump" },			{ "Agachar", "+duck" },
+	{ "Correr", "+speed" },					{ "Andar sem barulho", "+walk" },
+	{ "Atirar", "+attack" },				{ "Mirar pelo cano", "+attack2" },
+	{ "Recarregar", "+reload" },			{ "Usar / abrir grade", "+use" },
+	{ "Arma primária", "slot1" },			{ "Pistola", "slot2" },
+	{ "Faca", "slot3" },					{ "Última arma", "lastinv" },
+	{ "Placar", "+showscores" },			{ "Chat geral", "messagemode" },
+	{ "Chat do time", "messagemode2" },		{ "Tirar print", "jpeg" },
+};
+static const int NUM_BINDS = ARRAYSIZE( s_Binds );
+
+static const char *s_pszAbas[] = { "JOGO", "VÍDEO", "ÁUDIO", "CONTROLES" };
+
+// Nome da tecla para mostrar: "MOUSE1" vira "MOUSE 1", "SPACE" vira "ESPAÇO" etc.
+static void TrokKeyLabel( const char *pszKey, char *pszOut, int iOutSize )
+{
+	if ( !pszKey || !pszKey[ 0 ] )
+	{
+		V_strncpy( pszOut, "—", iOutSize );
+		return;
+	}
+	static const char *s_Nomes[][ 2 ] = {
+		{ "SPACE", "ESPAÇO" }, { "MOUSE1", "MOUSE 1" }, { "MOUSE2", "MOUSE 2" }, { "MOUSE3", "MOUSE 3" },
+		{ "MOUSE4", "MOUSE 4" }, { "MOUSE5", "MOUSE 5" }, { "MWHEELUP", "RODA ↑" }, { "MWHEELDOWN", "RODA ↓" },
+		{ "LSHIFT", "SHIFT" }, { "RSHIFT", "SHIFT DIR." }, { "LCTRL", "CTRL" }, { "RCTRL", "CTRL DIR." },
+		{ "LALT", "ALT" }, { "RALT", "ALT DIR." }, { "ENTER", "ENTER" }, { "BACKSPACE", "BACKSPACE" },
+		{ "UPARROW", "↑" }, { "DOWNARROW", "↓" }, { "LEFTARROW", "←" }, { "RIGHTARROW", "→" },
+	};
+	for ( int i = 0; i < ARRAYSIZE( s_Nomes ); ++i )
+	{
+		if ( V_stricmp( pszKey, s_Nomes[ i ][ 0 ] ) == 0 )
+		{
+			V_strncpy( pszOut, s_Nomes[ i ][ 1 ], iOutSize );
+			return;
+		}
+	}
+	V_strncpy( pszOut, pszKey, iOutSize );
+	V_strupr( pszOut );
+}
+
+void CTrokMenu::CaptureButton( ButtonCode_t code )
+{
+	if ( m_iCapture < 0 || m_iCapture >= NUM_BINDS )
+		return;
+	if ( IsKeyCode( code ) )
+		m_eSwallowTyped = code;
+	const int iAction = m_iCapture;
+	m_iCapture = -1;
+
+	// ESC cancela; o console (') não pode ser tomado.
+	if ( code == KEY_ESCAPE || code == KEY_BACKQUOTE || code == BUTTON_CODE_INVALID || code == BUTTON_CODE_NONE )
+		return;
+	const char *pszKey = inputsystem ? inputsystem->ButtonCodeToString( code ) : NULL;
+	if ( !pszKey || !pszKey[ 0 ] )
+		return;
+
+	// Tira a ação das teclas antigas (até 4) e liga na nova. Se a tecla nova era de outra
+	// ação, o bind novo substitui.
+	const char *pszCmd = s_Binds[ iAction ].pszCmd;
+	for ( int i = 0; i < 4; ++i )
+	{
+		const char *pszOld = engine->Key_LookupBinding( pszCmd );
+		if ( !pszOld || !pszOld[ 0 ] || V_stricmp( pszOld, pszKey ) == 0 )
+			break;
+		char szUnbind[ 128 ];
+		V_snprintf( szUnbind, sizeof( szUnbind ), "unbind \"%s\"", pszOld );
+		engine->ExecuteClientCmd( szUnbind ); // na hora, para a próxima busca já ver a mudança
+	}
+	char szBind[ 160 ];
+	V_snprintf( szBind, sizeof( szBind ), "bind \"%s\" \"%s\"", pszKey, pszCmd );
+	engine->ExecuteClientCmd( szBind );
+	m_bOptDirty = true;
+}
+
+void CTrokMenu::BuildVideoModes( void )
+{
+	m_VideoModes.RemoveAll();
+	m_iVideoMode = 0;
+	if ( !materials )
+		return;
+	const MaterialSystem_Config_t &config = materials->GetCurrentConfigForVideoCard();
+	m_bVideoWindowed = config.Windowed();
+	m_bVideoPending = false;
+
+	// Resoluções da placa, sem repetir (a mesma em várias taxas de atualização), da menor para a maior.
+	const int iCount = materials->GetModeCount( materials->GetCurrentAdapter() );
+	for ( int i = 0; i < iCount; ++i )
+	{
+		MaterialVideoMode_t mode;
+		materials->GetModeInfo( materials->GetCurrentAdapter(), i, mode );
+		if ( mode.m_Width < 1024 || mode.m_Height < 600 )
+			continue;
+		bool bDup = false;
+		FOR_EACH_VEC( m_VideoModes, j )
+			bDup |= ( m_VideoModes[ j ].w == mode.m_Width && m_VideoModes[ j ].h == mode.m_Height );
+		if ( bDup )
+			continue;
+		VideoMode_t vm = { mode.m_Width, mode.m_Height };
+		int iPos = 0;
+		while ( iPos < m_VideoModes.Count() && ( m_VideoModes[ iPos ].w * 10000 + m_VideoModes[ iPos ].h ) < ( vm.w * 10000 + vm.h ) )
+			++iPos;
+		m_VideoModes.InsertBefore( iPos, vm );
+	}
+	FOR_EACH_VEC( m_VideoModes, i )
+	{
+		if ( m_VideoModes[ i ].w == config.m_VideoMode.m_Width && m_VideoModes[ i ].h == config.m_VideoMode.m_Height )
+			m_iVideoMode = i;
+	}
+}
+
+void CTrokMenu::OptHeader( int x, int &y, int w, const char *pszText )
+{
+	y += S( 6 );
+	Text( m_hSmall, x, y, Accent(), pszText );
+	y += surface()->GetFontTall( m_hSmall ) + S( 6 );
+	Rect( x, y, w, 1, COR_LINHA );
+	y += S( 8 );
+}
+
+// Barra com − e +: clicar na barra põe o valor no ponto clicado.
+void CTrokMenu::OptSlider( int x, int &y, int w, const char *pszLabel, const char *pszCvar, float flMin, float flMax, float flStep, const char *pszFormat )
+{
+	ConVarRef var( pszCvar, true );
+	if ( !var.IsValid() )
+		return;
+	const int rh = S( 34 );
+	const int cx = x + w / 2, cw = w / 2;
+	Text( m_hBody, x, y + ( rh - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO2, pszLabel );
+
+	float flValue = clamp( var.GetFloat(), flMin, flMax );
+	const int bs = S( 26 );
+	const int tx = cx + bs + S( 10 ), tw = cw - bs * 2 - S( 20 ) - S( 56 );
+	const int ty = y + rh / 2;
+
+	float flNew = flValue;
+	if ( BoxButton( cx, y + ( rh - bs ) / 2, bs, bs, m_hBody, "−", false, false ) )
+		flNew = flValue - flStep;
+	if ( BoxButton( tx + tw + S( 10 ), y + ( rh - bs ) / 2, bs, bs, m_hBody, "+", false, false ) )
+		flNew = flValue + flStep;
+
+	const float flFrac = ( flMax > flMin ) ? ( flValue - flMin ) / ( flMax - flMin ) : 0.0f;
+	const bool bHover = Hover( tx, y, tw, rh );
+	Rect( tx, ty - S( 2 ), tw, S( 4 ), bHover ? COR_LINHA_FORTE : COR_LINHA );
+	Rect( tx, ty - S( 2 ), (int)( tw * flFrac ), S( 4 ), Accent() );
+	Rect( tx + (int)( tw * flFrac ) - S( 3 ), ty - S( 8 ), S( 6 ), S( 16 ), COR_TEXTO );
+	if ( Clicked( tx, y, tw, rh ) )
+	{
+		const float t = clamp( (float)( m_iMouseX - tx ) / (float)MAX( tw, 1 ), 0.0f, 1.0f );
+		flNew = flMin + t * ( flMax - flMin );
+		flNew = flMin + flStep * floorf( ( flNew - flMin ) / flStep + 0.5f );
+	}
+
+	char szValue[ 32 ];
+	V_snprintf( szValue, sizeof( szValue ), pszFormat, flValue );
+	Text( m_hBody, cx + cw - TextWide( m_hBody, szValue ), y + ( rh - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO, szValue );
+
+	flNew = clamp( flNew, flMin, flMax );
+	if ( flNew != flValue )
+	{
+		var.SetValue( flNew );
+		m_bOptDirty = true;
+	}
+	y += rh + S( 4 );
+}
+
+void CTrokMenu::OptToggle( int x, int &y, int w, const char *pszLabel, const char *pszCvar )
+{
+	ConVarRef var( pszCvar, true );
+	if ( !var.IsValid() )
+		return;
+	const int rh = S( 34 );
+	Text( m_hBody, x, y + ( rh - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO2, pszLabel );
+	const bool bOn = var.GetBool();
+	const int bw = S( 120 ), bh = S( 28 );
+	if ( BoxButton( x + w - bw, y + ( rh - bh ) / 2, bw, bh, m_hButton, bOn ? "LIGADO" : "DESLIGADO", bOn, false ) )
+	{
+		var.SetValue( bOn ? 0 : 1 );
+		m_bOptDirty = true;
+	}
+	y += rh + S( 4 );
+}
+
+// Valor com ‹ e ›; iDir volta -1 ou +1 quando clicado.
+bool CTrokMenu::OptCycle( int x, int &y, int w, const char *pszLabel, const char *pszValue, int &iDir )
+{
+	const int rh = S( 34 );
+	Text( m_hBody, x, y + ( rh - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO2, pszLabel );
+	const int bs = S( 26 ), vw = S( 150 );
+	const int bx = x + w - bs * 2 - vw - S( 8 );
+	iDir = 0;
+	if ( BoxButton( bx, y + ( rh - bs ) / 2, bs, bs, m_hBody, "‹", false, false ) )
+		iDir = -1;
+	Text( m_hBody, bx + bs + S( 4 ) + ( vw - TextWide( m_hBody, pszValue ) ) / 2, y + ( rh - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO, pszValue );
+	if ( BoxButton( bx + bs + vw + S( 8 ), y + ( rh - bs ) / 2, bs, bs, m_hBody, "›", false, false ) )
+		iDir = 1;
+	y += rh + S( 4 );
+	return iDir != 0;
+}
+
+void CTrokMenu::OptBind( int x, int &y, int w, int iIndex )
+{
+	const int rh = S( 32 );
+	Text( m_hBody, x, y + ( rh - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO2, s_Binds[ iIndex ].pszLabel );
+	char szKey[ 64 ];
+	if ( m_iCapture == iIndex )
+		V_strncpy( szKey, "APERTE UMA TECLA", sizeof( szKey ) );
+	else
+		TrokKeyLabel( engine->Key_LookupBinding( s_Binds[ iIndex ].pszCmd ), szKey, sizeof( szKey ) );
+	const int bw = S( 150 ), bh = S( 26 );
+	if ( BoxButton( x + w - bw, y + ( rh - bh ) / 2, bw, bh, m_hBody, szKey, m_iCapture == iIndex, false ) )
+		m_iCapture = iIndex;
+	y += rh + S( 2 );
+}
+
+void CTrokMenu::RunOptions( void )
+{
+	const int x0 = S( 64 );
+	const int xr = m_iWide - S( 56 );
+
+	// Cabeçalho
+	if ( LinkButton( x0, S( 52 ), m_hSmall, "‹ VOLTAR" ) )
+	{
+		SetState( STATE_ROOT );
+		return;
+	}
+	const int iSep = x0 + TextWide( m_hSmall, "‹ VOLTAR" ) + S( 20 );
+	Rect( iSep, S( 46 ), 1, S( 22 ), COR_LINHA_FORTE );
+	TextSpaced( m_hTitle, iSep + S( 21 ), S( 36 ), COR_TEXTO, "CONFIGURAÇÕES", S( 3 ) );
+
+	// Abas
+	{
+		int tx = x0;
+		const int th = S( 36 );
+		for ( int i = 0; i < ARRAYSIZE( s_pszAbas ); ++i )
+		{
+			const int tw = TextWide( m_hButton, s_pszAbas[ i ] ) + S( 40 );
+			if ( BoxButton( tx, S( 108 ), tw, th, m_hButton, s_pszAbas[ i ], i == m_iOptTab, i == m_iOptTab ) )
+			{
+				m_iOptTab = i;
+				m_iCapture = -1;
+			}
+			tx += tw + S( 6 );
+		}
+	}
+
+	const int top = S( 160 ), bottom = m_iTall - S( 72 );
+	const int pw = MIN( xr - x0, S( 900 ) );
+	Rect( x0, top, pw, bottom - top, COR_PAINEL );
+	Outline( x0, top, pw, bottom - top, COR_LINHA );
+	const int ix = x0 + S( 28 ), iw = pw - S( 56 );
+	int y = top + S( 14 );
+
+	switch ( m_iOptTab )
+	{
+	case 0: // Jogo
+	{
+		OptHeader( ix, y, iw, "MOUSE" );
+		OptSlider( ix, y, iw, "Sensibilidade", "sensitivity", 0.2f, 10.0f, 0.1f, "%.1f" );
+		OptSlider( ix, y, iw, "Sensibilidade mirando (relativa)", "zoom_sensitivity_ratio", 0.2f, 2.0f, 0.05f, "%.2f" );
+		{
+			ConVarRef pitch( "m_pitch", true );
+			if ( pitch.IsValid() )
+			{
+				const int rh = S( 34 );
+				Text( m_hBody, ix, y + ( rh - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO2, "Inverter mouse" );
+				const bool bInv = pitch.GetFloat() < 0.0f;
+				const int bw = S( 120 ), bh = S( 28 );
+				if ( BoxButton( ix + iw - bw, y + ( rh - bh ) / 2, bw, bh, m_hButton, bInv ? "LIGADO" : "DESLIGADO", bInv, false ) )
+				{
+					pitch.SetValue( -pitch.GetFloat() );
+					m_bOptDirty = true;
+				}
+				y += rh + S( 4 );
+			}
+		}
+		OptToggle( ix, y, iw, "Entrada direta do mouse (raw input)", "m_rawinput" );
+		OptHeader( ix, y, iw, "TELA" );
+		OptSlider( ix, y, iw, "Campo de visão", "fov_desired", 75.0f, 90.0f, 1.0f, "%.0f°" );
+		OptToggle( ix, y, iw, "Radar", "trok_hud_radar" );
+		OptToggle( ix, y, iw, "Balanço da arma ao andar", "trok_arma_balanco" );
+		OptToggle( ix, y, iw, "Mostrar FPS", "cl_showfps" );
+		break;
+	}
+	case 1: // Vídeo
+	{
+		OptHeader( ix, y, iw, "TELA" );
+		char szRes[ 32 ] = "—";
+		if ( m_VideoModes.Count() )
+			V_snprintf( szRes, sizeof( szRes ), "%d × %d", m_VideoModes[ m_iVideoMode ].w, m_VideoModes[ m_iVideoMode ].h );
+		int iDir;
+		if ( OptCycle( ix, y, iw, "Resolução", szRes, iDir ) && m_VideoModes.Count() )
+		{
+			m_iVideoMode = ( m_iVideoMode + iDir + m_VideoModes.Count() ) % m_VideoModes.Count();
+			m_bVideoPending = true;
+		}
+		if ( OptCycle( ix, y, iw, "Modo", m_bVideoWindowed ? "JANELA" : "TELA CHEIA", iDir ) )
+		{
+			m_bVideoWindowed = !m_bVideoWindowed;
+			m_bVideoPending = true;
+		}
+		{
+			const int bw = S( 160 ), bh = S( 32 );
+			if ( m_bVideoPending )
+				Text( m_hSmall, ix, y + ( bh - surface()->GetFontTall( m_hSmall ) ) / 2, COR_TEXTO3, "Resolução e modo só mudam ao aplicar." );
+			if ( BoxButton( ix + iw - bw, y, bw, bh, m_hButton, "APLICAR", false, m_bVideoPending ) && m_bVideoPending && m_VideoModes.Count() )
+			{
+				char szCmd[ 96 ];
+				V_snprintf( szCmd, sizeof( szCmd ), "mat_setvideomode %d %d %d\n", m_VideoModes[ m_iVideoMode ].w, m_VideoModes[ m_iVideoMode ].h, m_bVideoWindowed ? 1 : 0 );
+				engine->ClientCmd_Unrestricted( szCmd );
+				m_bVideoPending = false;
+				m_bOptDirty = true;
+			}
+			y += bh + S( 8 );
+		}
+		OptToggle( ix, y, iw, "Sincronização vertical (V-Sync)", "mat_vsync" );
+		{
+			ConVarRef fps( "fps_max", true );
+			if ( fps.IsValid() )
+			{
+				static const int s_Fps[] = { 60, 120, 144, 165, 240, 300, 0 };
+				int iCur = ARRAYSIZE( s_Fps ) - 1;
+				for ( int i = 0; i < ARRAYSIZE( s_Fps ); ++i )
+					if ( fps.GetInt() == s_Fps[ i ] ) iCur = i;
+				char szFps[ 32 ];
+				if ( s_Fps[ iCur ] )
+					V_snprintf( szFps, sizeof( szFps ), "%d", s_Fps[ iCur ] );
+				else
+					V_strncpy( szFps, "SEM LIMITE", sizeof( szFps ) );
+				if ( OptCycle( ix, y, iw, "Limite de FPS", szFps, iDir ) )
+				{
+					fps.SetValue( s_Fps[ ( iCur + iDir + ARRAYSIZE( s_Fps ) ) % ARRAYSIZE( s_Fps ) ] );
+					m_bOptDirty = true;
+				}
+			}
+		}
+		OptSlider( ix, y, iw, "Brilho", "mat_monitorgamma", 1.6f, 2.6f, 0.05f, "%.2f" );
+		OptHeader( ix, y, iw, "QUALIDADE" );
+		{
+			ConVarRef picmip( "mat_picmip", true );
+			if ( picmip.IsValid() )
+			{
+				static const char *s_Tex[] = { "MUITO ALTA", "ALTA", "MÉDIA", "BAIXA" }; // mat_picmip -1, 0, 1, 2
+				const int iCur = clamp( picmip.GetInt() + 1, 0, 3 );
+				if ( OptCycle( ix, y, iw, "Texturas", s_Tex[ iCur ], iDir ) )
+				{
+					picmip.SetValue( clamp( iCur - iDir, 0, 3 ) - 1 ); // › melhora, ‹ piora
+					m_bOptDirty = true;
+				}
+			}
+		}
+		y += S( 6 );
+		if ( LinkButton( ix, y, m_hSmall, "MAIS OPÇÕES DE VÍDEO (JANELA DO MOTOR) ›" ) )
+			Command( "OpenOptionsDialog" );
+		break;
+	}
+	case 2: // Áudio
+	{
+		OptHeader( ix, y, iw, "VOLUME" );
+		OptSlider( ix, y, iw, "Volume geral", "volume", 0.0f, 1.0f, 0.05f, "%.2f" );
+		OptSlider( ix, y, iw, "Música", "snd_musicvolume", 0.0f, 1.0f, 0.05f, "%.2f" );
+		OptHeader( ix, y, iw, "VOZ" );
+		OptToggle( ix, y, iw, "Chat de voz", "voice_enable" );
+		OptSlider( ix, y, iw, "Volume da voz dos outros", "voice_scale", 0.0f, 1.0f, 0.05f, "%.2f" );
+		break;
+	}
+	default: // Controles
+	{
+		const int colw = ( iw - S( 40 ) ) / 2;
+		const int iHalf = ( NUM_BINDS + 1 ) / 2;
+		int yl = y, yr = y;
+		for ( int i = 0; i < NUM_BINDS; ++i )
+		{
+			if ( i < iHalf )
+				OptBind( ix, yl, colw, i );
+			else
+				OptBind( ix + colw + S( 40 ), yr, colw, i );
+		}
+		y = MAX( yl, yr ) + S( 10 );
+		Text( m_hSmall, ix, y, COR_TEXTO3, "Clique numa ação e aperte a tecla ou o botão do mouse. ESC cancela." );
+		const int bw = S( 200 ), bh = S( 30 );
+		if ( BoxButton( ix + iw - bw, y - S( 8 ), bw, bh, m_hButton, "RESTAURAR PADRÃO", false, false ) )
+		{
+			engine->ClientCmd_Unrestricted( "exec config_default\n" );
+			m_iCapture = -1;
+			m_bOptDirty = true;
+		}
+		break;
+	}
+	}
 }
 
 //-----------------------------------------------------------------------------
