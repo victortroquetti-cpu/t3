@@ -1,0 +1,149 @@
+// Trok: catálogo da LOJA do modo Hordas (func_trok_loja: o jogador anda até a loja e aperta E).
+// Código: shared/trok/trok_hordas.cpp (leitura), server/trok/trok_hordas_diretor.cpp (compra),
+// client/trok/ui/trok_hordas_loja.cpp (menu). Desenho e preços: design/modo-hordas.md.
+// Recarregar: trok_hordas_loja_recarregar (nos dois lados). Lista: trok_hordas_loja_lista.
+//
+// "categorias": id e nome na tela, na ordem das teclas 1..9.
+// "itens": cada item
+//   tipo        arma (troca a da mesma classe; tendo, repõe a munição), defesa (torreta, claymore,
+//               mina, remota, granada: tendo, repõe até o máximo trok_max_*), municao (reserva cheia
+//               de todas as armas de fogo), colete, kit (kit de reanimação)
+//   entidade    weapon_* (arma e defesa)
+//   preco       pontos para comprar; repor: pontos para repor tendo (0 = metade do preço).
+//               Arma melhorada na máquina repõe pelo preço da munição melhorada (trok_upgrade.txt).
+//   energia     1 = só com a energia ligada
+//   categoria, nome, descricao
+
+"TrokHordasLoja"
+{
+	"categorias"
+	{
+		"armas"		"ARMAS"
+		"defesas"	"DEFESAS"
+		"equipamento"	"EQUIPAMENTO"
+	}
+
+	"itens"
+	{
+		// --- Armas de fogo (CoD: parede 500 a 1500; aqui todas na loja) ---
+		"pistola"
+		{
+			"tipo"		"arma"
+			"categoria"	"armas"
+			"nome"		"Pistola"
+			"entidade"	"weapon_trok_pistola"
+			"preco"		"500"
+			"repor"		"250"
+			"descricao"	"A de começo. Repor: reserva cheia."
+		}
+		"submetralhadora"
+		{
+			"tipo"		"arma"
+			"categoria"	"armas"
+			"nome"		"Submetralhadora"
+			"entidade"	"weapon_trok_submetralhadora"
+			"preco"		"1000"
+			"repor"		"500"
+			"descricao"	"Rápida e barata: a primeira compra das rodadas iniciais."
+		}
+		"escopeta"
+		{
+			"tipo"		"arma"
+			"categoria"	"armas"
+			"nome"		"Escopeta"
+			"entidade"	"weapon_trok_escopeta"
+			"preco"		"1200"
+			"repor"		"600"
+			"descricao"	"Perto, segura a janela. Até 1000 u."
+		}
+		"fuzil"
+		{
+			"tipo"		"arma"
+			"categoria"	"armas"
+			"nome"		"Fuzil"
+			"entidade"	"weapon_trok_fuzil"
+			"preco"		"1500"
+			"repor"		"750"
+			"descricao"	"Distância e cabeça. A melhor base para a máquina de melhoria."
+		}
+		"municao"
+		{
+			"tipo"		"municao"
+			"categoria"	"armas"
+			"nome"		"Munição (todas)"
+			"preco"		"1000"
+			"descricao"	"Reserva cheia de todas as armas de fogo que você carrega (não as melhoradas: essas pagam 4500 cada)."
+		}
+
+		// --- Defesas: põe no chão e elas agem sozinhas (foco do dono) ---
+		"torreta"
+		{
+			"tipo"		"defesa"
+			"categoria"	"defesas"
+			"nome"		"Torreta"
+			"entidade"	"weapon_trok_torreta"
+			"preco"		"1500"
+			"repor"		"1500"
+			"descricao"	"Arremessa, ela arma e atira sozinha até acabar as balas. Até 2 postas por jogador."
+		}
+		"claymore"
+		{
+			"tipo"		"defesa"
+			"categoria"	"defesas"
+			"nome"		"Claymore (2)"
+			"entidade"	"weapon_trok_claymore"
+			"preco"		"1000"
+			"repor"		"750"
+			"descricao"	"Explode em cone quando o zumbi passa. Até 4 postas."
+		}
+		"mina"
+		{
+			"tipo"		"defesa"
+			"categoria"	"defesas"
+			"nome"		"Mina (3)"
+			"entidade"	"weapon_trok_mina"
+			"preco"		"750"
+			"repor"		"500"
+			"descricao"	"Gruda no chão; o zumbi encosta e explode. Até 6 postas."
+		}
+		"remota"
+		{
+			"tipo"		"defesa"
+			"categoria"	"defesas"
+			"nome"		"Carga remota (2)"
+			"entidade"	"weapon_trok_remota"
+			"preco"		"1000"
+			"repor"		"750"
+			"descricao"	"Explode no botão 2. Contra o Crusher e quando a janela cai."
+		}
+		"granada"
+		{
+			"tipo"		"defesa"
+			"categoria"	"defesas"
+			"nome"		"Granadas (até 4)"
+			"entidade"	"weapon_trok_granada"
+			"preco"		"400"
+			"repor"		"400"
+			"descricao"	"M67. Ganha +2 de graça a cada rodada."
+		}
+
+		// --- Equipamento (no lugar dos perks; humano não tem poderes) ---
+		"colete"
+		{
+			"tipo"		"colete"
+			"categoria"	"equipamento"
+			"nome"		"Colete"
+			"preco"		"1500"
+			"descricao"	"100 de armadura. Compra de novo quando gastar."
+		}
+		"kit"
+		{
+			"tipo"		"kit"
+			"categoria"	"equipamento"
+			"nome"		"Kit de reanimação"
+			"preco"		"2500"
+			"energia"	"1"
+			"descricao"	"Ao cair, levanta sozinho em 4 s (gasta o kit). DECISÃO DO DONO: fica?"
+		}
+	}
+}

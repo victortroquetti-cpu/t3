@@ -32,6 +32,7 @@
 #endif
 class CBaseCombatWeapon;	// no cliente vira C_BaseCombatWeapon (shared_classnames.h)
 class CBasePlayer;
+class CTrokHordasEstacao;
 
 #define TROK_HORDAS_SLOTS		6		// classes de arma do inventário do CA (bucket 0..5)
 #define TROK_UPGRADE_MAX		5		// níveis da máquina de melhoria

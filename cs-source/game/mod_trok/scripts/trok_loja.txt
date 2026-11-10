@@ -1,6 +1,6 @@
 // Trok: loja da economia estilo CS (trok_economia 1). Ver design/economia.md.
 // Lido pelo servidor (vende: server/trok/trok_economia.cpp, relê a cada mapa) e pelo cliente
-// (menu da tecla B: client/trok/ui/trok_loja.cpp; trok_loja_recarregar relê).
+// (menu da tecla B: client/trok/ui/trok_loja_menu.cpp; trok_loja_recarregar relê).
 // Preços de partida tirados do CS:S (design/chimera/games/cs_source/data/economy.toml e
 // specs/cs_source/weapons.md "Economy"); o que o CS:S não tem está marcado PROPOSTA.
 "Loja"

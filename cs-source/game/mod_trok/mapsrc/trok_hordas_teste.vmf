@@ -17,7 +17,7 @@ viewsettings
 }
 world
 {
-	"id" "292"
+	"id" "252"
 	"mapversion" "1"
 	"classname" "worldspawn"
 	"skyname" "sky_day01_01"
@@ -1664,9 +1664,8 @@ entity
 entity
 {
 	"id" "164"
-	"classname" "func_trok_compra_parede"
-	"arma" "weapon_trok_submetralhadora"
-	"preco" "1000"
+	"classname" "func_trok_caixa_misteriosa"
+	"preco" "0"
 	"precisa_energia" "0"
 	solid
 	{
@@ -1674,161 +1673,6 @@ entity
 		side
 		{
 			"id" "166"
-			"plane" "(256 1024 112) (384 1024 112) (384 1008 112)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "167"
-			"plane" "(256 1008 48) (384 1008 48) (384 1024 48)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "168"
-			"plane" "(256 1024 112) (256 1008 112) (256 1008 48)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "169"
-			"plane" "(384 1024 48) (384 1008 48) (384 1008 112)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "170"
-			"plane" "(384 1024 112) (256 1024 112) (256 1024 48)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "171"
-			"plane" "(384 1008 48) (256 1008 48) (256 1008 112)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-	}
-}
-entity
-{
-	"id" "172"
-	"classname" "func_trok_compra_parede"
-	"arma" "weapon_trok_escopeta"
-	"preco" "1200"
-	"precisa_energia" "0"
-	solid
-	{
-		"id" "173"
-		side
-		{
-			"id" "174"
-			"plane" "(640 16 112) (768 16 112) (768 0 112)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "175"
-			"plane" "(640 0 48) (768 0 48) (768 16 48)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "176"
-			"plane" "(640 16 112) (640 0 112) (640 0 48)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "177"
-			"plane" "(768 16 48) (768 0 48) (768 0 112)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "178"
-			"plane" "(768 16 112) (640 16 112) (640 16 48)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "179"
-			"plane" "(768 0 48) (640 0 48) (640 0 112)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-	}
-}
-entity
-{
-	"id" "180"
-	"classname" "func_trok_caixa_misteriosa"
-	"preco" "0"
-	"precisa_energia" "0"
-	solid
-	{
-		"id" "181"
-		side
-		{
-			"id" "182"
 			"plane" "(800 1008 48) (896 1008 48) (896 960 48)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
@@ -1839,7 +1683,7 @@ entity
 		}
 		side
 		{
-			"id" "183"
+			"id" "167"
 			"plane" "(800 960 0) (896 960 0) (896 1008 0)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
@@ -1850,7 +1694,7 @@ entity
 		}
 		side
 		{
-			"id" "184"
+			"id" "168"
 			"plane" "(800 1008 48) (800 960 48) (800 960 0)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[0 1 0 0] 0.25"
@@ -1861,7 +1705,7 @@ entity
 		}
 		side
 		{
-			"id" "185"
+			"id" "169"
 			"plane" "(896 1008 0) (896 960 0) (896 960 48)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[0 1 0 0] 0.25"
@@ -1872,7 +1716,7 @@ entity
 		}
 		side
 		{
-			"id" "186"
+			"id" "170"
 			"plane" "(896 1008 48) (800 1008 48) (800 1008 0)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
@@ -1883,7 +1727,7 @@ entity
 		}
 		side
 		{
-			"id" "187"
+			"id" "171"
 			"plane" "(896 960 0) (800 960 0) (800 960 48)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
@@ -1896,10 +1740,165 @@ entity
 }
 entity
 {
+	"id" "172"
+	"classname" "trigger_trok_armadilha"
+	"targetname" "zona_arame"
+	solid
+	{
+		"id" "173"
+		side
+		{
+			"id" "174"
+			"plane" "(16 624 96) (176 624 96) (176 400 96)"
+			"material" "TOOLS/TOOLSTRIGGER"
+			"uaxis" "[1 0 0 0] 0.25"
+			"vaxis" "[0 -1 0 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "175"
+			"plane" "(16 400 0) (176 400 0) (176 624 0)"
+			"material" "TOOLS/TOOLSTRIGGER"
+			"uaxis" "[1 0 0 0] 0.25"
+			"vaxis" "[0 -1 0 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "176"
+			"plane" "(16 624 96) (16 400 96) (16 400 0)"
+			"material" "TOOLS/TOOLSTRIGGER"
+			"uaxis" "[0 1 0 0] 0.25"
+			"vaxis" "[0 0 -1 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "177"
+			"plane" "(176 624 0) (176 400 0) (176 400 96)"
+			"material" "TOOLS/TOOLSTRIGGER"
+			"uaxis" "[0 1 0 0] 0.25"
+			"vaxis" "[0 0 -1 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "178"
+			"plane" "(176 624 96) (16 624 96) (16 624 0)"
+			"material" "TOOLS/TOOLSTRIGGER"
+			"uaxis" "[1 0 0 0] 0.25"
+			"vaxis" "[0 0 -1 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "179"
+			"plane" "(176 400 0) (16 400 0) (16 400 96)"
+			"material" "TOOLS/TOOLSTRIGGER"
+			"uaxis" "[1 0 0 0] 0.25"
+			"vaxis" "[0 0 -1 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+	}
+}
+entity
+{
+	"id" "180"
+	"classname" "func_trok_armadilha"
+	"item" "arame"
+	"zona" "zona_arame"
+	"preco" "750"
+	"duracao" "30"
+	"recarga" "20"
+	"precisa_energia" "0"
+	solid
+	{
+		"id" "181"
+		side
+		{
+			"id" "182"
+			"plane" "(16 712 96) (32 712 96) (32 680 96)"
+			"material" "DEV/DEV_MEASUREGENERIC01"
+			"uaxis" "[1 0 0 0] 0.25"
+			"vaxis" "[0 -1 0 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "183"
+			"plane" "(16 680 48) (32 680 48) (32 712 48)"
+			"material" "DEV/DEV_MEASUREGENERIC01"
+			"uaxis" "[1 0 0 0] 0.25"
+			"vaxis" "[0 -1 0 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "184"
+			"plane" "(16 712 96) (16 680 96) (16 680 48)"
+			"material" "DEV/DEV_MEASUREGENERIC01"
+			"uaxis" "[0 1 0 0] 0.25"
+			"vaxis" "[0 0 -1 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "185"
+			"plane" "(32 712 48) (32 680 48) (32 680 96)"
+			"material" "DEV/DEV_MEASUREGENERIC01"
+			"uaxis" "[0 1 0 0] 0.25"
+			"vaxis" "[0 0 -1 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "186"
+			"plane" "(32 712 96) (16 712 96) (16 712 48)"
+			"material" "DEV/DEV_MEASUREGENERIC01"
+			"uaxis" "[1 0 0 0] 0.25"
+			"vaxis" "[0 0 -1 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+		side
+		{
+			"id" "187"
+			"plane" "(32 680 48) (16 680 48) (16 680 96)"
+			"material" "DEV/DEV_MEASUREGENERIC01"
+			"uaxis" "[1 0 0 0] 0.25"
+			"vaxis" "[0 0 -1 0] 0.25"
+			"rotation" "0"
+			"lightmapscale" "16"
+			"smoothing_groups" "0"
+		}
+	}
+}
+entity
+{
 	"id" "188"
-	"classname" "func_trok_compra_parede"
-	"arma" "weapon_trok_fuzil"
-	"preco" "1500"
+	"classname" "func_trok_loja"
 	"precisa_energia" "0"
 	solid
 	{
@@ -1907,7 +1906,7 @@ entity
 		side
 		{
 			"id" "190"
-			"plane" "(1300 1024 112) (1428 1024 112) (1428 1008 112)"
+			"plane" "(1400 1008 96) (1560 1008 96) (1560 960 96)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 -1 0 0] 0.25"
@@ -1918,7 +1917,7 @@ entity
 		side
 		{
 			"id" "191"
-			"plane" "(1300 1008 48) (1428 1008 48) (1428 1024 48)"
+			"plane" "(1400 960 0) (1560 960 0) (1560 1008 0)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 -1 0 0] 0.25"
@@ -1929,7 +1928,7 @@ entity
 		side
 		{
 			"id" "192"
-			"plane" "(1300 1024 112) (1300 1008 112) (1300 1008 48)"
+			"plane" "(1400 1008 96) (1400 960 96) (1400 960 0)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[0 1 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
@@ -1940,7 +1939,7 @@ entity
 		side
 		{
 			"id" "193"
-			"plane" "(1428 1024 48) (1428 1008 48) (1428 1008 112)"
+			"plane" "(1560 1008 0) (1560 960 0) (1560 960 96)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[0 1 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
@@ -1951,7 +1950,7 @@ entity
 		side
 		{
 			"id" "194"
-			"plane" "(1428 1024 112) (1300 1024 112) (1300 1024 48)"
+			"plane" "(1560 1008 96) (1400 1008 96) (1400 1008 0)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
@@ -1962,7 +1961,7 @@ entity
 		side
 		{
 			"id" "195"
-			"plane" "(1428 1008 48) (1300 1008 48) (1300 1008 112)"
+			"plane" "(1560 960 0) (1400 960 0) (1400 960 96)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
@@ -2127,19 +2126,16 @@ entity
 entity
 {
 	"id" "212"
-	"classname" "func_trok_bancada"
-	"item" "weapon_trok_torreta"
-	"preco" "1500"
-	"preco_municao" "1500"
-	"precisa_energia" "0"
+	"classname" "trigger_trok_armadilha"
+	"targetname" "zona_passagem"
 	solid
 	{
 		"id" "213"
 		side
 		{
 			"id" "214"
-			"plane" "(1080 64 40) (1176 64 40) (1176 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
+			"plane" "(1008 576 160) (1056 576 160) (1056 448 160)"
+			"material" "TOOLS/TOOLSTRIGGER"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 -1 0 0] 0.25"
 			"rotation" "0"
@@ -2149,8 +2145,8 @@ entity
 		side
 		{
 			"id" "215"
-			"plane" "(1080 16 0) (1176 16 0) (1176 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
+			"plane" "(1008 448 0) (1056 448 0) (1056 576 0)"
+			"material" "TOOLS/TOOLSTRIGGER"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 -1 0 0] 0.25"
 			"rotation" "0"
@@ -2160,8 +2156,8 @@ entity
 		side
 		{
 			"id" "216"
-			"plane" "(1080 64 40) (1080 16 40) (1080 16 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
+			"plane" "(1008 576 160) (1008 448 160) (1008 448 0)"
+			"material" "TOOLS/TOOLSTRIGGER"
 			"uaxis" "[0 1 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
 			"rotation" "0"
@@ -2171,8 +2167,8 @@ entity
 		side
 		{
 			"id" "217"
-			"plane" "(1176 64 0) (1176 16 0) (1176 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
+			"plane" "(1056 576 0) (1056 448 0) (1056 448 160)"
+			"material" "TOOLS/TOOLSTRIGGER"
 			"uaxis" "[0 1 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
 			"rotation" "0"
@@ -2182,8 +2178,8 @@ entity
 		side
 		{
 			"id" "218"
-			"plane" "(1176 64 40) (1080 64 40) (1080 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
+			"plane" "(1056 576 160) (1008 576 160) (1008 576 0)"
+			"material" "TOOLS/TOOLSTRIGGER"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
 			"rotation" "0"
@@ -2193,8 +2189,8 @@ entity
 		side
 		{
 			"id" "219"
-			"plane" "(1176 16 0) (1080 16 0) (1080 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
+			"plane" "(1056 448 0) (1008 448 0) (1008 448 160)"
+			"material" "TOOLS/TOOLSTRIGGER"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
 			"rotation" "0"
@@ -2206,10 +2202,12 @@ entity
 entity
 {
 	"id" "220"
-	"classname" "func_trok_bancada"
-	"item" "weapon_trok_claymore"
+	"classname" "func_trok_armadilha"
+	"item" "eletrica"
+	"zona" "zona_passagem"
 	"preco" "1000"
-	"preco_municao" "750"
+	"duracao" "25"
+	"recarga" "30"
 	"precisa_energia" "0"
 	solid
 	{
@@ -2217,7 +2215,7 @@ entity
 		side
 		{
 			"id" "222"
-			"plane" "(1230 64 40) (1326 64 40) (1326 16 40)"
+			"plane" "(1040 632 96) (1056 632 96) (1056 600 96)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 -1 0 0] 0.25"
@@ -2228,7 +2226,7 @@ entity
 		side
 		{
 			"id" "223"
-			"plane" "(1230 16 0) (1326 16 0) (1326 64 0)"
+			"plane" "(1040 600 48) (1056 600 48) (1056 632 48)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 -1 0 0] 0.25"
@@ -2239,7 +2237,7 @@ entity
 		side
 		{
 			"id" "224"
-			"plane" "(1230 64 40) (1230 16 40) (1230 16 0)"
+			"plane" "(1040 632 96) (1040 600 96) (1040 600 48)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[0 1 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
@@ -2250,7 +2248,7 @@ entity
 		side
 		{
 			"id" "225"
-			"plane" "(1326 64 0) (1326 16 0) (1326 16 40)"
+			"plane" "(1056 632 48) (1056 600 48) (1056 600 96)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[0 1 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
@@ -2261,7 +2259,7 @@ entity
 		side
 		{
 			"id" "226"
-			"plane" "(1326 64 40) (1230 64 40) (1230 64 0)"
+			"plane" "(1056 632 96) (1040 632 96) (1040 632 48)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
@@ -2272,7 +2270,7 @@ entity
 		side
 		{
 			"id" "227"
-			"plane" "(1326 16 0) (1230 16 0) (1230 16 40)"
+			"plane" "(1056 600 48) (1040 600 48) (1040 600 96)"
 			"material" "DEV/DEV_MEASUREGENERIC01"
 			"uaxis" "[1 0 0 0] 0.25"
 			"vaxis" "[0 0 -1 0] 0.25"
@@ -2285,400 +2283,6 @@ entity
 entity
 {
 	"id" "228"
-	"classname" "func_trok_bancada"
-	"item" "weapon_trok_mina"
-	"preco" "750"
-	"preco_municao" "500"
-	"precisa_energia" "0"
-	solid
-	{
-		"id" "229"
-		side
-		{
-			"id" "230"
-			"plane" "(1380 64 40) (1476 64 40) (1476 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "231"
-			"plane" "(1380 16 0) (1476 16 0) (1476 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "232"
-			"plane" "(1380 64 40) (1380 16 40) (1380 16 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "233"
-			"plane" "(1476 64 0) (1476 16 0) (1476 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "234"
-			"plane" "(1476 64 40) (1380 64 40) (1380 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "235"
-			"plane" "(1476 16 0) (1380 16 0) (1380 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-	}
-}
-entity
-{
-	"id" "236"
-	"classname" "func_trok_bancada"
-	"item" "weapon_trok_remota"
-	"preco" "1000"
-	"preco_municao" "750"
-	"precisa_energia" "0"
-	solid
-	{
-		"id" "237"
-		side
-		{
-			"id" "238"
-			"plane" "(1548 64 40) (1644 64 40) (1644 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "239"
-			"plane" "(1548 16 0) (1644 16 0) (1644 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "240"
-			"plane" "(1548 64 40) (1548 16 40) (1548 16 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "241"
-			"plane" "(1644 64 0) (1644 16 0) (1644 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "242"
-			"plane" "(1644 64 40) (1548 64 40) (1548 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "243"
-			"plane" "(1644 16 0) (1548 16 0) (1548 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-	}
-}
-entity
-{
-	"id" "244"
-	"classname" "func_trok_bancada"
-	"item" "weapon_trok_granada"
-	"preco" "400"
-	"preco_municao" "400"
-	"precisa_energia" "0"
-	solid
-	{
-		"id" "245"
-		side
-		{
-			"id" "246"
-			"plane" "(1680 64 40) (1776 64 40) (1776 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "247"
-			"plane" "(1680 16 0) (1776 16 0) (1776 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "248"
-			"plane" "(1680 64 40) (1680 16 40) (1680 16 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "249"
-			"plane" "(1776 64 0) (1776 16 0) (1776 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "250"
-			"plane" "(1776 64 40) (1680 64 40) (1680 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "251"
-			"plane" "(1776 16 0) (1680 16 0) (1680 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-	}
-}
-entity
-{
-	"id" "252"
-	"classname" "func_trok_bancada"
-	"item" "colete"
-	"preco" "1500"
-	"preco_municao" "0"
-	"precisa_energia" "0"
-	solid
-	{
-		"id" "253"
-		side
-		{
-			"id" "254"
-			"plane" "(1830 64 40) (1926 64 40) (1926 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "255"
-			"plane" "(1830 16 0) (1926 16 0) (1926 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "256"
-			"plane" "(1830 64 40) (1830 16 40) (1830 16 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "257"
-			"plane" "(1926 64 0) (1926 16 0) (1926 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "258"
-			"plane" "(1926 64 40) (1830 64 40) (1830 64 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "259"
-			"plane" "(1926 16 0) (1830 16 0) (1830 16 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-	}
-}
-entity
-{
-	"id" "260"
-	"classname" "func_trok_bancada"
-	"item" "kit_reanimacao"
-	"preco" "2500"
-	"precisa_energia" "1"
-	solid
-	{
-		"id" "261"
-		side
-		{
-			"id" "262"
-			"plane" "(1950 448 40) (2046 448 40) (2046 400 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "263"
-			"plane" "(1950 400 0) (2046 400 0) (2046 448 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 -1 0 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "264"
-			"plane" "(1950 448 40) (1950 400 40) (1950 400 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "265"
-			"plane" "(2046 448 0) (2046 400 0) (2046 400 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[0 1 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "266"
-			"plane" "(2046 448 40) (1950 448 40) (1950 448 0)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-		side
-		{
-			"id" "267"
-			"plane" "(2046 400 0) (1950 400 0) (1950 400 40)"
-			"material" "DEV/DEV_MEASUREGENERIC01"
-			"uaxis" "[1 0 0 0] 0.25"
-			"vaxis" "[0 0 -1 0] 0.25"
-			"rotation" "0"
-			"lightmapscale" "16"
-			"smoothing_groups" "0"
-		}
-	}
-}
-entity
-{
-	"id" "268"
 	"classname" "info_trok_hordas_spawn"
 	"area" "0"
 	"angles" "0 0 0"
@@ -2686,7 +2290,7 @@ entity
 }
 entity
 {
-	"id" "269"
+	"id" "229"
 	"classname" "info_trok_hordas_spawn"
 	"area" "0"
 	"angles" "0 180 0"
@@ -2694,7 +2298,7 @@ entity
 }
 entity
 {
-	"id" "270"
+	"id" "230"
 	"classname" "info_trok_hordas_spawn"
 	"area" "0"
 	"angles" "0 0 0"
@@ -2702,7 +2306,7 @@ entity
 }
 entity
 {
-	"id" "271"
+	"id" "231"
 	"classname" "info_trok_hordas_spawn"
 	"area" "0"
 	"angles" "0 180 0"
@@ -2710,7 +2314,7 @@ entity
 }
 entity
 {
-	"id" "272"
+	"id" "232"
 	"classname" "info_trok_hordas_spawn"
 	"area" "0"
 	"angles" "0 0 0"
@@ -2718,7 +2322,7 @@ entity
 }
 entity
 {
-	"id" "273"
+	"id" "233"
 	"classname" "info_trok_hordas_spawn"
 	"area" "0"
 	"angles" "0 180 0"
@@ -2726,7 +2330,7 @@ entity
 }
 entity
 {
-	"id" "274"
+	"id" "234"
 	"classname" "info_trok_hordas_spawn"
 	"area" "0"
 	"chefe" "1"
@@ -2735,35 +2339,35 @@ entity
 }
 entity
 {
-	"id" "275"
+	"id" "235"
 	"classname" "info_player_deathmatch"
 	"angles" "0 180 0"
 	"origin" "300 400 8"
 }
 entity
 {
-	"id" "276"
+	"id" "236"
 	"classname" "info_player_deathmatch"
 	"angles" "0 180 0"
 	"origin" "300 624 8"
 }
 entity
 {
-	"id" "277"
+	"id" "237"
 	"classname" "info_player_deathmatch"
 	"angles" "0 180 0"
 	"origin" "520 400 8"
 }
 entity
 {
-	"id" "278"
+	"id" "238"
 	"classname" "info_player_deathmatch"
 	"angles" "0 180 0"
 	"origin" "520 624 8"
 }
 entity
 {
-	"id" "279"
+	"id" "239"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2772,7 +2376,7 @@ entity
 }
 entity
 {
-	"id" "280"
+	"id" "240"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2781,7 +2385,7 @@ entity
 }
 entity
 {
-	"id" "281"
+	"id" "241"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2790,7 +2394,7 @@ entity
 }
 entity
 {
-	"id" "282"
+	"id" "242"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2799,7 +2403,7 @@ entity
 }
 entity
 {
-	"id" "283"
+	"id" "243"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2808,7 +2412,7 @@ entity
 }
 entity
 {
-	"id" "284"
+	"id" "244"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2817,7 +2421,7 @@ entity
 }
 entity
 {
-	"id" "285"
+	"id" "245"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2826,7 +2430,7 @@ entity
 }
 entity
 {
-	"id" "286"
+	"id" "246"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2835,7 +2439,7 @@ entity
 }
 entity
 {
-	"id" "287"
+	"id" "247"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2844,7 +2448,7 @@ entity
 }
 entity
 {
-	"id" "288"
+	"id" "248"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2853,7 +2457,7 @@ entity
 }
 entity
 {
-	"id" "289"
+	"id" "249"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2862,7 +2466,7 @@ entity
 }
 entity
 {
-	"id" "290"
+	"id" "250"
 	"classname" "light"
 	"_light" "255 240 220 220"
 	"_lightHDR" "-1 -1 -1 1"
@@ -2871,7 +2475,7 @@ entity
 }
 entity
 {
-	"id" "291"
+	"id" "251"
 	"classname" "trok_hordas_logica"
 	"targetname" "hordas"
 	"origin" "500 512 300"

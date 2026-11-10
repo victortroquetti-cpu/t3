@@ -4,8 +4,8 @@
 // - no alto, no meio: RODADA N (matilha/chefe marcados), zumbis que faltam e a contagem do
 //   intervalo; no fim de jogo, a rodada alcançada e o recorde;
 // - à direita: pontos de cada humano (o seu em destaque) com o "+10" subindo a cada ganho;
-// - aviso da estação que você olha ("E — COMPRAR SUBMETRALHADORA: 1000"; vermelho se faltam
-//   pontos) ou "SEGURE E — REVIVER" perto de um derrubado;
+// - aviso da estação que você olha ("[E] LOJA", máquina, armadilha; vermelho se faltam pontos)
+//   ou "SEGURE E — REVIVER" perto de um derrubado; o E na loja abre o menu (ui/trok_hordas_loja.cpp);
 // - derrubado: contagem para sangrar e a barra de quem está te revivendo; colegas derrubados
 //   marcados na tela;
 // - bônus ativos com o tempo e a faixa do bônus pego;
@@ -120,8 +120,11 @@ bool CHudTrokHordas::ShouldDraw( void )
 	return CHudElement::ShouldDraw();
 }
 
+void TrokHordasLoja_Pensar( void );	// ui/trok_hordas_loja.cpp: E na loja abre o menu
+
 void CHudTrokHordas::OnThink( void )
 {
+	TrokHordasLoja_Pensar();
 	CTrokHordasEstado *pEstado = TrokHordas_Estado();
 	C_BasePlayer *pLocal = C_BasePlayer::GetLocalPlayer();
 	if ( !pEstado || !pLocal )

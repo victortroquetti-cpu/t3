@@ -1,7 +1,7 @@
 //=============================================================================
 // Trok: dados da loja (economia estilo CS). Lidos de scripts/trok_loja.txt pelos dois
 // lados: o servidor vende (server/trok/trok_economia.cpp) e o cliente mostra o menu de
-// compra (client/trok/ui/trok_loja.cpp). Ver design/economia.md.
+// compra (client/trok/ui/trok_loja_menu.cpp). Ver design/economia.md.
 //=============================================================================
 #ifndef TROK_LOJA_H
 #define TROK_LOJA_H

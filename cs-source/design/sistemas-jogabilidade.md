@@ -239,7 +239,7 @@ CA, `trok_explosao_ca*`); o "x2" do CA (jogador e hitbox) já está no `dano` do
 
 Ver `design/economia.md` (regras, números do CS:S, loja, menu da tecla B, o que o dono decide e o que testar).
 Código: `src/game/server/trok/trok_economia.cpp`, `src/game/shared/trok/trok_loja.cpp`,
-`src/game/client/trok/ui/trok_loja.cpp`, `src/game/client/trok/hud_trok_economia.cpp`. Desligada por padrão.
+`src/game/client/trok/ui/trok_loja_menu.cpp`, `src/game/client/trok/hud_trok_economia.cpp`. Desligada por padrão.
 
 ## Modelos e sons de protótipo
 

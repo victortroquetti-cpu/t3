@@ -249,6 +249,10 @@ static void Hordas_Precache( void )
 		CBaseEntity::PrecacheScriptSound( s_pszSons[ i ] );
 	UTIL_PrecacheOther( "trok_hordas_bonus" );
 	UTIL_PrecacheOther( "weapon_trok_garras" );
+	const TrokHordasLoja_t &loja = TrokHordasLoja( true );
+	FOR_EACH_VEC( loja.itens, i )
+		if ( !Q_strncmp( loja.itens[ i ].szEntidade, "weapon_", 7 ) )
+			UTIL_PrecacheOther( loja.itens[ i ].szEntidade );
 	FOR_EACH_VEC( s_Caixa, i )
 		UTIL_PrecacheOther( s_Caixa[ i ].szArma );
 }
@@ -1936,6 +1940,91 @@ bool TrokHordas_PodeTerArma( CBasePlayer *pPlayer, CBaseCombatWeapon *pItem )
 	return !bGarras;
 }
 
+// Compra na loja (menu da func_trok_loja): perto da loja, de pé, com pontos.
+static void Comprar( CBasePlayer *pPlayer, const char *pszId )
+{
+	CTrokHordasEstado *pEstado = Estado();
+	const TrokHordasItem_t *pItem = TrokHordasLoja().Item( pszId );
+	if ( !pEstado || !pItem || !DePe( pPlayer ) )
+		return;
+	if ( !TrokHordas_LojaPerto( pPlayer ) )
+	{
+		ClientPrint( pPlayer, HUD_PRINTCENTER, "VÁ ATÉ A LOJA" );
+		return;
+	}
+	if ( pItem->bEnergia && !pEstado->IsEnergia() )
+	{
+		ClientPrint( pPlayer, HUD_PRINTCENTER, "SEM ENERGIA" );
+		return;
+	}
+
+	switch ( pItem->iTipo )
+	{
+	case HITEM_ARMA:
+	case HITEM_DEFESA:
+	{
+		CBaseCombatWeapon *pTem = pPlayer->Weapon_OwnsThisType( pItem->szEntidade );
+		if ( pTem )
+		{
+			// Tendo: repõe (arma melhorada paga a munição da máquina, como no CoD).
+			const int iTipo = pTem->GetPrimaryAmmoType();
+			const bool bComPente = pTem->UsesClipsForAmmo1();
+			const int iCheia = bComPente ? (int)( pTem->GetWpnData().iMaxClip1 * MAX( 1, trok_hordas_reserva_pentes.GetInt() ) *
+				TrokUpgrade().niveis[ TrokHordas_NivelArma( pTem ) ].flReserva ) : ( iTipo >= 0 ? GetAmmoDef()->MaxCarry( iTipo ) : 0 );
+			if ( iTipo < 0 || ( pPlayer->GetAmmoCount( iTipo ) >= MIN( iCheia, 999 ) && ( !bComPente || pTem->m_iClip1 >= pTem->GetMaxClip1() ) ) )
+			{
+				ClientPrint( pPlayer, HUD_PRINTCENTER, "JÁ ESTÁ CHEIO" );
+				return;
+			}
+			const int iPreco = ( pItem->iTipo == HITEM_ARMA && TrokHordas_NivelArma( pTem ) > 0 ) ? TrokUpgrade().iMunicaoPreco : pItem->iPrecoRepor;
+			if ( !TrokHordas_Pagar( pPlayer, iPreco ) )
+				return;
+			TrokHordas_EncherMunicao( pPlayer, pTem );
+		}
+		else
+		{
+			if ( !TrokHordas_Pagar( pPlayer, pItem->iPreco ) )
+				return;
+			TrokHordas_DarArma( pPlayer, pItem->szEntidade );
+		}
+		break;
+	}
+	case HITEM_MUNICAO:
+	{
+		if ( !TrokHordas_Pagar( pPlayer, pItem->iPreco ) )
+			return;
+		for ( int k = 0; k < pPlayer->WeaponCount(); ++k )
+		{
+			CBaseCombatWeapon *pW = pPlayer->GetWeapon( k );
+			if ( pW && pW->UsesClipsForAmmo1() )
+				TrokHordas_EncherMunicao( pPlayer, pW );
+		}
+		break;
+	}
+	case HITEM_COLETE:
+		if ( pPlayer->ArmorValue() >= trok_hordas_colete.GetInt() )
+		{
+			ClientPrint( pPlayer, HUD_PRINTCENTER, "COLETE CHEIO" );
+			return;
+		}
+		if ( !TrokHordas_Pagar( pPlayer, pItem->iPreco ) )
+			return;
+		pPlayer->SetArmorValue( trok_hordas_colete.GetInt() );
+		break;
+	case HITEM_KIT:
+		if ( pEstado->TemKit( pPlayer->entindex() ) )
+		{
+			ClientPrint( pPlayer, HUD_PRINTCENTER, "VOCÊ JÁ TEM UM KIT" );
+			return;
+		}
+		if ( !TrokHordas_Pagar( pPlayer, pItem->iPreco ) )
+			return;
+		TrokHordas_DarKit( pPlayer );
+		break;
+	}
+	pPlayer->EmitSound( "Trok.Hordas.Compra" );
+}
+
 bool TrokHordas_ClientCommand( CBasePlayer *pPlayer, const CCommand &args )
 {
 	if ( !s_bAtivo || !pPlayer )
@@ -1943,6 +2032,12 @@ bool TrokHordas_ClientCommand( CBasePlayer *pPlayer, const CCommand &args )
 	// No Hordas todo mundo é humano: sem escolher time.
 	if ( FStrEq( args[ 0 ], "jointeam" ) || FStrEq( args[ 0 ], "changeteam" ) )
 		return true;
+	if ( FStrEq( args[ 0 ], "trok_hordas_comprar" ) )
+	{
+		if ( args.ArgC() >= 2 )
+			Comprar( pPlayer, args[ 1 ] );
+		return true;
+	}
 	return false;
 }
 

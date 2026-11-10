@@ -88,7 +88,7 @@ Medir e decidir: manter a regra do HL2, ou trocar pela do CS (precisa de um ganc
 ## Menu de compra e HUD
 
 - **Tecla B** (`trok_loja`; `bind "b" "trok_loja"` no `config_default.cfg`, quem já tem `config.cfg` precisa dar o
-  bind uma vez) abre o menu próprio (`client/trok/ui/trok_loja.cpp`, visual dos painéis do Trok): dinheiro e
+  bind uma vez) abre o menu próprio (`client/trok/ui/trok_loja_menu.cpp`, visual dos painéis do Trok): dinheiro e
   tempo de compra no alto, equipamento atual, categorias à esquerda (1..8), itens no meio (clique compra; mostra
   preço, "NA MÃO"/"EQUIPADO", vermelho sem dinheiro), detalhes do item à direita. Fecha com B, ESC, FECHAR, ao
   morrer ou quando o tempo acaba. O servidor confere tudo de novo.

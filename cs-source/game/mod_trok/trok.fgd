@@ -100,7 +100,7 @@
 ]
 
 @SolidClass base(TrokHordasEstacao) = func_trok_compra_parede :
-	"Modo Hordas: arma na parede. E compra a arma (troca a da mesma classe); tendo a arma, E compra munição."
+	"Modo Hordas (OPCIONAL, fora do desenho padrão: as armas se compram na func_trok_loja): arma na parede. E compra a arma; tendo, compra munição."
 [
 	arma(string) : "Arma" : "weapon_trok_submetralhadora" : "Classe da arma (weapon_trok_pistola, _submetralhadora, _fuzil, _escopeta...)."
 	preco(integer) : "Preço" : 1000 : "Pontos."
@@ -130,7 +130,7 @@
 ]
 
 @SolidClass base(TrokHordasEstacao) = func_trok_bancada :
-	"Modo Hordas: bancada de equipamento. Um item por bancada."
+	"Modo Hordas (OPCIONAL: o padrão é a func_trok_loja): bancada de um item só."
 [
 	item(string) : "Item" : "weapon_trok_torreta" : "Arma de defesa (weapon_trok_torreta, _claymore, _mina, _remota), weapon_trok_granada, colete ou kit_reanimacao. Tendo a arma: repõe até o máximo (trok_max_*)."
 	preco(integer) : "Preço" : 1500 : "Pontos."
@@ -142,4 +142,37 @@
 	"Modo Hordas: chave de energia. E liga (uma vez); as estações com 'Precisa de energia' passam a funcionar."
 [
 	input Abrir(void) : "Liga a energia."
+]
+
+@SolidClass base(TrokHordasEstacao) = func_trok_loja :
+	"Modo Hordas: LOJA (o jeito padrão de comprar). E abre o menu com armas, munição, defesas (torreta, " +
+	"claymore, mina, remota, granada) e equipamento (scripts/trok_hordas_loja.txt). Só compra quem está " +
+	"perto (trok_hordas_loja_distancia). Uma ou poucas por mapa, num lugar que obrigue a andar."
+[
+	precisa_energia(choices) : "Precisa de energia" : 0 = [ 0 : "Não" 1 : "Sim" ]
+]
+
+@SolidClass base(TrokHordasEstacao) = func_trok_armadilha :
+	"Modo Hordas: painel de armadilha (como as do CoD). E liga por 'preco' pontos durante 'duracao' s; " +
+	"depois descansa 'recarga' s. Quem estiver na zona leva dano. Limite: trok_hordas_limite_armadilha por jogador."
+[
+	item(choices) : "Tipo" : "eletrica" =
+	[
+		"eletrica" : "Elétrica (mata zumbi na hora; fere humano)"
+		"fogo" : "Fogo (400/s em zumbi)"
+		"arame" : "Arame eletrificado (60/s e lentidão)"
+	]
+	zona(target_destination) : "Zona" : "" : "Nome do trigger_trok_armadilha (vazio = 160 u em volta do painel)."
+	preco(integer) : "Preço" : 1000 : "Pontos (CoD: 1000)."
+	duracao(float) : "Duração (s)" : 25 : "Tempo ligada."
+	recarga(float) : "Recarga (s)" : 30 : "Tempo até poder ligar de novo."
+	dano(float) : "Dano em zumbi por s" : -1 : "-1 = o do tipo."
+	dano_humano(float) : "Dano em humano por s" : -1 : "-1 = o do tipo (0 = não fere)."
+	lentidao(float) : "Lentidão" : -1 : "x velocidade do zumbi na zona (-1 = o do tipo; arame 0,35)."
+	precisa_energia(choices) : "Precisa de energia" : 0 = [ 0 : "Não" 1 : "Sim" ]
+]
+
+@SolidClass base(Targetname) = trigger_trok_armadilha :
+	"Modo Hordas: zona de uma func_trok_armadilha (pincel invisível, não sólido; use a textura trigger)."
+[
 ]

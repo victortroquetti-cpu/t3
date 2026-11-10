@@ -17,11 +17,12 @@ Planta (vista de cima, x para leste, y para o norte; medidas do CA, corpo 100u, 
 
 Sem portas pagas (decisão do dono): as duas salas ligadas por uma passagem livre; zumbis vêm
 pelas duas janelas desde a rodada 1.
-Sala 1: 4 nascimentos de jogador, parede da submetralhadora (1000) e da escopeta (1200), caixa
-        misteriosa, caixas para pular. Janela com barricada (func_trok_grade, 6 tábuas) para a alcova oeste.
-Sala 2: parede do fuzil (1500), chave de energia, máquina de melhoria (precisa de energia) e a
-        fileira de bancadas das ARMAS DE DEFESA: torreta, claymore, mina, carga remota, granada e
-        colete; kit de reanimação (precisa de energia). Janela com barricada para a alcova leste.
+Sem armas na parede (decisão do dono): tudo se compra na LOJA (func_trok_loja), num lugar só.
+Sala 1: 4 nascimentos de jogador, caixa misteriosa, caixas para pular, painel de ARAME ELETRIFICADO
+        na frente da janela oeste. Janela com barricada (func_trok_grade, 6 tábuas) para a alcova oeste.
+Sala 2: a LOJA (armas, munição, torreta, claymore, mina, remota, granada, colete, kit), chave de
+        energia, máquina de melhoria (precisa de energia). Janela com barricada para a alcova leste.
+Passagem do meio: ARMADILHA ELÉTRICA (painel na sala 2, zona na passagem): segura quem vem da sala 1.
 
 Nav: os bots precisam passar pelas janelas. Antes de "nav_generate", abra as barricadas:
    ent_fire func_trok_grade Abrir; nav_generate
@@ -134,36 +135,22 @@ def gerar():
             "liberar_nos_abrigos": "0", "rendermode": "0", "renderamt": "255", "rendercolor": "255 255 255",
         }, solido=(x1, 448, 0, x2, 576, 128, GRADE))
 
-    # Área 1
-    entidade("func_trok_compra_parede", {"arma": "weapon_trok_submetralhadora", "preco": "1000", "precisa_energia": "0"},
-             solido=(256, 1008, 48, 384, 1024, 112, ESTACAO))
-    entidade("func_trok_compra_parede", {"arma": "weapon_trok_escopeta", "preco": "1200", "precisa_energia": "0"},
-             solido=(640, 0, 48, 768, 16, 112, ESTACAO))
+    # Sala 1: caixa misteriosa e arame eletrificado na frente da janela oeste.
     entidade("func_trok_caixa_misteriosa", {"preco": "0", "precisa_energia": "0"},
              solido=(800, 960, 0, 896, 1008, 48, ESTACAO))
+    entidade("trigger_trok_armadilha", {"targetname": "zona_arame"}, solido=(16, 400, 0, 176, 624, 96, "TOOLS/TOOLSTRIGGER"))
+    entidade("func_trok_armadilha", {"item": "arame", "zona": "zona_arame", "preco": "750", "duracao": "30", "recarga": "20",
+                                     "precisa_energia": "0"}, solido=(16, 680, 48, 32, 712, 96, ESTACAO))
 
-    # Área 2
-    entidade("func_trok_compra_parede", {"arma": "weapon_trok_fuzil", "preco": "1500", "precisa_energia": "0"},
-             solido=(1300, 1008, 48, 1428, 1024, 112, ESTACAO))
+    # Sala 2: a loja (uma só no mapa: obriga a andar), energia e máquina.
+    entidade("func_trok_loja", {"precisa_energia": "0"}, solido=(1400, 960, 0, 1560, 1008, 96, ESTACAO))
     entidade("func_trok_energia", {"rotulo": "Energia"}, solido=(1500, 0, 64, 1532, 16, 112, ESTACAO))
     entidade("func_trok_maquina_upgrade", {"precisa_energia": "1"}, solido=(1800, 944, 0, 1872, 1008, 96, ESTACAO))
-    # Fileira de bancadas das armas de defesa encostada na parede sul: (item, preço, reposição).
-    bancadas = [
-        ("weapon_trok_torreta", 1500, 1500),
-        ("weapon_trok_claymore", 1000, 750),
-        ("weapon_trok_mina", 750, 500),
-        ("weapon_trok_remota", 1000, 750),
-        ("weapon_trok_granada", 400, 400),
-        ("colete", 1500, 0),
-    ]
-    for k, (item, preco, repor) in enumerate(bancadas):
-        x = 1080 + k * 150
-        if x < 1548 and x + 96 > 1484:
-            x = 1548  # não cobre a chave de energia (x 1500..1532)
-        entidade("func_trok_bancada", {"item": item, "preco": str(preco), "preco_municao": str(repor), "precisa_energia": "0"},
-                 solido=(x, 16, 0, x + 96, 64, 40, ESTACAO))
-    entidade("func_trok_bancada", {"item": "kit_reanimacao", "preco": "2500", "precisa_energia": "1"},
-             solido=(1950, 400, 0, 2046, 448, 40, ESTACAO))
+
+    # Passagem do meio: armadilha elétrica (zona na passagem, painel na sala 2 ao lado).
+    entidade("trigger_trok_armadilha", {"targetname": "zona_passagem"}, solido=(1008, 448, 0, 1056, 576, 160, "TOOLS/TOOLSTRIGGER"))
+    entidade("func_trok_armadilha", {"item": "eletrica", "zona": "zona_passagem", "preco": "1000", "duracao": "25", "recarga": "30",
+                                     "precisa_energia": "0"}, solido=(1040, 600, 48, 1056, 632, 96, ESTACAO))
 
     # Nascedouros de zumbi: alcovas oeste e leste, todos ativos desde a rodada 1.
     for y in (250, 512, 774):
