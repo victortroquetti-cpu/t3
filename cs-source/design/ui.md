@@ -81,8 +81,8 @@ Sem bússola (o dono preferiu; `trok_hud_bussola 1` ainda liga): a direção do 
 | Colete | traço fino (2 px) por cima da barra de vida | número menor (22 px) na cor do colete logo à direita do número da vida ("100 50"), sem rótulo |
 | Acima da vida | | "$ 1.250" (economia, âmbar no tempo de compra; só se `trok_hud_dinheiro` estiver desligado, senão é o `hud_trok_economia.cpp`); Surto humano: "[N] STRIKER" e a Fúria "1.800 / 2.350 FÚRIA" só em texto, sem caixa: valor vermelho-sangue `#CC2030` com contorno fino roxo-escuro `#220A26` no lugar da sombra preta, rótulo FÚRIA `#A81A28` com o mesmo contorno; preço cinza (âmbar se não dá) |
 | Zumbi | | tipo do zumbi ao lado do número, barra vermelho-sangue, brilho curto correndo na barra enquanto regenera (sem texto) |
-| Arma | canto inf. dir. | ícone (48×18) · NOME · modo de tiro em texto pequeno; pente 46 px / reserva 22 px; uma marca por bala (pentes até 40); explosivos com ícone e número à esquerda; garras: ícone + "GARRAS" |
-| Corrida | acima da arma | "14/20" + escada (degrau atual âmbar e mais alto) e "› ESCOPETA" pequeno (próxima); ao subir, "DEGRAU 15 · ESCOPETA" sob a mira |
+| Arma | canto inf. dir., variante **F** escolhida pelo dono (MWII/MWIII/Halo Infinite) | de baixo para cima: **nome** da arma numa linha própria, alinhado à direita (`printname` do script ou a tradução; 18 px, encolhe para 16 e 14 e acima de 320 px corta com "…"); filete fino de 220; **pente** 46 px + reserva 22 px (algarismos de largura fixa) com o modo de tiro pequeno sobre a reserva; à esquerda do número, um filete vertical e o **ícone** da arma (72×27); **granadas/explosivos** pequenos em cima (ícone + número). Sem marcas por bala. Garras/faca: só o ícone sobre o nome |
+| Corrida | acima do bloco da arma (yb − 122) | "14/20" + escada (degrau atual âmbar e mais alto) e "› ESCOPETA" pequeno (próxima); ao subir, "DEGRAU 15 · ESCOPETA" sob a mira |
 | Centro | | mira com contorno (abre com a dispersão), X de acerto (abate vermelho e 35% maior, cabeça âmbar), cunha de dano em 3 faixas (raio 118), granada perto (anel 78, ícone, seta, metros; sem pulsar), eventos à direita (x +44, y +30: ABATE +$300 nome, NA CABEÇA, ZUMBI ABATIDO, INFECTOU +1), "[R] RECARREGAR" / "SEM MUNIÇÃO" (y +74, fixo), "PROTEGIDO" com barra, "[E] PEGAR FUZIL" (62% da altura) |
 
 ### Tela de infectado (Surto, você zumbi)
@@ -108,7 +108,7 @@ genéricas provisórias (contorno tracejado) no lugar e no tamanho de cada um.
 
 | Grupo | Nomes | Tamanho do arquivo | Desenhado em (px a 720) |
 |---|---|---|---|
-| Armas e explosivos | `arma_fuzil`, `arma_submetralhadora`, `arma_escopeta`, `arma_pistola`, `arma_faca`, `arma_granada`, `arma_granada_luz`, `arma_granada_fumaca`, `arma_mina`, `arma_claymore`, `arma_remota`, `arma_torreta`, `arma_foguete`, `garras` | 128×48 (8:3) | 48×18 (lista de abates, ao lado do nome da arma); 40×15 (explosivos na arma); 26×10 (aviso de granada) |
+| Armas e explosivos | `arma_fuzil`, `arma_submetralhadora`, `arma_escopeta`, `arma_pistola`, `arma_faca`, `arma_granada`, `arma_granada_luz`, `arma_granada_fumaca`, `arma_mina`, `arma_claymore`, `arma_remota`, `arma_torreta`, `arma_foguete`, `garras` | 128×48 (8:3) | 72×27 (bloco da arma); 48×18 (lista de abates); 32×12 (granadas sobre a munição); 26×10 (aviso de granada) |
 | Abate | `abate_cabeca`, `abate_infeccao`, `abate_explosao`, `abate_queda` | 32×32 | 16×16 (lista de abates); explosão/queda entram no lugar da arma (48×18), então desenhe centrado com sobra dos lados |
 | Lados (Surto) | `lado_humano`, `lado_zumbi` | 32×32 | 16×16 (placar do topo) |
 

@@ -43,6 +43,7 @@
 #include "utldict.h"
 #include <vgui/ISurface.h>
 #include <vgui/IScheme.h>
+#include <vgui/ILocalize.h>
 #include <vgui_controls/Panel.h>
 #include <wctype.h>
 
@@ -164,6 +165,7 @@ private:
 	void PaintKillfeed( void );
 	void PaintVitais( C_BasePlayer *pLocal );
 	void PaintArma( C_BasePlayer *pLocal );
+	void NomeQueCabe( const char *psz, int iMaxW, HFont &fOut, float &flEspOut, char *pszOut, int iOutSize );
 	void PaintDegraus( C_BasePlayer *pLocal );
 	void PaintMira( C_BasePlayer *pLocal );
 	void PaintHitmarker( void );
@@ -176,6 +178,7 @@ private:
 
 	// Fontes (criadas aqui no tamanho do HUD)
 	HFont m_fBig, m_fScore, m_fTimer, m_fMed, m_fText, m_fLabel, m_fName, m_fSmall;
+	HFont m_fMed16, m_fMed14;		// nome da arma que não cabe: encolhe de 18 para 16 e 14
 	HFont m_fTextNS, m_fLabelNS;	// sem sombra: a Fúria leva contorno roxo no lugar da sombra preta
 	int m_iTexInfectado;
 	char m_szTexInfectado[ 128 ];
@@ -261,6 +264,7 @@ CHudTrokV2::CHudTrokV2( const char *pElementName ) : CHudElement( pElementName )
 	SetKeyBoardInputEnabled( false );
 	m_fBig = m_fScore = m_fTimer = m_fMed = m_fText = m_fLabel = m_fName = m_fSmall = INVALID_FONT;
 	m_fTextNS = m_fLabelNS = INVALID_FONT;
+	m_fMed16 = m_fMed14 = INVALID_FONT;
 	m_iTexInfectado = -1;
 	m_szTexInfectado[ 0 ] = 0;
 	m_iFontesAlt = 0;
@@ -375,6 +379,8 @@ void CHudTrokV2::CriarFontes( void )
 		{ &m_fScore,	"Barlow Condensed",				30.0f, 700 },
 		{ &m_fTimer,	"Barlow Condensed SemiBold",	22.0f, 600 },
 		{ &m_fMed,		"Barlow Condensed SemiBold",	18.0f, 600 },
+		{ &m_fMed16,	"Barlow Condensed SemiBold",	16.0f, 600 },
+		{ &m_fMed14,	"Barlow Condensed SemiBold",	14.0f, 600 },
 		{ &m_fText,		"Barlow Condensed SemiBold",	15.0f, 600 },
 		{ &m_fLabel,	"Barlow Condensed SemiBold",	11.0f, 600 },
 		{ &m_fName,		"Barlow Medium",				13.0f, 500 },
@@ -733,11 +739,20 @@ void CHudTrokV2::NomeArma( const char *pszName, char *pszOut, int iOutSize )
 	const char *pszPrint = pszName;
 	WEAPON_FILE_INFO_HANDLE h = LookupWeaponInfoSlot( szClass );
 	FileWeaponInfo_t *pInfo = GetFileWeaponInfoFromHandle( h );
-	if ( pInfo && pInfo->szPrintName[ 0 ] && pInfo->szPrintName[ 0 ] != '#' )
+	wchar_t wsz[ 96 ];
+	wsz[ 0 ] = 0;
+	if ( pInfo && pInfo->szPrintName[ 0 ] == '#' && g_pVGuiLocalize )
+	{
+		// nome traduzido (resource/mod_trok_*.txt), se houver
+		const wchar_t *pwszLoc = g_pVGuiLocalize->Find( pInfo->szPrintName );
+		if ( pwszLoc )
+			V_wcsncpy( wsz, pwszLoc, sizeof( wsz ) );
+	}
+	else if ( pInfo && pInfo->szPrintName[ 0 ] )
 		pszPrint = pInfo->szPrintName;
 
-	wchar_t wsz[ 64 ];
-	V_UTF8ToUnicode( pszPrint, wsz, sizeof( wsz ) );
+	if ( !wsz[ 0 ] )
+		V_UTF8ToUnicode( pszPrint, wsz, sizeof( wsz ) );
 	for ( wchar_t *p = wsz; *p; ++p )
 		*p = (wchar_t)towupper( *p );
 	V_UnicodeToUTF8( wsz, pszOut, iOutSize );
@@ -1721,43 +1736,74 @@ static int TipoExplosivo( const char *pszClasse )
 	return -1;
 }
 
+// Bloco da arma, variante F escolhida pelo dono (MWII / MWIII / Halo Infinite; prévia em design/ui.md):
+// granadas pequenas em cima; munição grande (pente e reserva) com o modo empilhado sobre a reserva e o
+// ícone da arma à esquerda atrás de um filete; o nome (printname do script, ou a tradução) numa linha
+// própria embaixo, que encolhe de 18 a 14 px e corta com "…" acima do limite.
+void CHudTrokV2::NomeQueCabe( const char *psz, int iMaxW, HFont &fOut, float &flEspOut, char *pszOut, int iOutSize )
+{
+	const HFont fontes[ 3 ] = { m_fMed, m_fMed16, m_fMed14 };
+	const float esps[ 3 ] = { 1.2f, 1.0f, 0.8f };
+	for ( int i = 0; i < 3; ++i )
+	{
+		if ( Larg( fontes[ i ], psz, esps[ i ] ) <= iMaxW )
+		{
+			fOut = fontes[ i ];
+			flEspOut = esps[ i ];
+			V_strncpy( pszOut, psz, iOutSize );
+			return;
+		}
+	}
+	fOut = m_fMed14;
+	flEspOut = 0.8f;
+	wchar_t wsz[ 96 ];
+	V_UTF8ToUnicode( psz, wsz, sizeof( wsz ) );
+	int n = V_wcslen( wsz );
+	char szTeste[ 192 ];
+	while ( n > 3 )
+	{
+		--n;
+		while ( n > 0 && wsz[ n - 1 ] == L' ' )
+			--n;
+		wchar_t wszCorte[ 96 ];
+		V_wcsncpy( wszCorte, wsz, ( n + 1 ) * sizeof( wchar_t ) );
+		V_UnicodeToUTF8( wszCorte, szTeste, sizeof( szTeste ) );
+		V_strncat( szTeste, "…", sizeof( szTeste ) );
+		if ( Larg( fOut, szTeste, flEspOut ) <= iMaxW )
+			break;
+	}
+	V_strncpy( pszOut, szTeste, iOutSize );
+}
+
 void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 {
 	C_BaseCombatWeapon *pWeapon = pLocal->GetActiveWeapon();
 	if ( !pWeapon )
 		return;
 	const int xr = ScreenWidth() - m_iMargem, yb = ScreenHeight() - m_iMargem;
-	const float t = gpGlobals->curtime;
+	const bool bZumbi = TrokSurto_IsZumbi( pLocal );
 
-	char szName[ 48 ];
+	// Nome numa linha própria, embaixo
+	char szName[ 96 ], szNomeCabe[ 192 ];
 	NomeArma( pWeapon->GetClassname(), szName, sizeof( szName ) );
+	HFont fNome = m_fMed;
+	float flEsp = 1.2f;
+	NomeQueCabe( szName, S( 320 ), fNome, flEsp, szNomeCabe, sizeof( szNomeCabe ) );
+	Texto( fNome, xr, yb - S( 2 ), A( COR_BRANCO ), szNomeCabe, AL_DIR, flEsp );
+	Rect( xr - S( 220 ), yb - S( 22 ), S( 220 ), S1( 1 ), A( Color( 255, 255, 255, 31 ) ) );	// filete entre a munição e o nome
 
-	// Garras do zumbi
-	if ( TrokSurto_IsZumbi( pLocal ) )
-	{
-		const int wn = Texto( m_fMed, xr, yb - S( 4 ), A( COR_BRANCO ), szName, AL_DIR, 1.2f );
-		DesenharIcone( "garras", xr - wn - S( 58 ), yb - S( 19 ), S( 48 ), S( 18 ), A( COR_ZUMBI ) );
-		return;
-	}
-
-	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pWeapon );
-	// linha de baixo: NOME [MODO]
-	int x = xr;
-	if ( pGun )
-	{
-		// modo de tiro: só o texto pequeno
-		const char *pszModo = pGun->IsAutomatic() ? "AUTO" : "SEMI";
-		x -= Texto( m_fLabel, x, yb - S( 3 ), A( COR_CINZA3 ), pszModo, AL_DIR, 1.4f ) + S( 10 );
-	}
-	x -= Texto( m_fMed, x, yb - S( 2 ), A( COR_BRANCO ), szName, AL_DIR, 1.2f ) + S( 10 );
-	// ícone da arma à esquerda do nome (48x18), se existir
 	char szIco[ 48 ];
 	NomeIconeArma( pWeapon->GetClassname(), szIco, sizeof( szIco ) );
-	DesenharIcone( szIco, x - S( 48 ), yb - S( 17 ), S( 48 ), S( 18 ), A( COR_BRANCO ) );
-
 	const int yNum = yb - S( 30 );
-	int xEquip = xr;
-	if ( pWeapon->UsesClipsForAmmo1() )
+	const int iw = S( 72 ), ih = S( 27 );
+
+	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pWeapon );
+	if ( bZumbi || !pWeapon->UsesClipsForAmmo1() )
+	{
+		// garras, faca, explosivo na mão: só o ícone acima do nome
+		DesenharIcone( szIco, xr - iw, yNum - S( 26 ), iw, ih, A( bZumbi ? COR_ZUMBI : COR_CINZA2 ) );
+	}
+	else
 	{
 		const int iClip = MAX( 0, pWeapon->Clip1() );
 		const int iMax = MAX( 1, pWeapon->GetMaxClip1() );
@@ -1768,21 +1814,14 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 		V_snprintf( szRes, sizeof( szRes ), "/%d", iReserve );
 		V_snprintf( szClip, sizeof( szClip ), "%d", iClip );
 		const int wRes = Texto( m_fTimer, xr, yNum, A( COR_CINZA3 ), szRes, AL_DIR, 0.0f, true );
+		if ( pGun )
+			Texto( m_fLabel, xr, yNum - S( 22 ), A( COR_CINZA3 ), pGun->IsAutomatic() ? "AUTO" : "SEMI", AL_DIR, 1.4f );	// modo, sobre a reserva
 		const int wClip = Texto( m_fBig, xr - wRes - S( 6 ), yNum + S( 2 ), A( bBaixo ? COR_INIMIGO : COR_BRANCO ), szClip, AL_DIR, 0.0f, true );
-		xEquip = xr - wRes - S( 6 ) - wClip - S( 26 );
+		const int xNum = xr - wRes - S( 6 ) - wClip;
 
-		// uma marca por bala
-		if ( !m_bMin && iMax <= 40 )
-		{
-			const int pw = S1( 2 ), ph = S( 7 ), pg = S1( 2 );
-			int px = xr - iMax * ( pw + pg ) + pg;
-			const int py = yNum - S( 52 );
-			for ( int i = 0; i < iMax; ++i )
-			{
-				Rect( px, py, pw, ph, i < iClip ? A( bBaixo ? COR_INIMIGO : Color( 236, 238, 241, 217 ) ) : A( Color( 255, 255, 255, 36 ) ) );
-				px += pw + pg;
-			}
-		}
+		// filete e o ícone da arma à esquerda do número
+		Rect( xNum - S( 14 ), yNum - S( 30 ), S1( 1 ), S( 32 ), A( Color( 255, 255, 255, 41 ) ) );
+		DesenharIcone( szIco, xNum - S( 14 ) - S( 12 ) - iw, yNum - S( 26 ), iw, ih, A( COR_CINZA2 ) );
 
 		// avisos de recarga (só armas de fogo do Trok, fora da recarga)
 		if ( pGun && !pWeapon->m_bInReload )
@@ -1795,11 +1834,9 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 				AvisoCentro( "RECARREGAR", szTecla, iClip == 0 ? COR_INIMIGO : COR_BRANCO, true );
 		}
 	}
-	else
-		xEquip = xr - Larg( m_fMed, szName, 1.2f ) - S( 26 );
-	(void)t;
 
-	// explosivos que o jogador carrega (à esquerda do número)
+	// granadas e explosivos: pequenos, em cima, a partir da direita
+	int x = xr;
 	for ( int i = pLocal->WeaponCount() - 1; i >= 0; --i )
 	{
 		C_BaseCombatWeapon *pW = pLocal->GetWeapon( i );
@@ -1813,16 +1850,16 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 			n += pW->Clip1();
 		char szN[ 8 ];
 		V_snprintf( szN, sizeof( szN ), "%d", n );
-		const Color c = A( n > 0 ? ( pW == pWeapon ? Accent() : COR_BRANCO ) : COR_CINZA3 );
-		const int wN = Texto( m_fText, xEquip, yNum - S( 4 ), c, szN, AL_DIR, 0.0f, true );
+		const Color c = A( n > 0 ? ( pW == pWeapon ? Accent() : COR_CINZA2 ) : COR_CINZA3 );
+		const int wN = Texto( m_fLabel, x, yNum - S( 52 ), c, szN, AL_DIR, 0.0f, true );
 		char szIcoE[ 48 ];
 		NomeIconeArma( pW->GetClassname(), szIcoE, sizeof( szIcoE ) );
-		if ( DesenharIcone( szIcoE, xEquip - wN - S( 44 ), yNum - S( 21 ), S( 40 ), S( 15 ), c ) )
-			xEquip -= wN + S( 54 );
+		if ( DesenharIcone( szIcoE, x - wN - S( 36 ), yNum - S( 63 ), S( 32 ), S( 12 ), c ) )
+			x -= wN + S( 46 );
 		else
 		{
-			IconeExplosivo( iTipo, xEquip - wN - S( 10 ), yNum - S( 14 ), c );
-			xEquip -= wN + S( 26 );
+			IconeExplosivo( iTipo, x - wN - S( 11 ), yNum - S( 56 ), c );
+			x -= wN + S( 30 );
 		}
 	}
 }
@@ -1837,7 +1874,7 @@ void CHudTrokV2::PaintDegraus( C_BasePlayer *pLocal )
 	const int n = MAX( 1, pC->GetDegraus() );
 	const int iDeg = pC->GetDegrau( iMe ) + 1;	// 1..n
 	const int xr = ScreenWidth() - m_iMargem;
-	const int y = ScreenHeight() - m_iMargem - S( 112 );
+	const int y = ScreenHeight() - m_iMargem - S( 122 );	// acima do bloco da arma (granadas em yb - 93)
 
 	const int w = n > 24 ? S( 5 ) : S( 7 ), gp = S1( 3 );
 	int x = xr - n * ( w + gp ) + gp;
