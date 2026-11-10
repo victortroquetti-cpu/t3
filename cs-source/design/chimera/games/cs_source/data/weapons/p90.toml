@@ -1,0 +1,75 @@
+# P90.
+id = "cs_source:weapon_p90"
+base = "cs_source:gun"
+slot = 0
+draw = 1.0
+max_speed = 245.0
+weight = 26
+
+[buy]
+price = 2350
+bot_weight = 2.0
+
+[trigger]
+automatic = true
+cycle = 0.07
+
+[magazine]
+clip = 50
+ammo = "cs_source:57mm"
+reload = 3.375
+
+[hitscan]
+range = 4096.0
+
+[damage]
+amount = 26.0
+falloff = 0.84
+armor_ratio = 1.5
+# Its ammo's push (measured, _gun.toml).
+impulse = 2000.0
+
+[penetration]
+objects = 1
+
+[sounds]
+fire = "Weapon_P90.Single"
+empty = "Default.ClipEmpty_Rifle"
+reload = [[0.4249, "Weapon_P90.Cliprelease"], [0.8751, "Weapon_P90.Clipout"], [1.8752, "Weapon_P90.Clipin"], [2.7, "Weapon_P90.Boltpull"]]
+draw = [[0.3, "Weapon_P90.Boltpull"]]
+
+[models]
+world = "models/weapons/w_smg_p90.mdl"
+view = "models/weapons/v_smg_p90.mdl"
+
+[hud]
+name = "Cstrike_WPNHUD_P90"
+icon = "d_p90"
+
+[anim]
+idle_after = 2.0
+idle_interval = 20.0
+
+[hooks."cs_source:accuracy"]
+spread = 0.001
+crouch = 0.01463
+stand = 0.01951
+jump = 0.16494
+land = 0.03299
+fire = 0.00732
+movement = 0.01062
+recovery_crouch = 0.23289
+recovery_stand = 0.32605
+
+[hooks."cs_source:hit_slowdown"]
+body = 0.5
+
+# Measured on the probe server, 2026-10-15 (specs/cs_source/weapons.md M3, more
+# weapons): full-clip holds standing, crouched and side-running; airborne
+# (a jump's worth of shots, M3 airborne table; its
+# airborne yaw cap wasn't reached in a jump: UNMEASURED, a guess).
+[hooks."cs_source:recoil"]
+standing = { up = 0.3, up_step = 0.125, side = 0.225, side_step = 0.02, up_cap = 3.25, side_cap = 1.25 }
+crouched = { up = 0.275, up_step = 0.125, side = 0.2, side_step = 0.02, up_cap = 3.0, side_cap = 1.0 }
+moving = { up = 0.45, up_step = 0.2, side = 0.3, side_step = 0.0275, up_cap = 4.0, side_cap = 2.25 }
+airborne = { up = 0.9, up_step = 0.35, side = 0.45, side_step = 0.04, up_cap = 5.25, side_cap = 3.0 }

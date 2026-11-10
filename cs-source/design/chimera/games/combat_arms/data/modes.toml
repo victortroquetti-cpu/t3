@@ -1,0 +1,466 @@
+# Combat Arms game modes: our defaults, from specs/combat_arms/game_modes.md
+# (section numbers in the comments). Read by
+# games/combat_arms/src/game/rules/settings.rs (`CaRuleSettings`); the
+# console's `ca_*` cvars set them after (the room's choices and the server
+# file's, as a lobby or a server's config would).
+
+# The room's mode, by its room key (Modes found): TDM (shown as
+# Elimination), TSV (Elimination Pro), TMM (Search & Destroy), CTF, FFA (One
+# Man Army), LMS (Last Man Standing), BNT (Spy Hunt), QRT (Quarantine
+# Regen), SBT (Bombing Run), HQM (Seize and Secure), SQM2 (Squad Match 2),
+# VTDM (VIP Elimination), VWRM (Arms Race), HG (Hunted), ESL (S&D for the
+# Go4CA Cup), SQM (Hired Guns), ESC (VIP Escort), the clan modes CDM, CMM,
+# CCTF, CTSV and CESC, or none (no mode: nobody is spawned, counted or
+# respawned by the rules).
+mode = "TDM"
+# The room's goal G (S2); 0: the mode's default (its `goal_default`).
+goal = 0
+# Room settings (S2): friendly fire (S8, the server's `NetFriendlyFire`)
+# and join in progress (`EnableJoinCombatSetting`, S1): 1 on, 0 off.
+friendly_fire = 0
+join_in_progress = 1
+
+# The dedicated server's file, section CombatMode (S2), the values of the
+# client's copy: round setup, round-over and intermission lengths (s).
+object_start = 0.0
+object_end = 3.0
+mission_end = 3.0
+
+# Constants (shared).
+# Respawn waits (S5): the client asks after more than this (s) ...
+respawn_wait_client = 7.0
+# ... and the server refuses a request sooner than this after the death (s).
+respawn_wait_server = 5.0
+# Spawn protection (S6): instant-hit shots pass through (s), and all damage
+# is blocked (s; the server's `RespawnInvulnerabilityTime`).
+protect_bullets = 3.0
+protect_all = 4.0
+# The warm-up's revive period (S9), s.
+warmup_revive = 5.0
+# Round modes hold a joiner only with at least this many players in (S1).
+late_join_wait = 3
+
+# Per mode (S2's goal table; the stock mission files' `TimeLimit` and
+# `TrainingTimeLimit`, s; no time_limit: the round has no timer).
+[modes.TDM]
+goal_min = 30
+goal_max = 140
+goal_step = 10
+goal_default = 100
+
+[modes.TSV]
+goal_min = 5
+goal_max = 9
+goal_step = 2
+goal_default = 7
+time_limit = 180.0
+training_time_limit = 10.0
+
+# Search & Destroy (M3): round wins; rounds of TimeLimit 180 s after a 10 s
+# warm-up.
+[modes.TMM]
+goal_min = 3
+goal_max = 9
+goal_step = 2
+goal_default = 5
+time_limit = 180.0
+training_time_limit = 10.0
+jsf_weapon = ["XK-2"]
+
+# Capture the Flag (M4): captures; one round of TimeLimit x G (180 x G s).
+[modes.CTF]
+goal_min = 3
+goal_max = 7
+goal_step = 2
+goal_default = 5
+time_limit = 180.0
+
+# One Man Army (M5): player kills; one round, no time limit.
+[modes.FFA]
+goal_min = 15
+goal_max = 45
+goal_step = 15
+goal_default = 30
+
+# Last Man Standing (M6): rounds played; rounds of 180 s after a warm-up.
+[modes.LMS]
+goal_min = 3
+goal_max = 9
+goal_step = 2
+goal_default = 5
+time_limit = 180.0
+training_time_limit = 10.0
+
+# Spy Hunt (M7): minutes (the whole round: G minutes; the stock files'
+# TimeLimit, 10 minutes, only without a goal), after a warm-up.
+[modes.BNT]
+goal_min = 8
+goal_max = 16
+goal_step = 4
+goal_default = 12
+time_limit = 600.0
+training_time_limit = 10.0
+
+# Quarantine Regen (M8): rounds played; TimeLimit 3 minutes (180 s).
+[modes.QRT]
+goal_min = 5
+goal_max = 9
+goal_step = 2
+goal_default = 7
+time_limit = 180.0
+training_time_limit = 10.0
+
+# Bombing Run (M9): round wins; rounds of 300 s after a warm-up.
+[modes.SBT]
+goal_min = 3
+goal_max = 9
+goal_step = 2
+goal_default = 5
+time_limit = 300.0
+# Both teams' field: the bomb a carrier is given on picking it up.
+jsf_weapon = ["XK-2"]
+creed_weapon = ["XK-2"]
+training_time_limit = 10.0
+
+# Seize and Secure (M10): minutes (one round of G minutes after a warm-up).
+[modes.HQM]
+goal_min = 8
+goal_max = 16
+goal_step = 4
+goal_default = 12
+training_time_limit = 10.0
+
+# Squad Match 2 (M11): Seize and Secure's rules; the goal numbers are
+# Seize and Secure's, the round HiredGuns2_HQM.GMS's TimeLimit 1800 s
+# (missions.md: max(1, TimeLimit), not G minutes).
+[modes.SQM2]
+goal_min = 8
+goal_max = 16
+goal_step = 4
+goal_default = 12
+time_limit = 1800.0
+training_time_limit = 10.0
+
+# VIP Elimination (M12): team points; as TDM, no time limit.
+[modes.VTDM]
+goal_min = 100
+goal_max = 180
+goal_step = 10
+goal_default = 140
+
+# Arms Race (M14): player kills; one round, no time limit.
+[modes.VWRM]
+goal_min = 15
+goal_max = 45
+goal_step = 15
+goal_default = 15
+
+# Hunted (M15): rounds played; Dark Hills' mission: rounds of 270 s after a
+# 20 s warm-up (missions.md, Stock values).
+[modes.HG]
+goal_min = 3
+goal_max = 9
+goal_step = 2
+goal_default = 5
+time_limit = 270.0
+training_time_limit = 20.0
+
+# S&D for the Go4CA Cup (M17): the rounds played (both teams' wins) end
+# the match at G, fixed at 5; S&D's rounds.
+[modes.ESL]
+goal_min = 5
+goal_max = 5
+goal_step = 1
+goal_default = 5
+time_limit = 180.0
+training_time_limit = 10.0
+jsf_weapon = ["XK-2"]
+
+# Hired Guns (game_modes_2.md M11): rounds played; rounds of 300 s after a
+# 10 s warm-up (Blood Money's mission file).
+[modes.SQM]
+goal_min = 3
+goal_max = 9
+goal_step = 2
+goal_default = 7
+time_limit = 300.0
+training_time_limit = 10.0
+
+# VIP Escort (M13): round wins R; rounds of 180 s after a 10 s warm-up
+# (another after each side swap).
+[modes.ESC]
+goal_min = 5
+goal_max = 11
+goal_step = 2
+goal_default = 7
+time_limit = 180.0
+training_time_limit = 10.0
+
+# Clan VIP Escort (M13.8; not enabled in any room data): rounds played.
+[modes.CESC]
+goal_min = 5
+goal_max = 11
+goal_step = 2
+goal_default = 7
+time_limit = 180.0
+training_time_limit = 10.0
+
+# The clan modes (M18): fixed goals, a 10 s warm-up before each half.
+# Clan Elimination: 100 kills, no time limit.
+[modes.CDM]
+goal_min = 100
+goal_max = 100
+goal_step = 1
+goal_default = 100
+training_time_limit = 10.0
+
+# Clan Capture the Flag: 6 captures; halves of a flat 600 s.
+[modes.CCTF]
+goal_min = 6
+goal_max = 6
+goal_step = 1
+goal_default = 6
+time_limit = 600.0
+training_time_limit = 10.0
+
+# Clan Search & Destroy: exactly 6 rounds of S&D's 180 s.
+[modes.CMM]
+goal_min = 6
+goal_max = 6
+goal_step = 1
+goal_default = 6
+time_limit = 180.0
+training_time_limit = 10.0
+jsf_weapon = ["XK-2"]
+
+# Clan Elimination Pro: exactly 6 rounds of 180 s.
+[modes.CTSV]
+goal_min = 6
+goal_max = 6
+goal_step = 1
+goal_default = 6
+time_limit = 180.0
+training_time_limit = 10.0
+
+# The objectives' numbers (Constants (shared) and the mode sections).
+[objectives]
+# M4: a dropped flag goes home after this, s.
+flag_return = 30.0
+# M3: the plant: the bomb's fire animation up to its FIRE_KEY (XK-2 fire_0
+# 4000 ms, the key at 3904 ms: Open question 4, answered; the HUD's gauge
+# shows the 4 s), the defuse when a site gives no DefuseTime, the fuse
+# when it gives no DetonateTime, and how far outside a site's box (u, each
+# axis) a planter may stand.
+bomb_plant = 3.904
+bomb_defuse = 7.0
+bomb_fuse = 40.0
+plant_margin = 50.0
+# M10: the mission file's use time of the triggers (s), FlagMoveTime (s)
+# and LastOccupyBonus (points).
+seize_time = 5.0
+flag_move_time = 120.0
+last_occupy_bonus = 50
+# M8: hosts are picked this long after the round goes live (s), H =
+# max(round(N x SelectionRate), MinHostNum) from 4 players; the infected
+# heal Heal every period (s) after standing still this long (s; Open
+# question 12, answered: a fraction of their maximum hit points); the
+# mission file's points.
+host_delay = 20.0
+selection_rate = 0.2
+min_hosts = 2
+infected_heal = 0.1
+infected_still = 3.0
+infected_heal_period = 1.0
+human_kills_infected = 3
+infected_killed_by_human = -1
+infected_infects = 2
+humans_win = 10
+infected_win = 5
+# M7: intel items per round.
+intel_count = 5
+# M5: the last player wins a round ended by leavers only with more than
+# this share of G (rounded) made in kills.
+leave_kill_share = 0.1
+# M12 (missions.md F4.7, GMS\VTDM.GMS's stock values): the points a death
+# is worth by the victim's VIP rank (0 none, 1 copper/bronze, 2 silver, 3
+# gold), and the VIP tables: [TargetPoint, VIPs for a team of 1..8
+# players]; G uses the first table with TargetPoint >= G.
+vip_points = [1, 3, 5, 7]
+vip_tables = [[60, [0, 0, 0, 0, 0, 1, 1, 2]], [1000, [0, 1, 1, 1, 2, 2, 2, 3]]]
+# M7 (missions.md F4.2): Stage2PlayTime and AgentCameraHoldingTime, s.
+stage2_time = 180.0
+agent_camera_hold = 5.0
+# M14 (missions.md F4.8): the stock default ladders of GMS\VWRM.GMS, per
+# goal G: steps [kills, weapon id as stored, WeaponType]; a roll below
+# `ladder_percent` (of 0..100) takes the step's weapon, else the player
+# keeps their own.
+ladder_percent = 80
+ladders = [
+    { goal = 15, steps = [[0, 325, 0], [4, 337, 1], [7, 35, 3], [10, 125, 26], [12, 257, 2], [13, 110, 4], [14, 84, 6]] },
+    { goal = 30, steps = [[0, 325, 0], [4, 255, 0], [7, 337, 1], [11, 203, 1], [15, 35, 3], [18, 220, 3], [21, 295, 26], [23, 125, 26], [25, 257, 2], [27, 110, 4], [29, 84, 6]] },
+    { goal = 45, steps = [[0, 325, 0], [4, 255, 0], [8, 351, 0], [11, 337, 1], [15, 203, 1], [19, 152, 1], [22, 35, 3], [26, 220, 3], [29, 386, 3], [32, 295, 26], [35, 125, 26], [38, 257, 2], [41, 110, 4], [44, 84, 6]] },
+]
+
+# S12 (Open question 27): the mutation boxes' items' pick weights by the
+# toucher's condition [lose, even, win]: 0 speed, 1 accuracy, 2 damage and
+# rate, 3 toughness, 4 ammunition, 5 health, 6 heal, 7 invulnerable, 8
+# infected host, 9 spy (the weights favour the winners, Quirk 15).
+mutation_weights = [
+    [10, 10, 10],
+    [5, 10, 20],
+    [10, 10, 10],
+    [10, 10, 10],
+    [10, 10, 10],
+    [10, 10, 10],
+    [10, 10, 10],
+    [5, 10, 20],
+    [5, 10, 20],
+    [5, 10, 20],
+]
+
+# Without the install (V1 key) a ladder's weapon ids name our weapon of
+# the same kind: ACR, M417, FS2000 our M4A1; Kriss, MP7, PP-19 the MP5A4;
+# M60, RPK, MG42 the M60; M3 Super 90, R870 the 870; M107CQ the L96A1;
+# Desert Eagle the M92FS; M69HE frag the M67.
+[objectives.stand_ins]
+325 = "combat_arms:m4a1"
+255 = "combat_arms:m4a1"
+351 = "combat_arms:m4a1"
+337 = "combat_arms:mp5a4"
+203 = "combat_arms:mp5a4"
+152 = "combat_arms:mp5a4"
+35 = "combat_arms:m60"
+220 = "combat_arms:m60"
+386 = "combat_arms:m60"
+295 = "combat_arms:remington_870"
+125 = "combat_arms:remington_870"
+257 = "combat_arms:l96a1"
+110 = "combat_arms:beretta_m92fs"
+84 = "combat_arms:m67"
+
+# Hired Guns (game_modes_2.md M11; Blood Money's mission file,
+# `[BullionManage]`, missions.md F4.5).
+[hired_guns]
+# The bar drop points' and spawn points' game type.
+family = "SquadMatch"
+# DropBullionNum: bars placed at each real round's start.
+drop_bullion_num = 80
+# BullionAmount: a placed bar's money.
+bullion_amount = 100
+# BaseBankAmount (added at each real round's start and on joining a live
+# round), RoundWinBonusAmount, KillBonusAmount, DeathBonusAmount.
+base_bank = 1000
+round_win_bonus = 500
+kill_bonus = 100
+death_bonus = 0
+# A bar or bag is taken within this distance of the player (u).
+pickup_reach = 200.0
+# The carry penalty's sections: [first bar, last bar, rate per bar]
+# (MovePenaltyIncPerBullionNumSection<i>, MovePenaltyIncPerBullionNum<i>).
+penalty_sections = [[0, 10, 0.0], [11, 25, 0.03], [26, 80, 0.0]]
+# The objective's AIDamageFactor (mercenaries' damage).
+ai_damage_factor = 1.0
+# Living mercenaries per player.
+merc_cap = 2
+# The mercenaries' spawn objects by the hirer's team.
+unit_spawn_alpha = "UNITSPAWN_ALPHA"
+unit_spawn_bravo = "UNITSPAWN_BRAVO"
+# A dead mercenary's body goes after this (s; `BodyLifetime`).
+body_lifetime = 2.0
+# The hire menu's units, by unit id 0-9 (`SpawnCostAI<i>`, the templates'
+# weapons). Our weapons stand in for the NPC ones we don't have: the
+# MP5A4 for the P90, the M4A1 for the M416, the M60 for the MG21E.
+[[hired_guns.units]]
+template = "Squad_1"
+name = "Heavy - Male"
+cost = 200
+weapon = "combat_arms:m4a1"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_2"
+name = "Heavy - Female"
+cost = 200
+weapon = "combat_arms:m4a1"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_3"
+name = "Light - Male"
+cost = 200
+weapon = "combat_arms:mp5a4"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_4"
+name = "Light - Female"
+cost = 200
+weapon = "combat_arms:mp5a4"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_5"
+name = "Light - Mei"
+cost = 500
+weapon = "combat_arms:mp5a4"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_6"
+name = "Light - Deckland"
+cost = 500
+weapon = "combat_arms:mp5a4"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_7"
+name = "Medium - Hana"
+cost = 500
+weapon = "combat_arms:m4a1"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_8"
+name = "Medium - Zadan"
+cost = 500
+weapon = "combat_arms:m4a1"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_9"
+name = "Heavy - Kamara"
+cost = 500
+weapon = "combat_arms:m60"
+grenade = "combat_arms:m67"
+[[hired_guns.units]]
+template = "Squad_0"
+name = "Heavy - Baron"
+cost = 500
+weapon = "combat_arms:m60"
+grenade = "combat_arms:m67"
+
+# VIP Escort (game_modes_2.md M13; the stock mission files, missions.md
+# F4.6, and the VIP data).
+[escort]
+# The points' and the exit's game type.
+family = "VIPEscort"
+# [Mission0] VIPSpawn: the object the VIP is teleported to.
+vip_spawn = "VipTeleportPoint"
+# The objective's EscapeZoneTrigger: the exit's name.
+escape_zone = "EscapeZoneTrigger"
+# The exit timer (`VipExitTimer` TimeAmount, s from the round's setup); the
+# exit opens when the timer stops itself, 1 s after that (its run-out:
+# world_objects.md Follow-up (2026-10-31b) 1.1, game_modes_2.md case 54).
+exit_time = 60.0
+# Its InTimeCommandTime: the helicopter starts to arrive (s).
+exit_arrival = 54.0
+# VIP_MISSION_END_TIME: the message hold after a deciding event (s).
+end_hold = 3.0
+# A side swap: the wait after the intermission, then the notice (s).
+swap_wait = 3.0
+swap_notice = 3.0
+# The VIP's weapons ([VIPChangeCharWeapon_0]: primary 91, the G18; ours,
+# until the G18 is in our data: the M92FS) and its model's MovePenalty
+# (model 87).
+vip_weapons = ["combat_arms:beretta_m92fs"]
+vip_move_penalty = 0.44
+
+# AI damage (game_modes_2.md Constants (shared)): one non-melee AI hit takes
+# at most `ai_damage_cap` health from a player, and `ai_damage_cap_big`
+# when the hit was `ai_damage_big` or more (HP).
+[ai_damage]
+cap = 50.0
+cap_big = 990.0
+big = 1000.0

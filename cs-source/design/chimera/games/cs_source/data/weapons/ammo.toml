@@ -1,0 +1,106 @@
+# CS:S's ammo types: penetration power (units of a scale-1 material) and
+# reach (measured M13), most rounds carried (`ammo_<type>_max`, M17), the
+# box it's bought in (M19: measured box sizes; ammo costs nothing in CS:S
+# today) and the HUD's ammo icon.
+units = { length = 0.0254 }
+
+# Power 39 (M13); it still passes at 4000 units, no farther limit was
+# found.
+[ammo."cs_source:762mm"]
+power = 39.0
+max_distance = inf
+max = 90
+box_price = 0
+box_rounds = 30
+hud_icon = "ammo_762"
+
+# Power 45, still passes at 4000 (M13).
+[ammo."cs_source:338mag"]
+power = 45.0
+max_distance = inf
+max = 30
+box_price = 0
+box_rounds = 10
+hud_icon = "ammo_338"
+
+# Power 30, passes a player at 1006 units, not at 1015 (M13).
+[ammo."cs_source:50ae"]
+power = 30.0
+max_distance = 1010.0
+max = 35
+box_price = 0
+box_rounds = 7
+hud_icon = "ammo_50"
+
+# Power 15 (M13). UNMEASURED distance: the community value 500 (the USP
+# passed doors at 100).
+[ammo."cs_source:45acp"]
+power = 15.0
+max_distance = 500.0
+max = 100
+box_price = 0
+box_rounds = 25
+hud_icon = "ammo_45"
+
+# Power 35 (M13, 2026-10-15: the M4A1 passes wood 67.8, not 71.5). Reach:
+# still passes a door at 818; UNMEASURED beyond: the community value 4000.
+[ammo."cs_source:556mm"]
+power = 35.0
+max_distance = 4000.0
+max = 90
+box_price = 0
+box_rounds = 30
+hud_icon = "ammo_556"
+
+# Power 21 (M13, 2026-10-15: the Glock passes wood 41.5, not 49.2); reach
+# 800 (an 8-unit door passed at 788, not at 803).
+[ammo."cs_source:9mm"]
+power = 21.0
+max_distance = 800.0
+max = 120
+box_price = 0
+box_rounds = 30
+hud_icon = "ammo_9mm"
+
+# Power 24 (M13, 2026-10-15: the P228 passes wood 47.7, not 48.5; was
+# 45ACP's 15); reach 800 (an 8-unit door passed at 788, not at 803; was
+# 500).
+[ammo."cs_source:357sig"]
+power = 24.0
+max_distance = 800.0
+max = 52
+box_price = 0
+box_rounds = 13
+hud_icon = "ammo_357"
+
+# Power 30 (M13, 2026-10-15: the Five-SeveN passes wood 57.8, not 60.0;
+# was 45ACP's 15). Reach: still passes a door at 818 (no longer line
+# found; was 500); UNMEASURED beyond: the community value 2000.
+[ammo."cs_source:57mm"]
+power = 30.0
+max_distance = 2000.0
+max = 100
+box_price = 0
+box_rounds = 50
+hud_icon = "ammo_57"
+
+# Pellets pass nothing (measured 2026-10-18, weapons.md M13: the M3
+# through 6.9-30 units of a wooden gate, a crate's 2.6-4.6-unit corner
+# or a player: no pellet came out). The HUD has no glyph for it (it
+# draws the sprite).
+[ammo."cs_source:buckshot"]
+power = 0.0
+max_distance = 500.0
+max = 32
+box_price = 0
+box_rounds = 8
+
+# The M249's. Power as 556MM (M13, 2026-10-15: passes wood 64.0, not
+# 73.7). UNMEASURED distance: 556MM's.
+[ammo."cs_source:556mm_box"]
+power = 35.0
+max_distance = 4000.0
+max = 200
+box_price = 0
+box_rounds = 30
+hud_icon = "ammo_556"

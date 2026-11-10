@@ -1,0 +1,181 @@
+# Combat Arms' M4A1 with its 5.56mm ammo: the worked example of
+# specs/combat_arms/weapon_firing.md ("Worked example: M4A1"), the
+# reference build's attribute data as the spec gives it (the install's
+# own records override these once the attribute reader exists:
+# specs/combat_arms/attribute_data.md, "Defaults and overrides"). Each
+# value names the spec section and attribute field it comes from. Our
+# numbers, not a file from the game.
+#
+# The format: docs/weapon-data.md; Combat Arms' hooks: game/weapons.rs.
+# Units: world units (1.8 cm each, by body size: data/movement.toml
+# `meters_per_unit`) and hit points. No sounds or models yet (the front end draws a
+# box).
+id = "combat_arms:m4a1"
+units = { length = 0.018, damage = 0.01 }
+slot = 0
+# "From the view-model animation file": select 1200 ms (the draw).
+draw = 1.2
+# Its class in an automatic gun game (docs/weapon-data.md); install
+# weapons copied from this document keep it.
+class = "rifle"
+
+# "From the ammo record": MaxAmount 120 is the total carried, clip
+# included, so the reserve holds 120 - 30 (ShotsPerClip). SelectionAmount
+# 120: a full reserve at spawn.
+[ammo."combat_arms:5.56mm_m4a1"]
+max = 90
+
+# "Trigger and fire cycle": RapidFireCount 0 (fully automatic); the cycle
+# is the fire_0 animation, 105 ms at rate 1 + FireAniRate (absent: 0).
+# `accumulate` is the spec's exact-time mode (Q2's recommendation); `set`
+# is the frame-quantised one.
+[trigger]
+automatic = true
+cycle = 0.105
+timing = "accumulate"
+# weapon_firing.md Corrections 10: the update that sees the press only
+# enters the firing state; the pre-fire (even a 0 ms one) and fire_0 take
+# one update each, so the first round comes 3 updates on.
+latency = 3
+
+# "Ammo" and "Reload": ShotsPerClip 30; the reload animation's 2300 ms;
+# an empty clip reloads by itself once the fire animation ends.
+[magazine]
+clip = 30
+ammo = "combat_arms:5.56mm_m4a1"
+reload = 2.3
+auto_reload = true
+
+# "Hitscan": Range 3500, VectorsPerRound 1; shots follow the view kick
+# (recoil moves the real view: punch_scale 1). The square spread is the
+# `combat_arms:spread` hook's (the frame's disc only tells the HUD).
+[hitscan]
+range = 3500.0
+pellets = 1
+punch_scale = 1.0
+
+# "Damage per ray": ammo InstDamage 35 (InstDamageType 2, bullet), weapon
+# DamageRFacter 0.05, Effectrange0..2 with the ammo's Rangedamage0..2;
+# fireDelay 0 (no server spacing). The ammo's DamageMovePenalty 40 and
+# DamageMovePenaltyDuration 0.3 s: the knock-back of an infected victim
+# (movement.md "Other modifiers", case 55).
+[hooks."combat_arms:damage"]
+damage = 35.0
+damage_type = 2
+roll = 0.05
+effect_range = [2500.0, 3000.0, 3500.0]
+range_damage = [1.0, 0.7, 0.35]
+fire_delay = 0.0
+move_penalty = 40.0
+move_penalty_duration = 0.3
+
+# "Spread": the weapon's MinPerturb/MaxPerturb 3/100 and
+# PerturbIncSpeed/PerturbDecSpeed 1.3/0.3, zoomed 2/30 and 1.3/0.3,
+# DynamicPerturbFactor 1; the ammo's Fire*Perturb caps, Walk/Run/Jump
+# targets and DecDelay 95 ms. (DuckPerturb/MoveDuckPerturb are the
+# crosshair's only, Q3: not here.)
+[hooks."combat_arms:spread"]
+cone = { min = 3, max = 100, inc = 1.3, dec = 0.3 }
+zoomed_cone = { min = 2, max = 30, inc = 1.3, dec = 0.3 }
+dynamic_factor = 1.0
+state = { fire = 0.30, fire_move = 0.38, fire_duck = 0.30, fire_move_duck = 0.38, walk = 0.04, run = 0.25, jump = 0.70 }
+dec_delay = 95.0
+
+# "Recoil (view kick)": the weapon's BaseCamRecoilPitch 1.3,
+# BaseCamRecoilAccelPitch 0.2, MaxCamRecoilPitch 5, MaxRandomPitch 0.02,
+# BaseCamRecoilWagR/L -1.2/1.2, MaxCamRecoilWag 15, MaxRandomwag 0.01,
+# BaseCamBackJitter/BackJitterRecover 0/1; the ammo's JitterDecDelay 95 ms,
+# JitterWaitRecover/JitterRecover 0.1/0.2.
+[hooks."combat_arms:recoil"]
+pitch = 1.3
+accel_pitch = 0.2
+max_pitch = 5.0
+random_pitch = 0.02
+wag_r = -1.2
+wag_l = 1.2
+max_wag = 15.0
+random_wag = 0.01
+back_jitter = 0.0
+back_jitter_recover = 1.0
+jitter_dec_delay = 95.0
+jitter_wait_recover = 0.1
+jitter_recover = 0.2
+
+# weapon_classes.md, "Typical weapons" and 1: ZoomTime 0.15 s, sway X
+# 5/15, Y 3/12; no scope attachment, so the zoom key does nothing until
+# one is fitted (attachments).
+[hooks."combat_arms:zoom"]
+zoom_time = 0.15
+sway = { x_speed = 5.0, x_freq = 15.0, y_speed = 3.0, y_freq = 12.0 }
+
+# attachments.md, "How attachments are described in the data": the M4A1
+# lists 51 attachments, all at variant 0 (the AR family): silencers A, B,
+# C, red dots A, B, ITECH, HDS-4, Holosight, magazines A to D, each also
+# Gold and Red; the bullets and three mechanical sights. No defaults: a
+# stock M4A1 has an empty sight slot, so it can't zoom (Quirk Q10).
+# "Sound": FireSndRadius 2000, silenced 1400.
+[hooks."combat_arms:attachments"]
+fire_sound_radius = 2000
+silenced_radius = [1400, 1400]
+accepts = [
+    "Silencer_A_AR", "Silencer_B_AR", "Silencer_C_AR",
+    "Silencer_A_AR_Gold", "Silencer_B_AR_Gold", "Silencer_C_AR_Gold",
+    "Silencer_A_AR_Red", "Silencer_B_AR_Red", "Silencer_C_AR_Red",
+    "DotSight_A_AR", "DotSight_B_AR", "DotSight_ITECH_AR", "DotSight_HDS-4_AR", "DotSight_Holosight_AR",
+    "DotSight_A_AR_Gold", "DotSight_B_AR_Gold", "DotSight_ITECH_AR_Gold", "DotSight_HDS-4_AR_Gold",
+    "DotSight_Holosight_AR_Gold",
+    "DotSight_A_AR_Red", "DotSight_B_AR_Red", "DotSight_ITECH_AR_Red", "DotSight_HDS-4_AR_Red",
+    "DotSight_Holosight_AR_Red",
+    "Magazine_A_AR", "Magazine_B_AR", "Magazine_C_AR", "Magazine_D_AR",
+    "Magazine_A_AR_Gold", "Magazine_B_AR_Gold", "Magazine_C_AR_Gold", "Magazine_D_AR_Gold",
+    "Magazine_A_AR_Red", "Magazine_B_AR_Red", "Magazine_C_AR_Red", "Magazine_D_AR_Red",
+    "Bullet_FT_I_AR", "Bullet_FT_II_AR", "Bullet_FT_III_AR",
+    "Bullet_PVP_Damage_I_AR", "Bullet_PVP_Damage_II_AR", "Bullet_PVP_Damage_III_AR",
+    "Bullet_PVP_Stun_I_AR", "Bullet_PVP_Stun_II_AR", "Bullet_PVP_Stun_III_AR",
+    "Bullet_QR_I_AR", "Bullet_QR_II_AR", "Bullet_QR_III_AR",
+    "MechSight_Aim_I_AR", "MechSight_Aim_II_AR", "MechSight_Aim_III_AR",
+]
+
+# "Worked example": MovePenalty 0.1, the speed lost while held (movement.md).
+[hooks."combat_arms:handling"]
+move_penalty = 0.1
+
+# "From the view-model animation file": PostRush 367 ms, the time after a
+# sprint before it fires again (inventory.md).
+[hooks."combat_arms:inventory"]
+sprint_out = 0.367
+
+# "Worked example": DuckPerturb/MoveDuckPerturb 2/3 are the crosshair's
+# crouched minimums only (Q3). (The HUD's weapon panel reads the inventory
+# class, `slot`, not a class of its own: hud_crosshair.md D4.)
+[hooks."combat_arms:hud"]
+duck_perturb = 2
+move_duck_perturb = 3
+
+# view_models.md 4, 9, 10 (per-weapon placement): `MuzzlePos`,
+# `BreachOffset`, `PVMuzzleFXName`; `Recoil` (the shot jiggle) is
+# (0, 0, 0) in every stock record. Its animations are the view model's
+# own, by view_models.md 7's names (game/view_model.rs).
+[hooks."combat_arms:view_model"]
+muzzle_pos = [4.4, -3.55, 7.75]
+breach_offset = [0.0, 0.0, 0.0]
+muzzle_fx = "AK47_pv_muzz"
+shells = true
+
+# effects_sounds.md, "How effects are described as data" and 11: the
+# ammo's ImpactFX, FireFX and TracerFX records (data/effects.toml), the
+# third-person muzzle group and the weapon's sounds (files inside the
+# install's archives; the spec names the M4A1's).
+[hooks."combat_arms:effects"]
+ammo_kind = "bullet"
+impact = "BulletFmj"
+fire = "5.56mm"
+tracer = "AR02"
+hh_muzzle = "M4_HH_Muzz"
+fire_sound = "guns_snd_ar/m4a1/fire.wav"
+fire_radius = 2000
+silenced_sounds = ["guns_snd_option/ar/silenced1.wav", "guns_snd_option/ar/silenced2.wav"]
+dry_fire_sound = "guns_snd_ar/m4a1/dryfire.wav"
+reload_sounds = ["guns_snd_ar/m4a1/reload1.wav", "guns_snd_ar/m4a1/reload2.wav", "guns_snd_ar/m4a1/reload3.wav"]
+select_sound = "guns_snd_ar/m4a1/select.wav"
+deselect_sound = "guns_snd_ar/m4a1/deselect.wav"

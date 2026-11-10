@@ -1,0 +1,55 @@
+# How Combat Arms' render-style files draw (game/render_style.rs): ours,
+# by file name. A model piece's render-style index picks one of these
+# from its object's list (specs/combat_arms/models_ltb.md "Textures and
+# render styles"); the files' own format isn't in the specs, so the look
+# is our reading of the name: "opaque" (the engine's default style),
+# "blend" (by the texture's alpha), "add" (added to what's behind,
+# unlit) or "glow" (at the texture's own brightness, ignoring the
+# lighting). A file not listed draws opaque: the default style, and the
+# outline, fur, freezing and infection styles (their effects aren't
+# drawn).
+
+[styles]
+"RS\\default.ltb" = "opaque"
+# characters.md 2 and Corrections (2026-10-30) 2, models_ltb.md R1: the
+# team-mark pieces' and the ghillie leaves' style: the texture alone
+# (unlit), alpha-tested (kept where alpha >= 160/255), not blended; mark 0
+# (`Alpha.dtx`) shows nothing through it.
+"RS\\MARKTRANSPARENT.LTB" = { cutout = { reference = 160, unlit = true } }
+# attachments.md Corrections (2026-10-30) 4: a sight's lens: texture x
+# lit colour, alpha-tested (kept where alpha > 160/255), two-sided.
+"RS\\transparent.ltb" = { cutout = { reference = 160, strict = true, two_sided = true } }
+# models_ltb.md "Stock styles" and Follow-up (2026-10-31): slot 1 as an
+# environment or rim map on generated coordinates (render_style::Layer),
+# each with its style file's lighting material; pv_char_b's three passes
+# in one.
+"RS\\ENV_ALPHA_MASK.ltb" = { layered = { layer = "env_alpha_mask" } }
+"RS\\ItemEdge.ltb" = { layered = { layer = "item_edge", cutout = 160 } }
+"RS\\EdgeAmp01.ltb" = { layered = { layer = "edge_amp", cutout = 160 } }
+"RS\\envmap.ltb" = { layered = { layer = "envmap" } }
+"RS\\PV_Char.ltb" = { layered = { layer = "pv_char" } }
+"RS\\PV_Char_B.ltb" = { layered = { layer = "pv_char_b" } }
+"RS\\translucent.ltb" = "blend"
+"RS\\translucent2pass.ltb" = "blend"
+"RS\\translucent_nolight.ltb" = "blend"
+"RS\\translucent_nodiffuse.ltb" = "blend"
+"RS\\translucentzbufferedsat.ltb" = "blend"
+"RS\\translucentzbufferedsatnocull.ltb" = "blend"
+"RS\\ninjatranslucent.ltb" = "blend"
+"RS\\glass.ltb" = "blend"
+"RS\\glass2.ltb" = "blend"
+"RS\\pv_glass.ltb" = "blend"
+"RS\\additive.ltb" = "add"
+"RS\\additive_2sided.ltb" = "add"
+"RS\\additive_4.ltb" = "add"
+"RS\\additive_sfx.ltb" = "add"
+"RS\\additive_sfx_alpha.ltb" = "add"
+"RS\\additive_sfx_alpha_ref.ltb" = "add"
+"RS\\additive_sfx_alpha_ref_cull.ltb" = "add"
+"RS\\additive_sfx_alpha_plus_ref.ltb" = "add"
+"RS\\additive_throughwall.ltb" = "add"
+"RS\\additive_wave.ltb" = "add"
+"RS\\alpha_additive_nocull_wglow.ltb" = "add"
+"RS\\GLOW.LTB" = "glow"
+"RS\\inner_glow.ltb" = "glow"
+"RS\\inner_glowghost.ltb" = "glow"

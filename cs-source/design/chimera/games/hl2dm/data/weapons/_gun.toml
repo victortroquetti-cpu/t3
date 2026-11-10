@@ -1,0 +1,52 @@
+# What every HL2:DM bullet weapon shares (weapons.md 5-6).
+id = "hl2dm:gun"
+base = "hl2dm:base"
+abstract = true
+
+[trigger]
+automatic = true
+cycle = 0.1
+# Every gun's held attack catches up shot by shot (the SDK's generic
+# primary attack, weapons.md 7.1, 7.3).
+timing = "accumulate"
+
+[magazine]
+clip = 1
+ammo = "hl2dm:pistol"
+reload = 1.0
+# Holding attack on an empty clip reloads once the dry fire has played
+# (weapons.md 7.6, CS:S's 3.4-3.5, the SDK's).
+reload_while_held = true
+
+[hitscan]
+# Every bullet weapon's trace (weapons.md, constants).
+range = 56755.84
+pellets = 1
+# The punch moves the shot (weapons.md 5: aim = view + punch).
+punch_scale = 1.0
+# A tracer every 2nd bullet by one count over every bullet (weapons.md 6,
+# effects_sounds.md 2; the .357 and the shotgun every 4th); other clients
+# draw one on every bullet of a round the server's count picked, and
+# trace it again through every player (effects_sounds.md 1).
+tracer_every = 2
+redrawn_through_characters = true
+# A call of several bullets (pellets, a tick's catch-up rounds) traces
+# every odd-numbered one as a +-3 box (weapons.md 5).
+odd_box = 3.0
+
+[damage]
+amount = 1.0
+# No range falloff (weapons.md 5).
+falloff = 1.0
+falloff_step = 500.0
+# `sk_player_*` as cfg/skill.cfg sets them: head 3, the rest 1
+# (weapons.md 6).
+hitgroups = { head = 3.0, chest = 1.0, stomach = 1.0, arm = 1.0, leg = 1.0 }
+impulse = 666.57
+# Health keeps the fraction (suit.md; the carried remainder is M3's).
+quantum = 0.0
+# The suit (`suit::suit_armour`, its coverage 0.8 on the shared armour
+# step) takes 80 % at one armour point a point: with ratio 1 health gets
+# the other 20 % (0.4 left health nothing while the armour lasted:
+# corrected with M5's projectiles, projectiles.md 11).
+armor_ratio = 1.0

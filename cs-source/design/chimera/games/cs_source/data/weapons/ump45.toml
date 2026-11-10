@@ -1,0 +1,74 @@
+# UMP45.
+id = "cs_source:weapon_ump45"
+base = "cs_source:gun"
+slot = 0
+draw = 1.0
+max_speed = 250.0
+weight = 25
+
+[buy]
+price = 1700
+bot_weight = 1.0
+
+[trigger]
+automatic = true
+cycle = 0.105
+
+[magazine]
+clip = 25
+ammo = "cs_source:45acp"
+reload = 3.4545
+
+[hitscan]
+range = 4096.0
+
+[damage]
+amount = 30.0
+falloff = 0.82
+armor_ratio = 1.0
+# Its ammo's push (measured, _gun.toml).
+impulse = 2100.0
+
+[penetration]
+objects = 1
+
+[sounds]
+fire = "Weapon_UMP45.Single"
+empty = "Default.ClipEmpty_Rifle"
+reload = [[0.6971, "Weapon_UMP45.Clipout"], [1.7877, "Weapon_UMP45.Clipin"], [2.6061, "Weapon_UMP45.Boltslap"]]
+
+[models]
+world = "models/weapons/w_smg_ump45.mdl"
+view = "models/weapons/v_smg_ump45.mdl"
+
+[hud]
+name = "Cstrike_WPNHUD_UMP45"
+icon = "d_ump45"
+
+[anim]
+idle_after = 2.0
+idle_interval = 20.0
+
+[hooks."cs_source:accuracy"]
+spread = 0.001
+crouch = 0.01439
+stand = 0.01919
+jump = 0.16941
+land = 0.03388
+fire = 0.01129
+movement = 0.01366
+recovery_crouch = 0.2171
+recovery_stand = 0.30394
+
+[hooks."cs_source:hit_slowdown"]
+body = 0.5
+
+# Measured on the probe server, 2026-10-15 (specs/cs_source/weapons.md M3, more
+# weapons): full-clip holds standing, crouched and side-running; airborne
+# (a jump's worth of shots, M3 airborne table; its
+# airborne yaw cap wasn't reached in a jump: UNMEASURED, a guess).
+[hooks."cs_source:recoil"]
+standing = { up = 0.275, up_step = 0.15, side = 0.2, side_step = 0.0225, up_cap = 2.5, side_cap = 1.5 }
+crouched = { up = 0.25, up_step = 0.125, side = 0.175, side_step = 0.02, up_cap = 2.25, side_cap = 1.25 }
+moving = { up = 0.55, up_step = 0.225, side = 0.3, side_step = 0.03, up_cap = 3.5, side_cap = 1.5 }
+airborne = { up = 0.125, up_step = 0.55, side = 0.65, side_step = 0.0475, up_cap = 5.5, side_cap = 3.0 }

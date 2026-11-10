@@ -1,0 +1,74 @@
+# MAC-10.
+id = "cs_source:weapon_mac10"
+base = "cs_source:gun"
+slot = 0
+draw = 1.0
+max_speed = 250.0
+weight = 25
+
+[buy]
+price = 1400
+team = 1
+bot_weight = 1.0
+
+[trigger]
+automatic = true
+cycle = 0.075
+
+[magazine]
+clip = 30
+ammo = "cs_source:45acp"
+reload = 3.1429
+
+[hitscan]
+range = 4096.0
+
+[damage]
+amount = 29.0
+falloff = 0.82
+armor_ratio = 0.95
+# Its ammo's push (measured, _gun.toml).
+impulse = 2100.0
+
+[penetration]
+objects = 1
+
+[sounds]
+fire = "Weapon_MAC10.Single"
+empty = "Default.ClipEmpty_Rifle"
+reload = [[0.6286, "Weapon_MAC10.Clipout"], [1.5715, "Weapon_MAC10.Clipin"], [2.4857, "Weapon_MAC10.Boltpull"]]
+
+[models]
+world = "models/weapons/w_smg_mac10.mdl"
+view = "models/weapons/v_smg_mac10.mdl"
+
+[hud]
+name = "Cstrike_WPNHUD_MAC10"
+icon = "d_mac10"
+
+[anim]
+idle_after = 2.0
+idle_interval = 20.0
+
+[hooks."cs_source:accuracy"]
+spread = 0.001
+crouch = 0.01425
+stand = 0.019
+jump = 0.13704
+land = 0.02741
+fire = 0.00845
+movement = 0.0062
+recovery_crouch = 0.25263
+recovery_stand = 0.35368
+
+[hooks."cs_source:hit_slowdown"]
+body = 0.5
+
+# Measured on the probe server, 2026-10-15 (specs/cs_source/weapons.md M3, more
+# weapons): full-clip holds standing, crouched and side-running; airborne
+# (a jump's worth of shots, M3 airborne table).
+[hooks."cs_source:recoil"]
+standing = { up = 0.775, up_step = 0.2, side = 0.425, side_step = 0.03, up_cap = 3.0, side_cap = 2.75 }
+crouched = { up = 0.75, up_step = 0.175, side = 0.4, side_step = 0.03, up_cap = 2.75, side_cap = 2.5 }
+moving = { up = 0.9, up_step = 0.25, side = 0.45, side_step = 0.035, up_cap = 3.5, side_cap = 2.75 }
+airborne = { up = 1.3, up_step = 0.4, side = 0.55, side_step = 0.05, up_cap = 4.75, side_cap = 3.75 }

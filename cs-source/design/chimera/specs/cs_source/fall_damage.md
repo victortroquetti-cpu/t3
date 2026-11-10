@@ -1,0 +1,141 @@
+# Counter-Strike: Source: fall damage and trigger_hurt
+
+Source basis: measurements only, on a local CS:S dedicated server (the
+tools/css_probe plugin over RCON, 0.015 s tick, de_dust2 and de_port),
+plus the landing rules of the public SDK 2013 shared movement code already
+in specs/cs_source/movement.md ("Falling and landing"). No game code was
+read for this spec.
+Status: implemented (src/games/cs_source/movement.rs, src/map/hurt.rs)
+
+## Summary
+
+- Landing faster than 580 units/s out of water costs
+  floor((fall speed − 580) × 100 / 416) health. 100 damage (death at full
+  health) comes at 996 units/s, not the shared code's 1024.
+- Armour doesn't absorb it. There is no attacker (the event's attacker is
+  0, "worldspawn" on death).
+- `trigger_hurt` with damage D (per second) bites everyone touching it for
+  D / 2 every half second (33 ticks at 0.015 s).
+
+## Fall damage
+
+**Fall speed** is −vz at the start of the landing tick (the movement spec's
+"fall speed"), i.e. −vz logged at the end of the previous tick.
+
+| Name | Value | Unit |
+|---|---|---|
+| fall_safe | 580 | units/s: no damage at or below |
+| fall_damage_per_speed | 100 / 416 = 0.240385 | hp per unit/s above fall_safe |
+| fall_fatal (100 hp) | 996 | units/s |
+
+damage = floor((fall − 580) × 100 / 416), when fall > 580 and the player
+isn't in water (water level 0; the movement spec's landing check). Health
+loses exactly that many whole points.
+
+Fit: 50 landings from 573 to 2012 units/s; floor with safe speed in
+579.9..580.2 and slope 0.2404..0.2405 is the only rounding rule that fits
+all of them (round and ceil need a safe speed of 582 or 584, which the
+measured 0 at 584 and 1 at 585 then pin to the same curve). 100/416 lies in
+the slope range; 1.25 × 100/444 (0.2815) and 100/444 (0.2252) don't.
+
+| Fall speed | Damage | Health after (from 100) |
+|---|---|---|
+| 573 .. 584 | 0 | 100 |
+| 585 | 1 | 99 |
+| 648 | 16 | 84 |
+| 836 | 61 | 39 |
+| 984 | 97 | 3 |
+| 992 | 99 | 1 |
+| 996 | 100 | dead |
+| 1024 | 106 | dead |
+| 1124 | 130 | |
+| 1512 | 224 | |
+| 2012 | 344 | |
+
+(Rows past 100 measured with health 1000.)
+
+- Armour 100 with fall speed 836: damage 61, armour stays 100.
+
+### Method
+
+`python3 tools/css_probe/fallmeas.py [start speeds]`: `mashup_health 1000`
+(plugin command: respawns the probe bot if dead, sets health and armour),
+then a `mashup_wrun` whose start line places the bot 40 units above the
+tile floor inside the CT spawn building on de_dust2 (352, 2384, −126.24)
+with a downward start velocity. The run log's tick rows give the landing
+tick (first grounded row) and the previous row's vz; its `player_hurt` row
+gives `dmg_health`. `python3 tools/css_probe/fallmeas.py armor` repeats the
+armour and death checks.
+
+Not measured: landing on a moving or floating object (the movement spec's
+adjustments), the landing view punch and the CS:S landing slowdown (already
+in the movement spec's stamina values).
+
+## trigger_hurt
+
+Of the stock maps on the reference install, only de_port has one (the sea
+under the map: model *11, a box −7424..7936 × −6816..2144 × −128..128
+around the entity's origin (256, 2976, 128), so −7168..8192 × −3840..5120 ×
+0..256 in the world (brush entity models are stored relative to their
+origin, as the BSP's other brush entities show),
+`damage` 50, `damagetype` 16384 (drown), `damagemodel` 0, `damagecap` 20,
+`spawnflags` 1, `StartDisabled` 0). dust2 has none.
+
+Measured on de_port, the bot standing on the floor at (256, 2000, 0) inside
+it for 300 ticks: 25 damage (half of `damage`) on tick 4, then every 33
+ticks (0.495 s), 10 bites in 300 ticks. Armour 0, so armour's effect isn't
+known.
+
+Measured 2026-10-17 (probe server, de_port, the same spot, health 1000,
+bites read from `player_hurt` with their ticks):
+- **Armour** (100, no helmet): every bite took 25 from health and none from
+  the armour (armour 100 throughout, `dmg_armor` 0): armour doesn't absorb
+  this (drown-type) damage.
+- **One timer per trigger:** a second bot put in 10 ticks after the first
+  was not bitten on entry; its first bite came on the first bot's next
+  bite tick, and from then on both were bitten on the same ticks (every
+  33 ticks).
+
+**Landing sounds** (measured 2026-10-17, the probe bot dropped onto
+de_dust2's CT spawn floor by `fallmeas.py`, its sounds logged by the
+probe's sound hook): a landing that takes health plays one of
+`player/damage1..3.wav` (`Player.FallDamage`, channel 4, volume 1.0) and
+a footstep at volume 1.0 on the same tick (6, 12, 16, 37 and 82 damage
+alike); a landing at a fall speed under 580 (no damage) plays only the
+footstep, at 0.85.
+
+Implemented: each volume's brushes (its brush model's convex brushes, moved
+by the entity origin); a living character whose bounding box overlaps one
+takes damage / 2 every 0.5 s, due within half a tick of the half second
+(which gives 33 ticks at 0.015 s); the first touch after nobody was inside
+bites 4 ticks later (measured 2026-10-18, triggers.md question 8). One timer per volume, shared by everyone in it (inferred).
+Left out: `StartDisabled 1` (needs map logic), triggers that don't hurt
+players (spawnflags without bit 1, when not 0).
+
+## Open questions
+
+1. **Answered (measured 2026-10-18, probe server, a spawned trigger_hurt
+   on de_nuke, damage 10, `damagemodel` 1, `damagecap` 50, the bot
+   standing in it):** passes took 5, 10, 20, 25, 25, ... (health 995,
+   985, 965, 940, 915, ...): doubling up to half the cap a pass, as
+   specs/source/triggers.md describes and ours does. Was: `damagemodel`
+   1 (doubling damage up to `damagecap`) isn't used by any stock map; it
+   hurts at the constant rate here.
+2. **Partly answered (2026-10-17, above): armour takes nothing of
+   de_port's drown-type damage.** Other damage types (no stock map has
+   one) are open. Was: Whether armour reduces trigger_hurt damage (drown
+   type), and whether other damage types differ.
+3. **Answered (2026-10-17, above): one shared timer per trigger; a
+   newcomer is first bitten on the trigger's next bite.** Was: Whether the
+   half-second timer is per trigger (shared) or per toucher.
+4. **Sound part answered (2026-10-17, "Landing sounds" above:
+   `Player.FallDamage` on every landing that takes health, none
+   otherwise; as ours).** The view roll and the HUD need the client. Was:
+   Feedback on a damaging landing (implementation guesses, for the
+   coordinator to measure on the probe server or a client demo): does
+   `Player.FallDamage` play on every landing that takes health (and not on
+   one that takes none, e.g. god mode)? Is the landing view roll
+   fall speed × 0.013° (the shared code's), with which sign, and does it
+   decay by the shared punch spring (damping 9, spring 65)? Which HUD
+   damage indicators light for a fall (ours: all four), and does the
+   health panel run `HealthTookDamage` (scripts/HudAnimations.txt) for it?

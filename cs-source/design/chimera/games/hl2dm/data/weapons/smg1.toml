@@ -1,0 +1,71 @@
+# The SMG1 (specs/hl2dm/weapons.md 7.3): 5 a bullet, 0.075 s accumulating
+# (13.33 a second), a 5 degree cone, the machine gun's kick (1 degree,
+# over 2 s held), 45 rounds, 225 carried. Its contact grenade on attack2
+# (projectiles.md 4): `hl2dm:smg1_grenade`.
+# Script: bucket 2 position 0, weight 3, clip 45.
+id = "hl2dm:weapon_smg1"
+base = "hl2dm:gun"
+class = "smg"
+slot = 2
+draw = 0.8333
+weight = 3
+
+[trigger]
+cycle = 0.075
+
+[magazine]
+clip = 45
+ammo = "hl2dm:smg1"
+# 100 ticks.
+reload = 1.5
+
+[hitscan]
+spread = { cone = 0.04362 }
+
+[damage]
+amount = 5.0
+
+[sounds]
+fire = "Weapon_SMG1.Single"
+empty = "Weapon_SMG1.Empty"
+reload = [[0.0, "Weapon_SMG1.Reload"]]
+
+[models]
+world = "models/weapons/w_smg1.mdl"
+view = "models/weapons/v_smg1.mdl"
+view_right_handed = true
+
+[hud]
+name = "#HL2_SMG1"
+icon = "smg1"
+
+[hooks."hl2dm:inventory"]
+position = 0
+
+[hooks."hl2dm:machine_gun"]
+max = 1.0
+slide = 2.0
+
+# The contact grenade (projectiles.md 4): 3 carried, none at spawn; 1000
+# units/s along view + punch, 400 units/s² of gravity, a +-3 box, 100 in
+# 250; next primary 0.5, next secondary 1.0; dry 0.5.
+[hooks."hl2dm:smg1_grenade"]
+ammo = "hl2dm:smg1_grenade"
+max = 3
+speed = 1000.0
+gravity = 400.0
+half = 3.0
+damage = 100.0
+radius = 250.0
+primary = 0.5
+secondary = 1.0
+dry = 0.5
+sound = "Weapon_SMG1.Double"
+empty = "Weapon_SMG1.Empty"
+# No server sound: the explosion's boom is the client's (H9 15.10).
+explode = ""
+
+# Eyes under water: the empty sound and 0.2 s (14 ticks) before the next
+# try, no shot (weapons.md 5).
+[hooks."hl2dm:dry_under_water"]
+wait = 0.2
