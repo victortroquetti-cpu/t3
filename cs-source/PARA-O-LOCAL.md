@@ -26,7 +26,14 @@ Ordem sugerida: de cima para baixo.
      - um amigo consegue entrar;
    - **`listenserver.cfg`:** no console, ao carregar o mapa, aparece "Executing listen server config file", e
      `trok_pulo_altura` vem do `movimento.cfg`.
-4. **Jogar com amigos:** testar o `exec online` e um amigo entrando pelo IP ou pela VPN.
+4. **Calibrar a mira pelo cano de cada arma** (todas estão com o mesmo chute `-3 1 -1.5`):
+   - no jogo, com a arma na mão: `trok_mira_calibrar 1` (arma presa na mira e linhas vermelhas no centro);
+   - ajustar com `trok_mira_mexer cima 0.05`, `direita`, `frente`, `pitch`, `yaw` e `roll` até a alça e a massa ficarem
+     sobre o cruzamento das linhas, com o cano reto (dá para fazer sozinho com o MCP `trok`: `comando` + `print_tela`);
+   - `trok_mira_imprimir` e colar as linhas no `scripts/weapon_trok_<arma>.txt`;
+   - depois, testar segurar e alternar, o zoom com FOV 75 e 90, e se o clarão aparece mirando (se não aparecer,
+     o modelo usa outro evento: usar `mira_animacao_tiro 1` nessa arma ou avisar a nuvem).
+5. **Jogar com amigos:** testar o `exec online` e um amigo entrando pelo IP ou pela VPN.
 
 ## Medir e preencher (Fase 3)
 - Converter para o Source os números de `design/decombat/specs/` (movimento, cone e recuo, modos) e preencher os

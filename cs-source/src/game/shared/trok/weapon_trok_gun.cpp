@@ -32,6 +32,9 @@
 #include "trok_surto.h"
 #ifdef CLIENT_DLL
 #include "prediction.h"
+#include "eventlist.h"
+#include "cl_animevent.h"
+#include "c_baseviewmodel.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -49,7 +52,28 @@ ConVar trok_arma_correndo_atraso( "trok_arma_correndo_atraso", "0.2", FCVAR_REPL
 #ifdef CLIENT_DLL
 static ConVar trok_mira_ajuste( "trok_mira_ajuste", "0 0 0 0 0 0", 0,
 	"Ajuste ao vivo da mira pelo cano: \"direita cima frente pitch yaw roll\" somados ao script. Depois: trok_mira_imprimir." );
+// Preferência do jogador (vai para o servidor pelo userinfo): 1 = segurar o botão 2 para mirar
+// (padrão do CoD), 0 = apertar para entrar e apertar de novo para sair.
+ConVar trok_mira_segurar( "trok_mira_segurar", "1", FCVAR_USERINFO | FCVAR_ARCHIVE,
+	"Mirar pelo cano: 1 = segurar o botão (como no CoD), 0 = alternar." );
+// Calibração: deixa a arma parada na posição de mira (mesmo sem mirar) e o HUD desenha
+// linhas finas no centro da tela. Mexer com trok_mira_mexer e copiar com trok_mira_imprimir.
+ConVar trok_mira_calibrar( "trok_mira_calibrar", "0", 0,
+	"1 = arma presa na posição de mira e linhas no centro da tela, para alinhar a alça (trok_mira_mexer, trok_mira_imprimir)." );
 #endif
+
+// Segurar ou alternar: bots sempre alternam (o código deles aperta e solta o botão 2).
+static bool TrokMiraSegurar( CBasePlayer *pPlayer )
+{
+	if ( !pPlayer || pPlayer->IsBot() )
+		return false;
+#ifdef CLIENT_DLL
+	return trok_mira_segurar.GetBool();
+#else
+	const char *pszVal = engine->GetClientConVarValue( pPlayer->entindex(), "trok_mira_segurar" );
+	return ( pszVal && pszVal[ 0 ] ) ? atoi( pszVal ) != 0 : true;
+#endif
+}
 
 ConVar trok_arma_correndo_vel( "trok_arma_correndo_vel", "230", FCVAR_REPLICATED,
 	"Velocidade (u/s) a partir da qual, segurando Shift, conta como correndo (arma abaixada)." );
@@ -179,6 +203,7 @@ CWeaponTrokGun::CWeaponTrokGun()
 	m_flBobPhase = 0.0f;
 	m_flBobAmount = 0.0f;
 	m_flViewmodelADS = 0.0f;
+	m_flCoiceTempo = -100.0f;
 	m_bFiresUnderwater = false;
 }
 
@@ -318,7 +343,20 @@ void CWeaponTrokGun::PrimaryAttack( void )
 
 	WeaponSound( SINGLE );
 	pPlayer->DoMuzzleFlash();
-	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
+	// Mirando: a animação de tiro do modelo (do CS:S) tira a alça do centro. No lugar dela,
+	// coice procedural (AddViewmodelBob) e o clarão do próprio modelo, sem mexer a arma.
+	if ( m_bADS && !info.m_bTrokADSAnimTiro )
+	{
+#ifdef CLIENT_DLL
+		if ( prediction->IsFirstTimePredicted() )
+		{
+			m_flCoiceTempo = gpGlobals->curtime;
+			ClaraoSemAnimacao();
+		}
+#endif
+	}
+	else
+		SendWeaponAnim( ACT_VM_PRIMARYATTACK );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
 	m_iClip1 -= 1;
 
@@ -344,7 +382,7 @@ void CWeaponTrokGun::PrimaryAttack( void )
 	m_flLastShotTime = gpGlobals->curtime;
 	m_flExtraSpread = MIN( m_flExtraSpread + info.m_flTrokSpreadPerShot, info.m_flTrokSpreadMaxShots );
 
-	float flADSKick = m_bADS ? 0.7f : 1.0f;
+	float flADSKick = m_bADS ? info.m_flTrokADSKick : 1.0f;
 	float flUp = info.m_flTrokKickUp * ( 1.0f + 0.1f * MIN( m_iShotsInRow.Get(), 10 ) ) * flADSKick;
 	float flSide = info.m_flTrokKickSide * sinf( m_iShotsInRow * 0.9f ) * flADSKick +
 		SharedRandomFloat( "TrokGunKick", -0.25f, 0.25f ) * info.m_flTrokKickSide;
@@ -377,8 +415,8 @@ void CWeaponTrokGun::PrimaryAttack( void )
 
 void CWeaponTrokGun::SecondaryAttack( void )
 {
-	if ( Info().m_flTrokADSFov <= 0.0f || IsOwnerSprinting() )
-		return;
+	if ( !HasADS() || IsOwnerSprinting() || TrokMiraSegurar( GetPlayerOwner() ) )
+		return;	// segurando: quem decide é o ItemPostFrame
 
 	SetADS( !m_bADS );
 	m_flNextSecondaryAttack = gpGlobals->curtime + 0.25f;
@@ -394,7 +432,21 @@ void CWeaponTrokGun::SetADS( bool bOn )
 	// começa no mesmo tique no cliente (só no servidor chegaria um ping depois).
 	CBasePlayer *pPlayer = GetPlayerOwner();
 	if ( pPlayer )
-		pPlayer->SetFOV( this, bOn ? (int)Info().m_flTrokADSFov : 0, Info().m_flTrokADSTime );
+		pPlayer->SetFOV( this, bOn ? GetADSFov( pPlayer ) : 0, Info().m_flTrokADSTime );
+}
+
+// FOV mirando. Com mira_zoom, é relativo ao campo de visão que o jogador escolheu (o mesmo
+// aumento em qualquer FOV, como no CoD); sem, é o mira_fov fixo do script.
+int CWeaponTrokGun::GetADSFov( CBasePlayer *pPlayer ) const
+{
+	const CHL2MPSWeaponInfo &info = Info();
+	if ( info.m_flTrokADSZoom > 1.0f && pPlayer )
+	{
+		const float flBase = (float)pPlayer->GetDefaultFOV();
+		const float flFov = 2.0f * RAD2DEG( atanf( tanf( DEG2RAD( flBase * 0.5f ) ) / info.m_flTrokADSZoom ) );
+		return clamp( (int)( flFov + 0.5f ), 10, (int)flBase );
+	}
+	return (int)info.m_flTrokADSFov;
 }
 
 void CWeaponTrokGun::ItemPostFrame( void )
@@ -413,6 +465,15 @@ void CWeaponTrokGun::ItemPostFrame( void )
 		bool bSprinting = IsOwnerSprinting();
 		if ( bSprinting && m_bADS )
 			SetADS( false );
+
+		// Segurar para mirar (padrão do CoD): mira enquanto o botão 2 está apertado. Correr ou
+		// recarregar tira; ainda segurando quando acabam, volta para a mira sozinho.
+		if ( TrokMiraSegurar( pPlayer ) && HasADS() )
+		{
+			const bool bQuer = ( pPlayer->m_nButtons & IN_ATTACK2 ) && !bSprinting && !m_bInReload;
+			if ( bQuer != m_bADS )
+				SetADS( bQuer );
+		}
 		if ( m_bWasSprinting && !bSprinting )
 			m_flSprintEndTime = gpGlobals->curtime;
 		m_bWasSprinting = bSprinting;
@@ -468,7 +529,7 @@ void CWeaponTrokGun::AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin,
 
 #ifdef CLIENT_DLL
 	float flTargetSprint = IsOwnerSprinting() ? 1.0f : 0.0f;
-	float flTargetADS = m_bADS ? 1.0f : 0.0f;
+	float flTargetADS = ( m_bADS || trok_mira_calibrar.GetBool() ) ? 1.0f : 0.0f;
 	float flRate = gpGlobals->frametime * 8.0f;
 	m_flViewmodelSprint = Approach( flTargetSprint, m_flViewmodelSprint, flRate );
 	m_flViewmodelADS = Approach( flTargetADS, m_flViewmodelADS, gpGlobals->frametime / MAX( 0.05f, Info().m_flTrokADSTime ) );
@@ -528,11 +589,77 @@ void CWeaponTrokGun::AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin,
 		// Na mira, quase sem balanço de passo: mira confortável.
 		origin += a * ( pos.x * right + pos.y * up + pos.z * forward );
 		angles += a * ang;
+
+		// Coice mirando: a arma vem para trás e levanta um pouco e volta em ~0,1 s,
+		// sem tirar a alça do centro por mais que um instante.
+		const float flCoiceDur = 0.1f;
+		const float tc = gpGlobals->curtime - m_flCoiceTempo;
+		if ( tc >= 0.0f && tc < flCoiceDur )
+		{
+			const float c = a * ( 1.0f - tc / flCoiceDur ) * ( 1.0f - tc / flCoiceDur );
+			origin -= c * Info().m_flTrokADSCoice * forward;
+			angles.x -= c * Info().m_flTrokADSCoiceAng;
+		}
 	}
 #endif
 }
 
 #ifdef CLIENT_DLL
+// Mirando sem a animação de tiro: dispara os eventos de clarão que a sequência de tiro do
+// modelo teria (mesmo tipo e mesmo anexo), sem tocar a sequência.
+void CWeaponTrokGun::ClaraoSemAnimacao( void )
+{
+	CBasePlayer *pPlayer = GetPlayerOwner();
+	C_BaseViewModel *pVM = pPlayer ? pPlayer->GetViewModel( m_nViewModelIndex ) : NULL;
+	if ( !pVM )
+		return;
+	CStudioHdr *pHdr = pVM->GetModelPtr();
+	if ( !pHdr )
+		return;
+	const int iSeq = pVM->SelectWeightedSequence( ACT_VM_PRIMARYATTACK );
+	if ( iSeq < 0 || iSeq >= pHdr->GetNumSeq() )
+		return;
+	mstudioseqdesc_t &seq = pHdr->pSeqdesc( iSeq );
+	for ( int i = 0; i < seq.numevents; ++i )
+	{
+		const mstudioevent_t *pEv = seq.pEvent( i );
+		const int ev = pEv->event;
+		const bool bClarao = ev == AE_MUZZLEFLASH || ( ev >= CL_EVENT_MUZZLEFLASH0 && ev <= CL_EVENT_MUZZLEFLASH3 );
+		if ( bClarao )
+			pVM->FireEvent( pVM->GetAbsOrigin(), pVM->GetAbsAngles(), ev, pEv->pszOptions() );
+	}
+}
+#endif
+
+#ifdef CLIENT_DLL
+// Calibração: soma um valor a um eixo do trok_mira_ajuste. Bom para bind nas setas:
+//   bind UPARROW "trok_mira_mexer cima 0.05"; bind DOWNARROW "trok_mira_mexer cima -0.05"
+CON_COMMAND( trok_mira_mexer, "Uso: trok_mira_mexer <direita|cima|frente|pitch|yaw|roll> <valor>. Soma ao trok_mira_ajuste." )
+{
+	static const char *s_pszEixos[ 6 ] = { "direita", "cima", "frente", "pitch", "yaw", "roll" };
+	if ( args.ArgC() < 3 )
+	{
+		Msg( "Uso: trok_mira_mexer <direita|cima|frente|pitch|yaw|roll> <valor>\n" );
+		return;
+	}
+	int iEixo = -1;
+	for ( int i = 0; i < 6; ++i )
+		if ( !Q_stricmp( args[ 1 ], s_pszEixos[ i ] ) )
+			iEixo = i;
+	if ( iEixo < 0 )
+	{
+		Msg( "Eixo desconhecido: %s\n", args[ 1 ] );
+		return;
+	}
+	float adj[ 6 ] = {};
+	sscanf( trok_mira_ajuste.GetString(), "%f %f %f %f %f %f", &adj[ 0 ], &adj[ 1 ], &adj[ 2 ], &adj[ 3 ], &adj[ 4 ], &adj[ 5 ] );
+	adj[ iEixo ] += atof( args[ 2 ] );
+	char szVal[ 128 ];
+	V_snprintf( szVal, sizeof( szVal ), "%.3f %.3f %.3f %.3f %.3f %.3f", adj[ 0 ], adj[ 1 ], adj[ 2 ], adj[ 3 ], adj[ 4 ], adj[ 5 ] );
+	trok_mira_ajuste.SetValue( szVal );
+	Msg( "trok_mira_ajuste \"%s\"\n", szVal );
+}
+
 // Ajuste ao vivo da mira pelo cano: mexe com trok_mira_ajuste até a alça cair
 // no centro e rode trok_mira_imprimir para copiar os valores para o script.
 CON_COMMAND( trok_mira_imprimir, "Mostra a posição e o ângulo de mira da arma atual (script + ajuste) para colar no script da arma." )

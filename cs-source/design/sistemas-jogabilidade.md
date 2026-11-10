@@ -64,7 +64,17 @@ entidade).
   Deslize: desligado (`trok_deslizar 0`), decisão do dono.
 - **Caminhar (C):** `+walk` anda devagar (`hl2_walkspeed`) e **não faz barulho de passo**
   (patch em `CBasePlayer::UpdateStepSound`). Os bots também não ouvem (só ouvem acima de ~160 u/s).
-- **Mira pelo cano:** botão 2 alterna. FOV vai para `mira_fov` em `mira_tempo`, a arma vai
+- **Mira pelo cano, estilo CoD:**
+  - **Botão:** segurar o botão 2 (`trok_mira_segurar 1`, padrão, com opção em CONFIGURAÇÕES); com 0, alterna. Os bots sempre
+    alternam. Segurando, correr ou recarregar tira da mira e, ao acabar, volta sozinho.
+  - **Zoom:** com `mira_zoom` ele é relativo ao campo de visão do jogador (o mesmo aumento com FOV 75 ou 90); o `mira_fov`
+    fixo só vale com `mira_zoom 0`.
+  - **Tiro mirando:** não toca a animação de tiro do modelo, que tira a alça do centro (`mira_animacao_tiro 0`). No lugar,
+    um coice procedural (`mira_coice`, `mira_coice_angulo`, cerca de 0,1 s) e o clarão do próprio modelo. O recuo mirando
+    é `mira_recuo` (×).
+  - **Calibração:** `trok_mira_calibrar 1` prende a arma na posição de mira e desenha linhas no centro.
+    `trok_mira_mexer <direita|cima|frente|pitch|yaw|roll> <valor>` ajusta, e `trok_mira_imprimir` dá as linhas para o script.
+- **Mira pelo cano (resto):** FOV vai para o zoom em `mira_tempo`, a arma vai
   para `mira_posicao`/`mira_angulos`, a dispersão multiplica por `dispersao_mira`, o recuo cai
   30%, o jogador anda a `mira_velocidade`. Sensibilidade do mouse escala com o zoom
   (`zoom_sensitivity_ratio` no `config_default.cfg`). Correr ou recarregar sai da mira.

@@ -1226,10 +1226,10 @@ index 78da217..b4fa5da 100644
  	CNetworkVar( float, m_flGameStartTime );
  	CUtlVector<EHANDLE> m_hRespawnableItemsAndWeapons;
 diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
-index 9b83dce..509a00c 100644
+index 9b83dce..79a3458 100644
 --- a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
 +++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
-@@ -19,6 +19,38 @@ FileWeaponInfo_t* CreateWeaponInfo()
+@@ -19,6 +19,43 @@ FileWeaponInfo_t* CreateWeaponInfo()
  CHL2MPSWeaponInfo::CHL2MPSWeaponInfo()
  {
  	m_iPlayerDamage = 0;
@@ -1258,6 +1258,11 @@ index 9b83dce..509a00c 100644
 +	m_angTrokADSAng.Init( 0.0f, 0.0f, 0.0f );
 +	m_flTrokADSViewmodelFov = 0.0f;
 +	m_flTrokADSMoveSpeed = 0.6f;
++	m_flTrokADSZoom = 0.0f;
++	m_flTrokADSKick = 0.7f;
++	m_flTrokADSCoice = 1.0f;
++	m_flTrokADSCoiceAng = 0.5f;
++	m_bTrokADSAnimTiro = false;
 +	m_flTrokMoveSpeed = 1.0f;
 +	Q_strncpy( m_szTrokAnim, "ar2", sizeof( m_szTrokAnim ) );
 +	m_flTrokKnockback = 30.0f;
@@ -1268,7 +1273,7 @@ index 9b83dce..509a00c 100644
  }
  
  
-@@ -27,6 +59,47 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
+@@ -27,6 +64,52 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
  	BaseClass::Parse( pKeyValuesData, szWeaponName );
  
  	m_iPlayerDamage = pKeyValuesData->GetInt( "damage", 0 );
@@ -1309,6 +1314,11 @@ index 9b83dce..509a00c 100644
 +			sscanf( pszAng, "%f %f %f", &m_angTrokADSAng.x, &m_angTrokADSAng.y, &m_angTrokADSAng.z );
 +		m_flTrokADSViewmodelFov = pTrok->GetFloat( "mira_fov_arma", m_flTrokADSViewmodelFov );
 +		m_flTrokADSMoveSpeed = pTrok->GetFloat( "mira_velocidade", m_flTrokADSMoveSpeed );
++		m_flTrokADSZoom = pTrok->GetFloat( "mira_zoom", m_flTrokADSZoom );
++		m_flTrokADSKick = pTrok->GetFloat( "mira_recuo", m_flTrokADSKick );
++		m_flTrokADSCoice = pTrok->GetFloat( "mira_coice", m_flTrokADSCoice );
++		m_flTrokADSCoiceAng = pTrok->GetFloat( "mira_coice_angulo", m_flTrokADSCoiceAng );
++		m_bTrokADSAnimTiro = pTrok->GetInt( "mira_animacao_tiro", m_bTrokADSAnimTiro ? 1 : 0 ) != 0;
 +		m_flTrokMoveSpeed = pTrok->GetFloat( "velocidade", m_flTrokMoveSpeed );
 +		Q_strncpy( m_szTrokAnim, pTrok->GetString( "animacao", m_szTrokAnim ), sizeof( m_szTrokAnim ) );
 +	}
@@ -1317,10 +1327,10 @@ index 9b83dce..509a00c 100644
  
  
 diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.h b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
-index 2ec16dd..6c8573a 100644
+index 2ec16dd..49f0082 100644
 --- a/src/game/shared/hl2mp/hl2mp_weapon_parse.h
 +++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
-@@ -29,6 +29,40 @@ public:
+@@ -29,6 +29,45 @@ public:
  public:
  
  	int m_iPlayerDamage;
@@ -1350,6 +1360,11 @@ index 2ec16dd..6c8573a 100644
 +	Vector m_vecTrokADSPos;			// mira pelo cano: deslocamento da arma (direita, cima, frente)
 +	QAngle m_angTrokADSAng;			// mira pelo cano: rotação da arma (pitch, yaw, roll)
 +	float m_flTrokADSViewmodelFov;	// FOV da arma na tela mirando (0 = não muda)
++	float m_flTrokADSZoom;			// mira pelo cano: zoom relativo ao FOV do jogador (0 = usa m_flTrokADSFov)
++	float m_flTrokADSKick;			// mira pelo cano: multiplicador do recuo
++	float m_flTrokADSCoice;			// mira pelo cano: quanto a arma recua na tela a cada tiro (u)
++	float m_flTrokADSCoiceAng;		// ... e quanto ela levanta (graus)
++	bool m_bTrokADSAnimTiro;		// mira pelo cano: toca a animacao de tiro do modelo (0 = so o coice, a alca fica no centro)
 +	float m_flTrokADSMoveSpeed;		// multiplicador da velocidade andando mirando
 +	float m_flTrokMoveSpeed;		// multiplicador da velocidade com a arma na mão (peso)
 +	char m_szTrokAnim[ 16 ];		// animação do jogador: ar2, smg1, pistol, shotgun

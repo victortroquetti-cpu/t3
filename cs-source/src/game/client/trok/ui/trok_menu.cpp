@@ -1206,6 +1206,7 @@ void CTrokMenu::RunOptions( void )
 		OptHeader( ix, y, iw, "MOUSE" );
 		OptSlider( ix, y, iw, "Sensibilidade", "sensitivity", 0.2f, 10.0f, 0.1f, "%.1f" );
 		OptSlider( ix, y, iw, "Sensibilidade mirando (relativa)", "zoom_sensitivity_ratio", 0.2f, 2.0f, 0.05f, "%.2f" );
+		OptToggle( ix, y, iw, "Segurar o botão para mirar (desligado: aperta para entrar e sair)", "trok_mira_segurar" );
 		{
 			ConVarRef pitch( "m_pitch", true );
 			if ( pitch.IsValid() )

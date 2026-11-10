@@ -48,11 +48,16 @@ WeaponData
 		"recuperacao"		"10"
 		"recuo_vertical"		"4.0"
 		"recuo_lateral"		"0.8"
-		"mira_fov"		"75"
+		"mira_zoom"		"1.15"		// aumento mirando, relativo ao campo de visão do jogador (0 = usa mira_fov)
+		"mira_fov"		"75"		// só se mira_zoom for 0
 		"mira_tempo"		"0.2"
 		"mira_posicao"		"-3.0 1.0 -1.5"
 		"mira_angulos"		"0 0 0"
 		"mira_velocidade"		"0.7"
+		"mira_recuo"		"0.7"		// recuo mirando (x o normal)
+		"mira_coice"		"2.0"		// mirando: quanto a arma vem para trás a cada tiro (u)
+		"mira_coice_angulo"	"1.5"		// ... e quanto levanta (graus)
+		"mira_animacao_tiro"	"0"		// 0 = mirando não toca a animação de tiro do modelo (a alça fica no centro)
 		"velocidade"		"0.92"		// R870 do CA: perda de 0,08 (movimento do CA: corrida x (1 - colete) x isto)
 		"animacao"		"shotgun"
 	}

@@ -798,12 +798,24 @@ void CHudTrok::PaintAmmo( C_BasePlayer *pLocal )
 	TextRight( m_hNum, xr - wRes - S( 8 ), yNum, bLow ? COR_INIMIGO : COR_BRANCO, szClip );
 }
 
+extern ConVar trok_mira_calibrar; // weapon_trok_gun.cpp
+
 void CHudTrok::PaintCrosshair( C_BasePlayer *pLocal )
 {
+	const int cx = ScreenWidth() / 2, cy = ScreenHeight() / 2;
+
+	// Calibração da mira pelo cano: linhas finas cruzando o centro da tela inteira.
+	if ( trok_mira_calibrar.GetBool() )
+	{
+		surface()->DrawSetColor( Color( 255, 40, 40, 200 ) );
+		surface()->DrawFilledRect( cx, 0, cx + 1, ScreenHeight() );
+		surface()->DrawFilledRect( 0, cy, ScreenWidth(), cy + 1 );
+		return;
+	}
+
 	if ( !trok_hud_mira.GetBool() )
 		return;
 
-	const int cx = ScreenWidth() / 2, cy = ScreenHeight() / 2;
 	C_BaseCombatWeapon *pWeapon = pLocal->GetActiveWeapon();
 	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pWeapon );
 

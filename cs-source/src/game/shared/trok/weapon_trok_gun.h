@@ -53,6 +53,10 @@ private:
 	CBasePlayer *GetPlayerOwner( void ) const { return ToBasePlayer( GetOwner() ); }
 	bool IsOwnerSprinting( void ) const;
 	void SetADS( bool bOn );
+	int GetADSFov( CBasePlayer *pPlayer ) const;
+#ifdef CLIENT_DLL
+	void ClaraoSemAnimacao( void );
+#endif
 	float DamageAtDistance( float flDistance ) const;
 
 	CNetworkVar( float, m_flExtraSpread );		// graus somados pelos tiros seguidos
@@ -67,6 +71,7 @@ private:
 	float m_flBobPhase;							// só cliente: fase do passo (anda com a distância, não com o tempo)
 	float m_flBobAmount;						// só cliente: força do balanço (sobe com a velocidade)
 	float m_flViewmodelADS;						// só cliente: 0 = quadril, 1 = mira
+	float m_flCoiceTempo;						// só cliente: último tiro mirando (coice procedural)
 
 	CWeaponTrokGun( const CWeaponTrokGun & );
 };
