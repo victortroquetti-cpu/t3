@@ -70,6 +70,7 @@ enum TrokEstacaoTipo_t
 	ESTACAO_CAIXA,			// func_trok_caixa_misteriosa
 	ESTACAO_BANCADA,		// func_trok_bancada
 	ESTACAO_ENERGIA,		// func_trok_energia
+	ESTACAO_ARMADILHA,		// func_trok_armadilha (painel; a zona é um trigger_trok_armadilha)
 };
 
 //-----------------------------------------------------------------------------
@@ -194,7 +195,7 @@ public:
 	int GetTipo( void ) const { return m_iTipo; }
 	int GetPreco( void ) const { return m_iPreco; }
 	int GetPreco2( void ) const { return m_iPreco2; }
-	int GetEstadoCaixa( void ) const { return m_iEstado; }		// caixa: 0 parada, 1 girando, 2 oferecendo
+	int GetEstadoCaixa( void ) const { return m_iEstado; }		// caixa: 0 parada, 1 girando, 2 oferecendo; armadilha: 0 pronta, 1 ligada, 2 recarregando
 	int GetDono( void ) const { return m_iDono; }				// caixa: quem pagou
 	bool PrecisaEnergia( void ) const { return m_bPrecisaEnergia; }
 	const char *GetRotulo( void ) const { return m_szRotulo.Get(); }
@@ -223,6 +224,7 @@ public:
 	void CaixaPensar( void );
 	void AbrirPorta( CBasePlayer *pPlayer );
 	void LigarEnergia( CBasePlayer *pPlayer );
+	void ArmadilhaPensar( void );
 	bool IsDesligada( void ) const { return m_bDesligada; }
 
 private:
@@ -230,6 +232,7 @@ private:
 	void UsarUpgrade( CBasePlayer *pPlayer );
 	void UsarCaixa( CBasePlayer *pPlayer );
 	void UsarBancada( CBasePlayer *pPlayer );
+	void UsarArmadilha( CBasePlayer *pPlayer );
 
 	string_t m_iszArmaMapa;			// keyvalue "arma" / "item"
 	string_t m_iszRotuloMapa;		// keyvalue "rotulo"
@@ -239,6 +242,16 @@ private:
 	float m_flFimEstado;			// caixa: quando acaba de girar / de oferecer
 	bool m_bDesligada;				// entrada Desligar (o mapa pode esconder uma caixa)
 	int m_iEnergiaMapa;				// keyvalue precisa_energia (-1 = padrão do tipo)
+	// Armadilha (keyvalues): tipo eletrica/fogo/arame, zona (nome do trigger_trok_armadilha),
+	// dano por segundo nos zumbis e nos humanos, lentidão, tempo ligada e de recarga.
+	string_t m_iszZona;
+	float m_flArmDps, m_flArmDpsHumano, m_flArmLentidao, m_flArmDuracao, m_flArmRecarga;
+	CHandle< CBasePlayer > m_hAtivador;
+	float m_flProxEfeito;
+public:
+	CBasePlayer *Ativador( void ) const { return m_hAtivador.Get(); }
+	bool ArmadilhaLigada( void ) const { return m_iTipo == ESTACAO_ARMADILHA && m_iEstado == 1; }
+private:
 	COutputEvent m_OnUsada;			// comprou / abriu / ligou
 	COutputEvent m_OnSemPontos;
 #endif
@@ -288,6 +301,8 @@ bool TrokHordas_MelhorarDefesa( CBasePlayer *pPlayer );				// sobe o nível de d
 int TrokHordas_LimitePostos( const char *pszEntidade, int iPadrao );
 int TrokHordas_ContarPostos( CBasePlayer *pDono, const char *pszEntidade );
 void TrokHordas_DarKit( CBasePlayer *pPlayer );
+int TrokHordas_ArmadilhasLigadas( CBasePlayer *pPlayer );			// armadilhas que este jogador ligou e estão ligadas
+void TrokHordas_LentoZumbi( CBasePlayer *pZumbi, float flFator, float flTempo );	// arame, munição atordoante
 #endif
 
 #endif // TROK_HORDAS_H
