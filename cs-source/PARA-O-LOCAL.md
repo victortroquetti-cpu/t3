@@ -4,6 +4,10 @@ A sessão na nuvem roda em Linux, sem Steam, sem jogo, sem tela e sem Visual Stu
 Ordem sugerida: de cima para baixo.
 
 ## Rodar e testar (nada disto foi testado ainda)
+0. **Alerta do nav:** o `.nav` do de_dust2 (e do de_dust e do de_inferno) do CS:S tem um formato com um byte a mais por
+   área que o HL2MP provavelmente lê errado, e o JOGAR do menu usa o de_dust2. Se os bots travarem ou o console acusar o nav,
+   rode `nav_generate` e `nav_analyze` nesse mapa ou teste antes num mapa v9 (de_nuke, de_aztec, cs_office).
+   Ver `design/recursos-uteis.md`, item 2.
 1. **Compilar e abrir o jogo** (Fases 0 e 1 do `CLAUDE.md`). O build do GitHub Actions compila, mas o jogo nunca
    abriu numa partida.
 2. **MCP `trok`:** confirmar se o SDK de 2025 aceita `-netconport`; se não aceitar, usar RCON ou `-condebug`.
