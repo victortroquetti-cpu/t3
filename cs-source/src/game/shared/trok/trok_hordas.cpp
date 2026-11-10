@@ -36,6 +36,8 @@ static void TrokUpgrade_Carregar( void )
 		TrokUpgrade_Padrao( s_Upgrade.niveis[ i ] );
 	Q_strncpy( s_Upgrade.niveis[ 0 ].szNome, "", sizeof( s_Upgrade.niveis[ 0 ].szNome ) );
 	s_Upgrade.iMunicaoPreco = 4500;
+	for ( int i = 0; i <= TROK_DEFESA_MAX; ++i )
+		TrokUpgrade_Padrao( s_Upgrade.defesa[ i ] );
 
 	KeyValues *pKV = new KeyValues( "TrokUpgrade" );
 	if ( pKV->LoadFromFile( filesystem, trok_hordas_upgrade_arquivo.GetString(), "MOD" ) )
@@ -63,6 +65,21 @@ static void TrokUpgrade_Carregar( void )
 			if ( pszCor )
 				sscanf( pszCor, "%d %d %d", &n.iCor[ 0 ], &n.iCor[ 1 ], &n.iCor[ 2 ] );
 			s_Upgrade.nNiveis = i;
+		}
+		// Níveis de defesa (torreta, claymore, mina, remota): só nome, preço e dano.
+		KeyValues *pDef = pKV->FindKey( "defesa" );
+		for ( int i = 1; pDef && i <= TROK_DEFESA_MAX; ++i )
+		{
+			char szChave[ 8 ];
+			V_snprintf( szChave, sizeof( szChave ), "%d", i );
+			KeyValues *pSub = pDef->FindKey( szChave );
+			if ( !pSub )
+				break;
+			TrokUpgradeNivel_t &n = s_Upgrade.defesa[ i ];
+			Q_strncpy( n.szNome, pSub->GetString( "nome", szChave ), sizeof( n.szNome ) );
+			n.iPreco = pSub->GetInt( "preco", 4000 * i );
+			n.flDano = pSub->GetFloat( "dano", 1.0f );
+			s_Upgrade.nDefesa = i;
 		}
 	}
 	else
@@ -107,6 +124,7 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokHordasEstado, DT_TrokHordasEstado )
 	RecvPropArray3( RECVINFO_ARRAY( m_aReviver ), RecvPropFloat( RECVINFO( m_aReviver[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aKit ), RecvPropInt( RECVINFO( m_aKit[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aVelZumbi ), RecvPropFloat( RECVINFO( m_aVelZumbi[ 0 ] ) ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aNivelDefesa ), RecvPropInt( RECVINFO( m_aNivelDefesa[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aNivel ), RecvPropInt( RECVINFO( m_aNivel[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aBonusAte ), RecvPropFloat( RECVINFO( m_aBonusAte[ 0 ] ) ) ),
 	RecvPropInt( RECVINFO( m_iUltimoBonus ) ),
@@ -125,6 +143,7 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokHordasEstado, DT_TrokHordasEstado )
 	SendPropArray3( SENDINFO_ARRAY3( m_aReviver ), SendPropFloat( SENDINFO_ARRAY( m_aReviver ), 8, 0, 0.0f, 1.0f ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aKit ), SendPropInt( SENDINFO_ARRAY( m_aKit ), 1, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aVelZumbi ), SendPropFloat( SENDINFO_ARRAY( m_aVelZumbi ), 10, 0, 0.0f, 4.0f ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aNivelDefesa ), SendPropInt( SENDINFO_ARRAY( m_aNivelDefesa ), 2, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aNivel ), SendPropInt( SENDINFO_ARRAY( m_aNivel ), 3, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aBonusAte ), SendPropFloat( SENDINFO_ARRAY( m_aBonusAte ), 0, SPROP_NOSCALE ) ),
 	SendPropInt( SENDINFO( m_iUltimoBonus ), 4, SPROP_UNSIGNED ),
@@ -151,6 +170,7 @@ CTrokHordasEstado::CTrokHordasEstado()
 		m_aReviver.Set( i, 0.0f );
 		m_aKit.Set( i, 0 );
 		m_aVelZumbi.Set( i, 1.0f );
+		m_aNivelDefesa.Set( i, 0 );
 	}
 	for ( int i = 0; i < ( MAX_PLAYERS + 1 ) * TROK_HORDAS_SLOTS; ++i )
 		m_aNivel.Set( i, 0 );
@@ -212,4 +232,12 @@ float TrokHordas_VelocidadeZumbi( const CBaseEntity *pPlayer )
 	if ( !p || !pPlayer )
 		return 1.0f;
 	return clamp( p->GetVelZumbi( pPlayer->entindex() ), 0.05f, 4.0f );
+}
+
+bool TrokHordas_EhArmaDefesa( const char *pszClasse )
+{
+	if ( !pszClasse )
+		return false;
+	return !V_stricmp( pszClasse, "weapon_trok_torreta" ) || !V_stricmp( pszClasse, "weapon_trok_claymore" ) ||
+		!V_stricmp( pszClasse, "weapon_trok_mina" ) || !V_stricmp( pszClasse, "weapon_trok_remota" );
 }

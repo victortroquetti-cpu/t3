@@ -4,26 +4,28 @@
 Uso:  python cs-source/tools/mapas/gerar_hordas_teste.py
 Depois compile pelo MCP trok (mapa_compilar) ou no Hammer, e gere o nav (veja o fim deste texto).
 
-Planta (vista de cima, x para leste, y para o norte; medidas do CA, corpo 100u, porta 128 de altura):
+Planta (vista de cima, x para leste, y para o norte; medidas do CA, corpo 100u, passagem 128 x 192):
 
    x=-320      x=0          x=1024|1040        x=2064   x=2400
    +----------+-------------+-----+-------------+--------+
-   | alcova   |  ÁREA 1     |porta|  ÁREA 2     | alcova |
-   | oeste    |  (início)   |paga |  (energia,  | leste  |
-   | zumbis   |=janela      |750  |  máquina)   |janela= | zumbis
-   | área 0   |  barricada  |     |             | área 2 |
+   | alcova   |  SALA 1     |pas- |  SALA 2     | alcova |
+   | oeste    |  (início)   |sagem|  (energia,  | leste  |
+   | zumbis   |=janela      |livre|  máquina,   |janela= | zumbis
+   |          |  barricada  |     |  defesas)   |        |
    +----------+-------------+-----+-------------+--------+
    y=0..1024, pé-direito 320, tudo selado numa casca (não vaza).
 
-Área 1: 4 nascimentos de jogador, parede da submetralhadora (1000) e da escopeta (1200), caixa
+Sem portas pagas (decisão do dono): as duas salas ligadas por uma passagem livre; zumbis vêm
+pelas duas janelas desde a rodada 1.
+Sala 1: 4 nascimentos de jogador, parede da submetralhadora (1000) e da escopeta (1200), caixa
         misteriosa, caixas para pular. Janela com barricada (func_trok_grade, 6 tábuas) para a alcova oeste.
-Área 2: abre pela porta paga (área 2): parede do fuzil (1500), chave de energia, máquina de melhoria
-        (precisa de energia), bancada de colete (1500) e de torreta (2000). Janela com barricada para a
-        alcova leste (nascedouros da área 2, só valem depois da porta).
+Sala 2: parede do fuzil (1500), chave de energia, máquina de melhoria (precisa de energia) e a
+        fileira de bancadas das ARMAS DE DEFESA: torreta, claymore, mina, carga remota, granada e
+        colete; kit de reanimação (precisa de energia). Janela com barricada para a alcova leste.
 
-Nav: os bots precisam passar pelas janelas e pela porta. Antes de "nav_generate", abra tudo:
-   ent_fire func_trok_grade Abrir; ent_fire func_trok_porta_paga Abrir; nav_generate
-(o nav_generate recarrega o mapa no fim, e tudo volta fechado).
+Nav: os bots precisam passar pelas janelas. Antes de "nav_generate", abra as barricadas:
+   ent_fire func_trok_grade Abrir; nav_generate
+(o nav_generate recarrega o mapa no fim, e as barricadas voltam fechadas).
 Texturas: só as de desenvolvimento do HL2 (dev/...), que vêm com o SDK Base.
 """
 
@@ -112,7 +114,7 @@ def gerar():
     bloco(-320, -16, 0, 2400, 0, 320)
     bloco(-320, 1024, 0, 2400, 1040, 320)
 
-    # Paredes de dentro: janela oeste (área 1), porta do meio, janela leste (área 2).
+    # Paredes de dentro: janela oeste, passagem livre no meio, janela leste.
     parede_com_vao(-16, 0, 448, 576, 128)
     parede_com_vao(1024, 1040, 448, 576, 192)
     parede_com_vao(2064, 2080, 448, 576, 128)
@@ -132,10 +134,6 @@ def gerar():
             "liberar_nos_abrigos": "0", "rendermode": "0", "renderamt": "255", "rendercolor": "255 255 255",
         }, solido=(x1, 448, 0, x2, 576, 128, GRADE))
 
-    # Porta paga entre as áreas.
-    entidade("func_trok_porta_paga", {"targetname": "porta_area2", "preco": "750", "area": "2", "rotulo": "Porta"},
-             solido=(1024, 448, 0, 1040, 576, 192, ESTACAO))
-
     # Área 1
     entidade("func_trok_compra_parede", {"arma": "weapon_trok_submetralhadora", "preco": "1000", "precisa_energia": "0"},
              solido=(256, 1008, 48, 384, 1024, 112, ESTACAO))
@@ -149,17 +147,28 @@ def gerar():
              solido=(1300, 1008, 48, 1428, 1024, 112, ESTACAO))
     entidade("func_trok_energia", {"rotulo": "Energia"}, solido=(1500, 0, 64, 1532, 16, 112, ESTACAO))
     entidade("func_trok_maquina_upgrade", {"precisa_energia": "1"}, solido=(1800, 944, 0, 1872, 1008, 96, ESTACAO))
-    entidade("func_trok_bancada", {"item": "colete", "preco": "1500", "precisa_energia": "0"},
-             solido=(1200, 16, 0, 1296, 64, 40, ESTACAO))
-    entidade("func_trok_bancada", {"item": "weapon_trok_torreta", "preco": "2000", "precisa_energia": "0"},
-             solido=(1700, 16, 0, 1796, 64, 40, ESTACAO))
+    # Fileira de bancadas das armas de defesa encostada na parede sul: (item, preço, reposição).
+    bancadas = [
+        ("weapon_trok_torreta", 1500, 1500),
+        ("weapon_trok_claymore", 1000, 750),
+        ("weapon_trok_mina", 750, 500),
+        ("weapon_trok_remota", 1000, 750),
+        ("weapon_trok_granada", 400, 400),
+        ("colete", 1500, 0),
+    ]
+    for k, (item, preco, repor) in enumerate(bancadas):
+        x = 1080 + k * 150
+        if x < 1548 and x + 96 > 1484:
+            x = 1548  # não cobre a chave de energia (x 1500..1532)
+        entidade("func_trok_bancada", {"item": item, "preco": str(preco), "preco_municao": str(repor), "precisa_energia": "0"},
+                 solido=(x, 16, 0, x + 96, 64, 40, ESTACAO))
     entidade("func_trok_bancada", {"item": "kit_reanimacao", "preco": "2500", "precisa_energia": "1"},
              solido=(1950, 400, 0, 2046, 448, 40, ESTACAO))
 
-    # Nascedouros de zumbi: alcova oeste (desde o começo) e leste (depois da porta).
+    # Nascedouros de zumbi: alcovas oeste e leste, todos ativos desde a rodada 1.
     for y in (250, 512, 774):
         entidade("info_trok_hordas_spawn", {"area": "0", "angles": "0 0 0"}, origem=(-200, y, 8))
-        entidade("info_trok_hordas_spawn", {"area": "2", "angles": "0 180 0"}, origem=(2260, y, 8))
+        entidade("info_trok_hordas_spawn", {"area": "0", "angles": "0 180 0"}, origem=(2260, y, 8))
     entidade("info_trok_hordas_spawn", {"area": "0", "chefe": "1", "angles": "0 0 0"}, origem=(-200, 100, 8))
 
     # Jogadores nascem na área 1 olhando para a janela.

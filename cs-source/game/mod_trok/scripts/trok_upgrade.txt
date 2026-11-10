@@ -16,6 +16,8 @@
 //   efeito_tempo    s (atordoante, incendiária); efeito_raio u (explosiva)
 //   cor             tom provisório da arma no mundo (R G B) até haver camuflagem própria
 // "municao_preco": encher a munição de uma arma melhorada na parede (CoD: 4500).
+// "defesa": com uma arma de defesa na mão (torreta, claymore, mina, remota) a mesma máquina sobe o
+//   NÍVEL DE DEFESA do jogador: x dano de tudo o que ele põe no chão. Zera ao morrer.
 
 "TrokUpgrade"
 {
@@ -77,5 +79,12 @@
 		"efeito_forca"	"0.5"
 		"efeito_raio"	"140"
 		"cor"		"230 200 90"
+	}
+
+	"defesa"
+	{
+		"1"	{ "nome" "DEFESA I"		"preco" "4000"	"dano" "1.75" }
+		"2"	{ "nome" "DEFESA II"	"preco" "9000"	"dano" "3" }
+		"3"	{ "nome" "DEFESA III"	"preco" "16000"	"dano" "5" }
 	}
 }

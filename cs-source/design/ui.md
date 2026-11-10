@@ -78,7 +78,7 @@ Sem bússola (o dono preferiu; `trok_hud_bussola 1` ainda liga): a direção do 
 | Placar | topo, centro, y 20 | Equipe: nós · tempo · eles + barras até a meta, meta pequena sob o relógio; Solo: você · tempo · melhor rival, "1º/8" pequeno; Surto: ícone + humanos · relógio (âmbar fixo no alarme) · zumbis + ícone; aviso real (preparação, alarme, abrigos) só 4 s quando acontece; Corrida: "2º" e "DE 8" no meio, líder (nome e degrau) à direita |
 | Lista de abates | canto sup. dir., linhas de 24 | atacante · ícone da arma (48×18) · ícone de cabeça/infecção (16) · vítima; véu à direita, traço âmbar nas suas linhas; sem ícone, o texto/losango de antes |
 | Vida | canto inf. esq. | número 46 px; barra de 10 partes (220×5) com rastro vermelho do dano; fôlego em linha âmbar só quando gasto |
-| Colete | ao lado da barra de vida, mesma linha | barra própria 74×5 na cor do colete e o número pequeno em cima, sem rótulo |
+| Colete | traço fino (2 px) por cima da barra de vida | número menor (22 px) na cor do colete logo à direita do número da vida ("100 50"), sem rótulo |
 | Acima da vida | | "$ 1.250" (economia, âmbar no tempo de compra; só se `trok_hud_dinheiro` estiver desligado, senão é o `hud_trok_economia.cpp`); Surto humano: "[N] STRIKER" e a plaquinha da Fúria "1.800 / 2.350 FÚRIA" (fundo roxo-escuro `#220A26`, filete e rótulo vermelho-sangue `#CC2030`, número `#E8414F` para ler no roxo; preço âmbar se não dá) |
 | Zumbi | | tipo do zumbi ao lado do número, barra vermelho-sangue, brilho curto correndo na barra enquanto regenera (sem texto) |
 | Arma | canto inf. dir. | ícone (48×18) · NOME · modo de tiro em texto pequeno; pente 46 px / reserva 22 px; uma marca por bala (pentes até 40); explosivos com ícone e número à esquerda; garras: ícone + "GARRAS" |

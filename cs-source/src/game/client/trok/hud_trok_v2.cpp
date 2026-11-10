@@ -1580,13 +1580,12 @@ void CHudTrokV2::PaintVitais( C_BasePlayer *pLocal )
 	{
 		CTrokPlacarExtra *pExtra = TrokPlacarExtra();
 		(void)pExtra;
-		// ao lado da vida, na mesma linha: barra própria (1/3 da largura) e o número pequeno em cima
+		// traço fino por cima da barra de vida; o número menor ao lado do número da vida, sem rótulo
 		const int iColeteMax = MAX( 100, m_iColete );
-		const int cxC = x + bw + S( 12 ), cw = S( 74 );
-		Rect( cxC, by, cw, bh, A( Color( COR_COLETE.r(), COR_COLETE.g(), COR_COLETE.b(), 46 ) ) );
-		Rect( cxC, by, (int)( cw * m_iColete / (float)iColeteMax ), bh, A( COR_COLETE ) );
+		Rect( x, by - S( 7 ), bw, S1( 2 ), A( Color( 255, 255, 255, 26 ) ) );
+		Rect( x, by - S( 7 ), (int)( bw * m_iColete / (float)iColeteMax ), S1( 2 ), A( COR_COLETE ) );
 		V_snprintf( sz, sizeof( sz ), "%d", m_iColete );
-		Texto( m_fText, cxC, by - S( 5 ), A( COR_COLETE ), sz, AL_ESQ, 0.0f, true );
+		Texto( m_fTimer, x + wNum + S( 8 ), yb - S( 18 ), A( COR_COLETE ), sz, AL_ESQ, 0.0f, true );
 	}
 
 	// fôlego da corrida: só quando gasto

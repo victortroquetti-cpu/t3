@@ -57,7 +57,7 @@
 	"Modo Hordas: nascedouro de zumbi. Ponha fora da área dos jogadores, atrás de uma barricada " +
 	"(func_trok_grade) ou numa saída de duto. O diretor usa os mais perto dos jogadores."
 [
-	area(integer) : "Área" : 0 : "Só vale depois que uma porta paga abre esta área (0 e 1 = desde o começo)."
+	area(integer) : "Área" : 0 : "0 = sempre (padrão). Outro número: só vale depois da entrada AbrirArea do trok_hordas_logica (ou de uma porta paga opcional)."
 	chefe(choices) : "Lugar do chefe" : 0 =
 	[
 		0 : "Não"
@@ -109,7 +109,7 @@
 ]
 
 @SolidClass base(TrokHordasEstacao) = func_trok_porta_paga :
-	"Modo Hordas: porta, entulho ou grade que some quando alguém paga. Abre a área (nascedouros)."
+	"Modo Hordas (OPCIONAL, fora do desenho padrão: o dono não quer portas pagas): porta que some quando alguém paga e abre uma área de nascedouros."
 [
 	preco(integer) : "Preço" : 1000 : "Pontos (CoD: 750 a 1500)."
 	area(integer) : "Área que abre" : 2 : "Liga os info_trok_hordas_spawn com esta área. Portas com a mesma área abrem juntas."
@@ -117,7 +117,7 @@
 ]
 
 @SolidClass base(TrokHordasEstacao) = func_trok_maquina_upgrade :
-	"Modo Hordas: máquina de melhoria. Sobe a arma da mão um nível (1 a 5, scripts/trok_upgrade.txt)."
+	"Modo Hordas: máquina de melhoria. Arma de fogo na mão: MK I a MK V. Arma de defesa na mão (torreta, claymore, mina, remota): nível de defesa I a III do jogador (scripts/trok_upgrade.txt)."
 [
 	precisa_energia(choices) : "Precisa de energia" : 1 = [ 0 : "Não" 1 : "Sim" ]
 ]
@@ -132,8 +132,9 @@
 @SolidClass base(TrokHordasEstacao) = func_trok_bancada :
 	"Modo Hordas: bancada de equipamento. Um item por bancada."
 [
-	item(string) : "Item" : "colete" : "colete, kit_reanimacao ou uma arma (weapon_trok_torreta, weapon_trok_claymore, weapon_trok_granada...): compra ou enche a munição."
+	item(string) : "Item" : "weapon_trok_torreta" : "Arma de defesa (weapon_trok_torreta, _claymore, _mina, _remota), weapon_trok_granada, colete ou kit_reanimacao. Tendo a arma: repõe até o máximo (trok_max_*)."
 	preco(integer) : "Preço" : 1500 : "Pontos."
+	preco_municao(integer) : "Preço da reposição" : 0 : "0 = o mesmo preço."
 	precisa_energia(choices) : "Precisa de energia" : 0 = [ 0 : "Não" 1 : "Sim" ]
 ]
 

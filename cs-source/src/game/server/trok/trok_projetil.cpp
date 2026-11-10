@@ -32,6 +32,7 @@
 #include "gamerules.h"
 #include "IEffects.h"
 #include "collisionutils.h"
+#include "trok/trok_hordas.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -1002,15 +1003,28 @@ void CTrokProjetil::Fumaca( const Vector &pos )
 //-----------------------------------------------------------------------------
 CBaseEntity *TrokExplosivo_Criar( const TrokExplosivoInfo_t &info, CBasePlayer *pDono, const Vector &vecOrigem, const Vector &vecVel, const QAngle &angInicial )
 {
-	// Um por vez (torreta): o anterior do mesmo dono some.
-	if ( info.bUmPorVez && pDono )
+	// Um por vez (torreta): o anterior do mesmo dono some. No modo Hordas o limite de postas por
+	// jogador vem do cfg (trok_hordas_limite_*; shared/trok/trok_hordas.h): passou, some a mais velha.
+	const int iLimite = TrokHordas_LimitePostos( info.szEntidade, info.bUmPorVez ? 1 : 0 );
+	if ( iLimite > 0 && pDono )
 	{
+		int nPostos = 0;
 		CBaseEntity *pVelho = NULL;
 		while ( ( pVelho = gEntList.FindEntityByClassname( pVelho, info.szEntidade ) ) != NULL )
 		{
 			CTrokProjetil *pProj = dynamic_cast< CTrokProjetil * >( pVelho );
-			if ( pProj && pProj->Dono() == pDono )
+			if ( pProj && pProj->Dono() == pDono && !pProj->IsMarkedForDeletion() )
+				++nPostos;
+		}
+		pVelho = NULL;
+		while ( nPostos >= iLimite && ( pVelho = gEntList.FindEntityByClassname( pVelho, info.szEntidade ) ) != NULL )
+		{
+			CTrokProjetil *pProj = dynamic_cast< CTrokProjetil * >( pVelho );
+			if ( pProj && pProj->Dono() == pDono && !pProj->IsMarkedForDeletion() )
+			{
 				UTIL_Remove( pProj );
+				--nPostos;
+			}
 		}
 	}
 

@@ -19,6 +19,7 @@
 #include "trok_surto.h"
 #include "weapon_parse.h"
 #include "collisionutils.h"
+#include "ammodef.h"
 
 #ifndef CLIENT_DLL
 	#include "entityoutput.h"
@@ -174,9 +175,23 @@ bool CTrokHordasEstacao::Aviso( CBasePlayer *pPlayer, char *pszTexto, int iTam, 
 	{
 		CBaseCombatWeapon *pArma = pPlayer->GetActiveWeapon();
 		const TrokUpgrade_t &up = TrokUpgrade();
+		if ( pArma && TrokHordas_EhArmaDefesa( pArma->GetClassname() ) )
+		{
+			// Arma de defesa na mão: sobe o nível de defesa do jogador (vale para tudo o que ele põe).
+			const int iDef = pEstado->GetNivelDefesa( pPlayer->entindex() );
+			if ( iDef >= up.nDefesa )
+			{
+				V_snprintf( pszTexto, iTam, "DEFESAS  —  NÍVEL MÁXIMO" );
+				*pbPode = false;
+				return true;
+			}
+			iPreco = up.defesa[ iDef + 1 ].iPreco;
+			V_snprintf( pszTexto, iTam, "E  —  MELHORAR DEFESAS PARA %s: %d", up.defesa[ iDef + 1 ].szNome, iPreco );
+			break;
+		}
 		if ( !pArma || !pArma->UsesClipsForAmmo1() )
 		{
-			V_snprintf( pszTexto, iTam, "%s  —  PEGUE UMA ARMA DE FOGO", szRotulo[ 0 ] ? szRotulo : "MELHORIA" );
+			V_snprintf( pszTexto, iTam, "%s  —  PEGUE UMA ARMA DE FOGO OU DE DEFESA", szRotulo[ 0 ] ? szRotulo : "MELHORIA" );
 			*pbPode = false;
 			return true;
 		}
@@ -213,8 +228,25 @@ bool CTrokHordasEstacao::Aviso( CBasePlayer *pPlayer, char *pszTexto, int iTam, 
 		V_snprintf( pszTexto, iTam, "E  —  %s: %d", szRotulo[ 0 ] ? szRotulo : "CAIXA MISTERIOSA", iPreco );
 		break;
 	case ESTACAO_BANCADA:
+	{
+		// Arma de defesa ou granada já na mão e cheia: nada a comprar; tendo, o preço é o da recarga.
+		CBaseCombatWeapon *pTem = !Q_strncmp( GetArma(), "weapon_", 7 ) ? pPlayer->Weapon_OwnsThisType( GetArma() ) : NULL;
+		if ( pTem )
+		{
+			const int iTipo = pTem->GetPrimaryAmmoType();
+			if ( iTipo >= 0 && pPlayer->GetAmmoCount( iTipo ) >= GetAmmoDef()->MaxCarry( iTipo ) )
+			{
+				V_snprintf( pszTexto, iTam, "%s  —  CHEIO (%d)", szRotulo, pPlayer->GetAmmoCount( iTipo ) );
+				*pbPode = false;
+				return true;
+			}
+			iPreco = GetPreco2() > 0 ? GetPreco2() : GetPreco();
+			V_snprintf( pszTexto, iTam, "E  —  REPOR %s: %d", szRotulo, iPreco );
+			break;
+		}
 		V_snprintf( pszTexto, iTam, "E  —  %s: %d", szRotulo, iPreco );
 		break;
+	}
 	case ESTACAO_ENERGIA:
 		if ( IsUsada() || pEstado->IsEnergia() )
 			return false;
@@ -498,6 +530,27 @@ void CTrokHordasEstacao::UsarUpgrade( CBasePlayer *pPlayer )
 {
 	CBaseCombatWeapon *pArma = pPlayer->GetActiveWeapon();
 	const TrokUpgrade_t &up = TrokUpgrade();
+	if ( pArma && TrokHordas_EhArmaDefesa( pArma->GetClassname() ) )
+	{
+		CTrokHordasEstado *pEstado = TrokHordas_Estado();
+		const int iDef = pEstado ? pEstado->GetNivelDefesa( pPlayer->entindex() ) : up.nDefesa;
+		if ( iDef >= up.nDefesa )
+		{
+			ClientPrint( pPlayer, HUD_PRINTCENTER, "DEFESAS NO NÍVEL MÁXIMO" );
+			return;
+		}
+		if ( !TrokHordas_Pagar( pPlayer, up.defesa[ iDef + 1 ].iPreco ) )
+		{
+			m_OnSemPontos.FireOutput( pPlayer, this );
+			return;
+		}
+		if ( TrokHordas_MelhorarDefesa( pPlayer ) )
+		{
+			EmitSound( "Trok.Hordas.Melhoria" );
+			m_OnUsada.FireOutput( pPlayer, this );
+		}
+		return;
+	}
 	if ( !pArma || !pArma->UsesClipsForAmmo1() )
 		return;
 	const int iNivel = TrokHordas_NivelArma( pArma );
@@ -616,12 +669,25 @@ void CTrokHordasEstacao::UsarBancada( CBasePlayer *pPlayer )
 	else if ( !Q_strncmp( pszItem, "weapon_", 7 ) )
 	{
 		CBaseCombatWeapon *pTem = pPlayer->Weapon_OwnsThisType( pszItem );
-		if ( !TrokHordas_Pagar( pPlayer, m_iPreco ) )
-			return;
 		if ( pTem )
+		{
+			// Recarga: enche até o máximo que se carrega (trok_max_* em cfg/hordas.cfg).
+			const int iTipo = pTem->GetPrimaryAmmoType();
+			if ( iTipo >= 0 && pPlayer->GetAmmoCount( iTipo ) >= GetAmmoDef()->MaxCarry( iTipo ) )
+			{
+				ClientPrint( pPlayer, HUD_PRINTCENTER, "JÁ ESTÁ CHEIO" );
+				return;
+			}
+			if ( !TrokHordas_Pagar( pPlayer, m_iPreco2 > 0 ? m_iPreco2.Get() : m_iPreco.Get() ) )
+				return;
 			TrokHordas_EncherMunicao( pPlayer, pTem );
+		}
 		else
+		{
+			if ( !TrokHordas_Pagar( pPlayer, m_iPreco ) )
+				return;
 			TrokHordas_DarArma( pPlayer, pszItem );
+		}
 	}
 	else
 	{

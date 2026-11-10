@@ -291,6 +291,13 @@ void CHudTrokHordas::PintarPontos( CTrokHordasEstado *pEstado, C_BasePlayer *pLo
 		V_snprintf( sz, sizeof( sz ), "MELHORIA %s", TrokUpgrade().niveis[ iNivel ].szNome );
 		Texto( m_hPequena, xDir, ScreenHeight() - S( 128 ), COR_DESTAQUE, sz, 1 );
 	}
+	// Nível de defesa (torreta, claymore, mina, remota postas por você).
+	const int iDef = pEstado->GetNivelDefesa( pLocal->entindex() );
+	if ( iDef > 0 )
+	{
+		V_snprintf( sz, sizeof( sz ), "DEFESAS %s", TrokUpgrade().defesa[ iDef ].szNome );
+		Texto( m_hPequena, xDir, ScreenHeight() - S( 146 ), COR_DESTAQUE, sz, 1 );
+	}
 }
 
 // Aviso da estação ou de reviver (no meio, embaixo da mira).

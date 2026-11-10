@@ -127,6 +127,7 @@
 		"weapon_trok_torreta"			"3"
 		"weapon_trok_claymore"			"5"
 		"weapon_trok_mina"				"4"
+		"weapon_trok_remota"			"4"
 	}
 
 	"bonus"

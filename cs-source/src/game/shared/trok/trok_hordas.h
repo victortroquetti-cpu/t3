@@ -33,6 +33,7 @@ class CBasePlayer;
 
 #define TROK_HORDAS_SLOTS		6		// classes de arma do inventário do CA (bucket 0..5)
 #define TROK_UPGRADE_MAX		5		// níveis da máquina de melhoria
+#define TROK_DEFESA_MAX		3		// níveis de defesa (torreta, claymore, mina, remota) na mesma máquina
 
 enum TrokHordasFase_t
 {
@@ -95,6 +96,8 @@ struct TrokUpgrade_t
 	int nNiveis;									// níveis carregados (até TROK_UPGRADE_MAX)
 	int iMunicaoPreco;								// encher munição de arma melhorada na parede
 	TrokUpgradeNivel_t niveis[ TROK_UPGRADE_MAX + 1 ];
+	int nDefesa;									// níveis de defesa carregados (bloco "defesa")
+	TrokUpgradeNivel_t defesa[ TROK_DEFESA_MAX + 1 ];	// dano das defesas postas pelo jogador
 };
 
 const TrokUpgrade_t &TrokUpgrade( bool bRecarregar = false );
@@ -130,6 +133,7 @@ public:
 	float GetReviver( int i ) const { return Valido( i ) ? m_aReviver[ i ] : 0.0f; }		// progresso de quem o revive (0..1)
 	bool TemKit( int i ) const { return Valido( i ) && m_aKit[ i ] != 0; }					// kit de reanimação comprado
 	float GetVelZumbi( int i ) const { return Valido( i ) ? m_aVelZumbi[ i ] : 1.0f; }
+	int GetNivelDefesa( int i ) const { return Valido( i ) ? m_aNivelDefesa[ i ] : 0; }	// torreta/claymore/mina/remota
 	int GetNivel( int iJogador, int iSlot ) const
 	{
 		if ( !Valido( iJogador ) || iSlot < 0 || iSlot >= TROK_HORDAS_SLOTS )
@@ -154,6 +158,7 @@ public:
 	CNetworkArray( float, m_aReviver, MAX_PLAYERS + 1 );
 	CNetworkArray( int, m_aKit, MAX_PLAYERS + 1 );
 	CNetworkArray( float, m_aVelZumbi, MAX_PLAYERS + 1 );
+	CNetworkArray( int, m_aNivelDefesa, MAX_PLAYERS + 1 );
 	CNetworkArray( int, m_aNivel, ( MAX_PLAYERS + 1 ) * TROK_HORDAS_SLOTS );
 	CNetworkArray( float, m_aBonusAte, HORDAS_BONUS_NUM );
 	CNetworkVar( int, m_iUltimoBonus );
@@ -166,7 +171,10 @@ bool TrokHordas_Caido( const CBaseEntity *pEnt );		// humano derrubado esperando
 int TrokHordas_NivelArma( const CBaseCombatWeapon *pArma );		// nível de melhoria (0 = nenhum)
 int TrokHordas_Pente( const CBaseCombatWeapon *pArma, int iBase );	// pente com a melhoria (weapon_trok_gun)
 float TrokHordas_VelocidadeZumbi( const CBaseEntity *pPlayer );	// x velocidade do zumbi pela rodada (1 fora do modo)
-int TrokHordas_PrecoCaixa( int iBase );						// preço da caixa (com o bônus Caixa barata)
+int TrokHordas_PrecoCaixa( int iBase );
+// Armas de defesa (postas no chão e atiram/explodem sozinhas): torreta, claymore, mina, remota.
+// Na máquina de melhoria sobem o "nível de defesa" do jogador (vale para tudo o que ele põe).
+bool TrokHordas_EhArmaDefesa( const char *pszClasse );						// preço da caixa (com o bônus Caixa barata)
 
 //-----------------------------------------------------------------------------
 // Estação de compra (todas as estações: uma classe só em rede; o tipo vem do nome da classe)
@@ -274,6 +282,11 @@ void TrokHordas_DarArma( CBasePlayer *pPlayer, const char *pszArma );	// troca a
 void TrokHordas_EncherMunicao( CBasePlayer *pPlayer, CBaseCombatWeapon *pArma );
 bool TrokHordas_Melhorar( CBasePlayer *pPlayer, CBaseCombatWeapon *pArma );	// sobe um nível
 const char *TrokHordas_SortearArmaCaixa( CBasePlayer *pPlayer );
+bool TrokHordas_MelhorarDefesa( CBasePlayer *pPlayer );				// sobe o nível de defesa do jogador
+// Quantas de cada objeto um jogador pode ter postas ao mesmo tempo (server/trok/trok_projetil.cpp).
+// Fora do Hordas devolve iPadrao (torreta do CA: 1, as outras sem limite).
+int TrokHordas_LimitePostos( const char *pszEntidade, int iPadrao );
+int TrokHordas_ContarPostos( CBasePlayer *pDono, const char *pszEntidade );
 void TrokHordas_DarKit( CBasePlayer *pPlayer );
 #endif
 

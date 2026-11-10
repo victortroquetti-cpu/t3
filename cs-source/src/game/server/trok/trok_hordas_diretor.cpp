@@ -97,6 +97,11 @@ ConVar trok_hordas_reviver_distancia( "trok_hordas_reviver_distancia", "110", FC
 ConVar trok_hordas_reviver_vida( "trok_hordas_reviver_vida", "0.5", FCVAR_NOTIFY, "Hordas: fração da vida máxima ao ser revivido." );
 ConVar trok_hordas_kit_tempo( "trok_hordas_kit_tempo", "4", FCVAR_NOTIFY, "Hordas: segundos até o kit de reanimação levantar quem caiu." );
 ConVar trok_hordas_aliados( "trok_hordas_aliados", "0", FCVAR_NOTIFY, "Hordas: bots aliados (humanos) que entram com os jogadores." );
+// Defesas postas ao mesmo tempo por jogador (0 = sem limite). Quem passa do limite: some a mais velha.
+ConVar trok_hordas_limite_torreta( "trok_hordas_limite_torreta", "2", FCVAR_NOTIFY, "Hordas: torretas postas ao mesmo tempo por jogador (fora do Hordas: 1, regra do CA)." );
+ConVar trok_hordas_limite_claymore( "trok_hordas_limite_claymore", "4", FCVAR_NOTIFY, "Hordas: claymores postas ao mesmo tempo por jogador." );
+ConVar trok_hordas_limite_mina( "trok_hordas_limite_mina", "6", FCVAR_NOTIFY, "Hordas: minas postas ao mesmo tempo por jogador." );
+ConVar trok_hordas_limite_remota( "trok_hordas_limite_remota", "4", FCVAR_NOTIFY, "Hordas: cargas remotas postas ao mesmo tempo por jogador." );
 ConVar trok_hordas_bot_dificuldade( "trok_hordas_bot_dificuldade", "1", FCVAR_NOTIFY, "Hordas: dificuldade dos bots (0-3; zumbis e aliados)." );
 // Bônus
 ConVar trok_hordas_bonus_chance( "trok_hordas_bonus_chance", "0.025", FCVAR_NOTIFY, "Hordas: chance de um zumbi abatido soltar um bônus." );
@@ -304,6 +309,13 @@ static float ValorDaLista( const char *pszLista, int i, float flPadrao )
 		f = (float)atof( partes[ clamp( i, 0, partes.Count() - 1 ) ] );
 	partes.PurgeAndDeleteElements();
 	return f;
+}
+
+// Objeto de defesa posto no chão (trok_projetil.cpp): torreta, claymore, mina, remota.
+static bool EhObjetoDefesa( CBaseEntity *pEnt )
+{
+	return pEnt && ( FClassnameIs( pEnt, "trok_torreta" ) || FClassnameIs( pEnt, "trok_claymore" ) ||
+		FClassnameIs( pEnt, "trok_mina" ) || FClassnameIs( pEnt, "trok_granada_remota" ) );
 }
 
 static float Dif( const ConVar &cv )
@@ -1816,6 +1828,7 @@ void TrokHordas_Abate( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 		pEstado->m_aCaidoAte.Set( i, 0.0f );
 		pEstado->m_aReviver.Set( i, 0.0f );
 		pEstado->m_aKit.Set( i, 0 );
+		pEstado->m_aNivelDefesa.Set( i, 0 );
 		s_aAutoReviver[ i ] = 0.0f;
 		pVictim->SetLaggedMovementValue( 1.0f );
 	}
@@ -1834,10 +1847,19 @@ void TrokHordas_Dano( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 			return;
 		int iVida = pVictim->GetHealth();
 
-		// Arma melhorada: o dano a mais sai da vida aqui (o motor só vê o dano da arma).
-		if ( info.GetDamageType() & DMG_BULLET )
+		// Defesa posta pelo jogador (torreta, claymore, mina, remota): nível de defesa dele.
+		CBaseEntity *pInf = info.GetInflictor();
+		CBaseCombatWeapon *pArma = pAtacante->GetActiveWeapon();
+		if ( pInf && pInf != pAtacante && pInf != pArma && EhObjetoDefesa( pInf ) )
 		{
-			CBaseCombatWeapon *pArma = pAtacante->GetActiveWeapon();
+			const int iDef = pEstado->GetNivelDefesa( pAtacante->entindex() );
+			if ( iDef > 0 )
+				iVida -= (int)( info.GetDamage() * MAX( 0.0f, TrokUpgrade().defesa[ iDef ].flDano - 1.0f ) );
+		}
+		// Arma melhorada: o dano a mais sai da vida aqui (o motor só vê o dano da arma). Só bala
+		// da própria arma (não a da torreta do mesmo jogador).
+		else if ( ( info.GetDamageType() & DMG_BULLET ) && ( !pInf || pInf == pAtacante || pInf == pArma ) )
+		{
 			const int iNivel = TrokHordas_NivelArma( pArma );
 			if ( iNivel > 0 )
 			{
@@ -1974,4 +1996,62 @@ CON_COMMAND_F( trok_hordas_recarregar, "Hordas: lê de novo scripts/trok_hordas.
 	Hordas_CarregarScript();
 	TrokUpgrade( true );
 	Msg( "Trok: Hordas com %d tipos, %d armas na caixa, %d níveis de melhoria.\n", s_Tipos.Count(), s_Caixa.Count(), TrokUpgrade().nNiveis );
+}
+
+//-----------------------------------------------------------------------------
+// Armas de defesa: limite de postas e nível de defesa
+//-----------------------------------------------------------------------------
+int TrokHordas_LimitePostos( const char *pszEntidade, int iPadrao )
+{
+	if ( !s_bAtivo || !pszEntidade )
+		return iPadrao;
+	if ( !Q_stricmp( pszEntidade, "trok_torreta" ) )
+		return MAX( 0, trok_hordas_limite_torreta.GetInt() );
+	if ( !Q_stricmp( pszEntidade, "trok_claymore" ) )
+		return MAX( 0, trok_hordas_limite_claymore.GetInt() );
+	if ( !Q_stricmp( pszEntidade, "trok_mina" ) )
+		return MAX( 0, trok_hordas_limite_mina.GetInt() );
+	if ( !Q_stricmp( pszEntidade, "trok_granada_remota" ) )
+		return MAX( 0, trok_hordas_limite_remota.GetInt() );
+	return iPadrao;
+}
+
+int TrokHordas_ContarPostos( CBasePlayer *pDono, const char *pszEntidade )
+{
+	int n = 0;
+	CBaseEntity *pEnt = NULL;
+	while ( ( pEnt = gEntList.FindEntityByClassname( pEnt, pszEntidade ) ) != NULL )
+		if ( pEnt->GetOwnerEntity() == pDono )
+			++n;
+	return n;
+}
+
+bool TrokHordas_MelhorarDefesa( CBasePlayer *pPlayer )
+{
+	CTrokHordasEstado *pEstado = Estado();
+	if ( !pEstado || !pPlayer )
+		return false;
+	const int i = pPlayer->entindex();
+	const int iNivel = pEstado->GetNivelDefesa( i ) + 1;
+	if ( iNivel > TrokUpgrade().nDefesa )
+		return false;
+	pEstado->m_aNivelDefesa.Set( i, iNivel );
+	ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "DEFESAS MELHORADAS: %s", TrokUpgrade().defesa[ iNivel ].szNome ) );
+	return true;
+}
+
+CON_COMMAND_F( trok_hordas_defesas, "Hordas: mostra as defesas postas de cada jogador e o nível de defesa.", 0 )
+{
+	CTrokHordasEstado *pEstado = Estado();
+	static const char *s_pszObj[] = { "trok_torreta", "trok_claymore", "trok_mina", "trok_granada_remota" };
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CBasePlayer *p = UTIL_PlayerByIndex( i );
+		if ( !EhHumano( p ) )
+			continue;
+		Msg( "%s: nível de defesa %d;", p->GetPlayerName(), pEstado ? pEstado->GetNivelDefesa( i ) : 0 );
+		for ( int k = 0; k < (int)ARRAYSIZE( s_pszObj ); ++k )
+			Msg( " %s %d/%d", s_pszObj[ k ], TrokHordas_ContarPostos( p, s_pszObj[ k ] ), TrokHordas_LimitePostos( s_pszObj[ k ], 0 ) );
+		Msg( "\n" );
+	}
 }
