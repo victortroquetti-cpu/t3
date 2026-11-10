@@ -40,8 +40,7 @@ Ordem sugerida: de cima para baixo.
   valores MEDIR dos `cfg` e dos `scripts/weapon_trok_*.txt`. O LithTech usa Y para cima e outra escala de unidades;
   ver a spec de movimento.
 - Conferir com `design/ca-pesquisa/numeros.md` e `armas-wiki.tsv`.
-- **Decisão do dono pendente:** vida e regeneração dos zumbis do Surto. O CA usa de 135 a 450 de vida; o nosso
-  `surto.cfg` está com 1500 e 2500.
+- Vida dos zumbis do Surto: já está igual ao CA (300/200, `surto.cfg`); conferir a regeneração.
 - O que nenhuma fonte tem: medir no CA instalado (cadência real, recarga, queda de dano, faca, raio das granadas).
 
 ## Conteúdo
@@ -54,9 +53,11 @@ Ordem sugerida: de cima para baixo.
 - **Mapa de teste do Surto no Hammer** (Fase 4).
 
 ## Decisões que ainda são do dono
-- Lanterna (F) e largar arma (G): ficam ou saem?
-- Recompensas e números da killstreak.
-- Nome completo do jogo e da corporação.
+- Já decididas (10/11/2026, ver `CLAUDE.md`): lanterna fica, sem tecla de largar arma, nome Rearmed, killstreak igual
+  ao CA, vida do zumbi do Surto igual ao CA (300/200 no `surto.cfg`).
+- Ainda abertas: nome da corporação; recompensas próprias de série (depois).
+
+**Próxima rodada local: `ROADMAP-SURTO.md`** (Surto jogável e bots muito bons).
 
 ## Rodada grande da nuvem (10/11/2026)
 - Testar cada item da tabela de `MUDANCAS-NUVEM.md` (itens 9 a 32): cada linha tem o "Testar" dela. Ordem sugerida:

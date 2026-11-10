@@ -11,7 +11,7 @@ bots prontos e espertos para o modo. Tudo foi feito na nuvem e **nada foi testad
 | Preparo | 20 s, todos humanos (wiki da Quarantine Regen) | `trok_surto_preparo 20` |
 | Rodada | 2:40 depois do preparo (wiki) | `trok_surto_tempo 160` |
 | Hospedeiros | 1 a 3, conforme o número de jogadores (wiki; a regra exata diverge) | 1 a cada `trok_surto_jogadores_por_hospedeiro` (8), até `_hospedeiros_max` (3), sempre sobra humano |
-| Infecção | o infectado ataca corpo a corpo e infecta o humano (PCInvasion, 2009) | humano que morre na rodada levanta zumbi onde caiu, em `trok_surto_virar_tempo` |
+| Infecção | o infectado ataca corpo a corpo e infecta o humano (PCInvasion, 2009) | só o golpe de garra infecta: o humano levanta zumbi onde caiu, em `trok_surto_virar_tempo`; outras mortes tiram da rodada (espectador); gás só fere |
 | Vencer | humanos: sobreviver até o fim ou destruir todos os infectados; infectados: infectar todos (wiki) | igual; zumbi morto fica morto (`trok_surto_zumbi_renasce 0`) |
 | Recuperação | 10% da vida a cada 3 s parado, para ao se mexer ou levar dano (wiki; outra fonte diz 1 s) | `trok_surto_regen*` |
 | Crítico | infectado não leva crítico (PCInvasion) | `trok_surto_zumbi_sem_critico 1` |
