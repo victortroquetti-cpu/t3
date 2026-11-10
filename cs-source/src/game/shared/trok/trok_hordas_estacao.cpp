@@ -1,11 +1,13 @@
 //=============================================================================
 // Trok: estações do modo Hordas (lugares físicos do mapa, usados com E, como no CA).
 //
-//   func_trok_compra_parede      arma na parede: compra a arma; tendo ela, compra munição
+//   func_trok_loja               LOJA (o jeito padrão de comprar no Hordas): E abre o menu com armas,
+//                                munição, defesas (torreta, claymore, mina, remota) e equipamento
+//   func_trok_compra_parede      (opcional) arma na parede: compra a arma; tendo ela, compra munição
 //   func_trok_porta_paga         porta/entulho pago: some e abre uma área (nascedouros de zumbi)
 //   func_trok_maquina_upgrade    máquina de melhoria: sobe a arma da mão um nível (1 a 5)
 //   func_trok_caixa_misteriosa   caixa: gira e oferece uma arma sorteada (scripts/trok_hordas.txt)
-//   func_trok_bancada            bancada: colete, kit de reanimação, torreta, granadas...
+//   func_trok_bancada            (opcional) bancada de um item só: colete, kit, torreta, granadas...
 //   func_trok_energia            chave de energia: liga as máquinas que precisam de energia
 //   func_trok_armadilha          painel de armadilha (elétrica, fogo, arame): E liga por X pontos por
 //                                Y segundos; a zona é um trigger_trok_armadilha (server/trok/trok_hordas_mapa.cpp)
@@ -39,6 +41,7 @@ ConVar trok_hordas_caixa_giro( "trok_hordas_caixa_giro", "4", FCVAR_REPLICATED, 
 ConVar trok_hordas_caixa_oferta( "trok_hordas_caixa_oferta", "10", FCVAR_REPLICATED, "Hordas: segundos que a arma sorteada fica esperando o dono pegar." );
 ConVar trok_hordas_caixa_preco( "trok_hordas_caixa_preco", "950", FCVAR_REPLICATED, "Hordas: preço da caixa misteriosa (quando o mapa não diz)." );
 ConVar trok_hordas_caixa_barata_preco( "trok_hordas_caixa_barata_preco", "10", FCVAR_REPLICATED, "Hordas: preço da caixa com o bônus Caixa barata." );
+ConVar trok_hordas_loja_distancia( "trok_hordas_loja_distancia", "160", FCVAR_REPLICATED, "Hordas: até esta distância (u) da loja o menu fica aberto e a compra vale." );
 ConVar trok_hordas_limite_armadilha( "trok_hordas_limite_armadilha", "1", FCVAR_REPLICATED, "Hordas: armadilhas ligadas ao mesmo tempo por jogador (0 = sem limite)." );
 ConVar trok_hordas_colete( "trok_hordas_colete", "100", FCVAR_REPLICATED, "Hordas: armadura que o colete da bancada dá." );
 
@@ -86,6 +89,7 @@ LINK_ENTITY_TO_CLASS( func_trok_caixa_misteriosa, CTrokHordasEstacao );
 LINK_ENTITY_TO_CLASS( func_trok_bancada, CTrokHordasEstacao );
 LINK_ENTITY_TO_CLASS( func_trok_energia, CTrokHordasEstacao );
 LINK_ENTITY_TO_CLASS( func_trok_armadilha, CTrokHordasEstacao );
+LINK_ENTITY_TO_CLASS( func_trok_loja, CTrokHordasEstacao );
 #endif
 
 CTrokHordasEstacao::CTrokHordasEstacao()
@@ -261,6 +265,9 @@ bool CTrokHordasEstacao::Aviso( CBasePlayer *pPlayer, char *pszTexto, int iTam, 
 		V_snprintf( pszTexto, iTam, "E  —  %s: %d", szRotulo, iPreco );
 		break;
 	}
+	case ESTACAO_LOJA:
+		V_snprintf( pszTexto, iTam, "[E]  %s", szRotulo );
+		return true;
 	case ESTACAO_ARMADILHA:
 		if ( GetEstadoCaixa() == 1 )
 		{
@@ -317,6 +324,33 @@ CTrokHordasEstacao *CTrokHordasEstacao::Mirada( CBasePlayer *pPlayer )
 	return pMelhor;
 }
 
+CTrokHordasEstacao *TrokHordas_LojaPerto( CBasePlayer *pPlayer )
+{
+	CTrokHordasEstado *pEstado = TrokHordas_Estado();
+	if ( !pPlayer || !pEstado )
+		return NULL;
+	const float flDist = trok_hordas_loja_distancia.GetFloat();
+	CTrokHordasEstacao *pMelhor = NULL;
+	float flMelhor = flDist;
+	FOR_EACH_VEC( s_Estacoes, i )
+	{
+		CTrokHordasEstacao *p = s_Estacoes[ i ];
+		if ( !p || p->GetTipo() != ESTACAO_LOJA || p->IsEffectActive( EF_NODRAW ) || p->IsDormant() )
+			continue;
+		if ( p->PrecisaEnergia() && !pEstado->IsEnergia() )
+			continue;
+		Vector vecMin, vecMax;
+		p->CollisionProp()->WorldSpaceAABB( &vecMin, &vecMax );
+		const float d = CalcDistanceToAABB( vecMin, vecMax, pPlayer->WorldSpaceCenter() );
+		if ( d <= flMelhor )
+		{
+			flMelhor = d;
+			pMelhor = p;
+		}
+	}
+	return pMelhor;
+}
+
 #ifndef CLIENT_DLL
 //=============================================================================
 // Servidor
@@ -366,6 +400,7 @@ void CTrokHordasEstacao::Precache( void )
 	PrecacheScriptSound( "Trok.Hordas.Caixa" );
 	PrecacheScriptSound( "Trok.Hordas.Energia" );
 	PrecacheScriptSound( "Trok.Hordas.Armadilha" );
+	PrecacheScriptSound( "Trok.Hordas.Loja" );
 	const char *pszArma = STRING( m_iszArmaMapa );
 	if ( pszArma && !Q_strncmp( pszArma, "weapon_", 7 ) )
 		UTIL_PrecacheOther( pszArma );
@@ -386,6 +421,8 @@ void CTrokHordasEstacao::Spawn( void )
 		m_iTipo = ESTACAO_ENERGIA;
 	else if ( FStrEq( pszClasse, "func_trok_armadilha" ) )
 		m_iTipo = ESTACAO_ARMADILHA;
+	else if ( FStrEq( pszClasse, "func_trok_loja" ) )
+		m_iTipo = ESTACAO_LOJA;
 	else
 		m_iTipo = ESTACAO_PAREDE;
 
@@ -428,6 +465,8 @@ void CTrokHordasEstacao::Spawn( void )
 		V_strncpy( szRotulo, "KIT DE REANIMAÇÃO", sizeof( szRotulo ) );
 	else if ( m_iTipo == ESTACAO_UPGRADE )
 		V_strncpy( szRotulo, "MÁQUINA DE MELHORIA", sizeof( szRotulo ) );
+	else if ( m_iTipo == ESTACAO_LOJA )
+		V_strncpy( szRotulo, "LOJA", sizeof( szRotulo ) );
 	else if ( m_iTipo == ESTACAO_ARMADILHA )
 	{
 		// Tipo da armadilha (keyvalue "item"): eletrica (padrão), fogo ou arame. Números padrão
@@ -544,6 +583,15 @@ void CTrokHordasEstacao::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE
 	case ESTACAO_BANCADA: UsarBancada( pPlayer ); break;
 	case ESTACAO_ENERGIA: LigarEnergia( pPlayer ); break;
 	case ESTACAO_ARMADILHA: UsarArmadilha( pPlayer ); break;
+	case ESTACAO_LOJA:
+	{
+		// Abre o menu no cliente (o HUD vê o contador mudar; client/trok/ui/trok_hordas_loja.cpp).
+		const int i = pPlayer->entindex();
+		pEstado->m_aLoja.Set( i, ( pEstado->m_aLoja[ i ] + 1 ) & 63 );
+		EmitSound( "Trok.Hordas.Loja" );
+		m_OnUsada.FireOutput( pPlayer, this );
+		break;
+	}
 	}
 }
 

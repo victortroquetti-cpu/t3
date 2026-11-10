@@ -83,6 +83,7 @@ ConVar trok_hordas_pontos_reparo( "trok_hordas_pontos_reparo", "10", FCVAR_NOTIF
 ConVar trok_hordas_pontos_reparo_teto( "trok_hordas_pontos_reparo_teto", "500", FCVAR_NOTIFY, "Hordas: teto de pontos de reparo por rodada por jogador." );
 ConVar trok_hordas_pontos_bonus_todos( "trok_hordas_pontos_bonus_todos", "400", FCVAR_NOTIFY, "Hordas: pontos para cada um no Ataque aéreo." );
 ConVar trok_hordas_pontos_reforco( "trok_hordas_pontos_reforco", "200", FCVAR_NOTIFY, "Hordas: pontos para cada um no Reforço." );
+ConVar trok_hordas_pontos_armadilha( "trok_hordas_pontos_armadilha", "0", FCVAR_NOTIFY, "Hordas: pontos por zumbi morto na armadilha (CoD: 0)." );
 ConVar trok_hordas_perda_caido( "trok_hordas_perda_caido", "0.05", FCVAR_NOTIFY, "Hordas: fração dos pontos perdida ao cair." );
 ConVar trok_hordas_perda_morte( "trok_hordas_perda_morte", "0.10", FCVAR_NOTIFY, "Hordas: fração dos pontos perdida ao morrer (sangrar até o fim)." );
 // Humanos
@@ -242,7 +243,7 @@ static void Hordas_Precache( void )
 	{
 		"Trok.Hordas.Compra", "Trok.Hordas.SemPontos", "Trok.Hordas.Porta", "Trok.Hordas.Melhoria",
 		"Trok.Hordas.Caixa", "Trok.Hordas.Energia", "Trok.Hordas.RodadaInicio", "Trok.Hordas.RodadaFim",
-		"Trok.Hordas.Bonus", "Trok.Hordas.Caido", "Trok.Hordas.Reviver",
+		"Trok.Hordas.Bonus", "Trok.Hordas.Caido", "Trok.Hordas.Reviver", "Trok.Hordas.Armadilha", "Trok.Hordas.Loja",
 	};
 	for ( int i = 0; i < (int)ARRAYSIZE( s_pszSons ); ++i )
 		CBaseEntity::PrecacheScriptSound( s_pszSons[ i ] );
@@ -1789,7 +1790,9 @@ void TrokHordas_Abate( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 		if ( pAtacante && EhHumano( pAtacante ) && !s_bAtaqueAereo )
 		{
 			int iPontos;
-			if ( info.GetDamageType() & ( DMG_CLUB | DMG_SLASH ) )
+			if ( info.GetInflictor() && FClassnameIs( info.GetInflictor(), "func_trok_armadilha" ) )
+				iPontos = trok_hordas_pontos_armadilha.GetInt();
+			else if ( info.GetDamageType() & ( DMG_CLUB | DMG_SLASH ) )
 				iPontos = trok_hordas_pontos_faca.GetInt();
 			else if ( pVictim->LastHitGroup() == HITGROUP_HEAD )
 				iPontos = trok_hordas_pontos_cabeca.GetInt();
@@ -1877,7 +1880,8 @@ void TrokHordas_Dano( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 				iVida = 0;
 		}
 		pVictim->SetHealth( iVida );	// <= 0: o motor mata logo depois deste gancho
-		TrokHordas_DarPontos( pAtacante, trok_hordas_pontos_acerto.GetInt() );
+		if ( !pInf || !FClassnameIs( pInf, "func_trok_armadilha" ) )	// armadilha não dá ponto por acerto
+			TrokHordas_DarPontos( pAtacante, trok_hordas_pontos_acerto.GetInt() );
 		return;
 	}
 
@@ -2054,4 +2058,30 @@ CON_COMMAND_F( trok_hordas_defesas, "Hordas: mostra as defesas postas de cada jo
 			Msg( " %s %d/%d", s_pszObj[ k ], TrokHordas_ContarPostos( p, s_pszObj[ k ] ), TrokHordas_LimitePostos( s_pszObj[ k ], 0 ) );
 		Msg( "\n" );
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Armadilhas (func_trok_armadilha, shared/trok/trok_hordas_estacao.cpp)
+//-----------------------------------------------------------------------------
+int TrokHordas_ArmadilhasLigadas( CBasePlayer *pPlayer )
+{
+	int n = 0;
+	for ( int i = 0; i < CTrokHordasEstacao::Num(); ++i )
+	{
+		CTrokHordasEstacao *p = CTrokHordasEstacao::Get( i );
+		if ( p && p->ArmadilhaLigada() && p->Ativador() == pPlayer )
+			++n;
+	}
+	return n;
+}
+
+void TrokHordas_LentoZumbi( CBasePlayer *pZumbi, float flFator, float flTempo )
+{
+	if ( !pZumbi || !EhDoPool( pZumbi ) )
+		return;
+	const int i = pZumbi->entindex();
+	const float flAte = gpGlobals->curtime + MAX( 0.05f, flTempo );
+	if ( gpGlobals->curtime >= s_aZLentoAte[ i ] || flFator < s_aZLentoFator[ i ] )
+		s_aZLentoFator[ i ] = clamp( flFator, 0.05f, 1.0f );
+	s_aZLentoAte[ i ] = MAX( s_aZLentoAte[ i ], flAte );
 }

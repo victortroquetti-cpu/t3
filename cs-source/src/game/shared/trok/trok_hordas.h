@@ -24,6 +24,8 @@
 #pragma once
 #endif
 
+#include "utlvector.h"
+
 #ifdef CLIENT_DLL
 	#define CTrokHordasEstado C_TrokHordasEstado
 	#define CTrokHordasEstacao C_TrokHordasEstacao
@@ -71,7 +73,54 @@ enum TrokEstacaoTipo_t
 	ESTACAO_BANCADA,		// func_trok_bancada
 	ESTACAO_ENERGIA,		// func_trok_energia
 	ESTACAO_ARMADILHA,		// func_trok_armadilha (painel; a zona é um trigger_trok_armadilha)
+	ESTACAO_LOJA,			// func_trok_loja: E abre o menu de compra do modo (client/trok/ui/trok_hordas_loja.cpp)
 };
+
+//-----------------------------------------------------------------------------
+// Loja do modo (scripts/trok_hordas_loja.txt), lida igual nos dois lados. Só se compra perto
+// de uma func_trok_loja (trok_hordas_loja_distancia); o menu manda "trok_hordas_comprar <id>".
+//-----------------------------------------------------------------------------
+enum TrokHordasItemTipo_t
+{
+	HITEM_ARMA = 0,		// arma de fogo: compra (troca a da mesma classe); tendo, repõe a munição
+	HITEM_DEFESA,		// torreta, claymore, mina, remota, granada: compra; tendo, repõe até o máximo
+	HITEM_MUNICAO,		// reserva cheia de todas as armas de fogo
+	HITEM_COLETE,		// armadura (trok_hordas_colete)
+	HITEM_KIT,			// kit de reanimação
+};
+
+struct TrokHordasItem_t
+{
+	char szId[ 32 ];
+	char szNome[ 48 ];
+	char szCategoria[ 32 ];
+	char szDescricao[ 128 ];
+	char szEntidade[ 64 ];		// arma/defesa: weapon_*
+	int iTipo;					// TrokHordasItemTipo_t
+	int iPreco;
+	int iPrecoRepor;			// tendo a arma: repor munição (0 = metade do preço)
+	bool bEnergia;				// só com a energia ligada
+};
+
+struct TrokHordasCategoria_t
+{
+	char szId[ 32 ];
+	char szNome[ 48 ];
+};
+
+struct TrokHordasLoja_t
+{
+	CUtlVector< TrokHordasCategoria_t > categorias;
+	CUtlVector< TrokHordasItem_t > itens;
+	const TrokHordasItem_t *Item( const char *pszId ) const
+	{
+		FOR_EACH_VEC( itens, i )
+			if ( !V_stricmp( itens[ i ].szId, pszId ) )
+				return &itens[ i ];
+		return NULL;
+	}
+};
+const TrokHordasLoja_t &TrokHordasLoja( bool bRecarregar = false );
 
 //-----------------------------------------------------------------------------
 // Máquina de melhoria (scripts/trok_upgrade.txt), lida igual nos dois lados.
@@ -134,6 +183,7 @@ public:
 	float GetReviver( int i ) const { return Valido( i ) ? m_aReviver[ i ] : 0.0f; }		// progresso de quem o revive (0..1)
 	bool TemKit( int i ) const { return Valido( i ) && m_aKit[ i ] != 0; }					// kit de reanimação comprado
 	float GetVelZumbi( int i ) const { return Valido( i ) ? m_aVelZumbi[ i ] : 1.0f; }
+	int GetLojaPedidos( int i ) const { return Valido( i ) ? m_aLoja[ i ] : 0; }	// muda quando o jogador abre a loja (E)
 	int GetNivelDefesa( int i ) const { return Valido( i ) ? m_aNivelDefesa[ i ] : 0; }	// torreta/claymore/mina/remota
 	int GetNivel( int iJogador, int iSlot ) const
 	{
@@ -160,6 +210,7 @@ public:
 	CNetworkArray( int, m_aKit, MAX_PLAYERS + 1 );
 	CNetworkArray( float, m_aVelZumbi, MAX_PLAYERS + 1 );
 	CNetworkArray( int, m_aNivelDefesa, MAX_PLAYERS + 1 );
+	CNetworkArray( int, m_aLoja, MAX_PLAYERS + 1 );
 	CNetworkArray( int, m_aNivel, ( MAX_PLAYERS + 1 ) * TROK_HORDAS_SLOTS );
 	CNetworkArray( float, m_aBonusAte, HORDAS_BONUS_NUM );
 	CNetworkVar( int, m_iUltimoBonus );
@@ -175,7 +226,9 @@ float TrokHordas_VelocidadeZumbi( const CBaseEntity *pPlayer );	// x velocidade 
 int TrokHordas_PrecoCaixa( int iBase );
 // Armas de defesa (postas no chão e atiram/explodem sozinhas): torreta, claymore, mina, remota.
 // Na máquina de melhoria sobem o "nível de defesa" do jogador (vale para tudo o que ele põe).
-bool TrokHordas_EhArmaDefesa( const char *pszClasse );						// preço da caixa (com o bônus Caixa barata)
+bool TrokHordas_EhArmaDefesa( const char *pszClasse );
+// Loja mais perto do jogador, se ele está a até trok_hordas_loja_distancia de uma (e ela funciona).
+CTrokHordasEstacao *TrokHordas_LojaPerto( CBasePlayer *pPlayer );						// preço da caixa (com o bônus Caixa barata)
 
 //-----------------------------------------------------------------------------
 // Estação de compra (todas as estações: uma classe só em rede; o tipo vem do nome da classe)

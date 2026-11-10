@@ -122,3 +122,24 @@ void TrokHordas_DispararMapa( int iEvento, int iValor )
 	while ( ( pEnt = gEntList.FindEntityByClassname( pEnt, "trok_hordas_logica" ) ) != NULL )
 		static_cast< CTrokHordasLogica * >( pEnt )->Disparar( iEvento, iValor );
 }
+
+//-----------------------------------------------------------------------------
+// trigger_trok_armadilha: zona (pincel invisível, não sólido) de uma func_trok_armadilha, que a
+// encontra pelo nome (keyvalue "zona"). Só marca o volume; o dano é do painel.
+//-----------------------------------------------------------------------------
+class CTrokArmadilhaZona : public CBaseEntity
+{
+public:
+	DECLARE_CLASS( CTrokArmadilhaZona, CBaseEntity );
+
+	virtual void Spawn( void )
+	{
+		SetMoveType( MOVETYPE_NONE );
+		SetModel( STRING( GetModelName() ) );
+		SetSolid( SOLID_BSP );
+		AddSolidFlags( FSOLID_NOT_SOLID );
+		AddEffects( EF_NODRAW );
+	}
+};
+
+LINK_ENTITY_TO_CLASS( trigger_trok_armadilha, CTrokArmadilhaZona );

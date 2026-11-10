@@ -387,3 +387,19 @@
 	"soundlevel"	"SNDLVL_75dB"
 	"wave"			"items/smallmedkit1.wav"	// TROCAR (HL2): revivido
 }
+
+"Trok.Hordas.Armadilha"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_85dB"
+	"wave"			"ambient/energy/zap9.wav"		// TROCAR (HL2): armadilha ligada
+}
+
+"Trok.Hordas.Loja"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_60dB"
+	"wave"			"buttons/button14.wav"		// TROCAR (HL2): abriu a loja
+}

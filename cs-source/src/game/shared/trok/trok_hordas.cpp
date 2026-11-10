@@ -125,6 +125,7 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokHordasEstado, DT_TrokHordasEstado )
 	RecvPropArray3( RECVINFO_ARRAY( m_aKit ), RecvPropInt( RECVINFO( m_aKit[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aVelZumbi ), RecvPropFloat( RECVINFO( m_aVelZumbi[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aNivelDefesa ), RecvPropInt( RECVINFO( m_aNivelDefesa[ 0 ] ) ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aLoja ), RecvPropInt( RECVINFO( m_aLoja[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aNivel ), RecvPropInt( RECVINFO( m_aNivel[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aBonusAte ), RecvPropFloat( RECVINFO( m_aBonusAte[ 0 ] ) ) ),
 	RecvPropInt( RECVINFO( m_iUltimoBonus ) ),
@@ -144,6 +145,7 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokHordasEstado, DT_TrokHordasEstado )
 	SendPropArray3( SENDINFO_ARRAY3( m_aKit ), SendPropInt( SENDINFO_ARRAY( m_aKit ), 1, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aVelZumbi ), SendPropFloat( SENDINFO_ARRAY( m_aVelZumbi ), 10, 0, 0.0f, 4.0f ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aNivelDefesa ), SendPropInt( SENDINFO_ARRAY( m_aNivelDefesa ), 2, SPROP_UNSIGNED ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aLoja ), SendPropInt( SENDINFO_ARRAY( m_aLoja ), 6, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aNivel ), SendPropInt( SENDINFO_ARRAY( m_aNivel ), 3, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aBonusAte ), SendPropFloat( SENDINFO_ARRAY( m_aBonusAte ), 0, SPROP_NOSCALE ) ),
 	SendPropInt( SENDINFO( m_iUltimoBonus ), 4, SPROP_UNSIGNED ),
@@ -171,6 +173,7 @@ CTrokHordasEstado::CTrokHordasEstado()
 		m_aKit.Set( i, 0 );
 		m_aVelZumbi.Set( i, 1.0f );
 		m_aNivelDefesa.Set( i, 0 );
+		m_aLoja.Set( i, 0 );
 	}
 	for ( int i = 0; i < ( MAX_PLAYERS + 1 ) * TROK_HORDAS_SLOTS; ++i )
 		m_aNivel.Set( i, 0 );
@@ -240,4 +243,73 @@ bool TrokHordas_EhArmaDefesa( const char *pszClasse )
 		return false;
 	return !V_stricmp( pszClasse, "weapon_trok_torreta" ) || !V_stricmp( pszClasse, "weapon_trok_claymore" ) ||
 		!V_stricmp( pszClasse, "weapon_trok_mina" ) || !V_stricmp( pszClasse, "weapon_trok_remota" );
+}
+
+//-----------------------------------------------------------------------------
+// Loja do modo (scripts/trok_hordas_loja.txt)
+//-----------------------------------------------------------------------------
+ConVar trok_hordas_loja_arquivo( "trok_hordas_loja_arquivo", "scripts/trok_hordas_loja.txt", FCVAR_REPLICATED, "Hordas: catálogo da loja." );
+
+static TrokHordasLoja_t s_Loja;
+static bool s_bLojaCarregada = false;
+
+static int TipoItem( const char *psz )
+{
+	if ( !V_stricmp( psz, "defesa" ) ) return HITEM_DEFESA;
+	if ( !V_stricmp( psz, "municao" ) ) return HITEM_MUNICAO;
+	if ( !V_stricmp( psz, "colete" ) ) return HITEM_COLETE;
+	if ( !V_stricmp( psz, "kit" ) ) return HITEM_KIT;
+	return HITEM_ARMA;
+}
+
+const TrokHordasLoja_t &TrokHordasLoja( bool bRecarregar )
+{
+	if ( s_bLojaCarregada && !bRecarregar )
+		return s_Loja;
+	s_bLojaCarregada = true;
+	s_Loja.categorias.RemoveAll();
+	s_Loja.itens.RemoveAll();
+	KeyValues *pKV = new KeyValues( "TrokHordasLoja" );
+	if ( pKV->LoadFromFile( filesystem, trok_hordas_loja_arquivo.GetString(), "MOD" ) )
+	{
+		if ( KeyValues *pCat = pKV->FindKey( "categorias" ) )
+		{
+			for ( KeyValues *k = pCat->GetFirstValue(); k; k = k->GetNextValue() )
+			{
+				TrokHordasCategoria_t &c = s_Loja.categorias[ s_Loja.categorias.AddToTail() ];
+				V_strncpy( c.szId, k->GetName(), sizeof( c.szId ) );
+				V_strncpy( c.szNome, k->GetString(), sizeof( c.szNome ) );
+			}
+		}
+		if ( KeyValues *pItens = pKV->FindKey( "itens" ) )
+		{
+			for ( KeyValues *k = pItens->GetFirstTrueSubKey(); k; k = k->GetNextTrueSubKey() )
+			{
+				TrokHordasItem_t &it = s_Loja.itens[ s_Loja.itens.AddToTail() ];
+				memset( &it, 0, sizeof( it ) );
+				V_strncpy( it.szId, k->GetName(), sizeof( it.szId ) );
+				V_strncpy( it.szNome, k->GetString( "nome", k->GetName() ), sizeof( it.szNome ) );
+				V_strncpy( it.szCategoria, k->GetString( "categoria", "" ), sizeof( it.szCategoria ) );
+				V_strncpy( it.szDescricao, k->GetString( "descricao", "" ), sizeof( it.szDescricao ) );
+				V_strncpy( it.szEntidade, k->GetString( "entidade", "" ), sizeof( it.szEntidade ) );
+				it.iTipo = TipoItem( k->GetString( "tipo", "arma" ) );
+				it.iPreco = MAX( 0, k->GetInt( "preco", 1000 ) );
+				it.iPrecoRepor = MAX( 0, k->GetInt( "repor", 0 ) );
+				if ( it.iPrecoRepor <= 0 )
+					it.iPrecoRepor = it.iPreco / 2;
+				it.bEnergia = k->GetInt( "energia", 0 ) != 0;
+			}
+		}
+	}
+	else
+	{
+		Warning( "Trok: não achei %s; loja do Hordas vazia.\n", trok_hordas_loja_arquivo.GetString() );
+	}
+	pKV->deleteThis();
+	return s_Loja;
+}
+
+CON_COMMAND( trok_hordas_loja_recarregar, "Hordas: lê de novo o catálogo da loja (scripts/trok_hordas_loja.txt) deste lado." )
+{
+	Msg( "Trok: loja do Hordas com %d itens.\n", TrokHordasLoja( true ).itens.Count() );
 }
