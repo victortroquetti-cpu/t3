@@ -1557,7 +1557,10 @@ static void Manutencao( void )
 		{
 			CBasePlayer *p = CriarBot( HORDAS_BOT_ALIADO, TEAM_TROK_HUMANOS );
 			if ( p )
+			{
 				s_Aliados.AddToTail( p );
+				AplicarHumano( p );		// o primeiro nascimento do bot passou antes do time (pontos iniciais)
+			}
 		}
 	}
 }
