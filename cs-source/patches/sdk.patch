@@ -156,10 +156,10 @@ index f560070..ef7c7ca 100644
  	if ( hud_fastswitch.GetBool() && ( gpGlobals->curtime - m_flSelectionTime ) < (FASTSWITCH_DISPLAY_TIMEOUT + FASTSWITCH_FADEOUT_TIME) )
  		return true;
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.cpp b/src/game/client/hl2mp/c_hl2mp_player.cpp
-index 367a616..18841ba 100644
+index 367a616..ee7ac94 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.cpp
 +++ b/src/game/client/hl2mp/c_hl2mp_player.cpp
-@@ -35,6 +35,14 @@ BEGIN_RECV_TABLE_NOBASE( C_HL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+@@ -35,6 +35,19 @@ BEGIN_RECV_TABLE_NOBASE( C_HL2MP_Player, DT_HL2MPLocalPlayerExclusive )
  
  	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
  	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),
@@ -168,13 +168,18 @@ index 367a616..18841ba 100644
 +	RecvPropFloat( RECVINFO( m_flTrokGroundTime ) ),
 +	RecvPropFloat( RECVINFO( m_flTrokRampaFrente ) ),
 +	RecvPropFloat( RECVINFO( m_flTrokRampaLado ) ),
++	RecvPropFloat( RECVINFO( m_flTrokEmpInicio ) ),
++	RecvPropFloat( RECVINFO( m_flTrokEmpFim ) ),
++	RecvPropFloat( RECVINFO( m_flTrokEmpForca ) ),
++	RecvPropFloat( RECVINFO( m_flTrokEmpDirX ) ),
++	RecvPropFloat( RECVINFO( m_flTrokEmpDirY ) ),
 +	RecvPropFloat( RECVINFO( m_flTrokJumpPressTime ) ),
 +	RecvPropFloat( RECVINFO( m_flTrokProtegidoAte ) ),
 +#endif
  END_RECV_TABLE()
  
  // all players except the local player
-@@ -59,6 +67,13 @@ END_RECV_TABLE()
+@@ -59,6 +72,13 @@ END_RECV_TABLE()
  
  BEGIN_PREDICTION_DATA( C_HL2MP_Player )
  	DEFINE_PRED_FIELD( m_fIsWalking, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
@@ -188,7 +193,7 @@ index 367a616..18841ba 100644
  
  	// misyl: Ammo is server side entities in HL2MP. Not catastrophic to error about.
  	// Just let the server stomp all over us.
-@@ -102,6 +117,14 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100
+@@ -102,6 +122,19 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100
  
  C_HL2MP_Player::C_HL2MP_Player() : m_PlayerAnimState( this ), m_iv_angEyeAngles( "C_HL2MP_Player::m_iv_angEyeAngles" )
  {
@@ -197,6 +202,11 @@ index 367a616..18841ba 100644
 +	m_flTrokGroundTime = -100.0f;
 +	m_flTrokRampaFrente = 0.0f;
 +	m_flTrokRampaLado = 0.0f;
++	m_flTrokEmpInicio = -100.0f;
++	m_flTrokEmpFim = -100.0f;
++	m_flTrokEmpForca = 0.0f;
++	m_flTrokEmpDirX = 0.0f;
++	m_flTrokEmpDirY = 0.0f;
 +	m_flTrokJumpPressTime = -100.0f;
 +	m_flTrokProtegidoAte = 0.0f;
 +#endif
@@ -204,10 +214,10 @@ index 367a616..18841ba 100644
  	m_iSpawnInterpCounterCache = 0;
  
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.h b/src/game/client/hl2mp/c_hl2mp_player.h
-index bac7584..a043777 100644
+index bac7584..3dc3839 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.h
 +++ b/src/game/client/hl2mp/c_hl2mp_player.h
-@@ -120,6 +120,17 @@ public:
+@@ -120,6 +120,22 @@ public:
  
  	virtual void PostThink( void );
  
@@ -218,6 +228,11 @@ index bac7584..a043777 100644
 +	float m_flTrokGroundTime;
 +	float m_flTrokRampaFrente;
 +	float m_flTrokRampaLado;
++	float m_flTrokEmpInicio;
++	float m_flTrokEmpFim;
++	float m_flTrokEmpForca;
++	float m_flTrokEmpDirX;
++	float m_flTrokEmpDirY;
 +	float m_flTrokJumpPressTime;
 +	float m_flTrokProtegidoAte;
 +#endif
@@ -890,10 +905,10 @@ index 30d2181..18f69f4 100644
  }
  
 diff --git a/src/game/server/hl2mp/hl2mp_player.cpp b/src/game/server/hl2mp/hl2mp_player.cpp
-index 9457928..529febb 100644
+index 9457928..fbf1197 100644
 --- a/src/game/server/hl2mp/hl2mp_player.cpp
 +++ b/src/game/server/hl2mp/hl2mp_player.cpp
-@@ -54,6 +54,14 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+@@ -54,6 +54,19 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
  
  	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
  	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
@@ -902,13 +917,18 @@ index 9457928..529febb 100644
 +	SendPropFloat( SENDINFO( m_flTrokGroundTime ), 0, SPROP_NOSCALE ),
 +	SendPropFloat( SENDINFO( m_flTrokRampaFrente ), 0, SPROP_NOSCALE ),
 +	SendPropFloat( SENDINFO( m_flTrokRampaLado ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokEmpInicio ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokEmpFim ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokEmpForca ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokEmpDirX ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokEmpDirY ), 0, SPROP_NOSCALE ),
 +	SendPropFloat( SENDINFO( m_flTrokJumpPressTime ), 0, SPROP_NOSCALE ),
 +	SendPropFloat( SENDINFO( m_flTrokProtegidoAte ), 0, SPROP_NOSCALE ),
 +#endif
  
  END_SEND_TABLE()
  
-@@ -143,6 +151,14 @@ const char *g_ppszRandomCombineModels[] =
+@@ -143,6 +156,19 @@ const char *g_ppszRandomCombineModels[] =
  CHL2MP_Player::CHL2MP_Player() : m_PlayerAnimState( this )
  {
  	m_angEyeAngles.Init();
@@ -917,13 +937,18 @@ index 9457928..529febb 100644
 +	m_flTrokGroundTime = -100.0f;
 +	m_flTrokRampaFrente = 0.0f;
 +	m_flTrokRampaLado = 0.0f;
++	m_flTrokEmpInicio = -100.0f;
++	m_flTrokEmpFim = -100.0f;
++	m_flTrokEmpForca = 0.0f;
++	m_flTrokEmpDirX = 0.0f;
++	m_flTrokEmpDirY = 0.0f;
 +	m_flTrokJumpPressTime = -100.0f;
 +	m_flTrokProtegidoAte = 0.0f;
 +#endif
  
  	m_iLastWeaponFireUsercmd = 0;
  
-@@ -239,10 +255,42 @@ void CHL2MP_Player::GiveAllItems( void )
+@@ -239,10 +265,42 @@ void CHL2MP_Player::GiveAllItems( void )
  	
  }
  
@@ -966,7 +991,7 @@ index 9457928..529febb 100644
  	CBasePlayer::GiveAmmo( 255,	"Pistol");
  	CBasePlayer::GiveAmmo( 45,	"SMG1");
  	CBasePlayer::GiveAmmo( 1,	"grenade" );
-@@ -1414,6 +1462,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
+@@ -1414,6 +1472,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
  		}
  	}
  
@@ -986,10 +1011,10 @@ index 9457928..529febb 100644
  	// Randomize the start spot
  	for ( int i = random->RandomInt(1,5); i > 0; i-- )
 diff --git a/src/game/server/hl2mp/hl2mp_player.h b/src/game/server/hl2mp/hl2mp_player.h
-index 5fad238..51d258d 100644
+index 5fad238..916b896 100644
 --- a/src/game/server/hl2mp/hl2mp_player.h
 +++ b/src/game/server/hl2mp/hl2mp_player.h
-@@ -143,6 +143,18 @@ public:
+@@ -143,6 +143,23 @@ public:
  
  	bool IsThreatAimingTowardMe( CBaseEntity* threat, float cosTolerance = 0.8f ) const;
  	bool IsThreatFiringAtMe( CBaseEntity* threat ) const;
@@ -1002,6 +1027,11 @@ index 5fad238..51d258d 100644
 +	CNetworkVar( float, m_flTrokGroundTime );
 +	CNetworkVar( float, m_flTrokRampaFrente );	// movimento do CA: rampa de aceleracao (frente/tras)
 +	CNetworkVar( float, m_flTrokRampaLado );	// movimento do CA: rampa de aceleracao (lados)
++	CNetworkVar( float, m_flTrokEmpInicio );	// empurrao do CA no infectado: quando comecou
++	CNetworkVar( float, m_flTrokEmpFim );		// ... quando acaba
++	CNetworkVar( float, m_flTrokEmpForca );	// ... forca K (aceleracao K^2)
++	CNetworkVar( float, m_flTrokEmpDirX );	// ... direcao horizontal do dano
++	CNetworkVar( float, m_flTrokEmpDirY );
 +	CNetworkVar( float, m_flTrokJumpPressTime );
 +	CNetworkVar( float, m_flTrokProtegidoAte );	// proteção ao nascer (regras do Trok), para o HUD
 +#endif
@@ -1196,10 +1226,10 @@ index 78da217..b4fa5da 100644
  	CNetworkVar( float, m_flGameStartTime );
  	CUtlVector<EHANDLE> m_hRespawnableItemsAndWeapons;
 diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
-index 9b83dce..e837f7c 100644
+index 9b83dce..509a00c 100644
 --- a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
 +++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
-@@ -19,6 +19,36 @@ FileWeaponInfo_t* CreateWeaponInfo()
+@@ -19,6 +19,38 @@ FileWeaponInfo_t* CreateWeaponInfo()
  CHL2MPSWeaponInfo::CHL2MPSWeaponInfo()
  {
  	m_iPlayerDamage = 0;
@@ -1232,11 +1262,13 @@ index 9b83dce..e837f7c 100644
 +	Q_strncpy( m_szTrokAnim, "ar2", sizeof( m_szTrokAnim ) );
 +	m_flTrokKnockback = 30.0f;
 +	m_flTrokStagger = 0.08f;
++	m_flTrokCAEmpurrao = 0.0f;
++	m_flTrokCAEmpurraoTempo = 0.0f;
 +#endif
  }
  
  
-@@ -27,6 +57,45 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
+@@ -27,6 +59,47 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
  	BaseClass::Parse( pKeyValuesData, szWeaponName );
  
  	m_iPlayerDamage = pKeyValuesData->GetInt( "damage", 0 );
@@ -1249,6 +1281,8 @@ index 9b83dce..e837f7c 100644
 +		m_flTrokRPM = pTrok->GetFloat( "tiros_por_minuto", m_flTrokRPM );
 +		m_flTrokKnockback = pTrok->GetFloat( "empurrao", m_flTrokKnockback );
 +		m_flTrokStagger = pTrok->GetFloat( "segurar", m_flTrokStagger );
++		m_flTrokCAEmpurrao = pTrok->GetFloat( "ca_empurrao", m_flTrokCAEmpurrao );
++		m_flTrokCAEmpurraoTempo = pTrok->GetFloat( "ca_empurrao_tempo", m_flTrokCAEmpurraoTempo );
 +		m_bTrokAuto = pTrok->GetInt( "automatica", m_bTrokAuto ? 1 : 0 ) != 0;
 +		m_iTrokPellets = MAX( 1, pTrok->GetInt( "balas_por_tiro", m_iTrokPellets ) );
 +		m_iTrokDamage = pTrok->GetInt( "dano", m_iTrokDamage );
@@ -1283,10 +1317,10 @@ index 9b83dce..e837f7c 100644
  
  
 diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.h b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
-index 2ec16dd..bb7ef56 100644
+index 2ec16dd..6c8573a 100644
 --- a/src/game/shared/hl2mp/hl2mp_weapon_parse.h
 +++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
-@@ -29,6 +29,38 @@ public:
+@@ -29,6 +29,40 @@ public:
  public:
  
  	int m_iPlayerDamage;
@@ -1321,6 +1355,8 @@ index 2ec16dd..bb7ef56 100644
 +	char m_szTrokAnim[ 16 ];		// animação do jogador: ar2, smg1, pistol, shotgun
 +	float m_flTrokKnockback;		// u/s de empurrão por bala acertada (modo Surto: zumbis)
 +	float m_flTrokStagger;			// fração da velocidade que cada bala tira do zumbi (o "segurar")
++	float m_flTrokCAEmpurrao;		// movimento do CA: forca K do empurrao no infectado (DamageMovePenalty)
++	float m_flTrokCAEmpurraoTempo;	// ... duracao em s (DamageMovePenaltyDuration)
 +#endif
  };
  

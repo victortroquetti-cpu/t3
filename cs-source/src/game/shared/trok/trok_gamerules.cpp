@@ -5,6 +5,7 @@
 #include "cbase.h"
 #include "trok_gamerules.h"
 #include "movevars_shared.h"
+#include "in_buttons.h"
 
 #ifndef CLIENT_DLL
 	#include "hl2mp_player.h"
@@ -44,11 +45,15 @@ ConVar trok_surto_virar_tempo( "trok_surto_virar_tempo", "2", FCVAR_NOTIFY, "Seg
 ConVar trok_surto_virar_no_lugar( "trok_surto_virar_no_lugar", "1", FCVAR_NOTIFY, "O infectado levanta onde morreu (0 = nasce num ponto de nascimento)." );
 ConVar trok_surto_zumbi_renasce( "trok_surto_zumbi_renasce", "0", FCVAR_NOTIFY, "Zumbi morto volta (0 = fica morto até a próxima rodada; humanos vencem matando todos)." );
 ConVar trok_surto_regen( "trok_surto_regen", "0.10", FCVAR_NOTIFY, "Fração da vida máxima que o zumbi parado recupera a cada intervalo." );
-ConVar trok_surto_regen_intervalo( "trok_surto_regen_intervalo", "3", FCVAR_NOTIFY, "Segundos entre as recuperações do zumbi parado." );
-ConVar trok_surto_regen_espera( "trok_surto_regen_espera", "3", FCVAR_NOTIFY, "Segundos sem levar dano antes de começar a recuperar." );
+ConVar trok_surto_regen_intervalo( "trok_surto_regen_intervalo", "1", FCVAR_NOTIFY, "Segundos entre as recuperações do zumbi parado (CA: 1)." );
+ConVar trok_surto_regen_espera( "trok_surto_regen_espera", "3", FCVAR_NOTIFY, "Segundos parado, sem levar dano e sem atacar, antes da primeira recuperação (CA: 3)." );
 ConVar trok_surto_zumbi_sem_critico( "trok_surto_zumbi_sem_critico", "1", FCVAR_NOTIFY, "Zumbi não leva o multiplicador de tiro na cabeça." );
 ConVar trok_surto_empurrao( "trok_surto_empurrao", "1", FCVAR_NOTIFY, "Multiplica o empurrão e o 'segurar' das armas nos zumbis (0 = desliga)." );
 ConVar trok_surto_empurrao_max( "trok_surto_empurrao_max", "450", FCVAR_NOTIFY, "Velocidade horizontal máxima (u/s) que o empurrão pode dar." );
+// Com trok_mov_ca 1 o empurrão é o do CA (ca_empurrao e ca_empurrao_tempo no script da arma).
+ConVar trok_surto_ca_granada_empurrao( "trok_surto_ca_granada_empurrao", "135", FCVAR_NOTIFY, "Movimento do CA: força K do empurrão de explosão no infectado (M67: 135)." );
+ConVar trok_surto_ca_granada_tempo( "trok_surto_ca_granada_tempo", "0.4", FCVAR_NOTIFY, "Movimento do CA: duração (s) do empurrão de explosão (M67: 0,4)." );
+extern ConVar trok_mov_ca;
 ConVar trok_surto_zumbi_folego( "trok_surto_zumbi_folego", "2", FCVAR_NOTIFY, "Fôlego do zumbi correndo, em vezes o do humano (CA: o dobro)." );
 ConVar trok_surto_assistir( "trok_surto_assistir", "3", FCVAR_NOTIFY, "Segundos depois de morrer (sem virar zumbi) para passar a assistir os vivos." );
 ConVar trok_surto_cor_zumbi( "trok_surto_cor_zumbi", "150 225 140", FCVAR_NOTIFY, "Tom do zumbi enquanto não há modelo próprio (R G B)." );
@@ -233,7 +238,7 @@ void CTrokRules::SurtoAplicarZumbi( CBasePlayer *pPlayer )
 	}
 
 	m_flUltimoDano[ i ] = gpGlobals->curtime;
-	m_flProxRegen[ i ] = 0.0f;
+	m_flProxRegen[ i ] = gpGlobals->curtime + trok_surto_regen_espera.GetFloat();
 }
 
 //-----------------------------------------------------------------------------
@@ -616,7 +621,9 @@ void CTrokRules::SurtoFim( int iVencedor )
 	TrokSurto_DispararMapa( iVencedor == SURTO_HUMANOS ? 4 : 5 );
 }
 
-// Zumbi parado e sem levar dano recupera vida aos poucos.
+// Zumbi parado recupera vida (CA: 10% da vida máxima por segundo depois de 3 s parado).
+// Andar (qualquer mudança de posição), atacar ou levar dano recomeça a espera; a primeira
+// recuperação vem assim que a espera acaba, depois uma a cada intervalo.
 void CTrokRules::SurtoRegenerar( void )
 {
 	const float flNow = gpGlobals->curtime;
@@ -630,17 +637,19 @@ void CTrokRules::SurtoRegenerar( void )
 		if ( !IsPlaying( pPlayer ) || !pPlayer->IsAlive() || pPlayer->GetTeamNumber() != TEAM_TROK_ZUMBIS )
 			continue;
 
-		const bool bParado = pPlayer->GetAbsVelocity().Length2D() < 10.0f;
-		if ( !bParado || flNow - m_flUltimoDano[ i ] < trok_surto_regen_espera.GetFloat() )
+		const bool bParado = pPlayer->GetAbsVelocity().Length() < 1.0f;
+		const bool bAtacando = ( pPlayer->m_nButtons & ( IN_ATTACK | IN_ATTACK2 ) ) != 0;
+		if ( !bParado || bAtacando )
 		{
-			m_flProxRegen[ i ] = flNow + trok_surto_regen_intervalo.GetFloat();
+			m_flProxRegen[ i ] = flNow + trok_surto_regen_espera.GetFloat();
 			continue;
 		}
 		if ( flNow < m_flProxRegen[ i ] )
 			continue;
 		m_flProxRegen[ i ] = flNow + trok_surto_regen_intervalo.GetFloat();
 		const int iMax = pPlayer->GetMaxHealth();
-		pPlayer->SetHealth( MIN( iMax, pPlayer->GetHealth() + MAX( 1, (int)( iMax * flFrac ) ) ) );
+		if ( pPlayer->GetHealth() < iMax )
+			pPlayer->SetHealth( MIN( iMax, pPlayer->GetHealth() + MAX( 1, (int)( iMax * flFrac ) ) ) );
 	}
 }
 
@@ -819,13 +828,22 @@ void CTrokRules::OnPlayerDamaged( CBasePlayer *pVictim, const CTakeDamageInfo &i
 	if ( !m_bSurto || !pVictim )
 		return;
 	m_flUltimoDano[ pVictim->entindex() ] = gpGlobals->curtime;
+	m_flProxRegen[ pVictim->entindex() ] = gpGlobals->curtime + trok_surto_regen_espera.GetFloat();
 
 	const float flScale = trok_surto_empurrao.GetFloat();
-	if ( flScale <= 0.0f || !TrokSurto_IsZumbi( pVictim ) || !( info.GetDamageType() & DMG_BULLET ) )
+	if ( flScale <= 0.0f || !TrokSurto_IsZumbi( pVictim ) )
 		return;
 
 	CBasePlayer *pAttacker = ToBasePlayer( info.GetAttacker() );
 	if ( !pAttacker || !TrokSurto_IsHumano( pAttacker ) )
+		return;
+
+	if ( trok_mov_ca.GetBool() )
+	{
+		SurtoEmpurraoCA( pVictim, pAttacker, info, flScale );
+		return;
+	}
+	if ( !( info.GetDamageType() & DMG_BULLET ) )
 		return;
 	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pAttacker->GetActiveWeapon() );
 	if ( !pGun )
@@ -850,6 +868,59 @@ void CTrokRules::OnPlayerDamaged( CBasePlayer *pVictim, const CTakeDamageInfo &i
 		vecVel.y *= flMax / flSpeed;
 	}
 	pVictim->SetAbsVelocity( vecVel );
+}
+
+// Empurrão do CA (movimento do CA ligado): liga o tempo no jogador e o
+// trok_gamemovement.cpp troca a aceleração por um empurrão de K² (1 - t) na direção do
+// dano, sem correr nem frear. Força e tempo vêm da arma (bala) ou das cvars (explosão).
+void CTrokRules::SurtoEmpurraoCA( CBasePlayer *pVictim, CBasePlayer *pAttacker, const CTakeDamageInfo &info, float flScale )
+{
+	CHL2MP_Player *pTrok = dynamic_cast< CHL2MP_Player * >( pVictim );
+	if ( !pTrok )
+		return;
+
+	float K = 0.0f, T = 0.0f;
+	if ( info.GetDamageType() & DMG_BLAST )
+	{
+		K = trok_surto_ca_granada_empurrao.GetFloat();
+		T = trok_surto_ca_granada_tempo.GetFloat();
+	}
+	else if ( info.GetDamageType() & DMG_BULLET )
+	{
+		CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pAttacker->GetActiveWeapon() );
+		if ( !pGun )
+			return;
+		K = pGun->Info().m_flTrokCAEmpurrao;
+		T = pGun->Info().m_flTrokCAEmpurraoTempo;
+	}
+	K *= flScale;
+	if ( K <= 0.0f || T <= 0.0f )
+		return;
+
+	// Direção em que o dano andou (para longe de quem causou).
+	Vector vecDir = info.GetDamageForce();
+	vecDir.z = 0.0f;
+	if ( vecDir.LengthSqr() < 0.001f )
+	{
+		CBaseEntity *pFonte = info.GetInflictor() ? info.GetInflictor() : pAttacker;
+		vecDir = pVictim->WorldSpaceCenter() - pFonte->WorldSpaceCenter();
+		vecDir.z = 0.0f;
+	}
+	if ( vecDir.LengthSqr() > 0.001f )
+		VectorNormalize( vecDir );
+	else
+		vecDir.Init();
+
+	// O tempo só recomeça se o novo for mais longo que o que falta; a força nova sempre vale.
+	const float flNow = gpGlobals->curtime;
+	if ( flNow + T > pTrok->m_flTrokEmpFim )
+	{
+		pTrok->m_flTrokEmpInicio = flNow;
+		pTrok->m_flTrokEmpFim = flNow + T;
+	}
+	pTrok->m_flTrokEmpForca = K;
+	pTrok->m_flTrokEmpDirX = vecDir.x;
+	pTrok->m_flTrokEmpDirY = vecDir.y;
 }
 
 // Pontes para o código da Valve (patches).

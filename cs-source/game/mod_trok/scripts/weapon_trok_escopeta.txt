@@ -30,6 +30,8 @@ WeaponData
 		"tiros_por_minuto"		"70"
 		"empurrao"		"40"		// u/s por bala acertada no zumbi (modo Surto) (por chumbo: 9 por tiro)
 		"segurar"		"0.06"		// fração da velocidade do zumbi que cada bala tira
+		"ca_empurrao"		"40"		// movimento do CA: força K do empurrão no infectado (MEDIR (padrão do CA: 40 / 0,3 s; por chumbo))
+		"ca_empurrao_tempo"	"0.3"
 		"automatica"		"0"
 		"balas_por_tiro"		"9"
 		"dano"		"18"

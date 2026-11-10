@@ -134,6 +134,7 @@ private:
 	bool CAAgachado( void ) const;
 	bool CASprint( void ) const;
 	bool CANoPulo( void ) const;
+	bool CAEmpurrao( float *pT = NULL ) const;
 	float CAHop( void ) const;
 	float CAVelocidadeAlvo( void ) const;
 	void CAVelocidade( bool bChao );
@@ -598,6 +599,21 @@ bool CTrokGameMovement::CANoPulo( void ) const
 	return pTrok && player->GetGroundEntity() == NULL && pTrok->m_flTrokJumpTime > pTrok->m_flTrokGroundTime;
 }
 
+// Empurrão do CA no infectado (só no Surto; o servidor liga o tempo em OnPlayerDamaged).
+// pT recebe os segundos desde o acerto.
+bool CTrokGameMovement::CAEmpurrao( float *pT ) const
+{
+	const CHL2MP_Player *pTrok = TrokPlayer();
+	if ( !pTrok || pTrok->m_flTrokEmpForca <= 0.0f )
+		return false;
+	const float flNow = gpGlobals->curtime;
+	if ( flNow < pTrok->m_flTrokEmpInicio || flNow >= pTrok->m_flTrokEmpFim )
+		return false;
+	if ( pT )
+		*pT = flNow - pTrok->m_flTrokEmpInicio;
+	return true;
+}
+
 // Fator do pulo: cai a trok_ca_pulo_min a cada pulo e recupera trok_ca_pulo_recupera por segundo.
 float CTrokGameMovement::CAHop( void ) const
 {
@@ -615,8 +631,8 @@ float CTrokGameMovement::CAVelocidadeAlvo( void ) const
 	float s;
 	if ( CAAgachado() )
 		s = trok_ca_agachado.GetFloat();
-	else if ( mv->m_nButtons & IN_WALK )
-		s = trok_ca_andar.GetFloat();
+	else if ( ( mv->m_nButtons & IN_WALK ) || CAEmpurrao() )
+		s = trok_ca_andar.GetFloat();	// levando empurrão: sem correr nem sprint
 	else if ( CASprint() )
 		s = trok_ca_corrida.GetFloat() * trok_ca_sprint.GetFloat();
 	else
@@ -753,6 +769,27 @@ void CTrokGameMovement::CAVelocidade( bool bChao )
 	if ( flHop < 1.0f )
 		vecA *= flHop;
 
+	// Empurrão do CA (infectado acertado por inimigo): a aceleração vira a ↑ K²(1 - t) na
+	// direção horizontal do dano. Agachado andando: x0,25; agachado parado: para na hora.
+	float flEmpT = 0.0f;
+	const bool bEmpurrao = CAEmpurrao( &flEmpT );
+	if ( bEmpurrao && pTrok )
+	{
+		const float K = pTrok->m_flTrokEmpForca;
+		Vector vecDir( pTrok->m_flTrokEmpDirX, pTrok->m_flTrokEmpDirY, 0.0f );
+		vecA = vecDir * CAEsc( K * K * MAX( 0.0f, 1.0f - flEmpT ) );
+		if ( bAgachado )
+		{
+			if ( bMove || ( mv->m_nButtons & IN_JUMP ) )
+				vecA *= 0.25f;
+			else
+			{
+				vecA.Init();
+				mv->m_vecVelocity.x = mv->m_vecVelocity.y = 0.0f;
+			}
+		}
+	}
+
 	// 4. Integração.
 	if ( bChao )
 	{
@@ -768,8 +805,8 @@ void CTrokGameMovement::CAVelocidade( bool bChao )
 		else
 			v += vecA * dt;
 
-		// Freio ao soltar as teclas: para a corrida em trok_ca_parada segundos.
-		if ( !bMove )
+		// Freio ao soltar as teclas: para a corrida em trok_ca_parada segundos (não freia no empurrão).
+		if ( !bMove && !bEmpurrao )
 		{
 			const float h = v.Length2D();
 			if ( h <= CAEsc( 5.0f ) )

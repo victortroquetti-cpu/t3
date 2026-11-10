@@ -51,6 +51,7 @@ public:
 
 	// Chamados por código da Valve (patches/sdk.patch):
 	void OnPlayerDamaged( CBasePlayer *pVictim, const CTakeDamageInfo &info );	// player.cpp, depois do dano
+	void SurtoEmpurraoCA( CBasePlayer *pVictim, CBasePlayer *pAttacker, const CTakeDamageInfo &info, float flScale );
 	bool IgnoresHeadshot( CBasePlayer *pVictim ) const;							// player.cpp, TraceAttack
 
 private:
