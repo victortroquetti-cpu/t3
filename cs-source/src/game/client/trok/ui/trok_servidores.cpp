@@ -9,6 +9,12 @@
 
 #include "cbase.h"
 #include "trok_servidores.h"
+// Os cabeçalhos públicos da Steam usam strncpy de propósito (inline em matchmakingtypes.h);
+// o SDK troca strncpy por um nome que não existe, o que quebra a ligação. Libera só aqui.
+#ifdef strncpy
+#undef strncpy
+#endif
+#include <string.h>
 #include "steam/steam_api.h"
 #include "steam/isteammatchmaking.h"
 #include "tier1/utlvector.h"
