@@ -46,3 +46,99 @@
 	output OnGolpe(void) : "Um infectado bateu nela."
 	output OnQuebrada(void) : "Quebrou."
 ]
+
+// ---------------------------------------------------------------------------
+// Modo Hordas (design/modo-hordas.md). Estações são pincéis: desenhe a parede, a máquina,
+// a porta ou a caixa com a textura que quiser e transforme em entidade. Usa-se com E.
+// Barricada = func_trok_grade (acima) com "Começa fechada" Sim e "tabuas".
+// ---------------------------------------------------------------------------
+
+@PointClass base(Targetname) size(-16 -16 0, 16 16 72) color(200 60 60) = info_trok_hordas_spawn :
+	"Modo Hordas: nascedouro de zumbi. Ponha fora da área dos jogadores, atrás de uma barricada " +
+	"(func_trok_grade) ou numa saída de duto. O diretor usa os mais perto dos jogadores."
+[
+	area(integer) : "Área" : 0 : "Só vale depois que uma porta paga abre esta área (0 e 1 = desde o começo)."
+	chefe(choices) : "Lugar do chefe" : 0 =
+	[
+		0 : "Não"
+		1 : "Sim (o Colosso nasce aqui; sem nenhum, nasce num normal)"
+	]
+	StartDisabled(choices) : "Começa desligado" : 0 =
+	[
+		0 : "Não"
+		1 : "Sim"
+	]
+	input Ligar(void) : "Liga."
+	input Desligar(void) : "Desliga."
+]
+
+@PointClass base(Targetname) iconsprite("editor/logic_auto.vmt") = trok_hordas_logica :
+	"Modo Hordas: saídas das rodadas para o mapa e entradas para abrir áreas."
+[
+	output OnRodadaInicio(integer) : "Rodada começou (número da rodada)."
+	output OnRodadaFim(integer) : "Rodada acabou (número da rodada)."
+	output OnEnergia(void) : "A energia foi ligada."
+	output OnChefe(integer) : "Rodada com chefe começou."
+	output OnFimDeJogo(integer) : "Todos caíram (rodada alcançada)."
+	output OnArea(integer) : "Uma área foi aberta (número)."
+	input AbrirArea(integer) : "Abre a área N (liga os nascedouros dela)."
+	input LigarEnergia(void) : "Liga a energia."
+]
+
+@BaseClass base(Targetname) = TrokHordasEstacao
+[
+	rotulo(string) : "Rótulo" : "" : "Nome no aviso (vazio = o nome da arma ou do tipo)."
+	comeca_desligada(choices) : "Começa escondida" : 0 =
+	[
+		0 : "Não"
+		1 : "Sim (some até a entrada Ligar)"
+	]
+	input Ligar(void) : "Aparece / volta a funcionar."
+	input Desligar(void) : "Some."
+	output OnUsada(void) : "Alguém comprou / abriu / ligou."
+	output OnSemPontos(void) : "Alguém tentou sem pontos."
+]
+
+@SolidClass base(TrokHordasEstacao) = func_trok_compra_parede :
+	"Modo Hordas: arma na parede. E compra a arma (troca a da mesma classe); tendo a arma, E compra munição."
+[
+	arma(string) : "Arma" : "weapon_trok_submetralhadora" : "Classe da arma (weapon_trok_pistola, _submetralhadora, _fuzil, _escopeta...)."
+	preco(integer) : "Preço" : 1000 : "Pontos."
+	preco_municao(integer) : "Preço da munição" : 0 : "0 = metade do preço. Arma melhorada paga o da máquina (trok_upgrade.txt)."
+	precisa_energia(choices) : "Precisa de energia" : 0 = [ 0 : "Não" 1 : "Sim" ]
+]
+
+@SolidClass base(TrokHordasEstacao) = func_trok_porta_paga :
+	"Modo Hordas: porta, entulho ou grade que some quando alguém paga. Abre a área (nascedouros)."
+[
+	preco(integer) : "Preço" : 1000 : "Pontos (CoD: 750 a 1500)."
+	area(integer) : "Área que abre" : 2 : "Liga os info_trok_hordas_spawn com esta área. Portas com a mesma área abrem juntas."
+	input Abrir(void) : "Abre sem pagar."
+]
+
+@SolidClass base(TrokHordasEstacao) = func_trok_maquina_upgrade :
+	"Modo Hordas: máquina de melhoria. Sobe a arma da mão um nível (1 a 5, scripts/trok_upgrade.txt)."
+[
+	precisa_energia(choices) : "Precisa de energia" : 1 = [ 0 : "Não" 1 : "Sim" ]
+]
+
+@SolidClass base(TrokHordasEstacao) = func_trok_caixa_misteriosa :
+	"Modo Hordas: caixa misteriosa. Paga, gira e oferece uma arma sorteada (scripts/trok_hordas.txt) só para quem pagou."
+[
+	preco(integer) : "Preço" : 0 : "0 = trok_hordas_caixa_preco (950)."
+	precisa_energia(choices) : "Precisa de energia" : 0 = [ 0 : "Não" 1 : "Sim" ]
+]
+
+@SolidClass base(TrokHordasEstacao) = func_trok_bancada :
+	"Modo Hordas: bancada de equipamento. Um item por bancada."
+[
+	item(string) : "Item" : "colete" : "colete, kit_reanimacao ou uma arma (weapon_trok_torreta, weapon_trok_claymore, weapon_trok_granada...): compra ou enche a munição."
+	preco(integer) : "Preço" : 1500 : "Pontos."
+	precisa_energia(choices) : "Precisa de energia" : 0 = [ 0 : "Não" 1 : "Sim" ]
+]
+
+@SolidClass base(TrokHordasEstacao) = func_trok_energia :
+	"Modo Hordas: chave de energia. E liga (uma vez); as estações com 'Precisa de energia' passam a funcionar."
+[
+	input Abrir(void) : "Liga a energia."
+]

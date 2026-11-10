@@ -3,7 +3,7 @@
 // no código do modo e nos números do cfg de cada modo.
 //
 // Campos de cada modo:
-//   "modo"          valor de trok_modo (equipe, solo, surto, corrida)
+//   "modo"          valor de trok_modo (equipe, solo, surto, corrida, hordas)
 //   "nome"          nome grande do cartão           "curto"   rótulo pequeno
 //   "descricao"     uma linha                       "regra1".."regra4"  regras principais
 //   "cfg"           cfg do modo (cfg/<cfg>.cfg): o menu lê dele a meta e o tempo padrão
@@ -96,6 +96,29 @@
 		"meta_cvar"		"mp_fraglimit"
 		"meta_rotulo"	"ABATES"
 		"meta_opcoes"	"0 15 30 45"
+		"tempo_cvar"	""
+		"tempo_unidade"	"min"
+		"tempo_opcoes"	""
+		"times"			"0"
+		"bots"			"1"
+		"mapas"			""
+		"mapa_padrao"	"de_dust2"
+	}
+
+	"hordas"
+	{
+		"modo"			"hordas"
+		"nome"			"HORDAS"
+		"curto"			"HORDAS"
+		"descricao"		"Cooperativo: sobreviva às hordas de zumbis, rodada após rodada."
+		"regra1"		"Cada acerto e abate dá pontos; gaste nas paredes, portas e máquinas do mapa (E)."
+		"regra2"		"A máquina de melhoria leva a arma da mão até o nível 5."
+		"regra3"		"Caiu? Um colega segura E para te reviver. Todos caídos: fim de jogo."
+		"regra4"		"Melhor num mapa feito para o modo (trok_hordas_teste)."
+		"cfg"			"hordas"
+		"meta_cvar"		""
+		"meta_rotulo"	""
+		"meta_opcoes"	""
 		"tempo_cvar"	""
 		"tempo_unidade"	"min"
 		"tempo_opcoes"	""
