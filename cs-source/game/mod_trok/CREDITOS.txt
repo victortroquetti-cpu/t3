@@ -10,6 +10,8 @@ Código
 Números e regras de referência do Combat Arms
 - Especificações do DeCombat (https://github.com/argallo/DeCombat), MIT ou Apache-2.0:
   movimento, armas, modos, radar e áudio do CA de 2009 (cópia em cs-source/design/decombat/).
+- Especificações de Combat Arms do Chimera (https://github.com/r0pi0x/Chimera), MIT ou Apache-2.0:
+  caixa do jogador, agachar e números de movimento e de armas usados como referência.
 
 Fontes
 - Barlow e Barlow Condensed, Copyright 2017 The Barlow Project Authors

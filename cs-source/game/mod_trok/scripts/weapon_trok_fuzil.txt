@@ -51,7 +51,7 @@ WeaponData
 		"mira_posicao"		"-3.0 1.0 -1.5"
 		"mira_angulos"		"0 0 0"
 		"mira_velocidade"		"0.6"
-		"velocidade"		"0.95"
+		"velocidade"		"0.90"		// M4A1 do CA: perda de 0,10 (movimento do CA: corrida x (1 - colete) x isto)
 		"animacao"		"ar2"
 	}
 

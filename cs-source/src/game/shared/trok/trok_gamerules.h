@@ -32,6 +32,8 @@ public:
 	virtual ~CTrokRules();
 
 	virtual const char *GetGameDescription( void );
+	// Caixa e olho do jogador: no movimento do CA (trok_mov_ca), proporções do Combat Arms.
+	virtual const CViewVectors *GetViewVectors() const;
 
 #ifndef CLIENT_DLL
 	virtual void PlayerSpawn( CBasePlayer *pPlayer );

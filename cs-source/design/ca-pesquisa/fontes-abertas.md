@@ -5,6 +5,7 @@ Pesquisa de 10/11/2026 (GitHub e busca na web). O que pode e o que não pode, co
 ## Pode usar
 | Fonte | O que tem | Confiança |
 |---|---|---|
+| **Chimera** (github.com/r0pi0x/Chimera, `specs/combat_arms/`) | 32 specs do CA Classic: movimento, tiro, classes de arma, granadas, 22 modos, killstreak, bots, HUD, radar. O projeto diz que usou código descompilado e atributos descriptografados; o dono decidiu usar como referência (10/11/2026) | alta, mas escrito por IA e sem revisão humana |
 | **DeCombat** (`design/decombat/`) | movimento, tiro, modos, radar, áudio e formatos do CA de 2009; código "clean room" (sem código vazado), MIT/Apache | alta |
 | CAWiki (combatarms.fandom.com) | notas de 0 a 100 por arma, portabilidade, fôlego, modos, mapas | média (escala do site oficial, não RPM) |
 | StrategyWiki (Combat_Arms/...) | as mesmas notas, alguns RPM medidos no jogo, recuo avaliado em teste, modos, mapas | média |
@@ -17,7 +18,6 @@ Os números já levantados estão em `numeros.md`, e as lições de design em `d
 ## Não usar
 | Fonte | Por quê |
 |---|---|
-| **r0pi0x/Chimera** (specs de CA em `specs/combat_arms/`) | Tem muitos números, mas o próprio projeto diz que vêm de **código do CA vazado ou descompilado** e de **arquivos de atributos descriptografados**, e o leitor de `.rez` deles descriptografa (Twofish/AES). As duas coisas são proibidas pela regra 2. **Nada daqui foi copiado.** Se o dono quiser rever, a decisão é dele. |
 | TechX1320/fireteam-fps | usa código-fonte da engine de origem provavelmente vazada, atributos "decrypted" e tenta quebrar a criptografia |
 | jsj2008/lithtech, madeinserver/lithtech, nolffan/nolfsrc | código de engine e de jogo sem licença aberta (vazado) |
 | Repositórios de cheat (Combat-Arms, CAScratch, combatarms-internal, CAClassic-Nightmare...) e "Rez Patcher" | cheat ou burla de proteção |

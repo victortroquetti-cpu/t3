@@ -15,6 +15,10 @@
 //             trok_escalar_altura_max acima dos pés) com espaço em cima, o
 //             jogador sobe e passa por cima (mantle). Funciona do chão e no ar.
 //
+//   Modo CA (trok_mov_ca 1): velocidade, aceleração, parada, pulo e agachar como no
+//             Combat Arms de 2009 (design/decombat/specs/MOVEMENT_2009.md e as specs de
+//             movimento do Chimera, que concordam). Ver "Movimento do Combat Arms" abaixo.
+//
 // Todos os números são ConVars replicadas: dá para ajustar no console com o
 // jogo aberto (sv_cheats não é preciso; são do servidor).
 //=============================================================================
@@ -69,6 +73,34 @@ ConVar trok_escalar( "trok_escalar", "1", FCVAR_REPLICATED | FCVAR_NOTIFY, "Esca
 ConVar trok_escalar_altura_max( "trok_escalar_altura_max", "80", FCVAR_REPLICATED, "Altura máxima (u, acima dos pés) de uma borda escalável." );
 ConVar trok_escalar_vel_frente( "trok_escalar_vel_frente", "140", FCVAR_REPLICATED, "Velocidade para frente ao passar por cima da borda." );
 
+// --- Movimento do Combat Arms (números do CA em unidades do CA; trok_ca_escala converte, padrão 1) ---
+ConVar trok_mov_ca( "trok_mov_ca", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"1 = movimento do Combat Arms 2009 (aceleração em rampa, parada seca, pulo fixo, agachar curto). 0 = Source/HL2 com os ajustes trok_*." );
+ConVar trok_ca_escala( "trok_ca_escala", "1.0", FCVAR_REPLICATED,
+	"Unidades do CA para o Source. O mundo do CA usa 40u = 1 m, quase o mesmo do Source (~39u = 1 m), então 1 = mesma escala "
+	"dos mapas. 0.72 converteria pela altura do corpo (o boneco do CA tem 100u, o do Source 72u)." );
+ConVar trok_ca_corrida( "trok_ca_corrida", "285", FCVAR_REPLICATED, "CA: velocidade correndo (u/s do CA), igual para frente, trás e lados." );
+ConVar trok_ca_andar( "trok_ca_andar", "70", FCVAR_REPLICATED, "CA: velocidade andando (+walk) e mirando com luneta." );
+ConVar trok_ca_agachado( "trok_ca_agachado", "50", FCVAR_REPLICATED, "CA: velocidade agachado." );
+ConVar trok_ca_sprint( "trok_ca_sprint", "1.4", FCVAR_REPLICATED, "CA: sprint = corrida x este valor (personagem padrão: 1 + 0.4 do colete)." );
+ConVar trok_ca_colete( "trok_ca_colete", "0.1", FCVAR_REPLICATED, "CA: perda de velocidade do colete padrão (somada à da arma)." );
+ConVar trok_ca_pulo( "trok_ca_pulo", "330", FCVAR_REPLICATED, "CA: velocidade vertical do pulo (u/s do CA). Com gravidade 1100: ~50u de altura." );
+ConVar trok_ca_acel( "trok_ca_acel", "3000", FCVAR_REPLICATED, "CA: aceleração base por eixo (u/s²)." );
+ConVar trok_ca_acel_inicio( "trok_ca_acel_inicio", "500", FCVAR_REPLICATED, "CA: aceleração no primeiro instante de um movimento." );
+ConVar trok_ca_acel_max( "trok_ca_acel_max", "3000", FCVAR_REPLICATED, "CA: teto da rampa e da aceleração somada." );
+ConVar trok_ca_acel_rampa( "trok_ca_acel_rampa", "6000", FCVAR_REPLICATED, "CA: quanto a aceleração sobe por segundo segurando a direção (500 -> 3000 em ~0,4 s)." );
+ConVar trok_ca_atrito( "trok_ca_atrito", "5", FCVAR_REPLICATED, "CA: atrito no chão (por segundo; a velocidade cai como exp(-5t))." );
+ConVar trok_ca_parada( "trok_ca_parada", "0.1", FCVAR_REPLICATED, "CA: tempo (s) para frear da corrida até parar ao soltar as teclas." );
+ConVar trok_ca_ar( "trok_ca_ar", "0.1", FCVAR_REPLICATED, "CA: fator da aceleração no ar depois de um pulo quando a rampa não vale (agachado no ar)." );
+ConVar trok_ca_ar_rampa( "trok_ca_ar_rampa", "1", FCVAR_REPLICATED, "CA: 1 = no ar vale a mesma rampa do chão (controle forte, como no CA). 0 = só trok_ca_ar." );
+ConVar trok_ca_pulo_min( "trok_ca_pulo_min", "0.3", FCVAR_REPLICATED, "CA: depois de cada pulo, o próximo pulo e a aceleração ficam com esta fração..." );
+ConVar trok_ca_pulo_recupera( "trok_ca_pulo_recupera", "1.2", FCVAR_REPLICATED, "...e recuperam este tanto por segundo (de volta a 1 em ~0,6 s, perto de pousar)." );
+ConVar trok_ca_agachar_tempo( "trok_ca_agachar_tempo", "0.15", FCVAR_REPLICATED, "CA: tempo (s) para agachar por completo no chão (Source: 0,4)." );
+ConVar trok_ca_agachar_ar( "trok_ca_agachar_ar", "0.5", FCVAR_REPLICATED,
+	"CA: no ar, a caixa encolhe pelo centro: os pés sobem esta fração da diferença de altura e a cabeça desce o resto (Source: 1 = só os pés)." );
+
+static inline float CAEsc( float f ) { return f * MAX( 0.01f, trok_ca_escala.GetFloat() ); }
+
 // Distância à frente em que procuramos a parede e a borda.
 #define MANTLE_PROBE		24.0f
 #define MANTLE_LEDGE_DEPTH	20.0f
@@ -91,7 +123,24 @@ public:
 	virtual bool OnLadder( trace_t &trace );
 	virtual void FullLadderMove( void );
 
+	// Movimento do Combat Arms
+	virtual void WalkMove( void );
+	virtual void Duck( void );
+	virtual void FinishDuck( void );
+	virtual void FinishUnDuck( void );
+
 private:
+	bool CAAtivo( void ) const;
+	bool CAAgachado( void ) const;
+	bool CASprint( void ) const;
+	bool CANoPulo( void ) const;
+	float CAHop( void ) const;
+	float CAVelocidadeAlvo( void ) const;
+	void CAVelocidade( bool bChao );
+	void CAMoverNoChao( void );
+	Vector m_vecCAAntesAtrito;		// velocidade antes do atrito do Source (o CA usa o atrito dele)
+	bool m_bCAAntesAtritoValido;
+
 	bool OnHL2Ladder( void );
 	CHL2MP_Player *TrokPlayer( void ) const { return dynamic_cast< CHL2MP_Player * >( player ); }
 	void ApplyJumpTurn( void );
@@ -290,6 +339,11 @@ void CTrokGameMovement::FullWalkMove( void )
 			pTrok->m_flTrokJumpPressTime = gpGlobals->curtime;
 	}
 
+	// Movimento do CA: o atrito do Source (CGameMovement::Friction, que não é virtual) roda antes
+	// do WalkMove; guardamos a velocidade de antes para o WalkMove do CA aplicar o atrito dele.
+	m_vecCAAntesAtrito = mv->m_vecVelocity;
+	m_bCAAntesAtritoValido = CAAtivo();
+
 	TryStartSlide();
 	TryMantle();
 
@@ -321,6 +375,31 @@ bool CTrokGameMovement::CheckJumpButton( void )
 {
 	CHL2MP_Player *pTrok = TrokPlayer();
 	const float flNow = gpGlobals->curtime;
+
+	if ( CAAtivo() )
+	{
+		// CA: só pula apertando (segurar não repete), só do chão, nunca agachado nem enquanto o
+		// agachar/levantar não terminou. Sem pulo atrasado nem antecipado.
+		if ( CAAgachado() || player->m_Local.m_bDucking || player->m_Local.m_flDucktime > 0.0f )
+		{
+			mv->m_nOldButtons |= IN_JUMP;
+			return false;
+		}
+		const float flHop = CAHop();
+		const Vector before = mv->m_vecVelocity;
+		if ( !BaseClass::CheckJumpButton() )
+			return false;
+		float flJump = CAEsc( trok_ca_pulo.GetFloat() ) * flHop;
+		if ( TrokSurto_IsZumbi( player ) )
+			flJump *= sqrtf( MAX( 0.1f, trok_surto_zumbi_pulo.GetFloat() ) ); // o cvar multiplica a altura
+		mv->m_vecVelocity.x = before.x;
+		mv->m_vecVelocity.y = before.y;
+		mv->m_vecVelocity.z = flJump;	// define, não soma (CA)
+		mv->m_outJumpVel.z = flJump;
+		if ( pTrok )
+			pTrok->m_flTrokJumpTime = flNow;
+		return true;
+	}
 	const bool bFreshPress = ( mv->m_nButtons & IN_JUMP ) && !( mv->m_nOldButtons & IN_JUMP );
 
 	// Pulo antecipado: apertou no ar pouco antes de pousar e ainda segura.
@@ -410,6 +489,14 @@ void CTrokGameMovement::CapJumpSpeed( void )
 //-----------------------------------------------------------------------------
 void CTrokGameMovement::AirMove( void )
 {
+	if ( CAAtivo() )
+	{
+		CAVelocidade( false );
+		VectorAdd( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+		TryPlayerMove();
+		VectorSubtract( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+		return;
+	}
 	ApplyJumpTurn();
 	BaseClass::AirMove();
 }
@@ -466,6 +553,356 @@ void CTrokGameMovement::ApplyJumpTurn( void )
 
 	mv->m_vecVelocity.x = vNew.x;
 	mv->m_vecVelocity.y = vNew.y;
+}
+
+//=============================================================================
+// Movimento do Combat Arms (trok_mov_ca 1)
+//
+// Fontes: design/decombat/specs/MOVEMENT_2009.md (DeCombat, MIT/Apache) e as specs de movimento
+// do Chimera (r0pi0x/Chimera, MIT). Código nosso; só os números e regras vêm de lá.
+// Unidades do CA vezes trok_ca_escala (1 = mesma escala de mundo: o CA usa 40u por metro, o Source ~39).
+//
+//   Velocidade-alvo: corrida 285 (frente, trás e lados iguais), andando 70, agachado 50,
+//   sprint 1,4x; menos a perda do colete e da arma na mão. Acima dela a velocidade é cortada.
+//   Aceleração por eixo em rampa: 500 no primeiro instante, sobe 6000/s até 3000; trocar de
+//   sentido (frente<->trás, esquerda<->direita) volta para 500. Agachado: metade, sem rampa.
+//   Chão: atrito exato exp(-5t) e, sem tecla, freio que para a corrida em 0,1 s.
+//   Ar: sem atrito e sem freio; mesma rampa (controle forte, limitado à velocidade-alvo);
+//   agachado no ar depois de pular, quase nenhum controle (x0,1).
+//   Pulo: velocidade vertical fixa (330); depois de cada pulo o fator cai a 0,3 e recupera
+//   1,2/s, reduzindo o próximo pulo e a aceleração (antibunny hop natural).
+//   Agachar: 0,15 s; não pula agachado; no ar a caixa encolhe pelo centro.
+//=============================================================================
+bool CTrokGameMovement::CAAtivo( void ) const
+{
+	return trok_mov_ca.GetBool() && player->GetMoveType() == MOVETYPE_WALK && player->GetWaterLevel() < WL_Waist;
+}
+
+bool CTrokGameMovement::CAAgachado( void ) const
+{
+	return ( player->GetFlags() & FL_DUCKING ) != 0 || ( ( mv->m_nButtons & IN_DUCK ) && player->m_Local.m_bDucking );
+}
+
+// Sprint: o HL2 já decide (Shift + fôlego) e põe a velocidade máxima no hl2_sprintspeed.
+extern ConVar hl2_normspeed;
+bool CTrokGameMovement::CASprint( void ) const
+{
+	return ( mv->m_nButtons & IN_SPEED ) && mv->m_flForwardMove > 0.1f && !( mv->m_nButtons & IN_BACK ) &&
+		player->MaxSpeed() > hl2_normspeed.GetFloat() + 1.0f;
+}
+
+// "Em um pulo": pulou e ainda não pousou (cair de uma borda não conta).
+bool CTrokGameMovement::CANoPulo( void ) const
+{
+	const CHL2MP_Player *pTrok = TrokPlayer();
+	return pTrok && player->GetGroundEntity() == NULL && pTrok->m_flTrokJumpTime > pTrok->m_flTrokGroundTime;
+}
+
+// Fator do pulo: cai a trok_ca_pulo_min a cada pulo e recupera trok_ca_pulo_recupera por segundo.
+float CTrokGameMovement::CAHop( void ) const
+{
+	const CHL2MP_Player *pTrok = TrokPlayer();
+	if ( !pTrok || pTrok->m_flTrokJumpTime < 0.0f )
+		return 1.0f;
+	const float t = gpGlobals->curtime - pTrok->m_flTrokJumpTime;
+	if ( t < 0.0f )
+		return 1.0f;
+	return clamp( trok_ca_pulo_min.GetFloat() + trok_ca_pulo_recupera.GetFloat() * t, 0.0f, 1.0f );
+}
+
+float CTrokGameMovement::CAVelocidadeAlvo( void ) const
+{
+	float s;
+	if ( CAAgachado() )
+		s = trok_ca_agachado.GetFloat();
+	else if ( mv->m_nButtons & IN_WALK )
+		s = trok_ca_andar.GetFloat();
+	else if ( CASprint() )
+		s = trok_ca_corrida.GetFloat() * trok_ca_sprint.GetFloat();
+	else
+		s = trok_ca_corrida.GetFloat();
+
+	// Colete e arma na mão (o script da arma traz a velocidade: M4 0,90; MP5 0,93; R870 0,92;
+	// pistola 0,97; faca 1). Também inclui mirar pelo cano e a velocidade do zumbi.
+	float flArma = TrokWeapon_MoveSpeedScale( player );
+	if ( flArma <= 0.0f )
+		flArma = 1.0f;
+	s *= MAX( 0.0f, 1.0f - trok_ca_colete.GetFloat() ) * flArma;
+	return CAEsc( s );
+}
+
+void CTrokGameMovement::CAVelocidade( bool bChao )
+{
+	CHL2MP_Player *pTrok = TrokPlayer();
+	const float dt = gpGlobals->frametime;
+	if ( dt <= 0.0f )
+		return;
+
+	const float flAlvo = CAVelocidadeAlvo();
+	const bool bAgachado = CAAgachado();
+	const bool bNoPulo = CANoPulo();
+
+	// Direções apertadas agora e no tick anterior (bots também apertam os botões).
+	const bool bFrente = mv->m_flForwardMove > 0.1f, bTras = mv->m_flForwardMove < -0.1f;
+	const bool bDir = mv->m_flSideMove > 0.1f, bEsq = mv->m_flSideMove < -0.1f;
+	const int iOld = mv->m_nOldButtons;
+	const bool oFrente = ( iOld & IN_FORWARD ) != 0, oTras = ( iOld & IN_BACK ) != 0;
+	const bool oDir = ( iOld & IN_MOVERIGHT ) != 0, oEsq = ( iOld & IN_MOVELEFT ) != 0;
+	const bool bMove = bFrente || bTras || bDir || bEsq;
+	const bool oMove = oFrente || oTras || oDir || oEsq;
+
+	// 1. Velocidade acima do alvo é cortada (no chão e no ar, só na horizontal).
+	{
+		const float h = mv->m_vecVelocity.Length2D();
+		if ( h > flAlvo && h > 0.001f )
+		{
+			const float k = flAlvo / h;
+			mv->m_vecVelocity.x *= k;
+			mv->m_vecVelocity.y *= k;
+		}
+	}
+
+	// 2. Direções pela mira (só o giro horizontal).
+	Vector vecF, vecR;
+	QAngle ang( 0.0f, mv->m_vecViewAngles.y, 0.0f );
+	AngleVectors( ang, &vecF, &vecR, NULL );
+	vecF.z = vecR.z = 0.0f;
+	VectorNormalize( vecF );
+	VectorNormalize( vecR );
+
+	// 3. Aceleração por eixo, com a rampa do CA.
+	const float flInicio = CAEsc( trok_ca_acel_inicio.GetFloat() );
+	const float flMax = CAEsc( trok_ca_acel_max.GetFloat() );
+	const float flRampa = CAEsc( trok_ca_acel_rampa.GetFloat() );
+	float a0 = CAEsc( trok_ca_acel.GetFloat() );
+	if ( bAgachado )
+		a0 *= 0.5f;
+	if ( !bChao && bNoPulo )
+		a0 *= trok_ca_ar.GetFloat();
+
+	float fa = pTrok ? MAX( (float)pTrok->m_flTrokRampaFrente, flInicio ) : flInicio;
+	float sa = pTrok ? MAX( (float)pTrok->m_flTrokRampaLado, flInicio ) : flInicio;
+	float flAF = a0, flAR = a0, flImpulso = 0.0f;
+	const bool bRampa = !bAgachado && ( bChao || trok_ca_ar_rampa.GetBool() );
+	if ( bRampa )
+	{
+		bool bReinicio = false;
+		if ( bMove && !oMove )
+		{
+			flImpulso = flInicio;
+			fa = sa = flInicio;
+			bReinicio = true;
+		}
+		if ( ( bFrente && oTras ) || ( bTras && oFrente ) )
+		{
+			flAF = flInicio;
+			fa = flInicio;
+			bReinicio = true;
+		}
+		if ( ( bEsq && oDir ) || ( bDir && oEsq ) )
+		{
+			flAR = flInicio;
+			sa = flInicio;
+			bReinicio = true;
+		}
+		if ( !bReinicio )
+		{
+			if ( bFrente || bTras )
+			{
+				fa = MIN( fa + dt * flRampa, flMax );
+				flAF = fa;
+			}
+			if ( bEsq || bDir )
+			{
+				sa = MIN( sa + dt * flRampa, flMax );
+				flAR = sa;
+			}
+		}
+		if ( !bFrente && !bTras )
+			fa = flInicio;
+		if ( !bEsq && !bDir )
+			sa = flInicio;
+	}
+	if ( pTrok )
+	{
+		pTrok->m_flTrokRampaFrente = fa;
+		pTrok->m_flTrokRampaLado = sa;
+	}
+
+	Vector vecA( 0.0f, 0.0f, 0.0f );
+	if ( bFrente )
+		vecA += vecF * flAF;
+	if ( bTras )
+		vecA -= vecF * flAF;
+	if ( bEsq )
+	{
+		vecA -= vecR * flAR;
+		if ( vecA.Length() > flMax )
+			vecA *= flMax / vecA.Length();
+	}
+	if ( bDir )
+	{
+		vecA += vecR * flAR;
+		if ( vecA.Length() > flMax )
+			vecA *= flMax / vecA.Length();
+	}
+	if ( flImpulso > 0.0f && vecA.LengthSqr() > 0.0f )
+		vecA *= flImpulso / vecA.Length();	// primeiro instante de qualquer movimento: exatamente o início
+
+	const float flHop = CAHop();
+	if ( flHop < 1.0f )
+		vecA *= flHop;
+
+	// 4. Integração.
+	if ( bChao )
+	{
+		// Atrito exato do CA: v = a/k + (v - a/k) e^(-k dt).
+		const float k = trok_ca_atrito.GetFloat();
+		Vector v( mv->m_vecVelocity.x, mv->m_vecVelocity.y, 0.0f );
+		if ( k > 0.0f )
+		{
+			const float E = expf( -k * dt );
+			const Vector ak = vecA / k;
+			v = ak + ( v - ak ) * E;
+		}
+		else
+			v += vecA * dt;
+
+		// Freio ao soltar as teclas: para a corrida em trok_ca_parada segundos.
+		if ( !bMove )
+		{
+			const float h = v.Length2D();
+			if ( h <= CAEsc( 5.0f ) )
+				v.Init();
+			else
+			{
+				const float d = ( CAEsc( trok_ca_corrida.GetFloat() ) / MAX( 0.01f, trok_ca_parada.GetFloat() ) ) * dt;
+				if ( d >= h )
+					v.Init();
+				else
+					v -= v * ( d / h );
+			}
+		}
+		mv->m_vecVelocity.x = v.x;
+		mv->m_vecVelocity.y = v.y;
+	}
+	else
+	{
+		// No ar: sem atrito nem freio.
+		mv->m_vecVelocity.x += vecA.x * dt;
+		mv->m_vecVelocity.y += vecA.y * dt;
+	}
+}
+
+// WalkMove do CA: a velocidade pela lei do CA e a colisão igual à do CGameMovement::WalkMove.
+void CTrokGameMovement::WalkMove( void )
+{
+	if ( !CAAtivo() )
+	{
+		BaseClass::WalkMove();
+		return;
+	}
+	CAMoverNoChao();
+}
+
+void CTrokGameMovement::CAMoverNoChao( void )
+{
+	// Desfaz o atrito do Source (aplicamos o do CA).
+	if ( m_bCAAntesAtritoValido )
+	{
+		mv->m_vecVelocity.x = m_vecCAAntesAtrito.x;
+		mv->m_vecVelocity.y = m_vecCAAntesAtrito.y;
+	}
+
+	CBaseEntity *pOldGround = player->GetGroundEntity();
+	CAVelocidade( true );
+	mv->m_vecVelocity.z = 0.0f;
+
+	VectorAdd( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+	if ( mv->m_vecVelocity.Length() < 1.0f )
+	{
+		mv->m_vecVelocity.Init();
+		VectorSubtract( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+		return;
+	}
+
+	Vector dest;
+	dest.x = mv->GetAbsOrigin().x + mv->m_vecVelocity.x * gpGlobals->frametime;
+	dest.y = mv->GetAbsOrigin().y + mv->m_vecVelocity.y * gpGlobals->frametime;
+	dest.z = mv->GetAbsOrigin().z;
+
+	trace_t pm;
+	TracePlayerBBox( mv->GetAbsOrigin(), dest, PlayerSolidMask(), COLLISION_GROUP_PLAYER_MOVEMENT, pm );
+	if ( pm.fraction == 1.0f )
+	{
+		mv->SetAbsOrigin( pm.endpos );
+		VectorSubtract( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+		StayOnGround();
+		return;
+	}
+	if ( pOldGround == NULL && player->GetWaterLevel() == 0 )
+	{
+		VectorSubtract( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+		return;
+	}
+	// (Pulo para fora da água não chega aqui: o movimento do CA só vale fora da água.)
+	StepMove( dest, pm );
+	VectorSubtract( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+	StayOnGround();
+}
+
+// Agachar do CA: completo em trok_ca_agachar_tempo no chão (o Source leva 0,4 s).
+void CTrokGameMovement::Duck( void )
+{
+	BaseClass::Duck();
+	if ( !CAAtivo() )
+		return;
+	if ( ( mv->m_nButtons & IN_DUCK ) && player->m_Local.m_bDucking && !( player->GetFlags() & FL_DUCKING ) &&
+		 player->GetGroundEntity() != NULL )
+	{
+		const float flPassou = ( GAMEMOVEMENT_DUCK_TIME - player->m_Local.m_flDucktime ) / 1000.0f;
+		if ( flPassou >= trok_ca_agachar_tempo.GetFloat() )
+			FinishDuck();
+	}
+}
+
+// No ar o Source encolhe a caixa por cima e sobe os pés a diferença toda; no CA a caixa encolhe
+// pelo centro: os pés sobem só trok_ca_agachar_ar dela e a cabeça desce o resto.
+void CTrokGameMovement::FinishDuck( void )
+{
+	const bool bAr = player->GetGroundEntity() == NULL;
+	const bool bJa = ( player->GetFlags() & FL_DUCKING ) != 0;
+	const Vector antes = mv->GetAbsOrigin();
+	BaseClass::FinishDuck();
+	if ( !CAAtivo() || !bAr || bJa )
+		return;
+	const Vector subiu = mv->GetAbsOrigin() - antes;
+	const float flVolta = subiu.z * ( 1.0f - clamp( trok_ca_agachar_ar.GetFloat(), 0.0f, 1.0f ) );
+	if ( flVolta <= 0.0f )
+		return;
+	trace_t tr;
+	TracePlayerBBox( mv->GetAbsOrigin(), mv->GetAbsOrigin() - Vector( 0, 0, flVolta ), PlayerSolidMask(), COLLISION_GROUP_PLAYER_MOVEMENT, tr );
+	if ( !tr.startsolid )
+		mv->SetAbsOrigin( tr.endpos );
+}
+
+void CTrokGameMovement::FinishUnDuck( void )
+{
+	const bool bAr = player->GetGroundEntity() == NULL;
+	const Vector antes = mv->GetAbsOrigin();
+	BaseClass::FinishUnDuck();
+	if ( !CAAtivo() || !bAr )
+		return;
+	// O Source desceu os pés a diferença toda; no CA a caixa cresce pelo centro (pés descem a
+	// fração e a cabeça sobe o resto). Sobe de volta o que der, sem entrar no teto.
+	const Vector desceu = antes - mv->GetAbsOrigin();
+	const float flVolta = desceu.z * ( 1.0f - clamp( trok_ca_agachar_ar.GetFloat(), 0.0f, 1.0f ) );
+	if ( flVolta <= 0.0f )
+		return;
+	trace_t tr;
+	TracePlayerBBox( mv->GetAbsOrigin(), mv->GetAbsOrigin() + Vector( 0, 0, flVolta ), PlayerSolidMask(), COLLISION_GROUP_PLAYER_MOVEMENT, tr );
+	if ( !tr.startsolid )
+		mv->SetAbsOrigin( tr.endpos );
 }
 
 //-----------------------------------------------------------------------------

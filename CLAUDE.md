@@ -37,6 +37,9 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
         CS:S montado); nada é copiado de um PC para outro;
      3. `.rez` **criptografados não são abertos** (não quebrar proteção).
      Nomes do CA também não aparecem para o jogador.
+   - **Chimera** (github.com/r0pi0x/Chimera, MIT/Apache): o dono decidiu (10/11/2026), assumindo a
+     responsabilidade, que as especificações de Combat Arms dele podem ser usadas como referência de números e
+     regras, como o DeCombat. Crédito em `CREDITOS.txt`.
    - O CS:S e o HL2 só **montados** (`gameinfo.txt`), nunca copiados para o pacote.
    - Das TCs estudadas (`cs-source/refs/`), só o **código** com licença compatível (NEOTOKYO
      Rebuild, Double Action, Momentum e Fortress Forever usam a Source 1 SDK License; dar crédito

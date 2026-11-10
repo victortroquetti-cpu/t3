@@ -4,6 +4,7 @@
 
 #include "cbase.h"
 #include "trok_gamerules.h"
+#include "movevars_shared.h"
 
 #ifndef CLIENT_DLL
 	#include "hl2mp_player.h"
@@ -52,6 +53,29 @@ ConVar trok_surto_zumbi_folego( "trok_surto_zumbi_folego", "2", FCVAR_NOTIFY, "F
 ConVar trok_surto_assistir( "trok_surto_assistir", "3", FCVAR_NOTIFY, "Segundos depois de morrer (sem virar zumbi) para passar a assistir os vivos." );
 ConVar trok_surto_cor_zumbi( "trok_surto_cor_zumbi", "150 225 140", FCVAR_NOTIFY, "Tom do zumbi enquanto não há modelo próprio (R G B)." );
 #endif
+
+//-----------------------------------------------------------------------------
+// Caixa e olho do jogador no movimento do Combat Arms (design/decombat/specs/MOVEMENT_2009.md
+// e as specs de movimento do Chimera): no CA o corpo tem 100u em pé e 80u agachado (só 20% mais
+// baixo; no Source é 50%), olho a 83u em pé e 60u agachado. Aqui vão as proporções sobre a caixa de
+// 72u do Source (os mapas são do Source); largura também a do Source.
+//-----------------------------------------------------------------------------
+extern ConVar trok_mov_ca;
+static CViewVectors g_TrokCAViewVectors(
+	Vector( 0, 0, 60 ),			// olho em pé (83% da altura)
+	Vector( -16, -16, 0 ),		// caixa em pé
+	Vector( 16, 16, 72 ),
+	Vector( -16, -16, 0 ),		// caixa agachado (80% da altura)
+	Vector( 16, 16, 58 ),
+	Vector( 0, 0, 43 ),			// olho agachado
+	Vector( -10, -10, -10 ),	// espectador
+	Vector( 10, 10, 10 ),
+	Vector( 0, 0, 14 ) );		// olho do morto
+
+const CViewVectors *CTrokRules::GetViewVectors() const
+{
+	return trok_mov_ca.GetBool() ? &g_TrokCAViewVectors : BaseClass::GetViewVectors();
+}
 
 CTrokRules::CTrokRules()
 {
@@ -737,11 +761,29 @@ bool CTrokRules::FPlayerCanRespawn( CBasePlayer *pPlayer )
 	return BaseClass::FPlayerCanRespawn( pPlayer );
 }
 
+// Dano de queda do CA: nada até trok_ca_queda_min de altura, depois sobe em linha reta até
+// trok_ca_queda_dano em trok_ca_queda_max (alturas em unidades do CA, convertidas pela escala).
+static ConVar trok_ca_queda_min( "trok_ca_queda_min", "300", FCVAR_REPLICATED, "CA: altura (u do CA) a partir da qual a queda machuca." );
+static ConVar trok_ca_queda_max( "trok_ca_queda_max", "700", FCVAR_REPLICATED, "CA: altura (u do CA) que dá trok_ca_queda_dano." );
+static ConVar trok_ca_queda_dano( "trok_ca_queda_dano", "200", FCVAR_REPLICATED, "CA: dano na altura trok_ca_queda_max (linear, sem teto)." );
+extern ConVar trok_ca_escala;
+
 float CTrokRules::FlPlayerFallDamage( CBasePlayer *pPlayer )
 {
 	if ( TrokSurto_IsZumbi( pPlayer ) )
 		return 0.0f;
-	return BaseClass::FlPlayerFallDamage( pPlayer );
+	if ( !trok_mov_ca.GetBool() )
+		return BaseClass::FlPlayerFallDamage( pPlayer );
+
+	const float flGravity = MAX( 1.0f, sv_gravity.GetFloat() * ( pPlayer->GetGravity() > 0.0f ? pPlayer->GetGravity() : 1.0f ) );
+	const float flVel = pPlayer->m_Local.m_flFallVelocity;
+	const float flAltura = ( flVel * flVel ) / ( 2.0f * flGravity );
+	const float flEscala = MAX( 0.01f, trok_ca_escala.GetFloat() );
+	const float flMin = trok_ca_queda_min.GetFloat() * flEscala;
+	const float flMax = MAX( flMin + 1.0f, trok_ca_queda_max.GetFloat() * flEscala );
+	if ( flAltura <= flMin )
+		return 0.0f;
+	return ( flAltura - flMin ) / ( flMax - flMin ) * trok_ca_queda_dano.GetFloat();
 }
 
 bool CTrokRules::CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pItem )

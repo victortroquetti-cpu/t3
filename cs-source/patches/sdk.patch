@@ -156,41 +156,47 @@ index f560070..ef7c7ca 100644
  	if ( hud_fastswitch.GetBool() && ( gpGlobals->curtime - m_flSelectionTime ) < (FASTSWITCH_DISPLAY_TIMEOUT + FASTSWITCH_FADEOUT_TIME) )
  		return true;
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.cpp b/src/game/client/hl2mp/c_hl2mp_player.cpp
-index 367a616..8bb9cb1 100644
+index 367a616..18841ba 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.cpp
 +++ b/src/game/client/hl2mp/c_hl2mp_player.cpp
-@@ -35,6 +35,12 @@ BEGIN_RECV_TABLE_NOBASE( C_HL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+@@ -35,6 +35,14 @@ BEGIN_RECV_TABLE_NOBASE( C_HL2MP_Player, DT_HL2MPLocalPlayerExclusive )
  
  	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
  	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),
 +#ifdef TROK
 +	RecvPropFloat( RECVINFO( m_flTrokJumpTime ) ),
 +	RecvPropFloat( RECVINFO( m_flTrokGroundTime ) ),
++	RecvPropFloat( RECVINFO( m_flTrokRampaFrente ) ),
++	RecvPropFloat( RECVINFO( m_flTrokRampaLado ) ),
 +	RecvPropFloat( RECVINFO( m_flTrokJumpPressTime ) ),
 +	RecvPropFloat( RECVINFO( m_flTrokProtegidoAte ) ),
 +#endif
  END_RECV_TABLE()
  
  // all players except the local player
-@@ -59,6 +65,11 @@ END_RECV_TABLE()
+@@ -59,6 +67,13 @@ END_RECV_TABLE()
  
  BEGIN_PREDICTION_DATA( C_HL2MP_Player )
  	DEFINE_PRED_FIELD( m_fIsWalking, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
 +#ifdef TROK
 +	DEFINE_PRED_FIELD( m_flTrokJumpTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
 +	DEFINE_PRED_FIELD( m_flTrokGroundTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
++	DEFINE_PRED_FIELD( m_flTrokRampaFrente, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
++	DEFINE_PRED_FIELD( m_flTrokRampaLado, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
 +	DEFINE_PRED_FIELD( m_flTrokJumpPressTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
 +#endif
  
  	// misyl: Ammo is server side entities in HL2MP. Not catastrophic to error about.
  	// Just let the server stomp all over us.
-@@ -102,6 +113,12 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100
+@@ -102,6 +117,14 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100
  
  C_HL2MP_Player::C_HL2MP_Player() : m_PlayerAnimState( this ), m_iv_angEyeAngles( "C_HL2MP_Player::m_iv_angEyeAngles" )
  {
 +#ifdef TROK
 +	m_flTrokJumpTime = -100.0f;
 +	m_flTrokGroundTime = -100.0f;
++	m_flTrokRampaFrente = 0.0f;
++	m_flTrokRampaLado = 0.0f;
 +	m_flTrokJumpPressTime = -100.0f;
 +	m_flTrokProtegidoAte = 0.0f;
 +#endif
@@ -198,10 +204,10 @@ index 367a616..8bb9cb1 100644
  	m_iSpawnInterpCounterCache = 0;
  
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.h b/src/game/client/hl2mp/c_hl2mp_player.h
-index bac7584..1120146 100644
+index bac7584..a043777 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.h
 +++ b/src/game/client/hl2mp/c_hl2mp_player.h
-@@ -120,6 +120,15 @@ public:
+@@ -120,6 +120,17 @@ public:
  
  	virtual void PostThink( void );
  
@@ -210,6 +216,8 @@ index bac7584..1120146 100644
 +	// Tempos do movimento do Trok (ver hl2mp_player.h), previstos.
 +	float m_flTrokJumpTime;
 +	float m_flTrokGroundTime;
++	float m_flTrokRampaFrente;
++	float m_flTrokRampaLado;
 +	float m_flTrokJumpPressTime;
 +	float m_flTrokProtegidoAte;
 +#endif
@@ -882,36 +890,40 @@ index 30d2181..18f69f4 100644
  }
  
 diff --git a/src/game/server/hl2mp/hl2mp_player.cpp b/src/game/server/hl2mp/hl2mp_player.cpp
-index 9457928..a059b3d 100644
+index 9457928..529febb 100644
 --- a/src/game/server/hl2mp/hl2mp_player.cpp
 +++ b/src/game/server/hl2mp/hl2mp_player.cpp
-@@ -54,6 +54,12 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+@@ -54,6 +54,14 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
  
  	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
  	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
 +#ifdef TROK
 +	SendPropFloat( SENDINFO( m_flTrokJumpTime ), 0, SPROP_NOSCALE ),
 +	SendPropFloat( SENDINFO( m_flTrokGroundTime ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokRampaFrente ), 0, SPROP_NOSCALE ),
++	SendPropFloat( SENDINFO( m_flTrokRampaLado ), 0, SPROP_NOSCALE ),
 +	SendPropFloat( SENDINFO( m_flTrokJumpPressTime ), 0, SPROP_NOSCALE ),
 +	SendPropFloat( SENDINFO( m_flTrokProtegidoAte ), 0, SPROP_NOSCALE ),
 +#endif
  
  END_SEND_TABLE()
  
-@@ -143,6 +149,12 @@ const char *g_ppszRandomCombineModels[] =
+@@ -143,6 +151,14 @@ const char *g_ppszRandomCombineModels[] =
  CHL2MP_Player::CHL2MP_Player() : m_PlayerAnimState( this )
  {
  	m_angEyeAngles.Init();
 +#ifdef TROK
 +	m_flTrokJumpTime = -100.0f;
 +	m_flTrokGroundTime = -100.0f;
++	m_flTrokRampaFrente = 0.0f;
++	m_flTrokRampaLado = 0.0f;
 +	m_flTrokJumpPressTime = -100.0f;
 +	m_flTrokProtegidoAte = 0.0f;
 +#endif
  
  	m_iLastWeaponFireUsercmd = 0;
  
-@@ -239,10 +251,42 @@ void CHL2MP_Player::GiveAllItems( void )
+@@ -239,10 +255,42 @@ void CHL2MP_Player::GiveAllItems( void )
  	
  }
  
@@ -954,7 +966,7 @@ index 9457928..a059b3d 100644
  	CBasePlayer::GiveAmmo( 255,	"Pistol");
  	CBasePlayer::GiveAmmo( 45,	"SMG1");
  	CBasePlayer::GiveAmmo( 1,	"grenade" );
-@@ -1414,6 +1458,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
+@@ -1414,6 +1462,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
  		}
  	}
  
@@ -974,10 +986,10 @@ index 9457928..a059b3d 100644
  	// Randomize the start spot
  	for ( int i = random->RandomInt(1,5); i > 0; i-- )
 diff --git a/src/game/server/hl2mp/hl2mp_player.h b/src/game/server/hl2mp/hl2mp_player.h
-index 5fad238..861b5aa 100644
+index 5fad238..51d258d 100644
 --- a/src/game/server/hl2mp/hl2mp_player.h
 +++ b/src/game/server/hl2mp/hl2mp_player.h
-@@ -143,6 +143,16 @@ public:
+@@ -143,6 +143,18 @@ public:
  
  	bool IsThreatAimingTowardMe( CBaseEntity* threat, float cosTolerance = 0.8f ) const;
  	bool IsThreatFiringAtMe( CBaseEntity* threat ) const;
@@ -988,6 +1000,8 @@ index 5fad238..861b5aa 100644
 +	// e último aperto de pular no ar (pulo adiantado antes de pousar).
 +	CNetworkVar( float, m_flTrokJumpTime );
 +	CNetworkVar( float, m_flTrokGroundTime );
++	CNetworkVar( float, m_flTrokRampaFrente );	// movimento do CA: rampa de aceleracao (frente/tras)
++	CNetworkVar( float, m_flTrokRampaLado );	// movimento do CA: rampa de aceleracao (lados)
 +	CNetworkVar( float, m_flTrokJumpPressTime );
 +	CNetworkVar( float, m_flTrokProtegidoAte );	// proteção ao nascer (regras do Trok), para o HUD
 +#endif

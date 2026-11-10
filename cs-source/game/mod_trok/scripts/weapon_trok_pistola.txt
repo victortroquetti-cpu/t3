@@ -51,7 +51,7 @@ WeaponData
 		"mira_posicao"		"-3.0 1.0 -1.5"
 		"mira_angulos"		"0 0 0"
 		"mira_velocidade"		"0.8"
-		"velocidade"		"1.05"
+		"velocidade"		"0.97"		// pistola do CA: perda de 0,03 (movimento do CA: corrida x (1 - colete) x isto)
 		"animacao"		"pistol"
 	}
 
