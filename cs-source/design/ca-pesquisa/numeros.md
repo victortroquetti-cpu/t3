@@ -1,5 +1,29 @@
 # Combat Arms: números de jogabilidade (pesquisa de 10/11/2026)
 
+## Conferido nas páginas inteiras da CAWiki (combatarms.fandom.com, lidas com a rede liberada)
+- **Tabela de armas:** `armas-wiki.tsv` traz 609 fichas (Reloaded e Classic) com dano, mobilidade, cadência,
+  precisão, controle, alcance e munição. As escalas são as do jogo: no Reloaded a mobilidade vai de 0 a 100 e no
+  Classic é peso; a cadência é a escala nova (250 a 333 nos fuzis).
+- **Dano por parte do corpo:** tronco = dano cheio; braço e perna = cerca de 10% a menos; cabeça = cerca de 5× (a
+  página Headshot diz 6×), e normalmente mata. Capacete reduz.
+- **Recuo** (estatística do jogo): quanto maior, mais rápido a dispersão cresce a cada tiro. Padrões: para cima,
+  de lado, diagonal ou aleatório, conforme a arma.
+- **Portabilidade:** as pistolas têm 90 (exceto Desert Eagle e afins); quase todas as escopetas têm a mesma.
+- **Proteção ao nascer:** 3 s. No One Man Army acaba ao atirar (igual ao nosso `trok_protecao`).
+- **Quarantine Regen:**
+  - rodadas: 5, 7 ou 9; 2:40 por rodada; 20 s de preparo;
+  - jogadores: de 8 a 16 (mínimo de 4 para começar);
+  - hospedeiros: 2 com menos de 12 jogadores, 3 com mais;
+  - regeneração: 10% da vida a cada 3 s parado (outra página diz 10% por segundo; o Crusher recupera 20%);
+  - fim de rodada: zumbis eliminados (+20 para cada sobrevivente); tempo acabou (+20 para cada sobrevivente e −1
+    para cada infectado); todos infectados (+3 para cada infectado restante); humano ganha 3 por infectado morto;
+  - vida pela tabela de colete: hospedeiro de 200 a 300+ e infectado de 135 a 200+; o colete do infectado fica sempre
+    em 100 e não esvazia.
+- **One Man Army:** meta de 15, 30 ou 45, sem limite de tempo, de 2 a 16 jogadores.
+- **Elimination:** meta de 30 a 140 (máximo de 100 em partida de clã), de 1x1 a 8x8.
+- **Spy Hunt:** o Super Spy tem 500 de colete.
+
+
 Tudo veio de **trechos de busca**. As páginas inteiras (combatarms.fandom.com, strategywiki.org) não abriram nesta rede.
 Os números de física e de cone e recuo de 2009 estão em `design/decombat/`. Este arquivo complementa com dados por arma e
 por modo.

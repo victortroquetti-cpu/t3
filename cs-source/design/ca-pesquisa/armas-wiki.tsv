@@ -1,0 +1,610 @@
+nome	versao	classe	dano	mobilidade	cadencia	precisao	controle	alcance	municao
+AA-12 Dragon Tooth	Reloaded	sg	84	91	85	24	17	1020	20/40
+ACR	Classic	ar	36	11	285	66	28	3750	30/90
+ACR	Reloaded	ar	38	91	285	66	42	3750	30/90
+ACR Blacksnake	Classic	ar	35	??	285	66	??	3750	30/90
+ACR Blacksnake	Reloaded	ar	35	91	285	66	72	3750	30/90
+ACR Dark Angel	Reloaded	ar	38	91	285	67	72	3850	30/90
+ACR Sandfire	Classic	ar	38	10	285	66	28	3750	30/90
+ACR Sandfire	Reloaded	ar	38	91	285	66	42	3750	30/90
+AEK-971	Classic	ar	40	12	272	60	40	3750	30/90
+AEK-971	Reloaded	ar	40	89	272	60	59	3750	30/90
+AIS50	Reloaded	sr	164	80	27	99	78	5550	6/18
+AIS50 Polygonal Art	Reloaded	sr	166	81	27	99	79	5550	8/24
+AK-103	Classic	ar	48	14	250	48	42	3750	30/90
+AK-103	Reloaded	ar	48	87	250	48	57	3750	30/90
+AK-103 Gold-Plated	Classic	ar	48	14	250	48	41	3750	30/90
+AK-103 Gold-Plated	Reloaded	ar	48	87	250	48	58	3750	30/90
+AK-12	Classic	ar	43	11	272	60	36	3750	30/90
+AK-12	Reloaded	ar	43	90	272	60	66	3810	30/90
+AK-47	Classic	ar	48	14	250	48	43	3750	30/90
+AK-47	Reloaded	ar	48	87	250	48	57	3810	30/90
+AK-47 Anubis (Common)	Classic	ar	48	13	250	48	43	3750	30/90
+AK-47 Anubis (Epic)	Classic	ar	49	13	250	48	42	3800	30/90
+AK-47 Anubis (Legendary)	Classic	ar	50	12	250	49	41	3850	30/90
+AK-47 Anubis (Rare)	Classic	ar	49	13	250	48	43	3750	30/90
+AK-47 Gold-Plated	Classic	ar	48	14	250	48	42	3810	30/90
+AK-47 Gold-Plated	Reloaded	ar	48	87	250	48	57	3810	30/90
+AK-47 Level UP	Classic	ar	48	14	250	48	43	3750	30/90
+AK-47 Level UP	Reloaded	ar	48	87	250	48	57	3810	30/90
+AK-74M	Classic	ar	43	10	272	60	36	3750	30/90
+AK-74M	Reloaded	ar	43	91	272	60	63	3810	30/90
+AK-74M Gold-Plated	Classic	ar	46	11	272	60	36	3750	30/90
+AK-74M Gold-Plated	Reloaded	ar	46	90	272	60	63	3750	30/90
+AK-74U	Classic	ar	40	11	272	59	36	3750	30/90
+AK-74U	Reloaded	ar	40	90	272	60	63	3750	30/90
+AK-74U Gold-Plated	Classic	ar	40	11	272	60	36	3750	30/90
+AK-74U Gold-Plated	Reloaded	ar	40	90	272	60	63	3750	30/90
+AN-94	Classic	ar	44	14	272	48	43	3750	30/90
+AN-94	Reloaded	ar	44	87	272	48	57	3810	30/90
+AN-94 TactOP	Classic	ar	45	14	272	48	42	3750	30/90
+AN-94 TactOP	Reloaded	ar	45	87	272	48	57	3750	30/90
+AN-94 TactOP Silver Skull	Classic	ar	46	11	272	50	42	3750	35/105
+AN-94 TactOP Silver Skull	Reloaded	ar	46	90	272	50	57	3750	35/105
+AR-15 Double Barrel	Classic	ar	36	10	300	63	36	3750	30/90
+AR-15 Double Barrel	Reloaded	ar	34	91	300	63	60	3750	30/90
+ARX-160	Classic	ar	37	12	300	66	27	3750	30/90
+ARX-160	Reloaded	ar	37	89	300	66	73	3750	30/90
+ARX-160 Futuristic	Classic	ar	37	12	300	66	27	3750	30/90
+ARX-160 Futuristic	Reloaded	ar	37	89	300	66	73	3750	30/90
+ARX-160 Space	Classic	ar	39	11	300	67	27	3750	35/105
+ARX-160 Space	Reloaded	ar	39	90	300	67	73	3750	35/105
+AS Val	Classic	ar	43	11	285	65	27	3750	20/120
+AS Val	Reloaded	ar	43	90	285	65	73	3750	20/120
+ASW338LM	Classic	sr	166	24	30	99	21	6550	15/30
+ASW338LM Interstellar	Classic	sr	170	23	35	99	26	6550	15/30
+AUG A1	Classic	ar	40	13	285	50	37	3750	30/90
+AUG A1	Reloaded	ar	44	88	285	50	63	3750	30/90
+AUG A1 Black	Classic	ar	44	13	285	50	36	3750	30/90
+AUG A1 Black	Reloaded	ar	44	88	285	50	63	3750	30/90
+AUG A1 Leather Works	Reloaded	ar	45	90	285	49	60	3850	30/90
+AUG A1 Steampunk	Classic	ar	43	12	285	50	37	3750	35/105
+AUG A1 Steampunk	Reloaded	ar	46	86	285	50	65	3750	35/105
+AUG A3	Classic	ar	40	13	285	50	36	3750	30/90
+AUG A3	Reloaded	ar	44	87	272	48	57	3810	30/90
+AUG A3 SE	Classic	ar	40	13	285	50	36	3750	30/90
+AUG A3 SE	Reloaded	ar	44	88	285	50	64	3750	30/90
+Abstract Mystery G23	Classic	pt	35	3	250	72	28	2400	30/90
+Abstract Mystery G23	Reloaded	pt	35	98	250	72	72	2400	15/30
+Abstract Mystery M-200	Classic	sr	165	24	25	99	22	6150	5/10
+Abstract Mystery M-200	Reloaded	sr	165	75	25	99	79	5150	5/15
+Abstract Mystery M416 CQB	Classic	ar	37	9	385	66	24	3750	30/60
+Abstract Mystery M416 CQB	Reloaded	ar	37	92	285	66	78	3750	30/90
+Advanced Claymore	Reloaded	sp	70	96					
+Advanced Era M4A1	Classic	ar	38	10	285	66	23	3750	30/90
+Advanced Era M4A1	Reloaded	sr	171	85	27	99	80	6150	5/20
+Agent-Z's F2000 Tactical	Reloaded	ar	40	92	300	68	74	3750	40/120
+Agent-Z's KSG	Reloaded	sg	112	93	50	16	18	1020	18/36
+Alice MK.48 MOD 0	Reloaded	mg	50	70	260	68	57	3000	150/150
+Alice MP5 RAS	Reloaded	smg	30	94	375	74	74	2250	35/105
+Alice SAIGA 20K	Reloaded	sg	72	91	75	21	17	1020	10/30
+Anaconda 8-Inch Lava Works	Reloaded	pt	88	95	50	62	70	2400	6/18
+Arcade Edition Groza	Classic	ar	44	12	272	59	38	3810	20/100
+Arcade Edition Groza	Reloaded	ar	44	93	272	59	66	3810	20/100
+Arcade Edition JNG-90	Classic	sr	167	29	27	99	25	5550	10/20
+Arcade Edition JNG-90	Reloaded	sr	167	79	27	99	80	5550	10/20
+Arcade Edition Ultimax 100	Classic	mg	51	31	272	65	44	3030	100/100
+Arcade Edition Ultimax 100	Reloaded	mg	50	75	272	65	61	3030	100/100
+Asuka L96A1	Classic		165	21	27	96	22	5550	6/18
+Asuka L96A1	Reloaded	sr	160	76	25	97	78	5550	5/15
+Auto-Turret	Classic	sp	12						1/0
+Auto-Turret	Reloaded	sp	12						1/0
+Autumn G36E Valkyrie	Classic	ar	44	13	260	53	36	3810	35/105
+Autumn G36E Valkyrie	Reloaded	ar	40	88	260	51	63	3810	35/105
+Azazel	Classic	ar	39	9	285	67	25	3750	35/105
+Azazel	Reloaded	ar	39	92	285	67	74	3750	35/105
+BGL's AK-47	Classic	ar	48	14	250	48	43	3750	30/90
+BGL's AK-47	Reloaded	ar	48	87	250	48	57	3810	30/90
+BGL's L96A1	Classic	sr	160	25	25		22	5550	5/15
+BGL's L96A1	Reloaded	sr	160	76	25		78	5550	5/15
+Black Dragon AK-47	Classic	ar	48	14	250	48	43	3750	30/90
+Black Dragon AK-47	Reloaded	ar	48	87	250	48	57	3810	30/90
+Black Skull Guitar Gun	Classic	ar	37	10	300	67	28	3750	30/90
+Black Skull Guitar Gun	Reloaded	ar	37	91	300	67	71	3750	30/90
+Blacklist Conviction FS2000	Classic	ar	37	14	320	67	25	3750	30/90
+Blacklist Conviction Five-seven	Classic	pt	40	3	230	73	26	2400	15/45
+Blacklist Conviction Five-seven	Reloaded	pt	53	99	230	73	74	2400	15/45
+Blacklist Conviction L96A1	Classic	sr	170	30	25	96	24	5550	5/15
+Bloody Hunter AUG A1	Classic	ar	40	13	285	50	37	3750	30/90
+Bloody Hunter AUG A1	Reloaded	ar	44	88	285	50	63	3750	30/90
+Bloody Mask Guitar	Classic	ar	37	10	300	67	28	3750	30/90
+Bloody Mask Guitar	Reloaded	ar	37	91	300	67	71	3750	30/90
+Blue Destiny TPG-1 Pro	Reloaded	sr	172	82	25	99	78	6250	6/24
+Bowie Knife Silver Skull	Classic	ml	80	2	42			162	Infinte
+Bowie Knife Silver Skull	Reloaded	ml	80	99	42		100	162	Infinte
+Brave Eagle CZ805	Reloaded	ar	37	92	300	66	76	3750	30/90
+Brave Eagle DE	Reloaded	pt	84	96	50	47	67	2400	7/7
+Brave Eagle WA2000-1 Tactical	Reloaded	sr	166	79	79	98	79	6150	5/25
+CX4 Storm	Classic	ar	35	11	300	67	25	3750	30/90
+CX4 Storm	Reloaded	ar	35	90	300	67	75	3750	30/90
+CZ805	Classic	ar	37	10	300	64	23	3750	30/90
+CZ805	Reloaded	ar	37	91	300	65	76	3750	30/90
+Carbon 15	Classic	ar	36	11	315	67	24	3150	30/90
+Carbon 15	Reloaded	ar	36	90	315	67	76	3210	30/90
+Carnival G36E Valkyrie Rio	Classic	ar	44	13	260	53	36	3810	30/90
+Carnival G36E Valkyrie Rio	Reloaded	ar	40	88	260	51	63	3810	30/90
+Cerulean Fantasy 32SW2	Classic	pt	?	?	?	?	?	?	?/?
+Cerulean Fantasy 32SW2	Reloaded	pt	81	96	50	70	67	2400	7/21
+Cerulean Fantasy M24A3	Classic	sr	?	?	?	?	?	?	?/?
+Cerulean Fantasy M24A3	Reloaded	sr	160	80	30	99	80	5250	8/24
+Cerulean Fantasy PP-19	Classic	smg	?	?	?	?	?	?	?/?
+Cerulean Fantasy PP-19	Reloaded	smg	41	93	300	71	70	2250	80/80
+Christmas FAMAS G2	Classic	ar	36	11	300	67	25	3780	30/90
+Christmas FAMAS G2	Reloaded	ar	36	90	300	67	74	3780	30/90
+Cold Thunder Guitar Gun	Classic	ar	37	10	300	67	28	3750	30/90
+Cold Thunder Guitar Gun	Reloaded	ar	37	91	300	67	71	3750	30/90
+Cyborg Ninjato	Classic	ml	75	4	37			180	Infinite
+Cyborg Ninjato	Reloaded	ml	75	99	37		100	180	Infinite
+D-28	Reloaded	mg	49	73	272	63	60	3000	60/180
+DSR-1 Anaconda Black	Reloaded	sr	170	78	27	99	78	6150	6/24
+DSR-1 Black Lotus	Reloaded	sr	168	76	27	99	79	6150	6/24
+DSR-1 Steampunk	Classic	sr	35	8	333	75	25	2250	30/90
+DSR-1 Steampunk	Reloaded	sr	168	75	27	98	80	6150	6/24
+DSR-1 White Glint	Classic	sr	166	20	27	98	20	6150	6/24
+Deep Howl G23	Reloaded	pt	35	95	250	77	72	2400	16/32
+Deep Howl REC7	Reloaded	ar	42	90	300	66	74	3750	35/105
+Deep Howl SV-98	Reloaded	sr	165	75	27	99	80	6000	6/18
+Demonic Skull AUG A1	Reloaded	ar	46	90	285	55	65	3750	40/120
+Devil Soul P90	Classic	smg	38	9	333	78	32	2250	60/60
+Devil Soul P90	Reloaded	smg	45	94	333	74	65	2250	60/60
+Digital Camouflage M99-II	Classic	sr	162	20	27	99	24	5550	5/25
+Digital Camouflage MG36	Classic	mg	52	30	272	65	30	3000	120/120
+Digital Camouflage SAIGA 20K	Classic	sg	69	9	75	21	83	1500	8/32
+Dreamy G18	Classic	pt	31	4	300	72	30	2400	15/30
+Dreamy G18	Reloaded	pt	30	97	300	72	70	2400	15/30
+Duck Frag	Reloaded	sp	72	90			100		1/1
+EMP Bomb	Reloaded	sp		97			99		1/1
+Eagle Eye The FAMAS	Classic	ar	38	11	300	67	25	3780	30/90
+Eagle Eye The FAMAS	Reloaded	ar	44	91	300	69	75	3900	30/90
+Envious Tiger ACR	Classic	ar	38	12	285	66	28	3750	35/105
+Envious Tiger KNT-308	Classic	sr	166	26	27	99	22	5550	7/21
+Envious Tiger TEC-9	Classic	smg	31	7	375	70	40	2250	40/120
+F2000	Classic	ar	37	11	300	67	25	3750	30/120
+F2000	Reloaded	ar	37	90	333	67	74	3750	30/120
+F2000 Lava Works	Reloaded	smg	40	88	333	67	77	3750	40/120
+F2000 Peru	Reloaded	ar	37	88	333	67	74	3750	30/90
+F2000 Tactical	Classic	ar	36	11	300	67	25	3750	30/90
+F2000 Tactical	Reloaded	ar	36	90	333	67	74	3810	30/90
+FAMAS	Classic	ar	33	11	300	67	25	3750	30/90
+FAMAS	Reloaded	ar	36	90	300	67	74	3750	30/90
+FAMAS G2	Classic	ar	36	11	300	67	25	3750	30/90
+FAMAS G2	Reloaded	ar	36	90	300	67	74	3780	30/90
+FAMAS G2 SE	Classic	ar	36	11	300	67	25	3750	30/90
+FAMAS G2 SE	Reloaded	ar	36	90	300	67	74	3780	30/90
+FAMAS HANAFUDA	Reloaded	ar	37	90	300	68	74	3750	30/90
+FAMAS SE	Classic	ar	36	11	300	67	25	3750	30/90
+FAMAS SE	Reloaded	ar	36	90	300	67	74	3750	30/90
+FS2000	Classic	ar	37	13	300	74	17	3750	30/90
+FS2000	Reloaded	ar	37	88	333	67	74	3750	30/90
+First Green AK-47	Classic	ar	48	14	250	48	43	3750	30/90
+First Green AK-47	Reloaded	ar	48	87	250	48	57	3810	30/90
+First Green M6A2 CQB	Classic	ar	36	10	285	66	25	3750	30/110
+First Green M6A2 CQB	Reloaded	ar	40	91	285	67	75	3750	30/110
+Four-Leaf ASW338LM	Classic	sr	166	25	35	99	26	6550	15/30
+Four-Leaf B Type 97	Classic	pt	40	10	275	68	35	2400	20/40
+Four-Leaf G11	Classic	ar	40	11	315	70	26	3750	50/50
+Four-Leaf G11	Reloaded	ar	37	89	285	64	73	3750	50/50
+France FAMAS G2 SE	Classic	ar	36	11	300	67	25	3750	30/90
+France FAMAS G2 SE	Reloaded	ar	36	90	300	67	74	3780	30/90
+Frost AK-47	Classic	ar	?	?	?	?	?	?	?/?
+Frost AK-47	Reloaded	ar	50	90	250	54	55	3810	35/105
+Frost M24	Classic	sr	?	?	?	?	?	?	?/?
+Frost M24	Reloaded	sr	159	84	33	99	77	5550	8/32
+Frost UMP45	Classic	smg	?	?	?	?	?	?	?/?
+Frost UMP45	Reloaded	smg	41	94	300	73	67	2280	40/120
+G11	Classic	ar	37	10	300	66	26	3750	50/50
+G11	Reloaded	ar	37	89	285	64	73	3750	50/50
+G11 Biohazard	Reloaded	ar	40	89	300	64	74	3750	55/55
+G18	Classic	pt	30	4	300	72	30	2400	15/35
+G18	Reloaded	pt	30	97	300	72	70	2400	15/30
+G18 Chrome	Classic	pt	37	4	250	73	30	2400	15/30
+G18 Chrome	Reloaded	pt	37	97	250	73	70	2400	15/30
+G18 Cobra	Classic	pt	36	4	250	71	31	2400	20/20
+G18 Cobra	Reloaded	pt	36	97	250	71	69	2400	20/20
+G18 Royal Crown	Reloaded	pt	42	95	300	76	73	2400	20/40
+G23 Steel Dragon	Reloaded	pt	36	96	250	74	71	2400	15/30
+G3	Classic	ar	37	12	285	57	26	3750	20/100
+G3	Reloaded	ar	37	89	285	64	73	3750	20/100
+G36C	Classic	ar	44	9	260	53	36	3750	30/90
+G36C	Reloaded	ar	44	92	260	53	63	3750	30/90
+G36C Accurate Shooter	Reloaded	ar	46	90	285	55	65	3750	40/120
+G36E	Classic	ar	44	13	260	53	36	3750	30/90
+G36E	Reloaded	ar	40	88	260	51	63	3810	30/90
+G36E Italian	Classic	ar	44	13	272	53	36	3750	30/90
+G36E Italian	Reloaded	ar	40	88	260	51	63	3810	30/90
+G36E Kamon	Reloaded	ar	47	92	260	55	60	3810	40/120
+G36E Valkyrie	Classic	ar	44	13	260	53	36	3750	30/90
+G36E Valkyrie	Reloaded	ar	40	88	260	51	63	3810	30/90
+G36E Valkyrie CBS	Classic	ar	44	13	260	53	36	3810	30/90
+G36E Valkyrie CBS	Reloaded	ar	40	88	260	51	63	3810	30/90
+G36E Valkyrie Red Knight	Classic	ar	44	13	260	53	36	3810	30/90
+G36E Valkyrie Red Knight	Reloaded	ar	40	88	260	51	63	3810	30/90
+G36E Valkyrie Sakura	Classic	ar	44	13	260	53	36	3810	30/90
+G36E Valkyrie Sakura	Reloaded	ar	40	88	260	51	63	3810	30/90
+G36E Valkyrie Scarlet Wings	Classic	ar	44	13	260	53	36	3810	30/90
+G36E Valkyrie Scarlet Wings	Reloaded	ar	40	88	260	51	63	3810	30/90
+G36KE	Classic	ar	44	11	260	53	36	3750	30/90
+G36KE	Reloaded	ar	44	90	260	53	63	3750	30/90
+Galil ACE	Classic	ar	48	14	187	46	31	3750	20/80
+Galil ACE	Reloaded	ar	40	89	272	64	74	3750	30/90
+Ghost Hunter ParaFAL	Reloaded	ar	45	92	285	68	74	3750	40/120
+Ghost Shark L96A1	Classic		165	21	27	96	22	5550	6/18
+Ghost Shark L96A1	Reloaded	sr	160	76	25	97	78	5550	5/15
+Global M4A1 SOPMOD	Classic	ar	36	11	285	66	23	3750	30/90
+Global M4A1 SOPMOD	Reloaded	ar	36	90	285	66	76	3750	30/90
+Global M4A1 SOPMOD (event)	Classic	ar	34	11	285	66	23	3750	30/90
+Global M4A1 SOPMOD (event)	Reloaded	ar	36	90	285	66	76	3750	30/90
+HG2 Auto-Turret	Reloaded	sp	15						
+Halloween ACR	Classic	ar	38	10	285	66	28	3750	35/105
+Halloween ACR	Reloaded	ar	40	92	285	68	72	3750	35/140
+Halloween Jackhammer	Reloaded	sg	90	87	66	21	16	990	12/36
+Halloween KH2002	Reloaded	ar	38	90	300	67	75	3750	35/105
+Halloween M107CQ	Classic	sr	160	30	25	99	30	5550	5/20
+Halloween M107CQ	Reloaded	sr	169	72	25	99	70	6150	6/30
+Halloween Python	Classic	pt	72	3	50	66	30	2400	6/18
+Halloween Python	Reloaded	pt	82	99	50	64	62	2400	7/21
+Halloween Shovel	Classic	ar	75	2	33	100		162	Infinite
+Halloween Shovel	Reloaded	ml	85	99	33	100	99	162	Infinite
+Halloween UMP45	Reloaded	smg	39	93	300	71	67	2280	40/120
+Harlequin's ARX-160	Classic	ar	42	12	300	69	26	3750	35/115
+Harlequin's ARX-160	Reloaded	ar	42	88	300	69	74	3750	35/105
+Harlequin's Dual Pistol	Classic	pt	41	6	187	72	24	2400	24/48
+Harlequin's Dual Pistol	Reloaded	pt	41	94	187	72	76	2250	24/48
+Harlequin's MP7 MOD	Classic	smg	33	5	352	74	26	2250	30/120
+Harlequin's MP7 MOD	Reloaded	smg	33	95	352	74	74	2250	30/120
+Hexagon L96A1 Magnum CORE+	Classic		165	20	27	96	22	5550	7/21
+Hexagon L96A1 Magnum CORE+	Reloaded	sr	165	81	27	96	78	5550	7/21
+Horrific AK-47	Classic	ar	50	15	250	50	43	3750	30/90
+Horrific Desert Eagle	Classic	pt	73	5	50	50	33	2400	7/14
+Horrific Tomahawk	Classic	ml	72	4	33	100		156	Infinite
+INSAS	Classic	ar	37	12	285	61	36	3750	30/90
+INSAS	Reloaded	ar	39	89	285	61	64	3750	30/90
+Ice Crystal AK-47	Classic	ar	?	?	?	?	?	?	?/?
+Ice Crystal AK-47	Reloaded	ar	51	87	250	50	59	3810	40/120
+Ice Crystal M24	Classic	sr	?	?	?	?	?	?	?/?
+Ice Crystal M24	Reloaded	sr	160	82	33	99	79	5250	9/36
+Ice Crystal UMP45	Classic	smg	?	?	?	?	?	?	?/?
+Ice Crystal UMP45	Reloaded	smg	42	93	300	71	69	2280	40/120
+Industrial Era G36E	Classic	ar	48	9	260	53	30	3750	30/90
+Israeli G36E	Classic	ar	44	13	260	53	36	3750	30/90
+Israeli G36E	Reloaded	ar	40	88	260	51	63	3810	30/90
+Justice Groza	Classic	ar	44	12	272	59	38	3810	20/100
+Justice Groza	Reloaded	ar	46	91	272	62	65	3810	25/100
+Justice PP-19	Classic	smg	37	5	300	70	34	2250	70/70
+Justice PP-19	Reloaded	smg	42	91	300	68	67	2250	70/70
+Justice XM8	Classic	ar	39	10	300	68	26	3750	30/90
+Justice XM8	Reloaded	ar	44	89	300	60	70	3780	35/105
+K2	Classic	ar	38	13	285	57	32	3750	30/90
+K2	Reloaded	ar	40	88	272	57	68	3750	30/90
+K2 Black Lotus	Reloaded	ar	41	87	66	60	70	3750	35/105
+K2 Season Champion Reward	Classic	ar	40	13	285	63	22	3750	30/90
+K3 Anubis	Reloaded	mg	55	69	315	62	63	3000	200/200
+K3 Anubis (Common)	Classic	mg	38	33	315	62	36	3000	100/100
+K3 Anubis (Epic)	Classic	mg	42	31	315	65	36	3000	100/100
+K3 Anubis (Legendary)	Classic	mg	45	31	315	67	36	3000	100/100
+K3 Anubis (Rare)	Classic	mg	40	32	315	64	36	3000	100/100
+K5 Season Champion Reward	Classic	pt	30	4	272	67	34	2400	13/26
+KH2002 Polygonal Art	Reloaded	ar	39	61	300	67	76	3750	40/120
+KNT-308 Black Toxin	Reloaded	sr	168	78	27	99	80	6150	6/24
+KSG Polygonal Art	Reloaded	sg	104	93	50	16	18	1020	16/32
+Kaboom M4A1 SOPMOD	Classic	ar	36	11	285	66	23	3750	30/90
+Kaboom M4A1 SOPMOD	Reloaded	ar	36	90	285	66	76	3750	30/90
+Kriss	Classic	smg	29	6	375	71	25	2250	28/84
+Kriss	Reloaded	smg	32	95	375	71	74	2250	28/112
+Kriss SpecOps	Classic	smg	31	6	375	72	30	2250	28/112
+Kriss SpecOps	Reloaded	smg	31	95	375	72	69	2250	28/112
+Kriss SpecOps Reaper	Reloaded	smg	34	94	375	72	69	2250	35/105
+Kriss White Glint	Classic	smg	31	8	375	75	28	2250	30/90
+L115A2	Classic	sr	160	24	25	96	22	5550	5/15
+L115A2	Reloaded	sr	160	78	25	96	78	5550	5/15
+L115A2 Arctic Wolf	Classic	sr	160	23	25	96	22	5550	5/15
+L115A2 Arctic Wolf	Reloaded	sr	160	78	25	96	78	5550	5/15
+L115A3	Classic	sr	162	24	25	97	21	5550	5/15
+L115A3	Reloaded	sr	162	77	25	97	78	5550	5/15
+L115A3 Blue	Classic	sr	162	24	25	96	22	5550	5/15
+L115A3 Blue	Reloaded	sr	162	77	25	97	78	5550	5/15
+L115A3 Ghillie	Classic	sr	165	22	30	99	21	5550	5/35
+L115A3 Ghillie	Reloaded	sr	165	79	30	99	79	5550	5/35
+L115A3 Green	Classic	sr	162	24	25	96	22	5550	5/15
+L115A3 Green	Reloaded	sr	162	77	25	97	78	5550	5/15
+L115A3 Red	Classic	sr	162	24	25	96	22	5550	5/15
+L115A3 Red	Reloaded	sr	162	77	25	97	78	5550	5/15
+L85A1	Classic	ar	40	13	285	50	35	3750	30/90
+L85A1	Reloaded	ar	40	89	285	54	66	3750	30/90
+L85A1 CAMO	Classic	ar	40	13	285	51	35	3750	30/90
+L85A1 CAMO	Reloaded	ar	40	89	285	54	66	3750	30/90
+L85A1 CAMO MARK II	Classic	ar	40	13	285	51	35	3750	30/90
+L85A1 CAMO MARK II	Reloaded	ar	40	89	285	54	66	3750	30/90
+L85A1 MARK II	Classic	ar	40	13	285	50	35	3750	30/90
+L85A1 MARK II	Reloaded	ar	40	89	285	54	66	3750	30/90
+L85A1 MOD	Classic	ar	43	13	285	51	35	3750	30/90
+L85A1 MOD	Reloaded	ar	43	88	285	51	65	3750	30/90
+L85A1 MOD CAMO	Classic	ar	43	13	285	51	35	3750	30/90
+L85A1 MOD CAMO	Reloaded	ar	43	88	285	52	65	3750	30/90
+L96A1	Classic	sr	160	25	25		22	5550	5/15
+L96A1	Reloaded	sr	160	76	25		78	5550	5/15
+L96A1 Arctic Wolf	Classic	sr	160	25	25	96	22	5550	5/15
+L96A1 Arctic Wolf	Reloaded	sr	160	76	25	97	78	5550	5/15
+L96A1 Black-Magnum	Classic	sr	165	21	27	96	22	5550	6/18
+L96A1 Black-Magnum	Reloaded	sr	165	80	27	96	78	5550	6/18
+L96A1 Ghillie	Classic	sr	160	25	25	96	22	5550	5/15
+L96A1 Ghillie	Reloaded	sr	160	76	25	97	78	5550	5/15
+L96A1 Season Champion Reward	Classic	sr	160	25	26	106	15	5500	7/21
+L96A1 Super-Magnum	Classic	sr	165	21	27	96	22	5550	6/18
+L96A1 Super-Magnum	Reloaded	sr	165	80	27	96	78	5550	6/18
+LR300 ML	Classic	ar	38	11	285	67	25	3750	30/90
+LR300 ML	Reloaded	ar	38	90	285	67	74	3750	30/90
+Legion	Classic	mg	25	34	857		44	3000	500/000
+Legion	Reloaded	mg	25	67	857	56	58	3000	500/000
+Leviathan AK-47 SOPMOD	Classic	ar	48	14	250	48	42	3750	30/90
+Leviathan AK-47 SOPMOD	Reloaded	ar	48	87	250	48	57	3750	30/90
+Lightning Cobra .38 Special	Classic	pt	73	2	75	71	32	2400	6/12
+Lightning Cobra .38 Special	Reloaded	pt	67	98	75	71	68	2400	6/12
+Lightning FMG-9	Classic	smg	33	4	375	72	26	2250	30/90
+Lightning FMG-9	Reloaded	smg	33	96	375	72	74	2250	30/120
+Lightning SG550	Classic	ar	40	13	285	50	26	3825	30/60
+Lightning SG550	Reloaded	ar	40	87	285	50	74	3825	30/90
+Lionheart G36E	Classic	ar	48	13	260	53	36	3810	35/105
+Lionheart G36E	Reloaded	ar	40	88	260	51	63	3810	30/90
+Loaded AK-74M	Classic	ar	43	10	272	60	36	3810	30/90
+Loaded AK-74M	Reloaded	ar	43	91	272	60	63	3810	30/90
+Loaded G36E Valkyrie	Classic	ar	44	13	260	53	36	3810	30/90
+Loaded G36E Valkyrie	Reloaded	ar	40	88	260	51	63	3810	30/90
+Loaded L96A1 Arctic Wolf	Classic	sr	160	25	25	97	22	5550	5/15
+Loaded L96A1 Arctic Wolf	Reloaded	sr	160	76	25	97	78	5550	5/15
+Loaded M4A1 Desert Warrior	Classic	ar	36	11	285	66	23	3750	30/90
+Loaded M4A1 Desert Warrior	Reloaded	ar	36	90	285	66	76	3750	30/90
+Loaded M6A2 SRT	Classic	ar	38	10	285	66	25	3750	35/105
+Loaded M6A2 SRT	Reloaded	ar	38	91	285	66	75	3750	35/105
+M134 Fortress Crusher	Classic	mg	27	34	857		42	3000	500/0
+M134 Fortress Crusher	Reloaded	mg	27	66	857	53	56	3000	600/0
+M136 Rocket Launcher	Classic	etc	100						1/9
+M136 Rocket Launcher	Reloaded	etc	100	80	30		99		1/9
+M16A4 Silver Skull	Classic	ar	40	8	285	68	30	3780	30/90
+M16A4 Silver Skull	Reloaded	ar	40	93	300	68	70	3780	30/90
+M24 Black & Gold	Reloaded	sr	158	80	33	99	77	5550	6/24
+M24 Supreme MOD	Classic	sr	158	24	33	99	22	5750	6/24
+M249 Para Lava Works	Reloaded	smg	44	90	300	67	63	2250	50/100
+M416 CQB Biohazard	Reloaded	ar	39	91	285	64	75	3750	40/120
+M417 CQB Asuka	Reloaded	ar	39	91	285	66	71	3750	35/105
+M4A1	Classic	ar	35	11	285	66	23	3750	30/90
+M4A1	Reloaded	ar	36	90	285	66	76	3750	30/90
+M4A1 CQBR	Classic	ar	35	10	285	66	23	3750	30/90
+M4A1 CQBR	Reloaded	ar	35	90	285	67	76	3750	30/90
+M4A1 CQBR Gold	Classic	ar	35	10	285	66	23	3750	30/90
+M4A1 CQBR Gold	Reloaded	ar	35	90	285	67	76	3750	30/90
+M4A1 Concentric World	Classic	ar	35	11	285	67	23	3750	30/90
+M4A1 Concentric World	Reloaded	ar	35	90	285	67	76	3750	30/90
+M4A1 Desert Warrior	Classic	ar	35	11	285	66	23	3750	30/90
+M4A1 Desert Warrior	Reloaded	ar	36	90	285	66	76	3750	30/90
+M4A1 SOPMOD	Classic	ar	36	11	285	66	23	3750	30/90
+M4A1 SOPMOD	Reloaded	ar	36	90	285	66	76	3750	30/90
+M6A2	Classic	ar	36	11	285	66	25	3750	35/105
+M6A2	Reloaded	ar	40	91	285	67	75	3750	35/105
+M6A2 CQB	Classic	ar	36	10	285	66	25	3750	30/110
+M6A2 CQB	Reloaded	ar	40	91	285	67	75	3750	30/110
+M6A3 DMR	Classic	sr	73	20	150	99	18	5550	30/30
+M6A3 DMR	Reloaded	sr	73	81	150	99	81	5550	30/30
+M960 Future Combat	Reloaded	smg	45	96	333	73	73	2250	60/120
+M99-II Silver Skull	Classic	sr	163	26	27	99	24	5550	5/15
+M99-II Silver Skull	Reloaded	sr	163	75	27	99	76	5550	5/15
+MP5 RAS Asuka	Reloaded	smg	30	95	375	74	74	2250	35/105
+MP5SD6 Steampunk	Classic	smg	35	8	333	75	25	2250	30/90
+MP5SD6 Steampunk	Reloaded	smg	39	91	333	74	76	2250	35/105
+MP7	Classic	smg	29	7	352	72	26	2100	30/90
+MP7	Reloaded	smg	31	94	352	72	74	2100	30/90
+MP7 MOD	Classic	smg	30	6	352	72	25	2100	30/90
+MP7 MOD	Reloaded	smg	30	95	352	73	74	2190	30/90
+MP7 Steel	Classic	smg	29	7	352	72	25	2100	30/90
+MP7 Steel	Reloaded	smg	31	94	352	72	74	2100	30/90
+MSR Anubis (Common)	Classic	sr	165	22	30	99	20	5250	5/35
+MSR Anubis (Epic)	Classic	sr	166	20	30	99	20	5350	6/36
+MSR Anubis (Legendary)	Classic	sr	167	20	30	99	20	5450	6/36
+MSR Anubis (Rare)	Classic	sr	166	21	30	99	20	5250	5/35
+MSR Zodiac	Classic	sr	165	16	30	99	16	5250	7/49
+MSR Zodiac	Reloaded	sr	166	83	30	99	88	5550	6/42
+MTAR-21	Classic	ar	36	12	300	51	36	3750	30/90
+MTAR-21	Reloaded	ar	36	89	300	51	64	3750	30/90
+MTAR-21 CAMO	Classic	ar	36	12	300	51	34	3750	30/90
+MTAR-21 CAMO	Reloaded	ar	36	89	300	51	65	3750	30/90
+Makarov Champion	Classic	pt	?	?	?	?	?	?	?/?
+Makarov Champion	Reloaded	pt	45	97	166	69	67	2400	8/40
+Makarov Elite	Classic	pt	?	?	?	?	?	?	?/?
+Makarov Elite	Reloaded	pt	45	97	166	69	67	2400	8/40
+Makarov Professional	Classic	pt	?	?	?	?	?	?	?/?
+Makarov Professional	Reloaded	pt	45	97	166	69	67	2400	8/40
+Makarov Veteran	Classic	pt	?	?	?	?	?	?	?/?
+Makarov Veteran	Reloaded	pt	45	97	166	69	67	2400	8/40
+Mechanical Scanning AK-12	Classic	ar	?	?	?	?	?	?	?/?
+Mechanical Scanning AK-12	Reloaded	ar	46	91	272	58	66	3810	35/105
+Mechanical Scanning L96A1	Classic	sr	?	?	?	?	?	?	?/?
+Mechanical Scanning L96A1	Reloaded	sr	167	78	25	99	78	5550	6/24
+Mechanical Scanning USP Tactical	Classic	pt	?	?	?	?	?	?	?/?
+Mechanical Scanning USP Tactical	Reloaded	pt	47	98	187	72	67	2400	15/30
+Melissa's MP7 MOD	Reloaded	smg	34	96	352	73	75	2100	30/120
+Melissa's VSS	Reloaded	sr	120	82	100	99	80	5550	10/50
+Micro UZI Zodiac	Classic	smg	32	5	375	72	29	2250	35/140
+Micro UZI Zodiac	Reloaded	smg	32	96	375	70	68	2280	30/90
+Mummy Trooper Guitar	Classic	ar	37	10	300	67	28	3750	30/90
+Mummy Trooper Guitar	Reloaded	ar	37	91	300	67	71	3750	30/90
+N.S.M Testers M4A1	Classic	ar	40	13	285	70	25	3750	30/90
+NEMEXIS F2000	Classic	ar	37	11	300	67	25	3750	30/120
+NEMEXIS F2000	Reloaded	ar	37	90	300	67	74	3750	30/120
+NEMEXIS Kriss	Classic	smg	32	6	375	71	25	2250	28/112
+NEMEXIS Kriss	Reloaded	smg	32	95	375	71	74	2250	28/112
+NEMEXIS T-2	Reloaded	smg	34	94	375	74	74	2250	40/120
+NR-40 Champion	Classic	ml	?	?	?	?	?	?	Infinite
+NR-40 Champion	Reloaded	ml	55	100	46		100	126	Infinite
+NR-40 Elite	Classic	ml	?	?	?	?	?	?	Infinite
+NR-40 Elite	Reloaded	ml	55	100	46		100	126	Infinite
+NR-40 Professional	Classic	ml	?	?	?	?	?	?	Infinite
+NR-40 Professional	Reloaded	ml	55	100	46		100	126	Infinite
+NR-40 Veteran	Classic	ml	?	?	?	?	?	?	Infinite
+NR-40 Veteran	Reloaded	ml	55	100	46		100	126	Infinite
+NT86S	Reloaded	ar	44	88	285	50	63	3750	30/90
+Natural Disaster CZ805	Classic	ar	38	9	300	66	22	3750	30/90
+Natural Disaster CZ805	Reloaded	ar	41	93	300	68	75	3750	35/105
+Natural Disaster L96A1	Classic	sr	164	24	25	99	22	5550	6/18
+Natural Disaster L96A1	Reloaded	sr	172	78	25	98	77	6000	5/15
+Natural Disaster P90TR	Classic	smg	35	8	333	76	31	2250	50/50
+Natural Disaster P90TR	Reloaded	smg	38	94	333	70	68	2280	50/100
+Netherland L115A3	Classic	sr	162	24	25	97	21	5550	5/15
+Netherland L115A3	Reloaded	sr	162	77	25	97	78	5550	5/15
+Netherland L115A3 Ghillie	Classic	sr	165	22	30	99	21	5550	5/35
+Netherland L115A3 Ghillie	Reloaded	sr	165	79	30	99	79	5550	5/35
+Nevada Lobo ACR	Classic	ar	38	13	285	66	28	3750	35/105
+Nevada Lobo ACR	Reloaded	ar	40	91	285	66	72	3850	35/105
+Nevada Lobo SR2 Veresk	Classic	smg	33	5	375	72	36	2250	20/130
+Nevada Lobo SR2 Veresk	Reloaded	smg	33	96	375	72	67	2250	35/105
+Nevada Lobo WA2000-1 Tactical	Classic	sr	168	25	27	98	20	6150	5/25
+Nevada Lobo WA2000-1 Tactical	Reloaded	sr	166	80	27	99	80	6150	6/30
+O.J.B. F2000 Tactical	Classic	ar	36	11	300	67	25	3810	30/90
+O.J.B. F2000 Tactical	Reloaded	ar	36	90	333	67	74	3750	30/90
+Orthus	Classic	smg	32	6	375	71	25	2250	70/70
+Orthus	Reloaded	smg	32	89	480	71	50	2250	70/70
+P220 SE Anubis (Common)	Classic	pt	45	4	200	77	25	2400	9/27
+P220 SE Anubis (Epic)	Classic	pt	46	3	200	78	23	2400	9/27
+P220 SE Anubis (Legendary)	Classic	pt	47	3	200	80	22	2400	9/27
+P220 SE Anubis (Rare)	Classic	pt	46	3	200	77	24	2400	9/27
+P220 SE Kamon	Reloaded	pt	42	96	200	80	75	2400	12/36
+P90 HANAFUDA	Reloaded	smg	36	93	333	74	70	2250	50/50
+PSY's Guitar Gun	Classic	ar	37	10	300	67	28	3750	30/90
+PSY's Guitar Gun	Reloaded	ar	37	91	300	67	71	3750	30/90
+PSY's L115A3	Classic	sr	162	24	25	97	21	5550	5/15
+PSY's L115A3	Reloaded	sr	162	77	25	97	78	5550	5/15
+ParaFAL Sakura	Reloaded	ar	39	90	285	66	75	3750	30/90
+Parse Tangle Dual-Kriss	Classic	smg	33	7	375	71	25	2250	70/70
+Phoenix G36E Valkyrie	Classic	ar	44	13	260	53	36	3750	30/90
+Phoenix G36E Valkyrie	Reloaded	ar	40	88	260	51	63	3810	30/90
+Plasma Boost MG36	Reloaded	mg	60	72	272	62	58	3000	150/150
+QBZ-95 Zodiac	Classic	ar	40	10	285	65	32	3750	35/105
+QBZ-95 Zodiac	Reloaded	ar	40	93	285	61	65	3750	30/90
+R870 MCS Biohazard	Reloaded	sg	96	90	63	20	18	1050	8/24
+REC7 Dark Angel	Reloaded	ar	39	90	300	65	71	3850	35/105
+REC7 Leather Works	Reloaded	ar	43	91	300	65	72	3850	35/105
+RMS-12 Flamethrower	Classic	etc	30	21					Infinite
+RMS-12 Flamethrower	Reloaded	etc							Infinite
+RPK-74M Reaper	Reloaded	mg	51	73	272	63	55	3000	150/150
+Raven's G36C	Classic	ar	40	9	272	66	35	3750	35/105
+Raven's G36C	Reloaded	ar	40	92	272	66	64	3750	35/105
+Reaper Sickle	Reloaded	ml	80	99	66	100	99	162	Infinite
+Red Camo L115A3 Ghillie CORE	Classic	sr	165	22	30	99	21	5550	6/42
+Red Camo L115A3 Ghillie CORE	Reloaded	sr	165	79	30	99	79	5550	6/42
+Roaring Dragon CZ805	Classic	ar	40	10	300	65	23	3950	35/105
+Roaring Dragon CZ805	Reloaded	ar	40	91	300	65	76	3950	35/105
+Roaring Dragon SG50	Classic	sr	166	21	27	99	17	5850	10/30
+Roaring Dragon SG50	Reloaded	sr	166	78	27	99	80	5850	11/33
+Roaring Dragon SG550	Classic	ar	37	14	285	46	26	3825	35/105
+Roaring Dragon SG550	Reloaded	ar	37	88	285	46	74	3825	35/105
+Rocco's AUG A3	Classic	ar	43	9	285	54	36	3750	35/105
+Rocco's AUG A3	Reloaded	ar	43	92	285	54	64	3750	35/105
+Russian AK-74M	Classic	ar	43	10	272	60	36	3750	30/90
+Russian AK-74M	Reloaded	ar	43	91	272	60	63	3810	30/90
+Rusty AS Val	Classic	ar	43	11	285	65	27	3750	20/120
+Rusty AS Val	Reloaded	ar	43	90	285	65	73	3750	20/120
+Rusty M6A3 DMR	Classic	sr	73	20	150	99	18	5550	30/30
+Rusty M6A3 DMR	Reloaded	sr	73	81	150	99	81	5550	30/30
+SCAR-H Silver Dragon	Classic	ar	42	15	300	71	23	3750	35/105
+SCAR-H Silver Dragon	Reloaded	ar	44	90	300	65	77	3750	40/120
+SG50 Kamon	Reloaded	sr	166	82	27	99	83	5550	12/36
+SG550 Steel Dragon	Reloaded	ar	41	86	285	50	74	3825	30/90
+SPAS-12 Black Lotus	Reloaded	sg	88	89	66	20	20	1050	10/30
+SPAS-12 White Glint	Classic	sg	70	8	66	23	79	1020	10/30
+SPAS-12 White Glint	Reloaded	sg	96	92	66	18	19	1050	12/36
+SV-98 Supreme MOD	Classic	sr	161	26	27	99	21	5650	6/24
+Sea Camo M4A1 SOPMOD CORE	Classic	ar	36	11	285	66	23	3750	33/99
+Sea Camo M4A1 SOPMOD CORE	Reloaded	ar	36	90	285	66	77	3750	33/99
+Snow Camo AR-15 Double Barrel CORE+	Classic	ar	36	9	300	63	36	3750	33/99
+Snow Camo AR-15 Double Barrel CORE+	Reloaded	ar	34	92	300	63	64	3750	33/99
+Snow Camo CZ Scorpion EVO 3 A1	Classic	smg	34	10	375	73	31	2450	30/90
+Snow Camo CZ Scorpion EVO 3 A1	Reloaded	smg	34	98	375	73	69	2450	30/90
+Snow Camo M14 Hunter	Classic	ar	54	20	230	44	48	4000	20/100
+Snow Camo M14 Hunter	Reloaded	ar	54	92	230	48	57	4000	20/100
+Snow Camo VSS	Classic	sr	100	30	100	99	23	5550	10/50
+Snow Camo VSS	Reloaded	sr	100	82	100	99	80	5550	10/50
+Snow Tiger Carbon 15	Reloaded	ar	36	90	315	67	67	3750	30/90
+Snow Tiger K5	Reloaded	pt	30	97	272	69	68	2400	15/30
+Snow Tiger MG36	Reloaded	mg	50	73	272	65	58	3000	100/100
+Solid Guardian SV-98	Reloaded	sr	169	82	27	99	81	6150	8/24
+Spec Ops Mei's M4A1	Classic	ar	36	11	285	66	23	3750	30/90
+Spec Ops Mei's M4A1	Reloaded	ar	36	90	285	66	76	3750	30/90
+Storm Rider	Classic	ar	37	10	300	67	28	3750	30/90
+Storm Rider	Reloaded	ar	37	91	300	67	71	3750	30/90
+Symphony of Destruction	Classic	ar	37	10	300	67	28	3750	30/90
+Symphony of Destruction	Reloaded	ar	37	91	300	67	71	3750	30/90
+Synapsida Beast AR-15	Reloaded	ar	42	95	300	63	60	3750	35/105
+TAR-21	Classic	ar	36	13	285	52	37	3750	30/90
+TAR-21	Reloaded	ar	38	89	285	55	72	3750	30/90
+TAR-21 CAMO	Classic	ar	36	13	285	52	37	3750	30/90
+TAR-21 CAMO	Reloaded	ar	38	89	285	55	72	3750	30/90
+TEC-9 Dark Angel	Reloaded	smg	32	95	375	71	60	2350	32/96
+TMP Sakura	Reloaded	smg	39	94	300	71	66	2250	30/90
+TPG-1 Dark Angel	Reloaded	sr	165	77	27	98	78	6150	5/25
+TRG-21 Sakura	Reloaded	sr	166	78	27	98	78	5550	50/20
+Tango 51 Exlusive Black	Reloaded	sr	160	78	25	99	77	5550	6/24
+Tango 51 Supreme MOD	Classic	sr	151	24	26	99	23	5550	6/24
+Tarot: The Death SG550	Classic	ar	33	14	285	46	26	3750	30/70
+Tarot: The Death SG550	Reloaded	ar	42	84	285	50	74	3750	35/105
+Tarot: The Fool P90	Classic	smg	35	8	333	73	30	2250	50/50
+Tarot: The Fool P90	Reloaded	smg	37	92	333	74	70	2250	65/65
+Tarot: The World G18	Classic	pt	32	4	300	72	30	2650	15/30
+Tarot: The World G18	Reloaded	pt	38	94	300	73	70	2400	18/36
+Tempest Aviator L115A3	Classic	sr	166	25	25	99	23	5550	6/30
+Tempest Aviator L115A3	Reloaded	sr	166	80	25	99	79	5550	6/30
+Tempest Aviator M6A2-SRT	Classic	ar	40	11	285	68	25	3850	40/120
+Tempest Aviator M6A2-SRT	Reloaded	ar	40	92	285	68	75	3850	40/120
+Tempest Aviator PP-19 MOD	Classic	smg	38	8	300	68	34	2250	70/70
+Tempest Aviator PP-19 MOD	Reloaded	smg	37	96	300	70	66	2250	70/70
+The Second Amendment	Classic	ar	40	10	285	67	25	3750	35/105
+The Second Amendment	Reloaded	ar	40	91	285	67	75	3750	35/105
+The Vimy Ridge	Classic	ar	40	10	285	67	25	3750	35/105
+The Vimy Ridge	Reloaded	ar	40	91	285	67	75	3750	35/105
+Tohunga M4A1 SOPMOD	Classic	ar	36	11	285	66	23	3750	30/90
+Tohunga M4A1 SOPMOD	Reloaded	ar	36	90	285	66	76	3750	30/90
+Turkish L96A1	Classic	sr	160	25	25	97	22	5550	5/15
+Turkish L96A1	Reloaded	sr	160	76	25	97	78	5550	5/15
+UK Flag L96A1 Magnum	Classic		160	25	25	96	22	5550	6/18
+UK Flag L96A1 Magnum	Reloaded	sr	165	80	27	96	78	5550	6/18
+UMP Season Champion Reward	Classic	smg	37	8	300	71	32	2250	35/105
+VALOFE Limited 2nd FS2000	Reloaded	ar	40	88	333	70	75	3750	35/105
+VALOFE Limited 2nd M2 Browning	Reloaded	mg	52	70	250	65	50	3000	120/120
+VALOFE Limited 2nd SV-98	Reloaded	sr	165	81	27	99	79	6000	6/24
+VALOFE Limited 3rd L115A2	Reloaded	sr	168	78	25	99	78	5550	7/21
+VALOFE Limited 3rd MK16 SCAR-L	Reloaded	ar	44	89	285	66	74	3750	40/120
+VALOFE Limited 3rd MP5SD6	Reloaded	smg	38	93	333	76	74	2250	40/120
+VALOFE Limited G18	Reloaded	pt	37	98	300	74	69	2400	15/30
+VALOFE Limited Karambit	Reloaded	ml	69	98	66		100	158	Infinite
+VALOFE Limited Kriss SpecOps	Reloaded	smg	34	93	375	74	73	2250	28/112
+VALOFE Limited L96A1	Reloaded	sr	166	82	25	99	78	5550	6/18
+VALOFE Limited MK18 MOD1	Reloaded	ar	45	93	285	62	69	3825	35/105
+VSS HANAFUDA	Reloaded	sr	96	77	100	99	79	4950	10/30
+Valentine's Day AUG A3	Classic	ar	40	13	285	50	36	3750	30/90
+Valentine's Day AUG A3	Reloaded	ar	44	87	272	48	57	3810	30/90
+Venom Crossbow	Reloaded	etc	60	84	27	86	73	5250	5/5
+Visionary AK-47 Gold-Plated	Classic	ar	48	14	250	48	42	3810	30/90
+Visionary AK-47 Gold-Plated	Reloaded	ar	48	87	250	48	57	3810	30/90
+Visionary G36E Valkyrie	Classic	ar	44	13	260	53	36	3750	30/90
+Visionary G36E Valkyrie	Reloaded	ar	40	88	260	51	63	3810	30/90
+Visionary L115A3	Classic	sr	162	24	25	96	22	5550	5/15
+Visionary L115A3	Reloaded	sr	162	77	25	97	78	5550	5/15
+Visionary L96A1 Arctic Wolf	Classic	sr	160	25	25	97	22	5550	5/15
+Visionary L96A1 Arctic Wolf	Reloaded	sr	160	76	25	97	78	5550	5/15
+Visionary M4A1 Desert Warrior	Classic	ar	36	11	285	66	23	3750	30/90
+Visionary M4A1 Desert Warrior	Reloaded	ar	36	90	285	66	76	3750	30/90
+Visionary The Second Amendment	Classic	ar	40	10	285	67	25	3750	35/105
+Visionary The Second Amendment	Reloaded	ar	40	91	285	67	75	3750	35/105
+Visionary The Vimy Ridge	Classic	ar	40	10	285	67	25	3750	35/105
+Visionary The Vimy Ridge	Reloaded	ar	40	91	285	67	75	3750	35/105
+Vivid Assault Dual Skorpions	Reloaded	smg	32	94	410	68	56	2250	60/60
+Vivid Assault G36C	Reloaded	ar	47	95	260	63	64	3750	35/105
+Vivid Assault Super Shorty	Reloaded	sg	104	97	75	18	16	1020	5/30
+Wild Leopard Jackhammer	Reloaded	sg	80	88	66	21	16	1020	10/30
+Wild Leopard Kukri	Reloaded	ml	75	98	37		100	162	Infinite
+Wild Leopard PP-2000	Reloaded	smg	31	96	375	68	65	2250	20/100
+Wild Leopard XK-8	Reloaded	ar	38	88	285	66	66	3750	30/90
+XK-8 Tactical Reaper	Reloaded	ar	40	93	285	65	62	3750	40/120
+XM8 Asuka	Reloaded	ar	38	92	300	64	72	3780	35/105
+Zadan's L85A1 MOD	Classic	ar	43	13	285	51	35	3750	35/105
+Zadan's L85A1 MOD	Reloaded	ar	43	92	285	57	65	3750	35/105
+Zharkov's AN-94	Classic	ar	44	11	272	53	42	3750	35/105
+Zharkov's AN-94	Reloaded	ar	44	90	272	53	57	3750	35/105
