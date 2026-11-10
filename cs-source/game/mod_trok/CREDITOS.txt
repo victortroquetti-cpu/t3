@@ -6,6 +6,10 @@ Código
 - Arquitetura do menu próprio (client/trok/ui/trok_menu.cpp) baseada no NEOTOKYO Rebuild
   (https://github.com/NeotokyoRebuild/neo), Source 1 SDK License:
   neo/ui/neo_root.cpp e OverrideInterface.cpp.
+- Animação de corpo do jogador (shared/trok/trok_playeranimstate.cpp) adaptada do
+  Zombie Master: Reborn (https://github.com/zm-reborn/zmr-game), Source 1 SDK License:
+  zmr/zmr_playeranimstate.cpp. Evento de animação em rede (trok_animevent.cpp) como no
+  NEOTOKYO Rebuild e no HL2MP.
 
 Números e regras de referência do Combat Arms
 - Especificações do DeCombat (https://github.com/argallo/DeCombat), MIT ou Apache-2.0:

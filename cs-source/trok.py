@@ -175,6 +175,10 @@ def link_mod():
 # gen: .vpc e scripts de build gerados a partir dos do HL2MP
 # ----------------------------------------------------------------------------
 
+# Arquivos do SDK fora do projeto do HL2MP que entram no projeto do mod (caminho a partir de game/shared).
+SDK_EXTRA_FILES = ["Multiplayer\\multiplayer_animstate.cpp", "Multiplayer\\multiplayer_animstate.h"]
+
+
 def mod_files(side):
     """Arquivos .cpp/.h de src/game/<side>/trok, com caminho relativo à pasta."""
     base = os.path.join(ROOT, "src", "game", side, MOD)
@@ -212,6 +216,8 @@ def gen_game_vpc(side):
     # outras pastas dele (nada de bloco $Project extra).
     entries = ["\t\t$File\t\"%s\\%s\"" % (MOD, f) for f in mod_files(side)]
     entries += ["\t\t$File\t\"$SRCDIR\\game\\shared\\%s\\%s\"" % (MOD, f) for f in mod_files("shared")]
+    # Arquivos do SDK que o HL2MP não compila e o mod usa (animação de corpo nova).
+    entries += ["\t\t$File\t\"$SRCDIR\\game\\shared\\%s\"" % f for f in SDK_EXTRA_FILES]
     folder = ("\t// Código do mod (cs-source/src/game/{%s,shared}/%s), listado pelo trok.py.\n"
               "\t$Folder\t\"%s\"\n\t{\n%s\n\t}\n\n" % (side, MOD, TITLE, "\n".join(entries)))
     text = sub_once(r'^\$Project "%s \(HL2MP\)"\s*\n\{[ \t]*\r?\n' % label,

@@ -156,10 +156,22 @@ index f560070..ef7c7ca 100644
  	if ( hud_fastswitch.GetBool() && ( gpGlobals->curtime - m_flSelectionTime ) < (FASTSWITCH_DISPLAY_TIMEOUT + FASTSWITCH_FADEOUT_TIME) )
  		return true;
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.cpp b/src/game/client/hl2mp/c_hl2mp_player.cpp
-index 367a616..ee7ac94 100644
+index 367a616..269e125 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.cpp
 +++ b/src/game/client/hl2mp/c_hl2mp_player.cpp
-@@ -35,6 +35,19 @@ BEGIN_RECV_TABLE_NOBASE( C_HL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+@@ -7,6 +7,11 @@
+ #include "cbase.h"
+ #include "vcollide_parse.h"
+ #include "c_hl2mp_player.h"
++#ifdef TROK
++#include "trok_playeranimstate.h"
++#include "prediction.h"
++#include "datacache/imdlcache.h"
++#endif
+ #include "view.h"
+ #include "takedamageinfo.h"
+ #include "hl2mp_gamerules.h"
+@@ -35,6 +40,19 @@ BEGIN_RECV_TABLE_NOBASE( C_HL2MP_Player, DT_HL2MPLocalPlayerExclusive )
  
  	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
  	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),
@@ -179,7 +191,7 @@ index 367a616..ee7ac94 100644
  END_RECV_TABLE()
  
  // all players except the local player
-@@ -59,6 +72,13 @@ END_RECV_TABLE()
+@@ -59,6 +77,13 @@ END_RECV_TABLE()
  
  BEGIN_PREDICTION_DATA( C_HL2MP_Player )
  	DEFINE_PRED_FIELD( m_fIsWalking, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
@@ -193,7 +205,7 @@ index 367a616..ee7ac94 100644
  
  	// misyl: Ammo is server side entities in HL2MP. Not catastrophic to error about.
  	// Just let the server stomp all over us.
-@@ -102,6 +122,19 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100
+@@ -102,6 +127,20 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100
  
  C_HL2MP_Player::C_HL2MP_Player() : m_PlayerAnimState( this ), m_iv_angEyeAngles( "C_HL2MP_Player::m_iv_angEyeAngles" )
  {
@@ -209,15 +221,107 @@ index 367a616..ee7ac94 100644
 +	m_flTrokEmpDirY = 0.0f;
 +	m_flTrokJumpPressTime = -100.0f;
 +	m_flTrokProtegidoAte = 0.0f;
++	m_pTrokAnimState = CreateTrokPlayerAnimState( this );
 +#endif
  	m_iIDEntIndex = 0;
  	m_iSpawnInterpCounterCache = 0;
  
+@@ -120,6 +159,13 @@ C_HL2MP_Player::C_HL2MP_Player() : m_PlayerAnimState( this ), m_iv_angEyeAngles(
+ C_HL2MP_Player::~C_HL2MP_Player( void )
+ {
+ 	ReleaseFlashlight();
++#ifdef TROK
++	if ( m_pTrokAnimState )
++	{
++		m_pTrokAnimState->Release();
++		m_pTrokAnimState = NULL;
++	}
++#endif
+ }
+ 
+ int C_HL2MP_Player::GetIDTarget() const
+@@ -219,6 +265,10 @@ CStudioHdr *C_HL2MP_Player::OnNewModel( void )
+ 	CStudioHdr *hdr = BaseClass::OnNewModel();
+ 	
+ 	Initialize( );
++#ifdef TROK
++	if ( m_pTrokAnimState )
++		m_pTrokAnimState->OnNewModel();
++#endif
+ 
+ 	return hdr;
+ }
+@@ -582,6 +632,11 @@ void C_HL2MP_Player::AddEntity( void )
+ 
+ 	SetLocalAngles( vTempAngles );
+ 		
++#ifdef TROK
++	if ( TrokAnimNova() && m_pTrokAnimState )
++		m_pTrokAnimState->Update( EyeAngles()[ YAW ], EyeAngles()[ PITCH ] );
++	else
++#endif
+ 	m_PlayerAnimState.Update();
+ 
+ 	// Zero out model pitch, blending takes care of all of it.
+@@ -679,10 +734,42 @@ const QAngle& C_HL2MP_Player::GetRenderAngles()
+ 	}
+ 	else
+ 	{
++#ifdef TROK
++		if ( TrokAnimNova() && m_pTrokAnimState )
++			return m_pTrokAnimState->GetRenderAngles();
++#endif
+ 		return m_PlayerAnimState.GetRenderAngles();
+ 	}
+ }
+ 
++#ifdef TROK
++// Animação nova: eventos de tiro, recarga e pulo (do servidor pelo TE, ou da predição local).
++void C_HL2MP_Player::DoAnimationEvent( PlayerAnimEvent_t event, int nData )
++{
++	if ( IsLocalPlayer() && prediction->InPrediction() && !prediction->IsFirstTimePredicted() )
++		return;
++	MDLCACHE_CRITICAL_SECTION();
++	if ( m_pTrokAnimState )
++		m_pTrokAnimState->DoAnimationEvent( event, nData );
++}
++
++// No cliente, o código compartilhado das armas chama SetAnimation na predição do jogador local.
++void C_HL2MP_Player::SetAnimation( PLAYER_ANIM playerAnim )
++{
++	if ( !TrokAnimNova() )
++	{
++		BaseClass::SetAnimation( playerAnim );
++		return;
++	}
++	if ( playerAnim == PLAYER_ATTACK1 )
++		DoAnimationEvent( PLAYERANIMEVENT_ATTACK_PRIMARY );
++	else if ( playerAnim == PLAYER_RELOAD )
++		DoAnimationEvent( PLAYERANIMEVENT_RELOAD );
++	else if ( playerAnim == PLAYER_JUMP )
++		DoAnimationEvent( PLAYERANIMEVENT_JUMP );
++}
++#endif
++
+ bool C_HL2MP_Player::ShouldDraw( void )
+ {
+ 	// If we're dead, our ragdoll will be drawn for us instead.
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.h b/src/game/client/hl2mp/c_hl2mp_player.h
-index bac7584..3dc3839 100644
+index bac7584..8bf1f8d 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.h
 +++ b/src/game/client/hl2mp/c_hl2mp_player.h
-@@ -120,6 +120,22 @@ public:
+@@ -13,6 +13,10 @@ class C_HL2MP_Player;
+ #include "c_basehlplayer.h"
+ #include "hl2mp_player_shared.h"
+ #include "beamdraw.h"
++#ifdef TROK
++#include "Multiplayer/multiplayer_animstate.h"
++class CTrokPlayerAnimState;
++#endif
+ 
+ //=============================================================================
+ //=============================================================================
+@@ -120,6 +124,27 @@ public:
  
  	virtual void PostThink( void );
  
@@ -235,6 +339,11 @@ index bac7584..3dc3839 100644
 +	float m_flTrokEmpDirY;
 +	float m_flTrokJumpPressTime;
 +	float m_flTrokProtegidoAte;
++
++	// Animação de corpo nova (shared/trok/trok_playeranimstate.cpp), ligada por trok_anim_nova.
++	void DoAnimationEvent( PlayerAnimEvent_t event, int nData = 0 );
++	virtual void SetAnimation( PLAYER_ANIM playerAnim );
++	CTrokPlayerAnimState *m_pTrokAnimState;
 +#endif
 +
  private:
@@ -905,10 +1014,21 @@ index 30d2181..18f69f4 100644
  }
  
 diff --git a/src/game/server/hl2mp/hl2mp_player.cpp b/src/game/server/hl2mp/hl2mp_player.cpp
-index 9457928..fbf1197 100644
+index 9457928..ce7b89c 100644
 --- a/src/game/server/hl2mp/hl2mp_player.cpp
 +++ b/src/game/server/hl2mp/hl2mp_player.cpp
-@@ -54,6 +54,19 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+@@ -7,6 +7,10 @@
+ #include "cbase.h"
+ #include "weapon_hl2mpbasehlmpcombatweapon.h"
+ #include "hl2mp_player.h"
++#ifdef TROK
++#include "trok_playeranimstate.h"
++extern void TE_TrokAnimEvent( CBasePlayer *pPlayer, PlayerAnimEvent_t event, int nData );
++#endif
+ #include "globalstate.h"
+ #include "game.h"
+ #include "gamerules.h"
+@@ -54,6 +58,19 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
  
  	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
  	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
@@ -928,7 +1048,7 @@ index 9457928..fbf1197 100644
  
  END_SEND_TABLE()
  
-@@ -143,6 +156,19 @@ const char *g_ppszRandomCombineModels[] =
+@@ -143,6 +160,20 @@ const char *g_ppszRandomCombineModels[] =
  CHL2MP_Player::CHL2MP_Player() : m_PlayerAnimState( this )
  {
  	m_angEyeAngles.Init();
@@ -944,11 +1064,26 @@ index 9457928..fbf1197 100644
 +	m_flTrokEmpDirY = 0.0f;
 +	m_flTrokJumpPressTime = -100.0f;
 +	m_flTrokProtegidoAte = 0.0f;
++	m_pTrokAnimState = CreateTrokPlayerAnimState( this );
 +#endif
  
  	m_iLastWeaponFireUsercmd = 0;
  
-@@ -239,10 +265,42 @@ void CHL2MP_Player::GiveAllItems( void )
+@@ -161,6 +192,13 @@ CHL2MP_Player::CHL2MP_Player() : m_PlayerAnimState( this )
+ 
+ CHL2MP_Player::~CHL2MP_Player( void )
+ {
++#ifdef TROK
++	if ( m_pTrokAnimState )
++	{
++		m_pTrokAnimState->Release();
++		m_pTrokAnimState = NULL;
++	}
++#endif
+ 
+ }
+ 
+@@ -239,10 +277,42 @@ void CHL2MP_Player::GiveAllItems( void )
  	
  }
  
@@ -991,7 +1126,59 @@ index 9457928..fbf1197 100644
  	CBasePlayer::GiveAmmo( 255,	"Pistol");
  	CBasePlayer::GiveAmmo( 45,	"SMG1");
  	CBasePlayer::GiveAmmo( 1,	"grenade" );
-@@ -1414,6 +1472,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
+@@ -619,6 +689,11 @@ void CHL2MP_Player::PostThink( void )
+ 		SetCollisionBounds( VEC_CROUCH_TRACE_MIN, VEC_CROUCH_TRACE_MAX );
+ 	}
+ 
++#ifdef TROK
++	if ( TrokAnimNova() && m_pTrokAnimState )
++		m_pTrokAnimState->Update( EyeAngles()[ YAW ], EyeAngles()[ PITCH ] );
++	else
++#endif
+ 	m_PlayerAnimState.Update();
+ 
+ 	// Store the eye angles pitch so the client can compute its animation state correctly.
+@@ -736,8 +811,39 @@ Activity CHL2MP_Player::TranslateTeamActivity( Activity ActToTranslate )
+ extern ConVar hl2_normspeed;
+ 
+ // Set the activity based on an event or current state
++#ifdef TROK
++// Animação nova: o tiro, a recarga e o pulo viram eventos (gestos por cima das pernas, mandados
++// aos outros clientes); andar, correr e ficar parado o CTrokPlayerAnimState decide sozinho.
++void CHL2MP_Player::DoAnimationEvent( PlayerAnimEvent_t event, int nData )
++{
++	if ( m_pTrokAnimState )
++		m_pTrokAnimState->DoAnimationEvent( event, nData );
++	TE_TrokAnimEvent( this, event, nData );
++}
++
++CStudioHdr *CHL2MP_Player::OnNewModel( void )
++{
++	CStudioHdr *hdr = BaseClass::OnNewModel();
++	if ( m_pTrokAnimState )
++		m_pTrokAnimState->OnNewModel();
++	return hdr;
++}
++#endif
++
+ void CHL2MP_Player::SetAnimation( PLAYER_ANIM playerAnim )
+ {
++#ifdef TROK
++	if ( TrokAnimNova() && m_pTrokAnimState )
++	{
++		if ( playerAnim == PLAYER_ATTACK1 )
++			DoAnimationEvent( PLAYERANIMEVENT_ATTACK_PRIMARY );
++		else if ( playerAnim == PLAYER_RELOAD )
++			DoAnimationEvent( PLAYERANIMEVENT_RELOAD );
++		else if ( playerAnim == PLAYER_JUMP )
++			DoAnimationEvent( PLAYERANIMEVENT_JUMP );
++		return;
++	}
++#endif
+ 	int animDesired;
+ 
+ 	float speed;
+@@ -1414,6 +1520,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
  		}
  	}
  
@@ -1011,10 +1198,21 @@ index 9457928..fbf1197 100644
  	// Randomize the start spot
  	for ( int i = random->RandomInt(1,5); i > 0; i-- )
 diff --git a/src/game/server/hl2mp/hl2mp_player.h b/src/game/server/hl2mp/hl2mp_player.h
-index 5fad238..916b896 100644
+index 5fad238..d21351f 100644
 --- a/src/game/server/hl2mp/hl2mp_player.h
 +++ b/src/game/server/hl2mp/hl2mp_player.h
-@@ -143,6 +143,23 @@ public:
+@@ -19,6 +19,10 @@ class CHL2MP_Player;
+ #include "hl2mp_player_shared.h"
+ #include "hl2mp_gamerules.h"
+ #include "utldict.h"
++#ifdef TROK
++#include "Multiplayer/multiplayer_animstate.h"
++class CTrokPlayerAnimState;
++#endif
+ 
+ //=============================================================================
+ // >> HL2MP_Player
+@@ -143,6 +147,28 @@ public:
  
  	bool IsThreatAimingTowardMe( CBaseEntity* threat, float cosTolerance = 0.8f ) const;
  	bool IsThreatFiringAtMe( CBaseEntity* threat ) const;
@@ -1034,6 +1232,11 @@ index 5fad238..916b896 100644
 +	CNetworkVar( float, m_flTrokEmpDirY );
 +	CNetworkVar( float, m_flTrokJumpPressTime );
 +	CNetworkVar( float, m_flTrokProtegidoAte );	// proteção ao nascer (regras do Trok), para o HUD
++
++	// Animação de corpo nova (shared/trok/trok_playeranimstate.cpp), ligada por trok_anim_nova.
++	void DoAnimationEvent( PlayerAnimEvent_t event, int nData = 0 );
++	virtual CStudioHdr *OnNewModel( void );
++	CTrokPlayerAnimState *m_pTrokAnimState;
 +#endif
  private:
  
