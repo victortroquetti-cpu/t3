@@ -54,6 +54,9 @@ public:
 	void SurtoEmpurraoCA( CBasePlayer *pVictim, CBasePlayer *pAttacker, const CTakeDamageInfo &info, float flScale );
 	bool IgnoresHeadshot( CBasePlayer *pVictim ) const;							// player.cpp, TraceAttack
 
+	// Explosões como no CA (trok_explosao_ca): parede bloqueia, gente e objetos soltos não.
+	virtual void RadiusDamage( const CTakeDamageInfo &info, const Vector &vecSrc, float flRadius, int iClassIgnore, CBaseEntity *pEntityIgnore );
+
 private:
 	void SurtoThink( void );
 	void SurtoPreparo( void );

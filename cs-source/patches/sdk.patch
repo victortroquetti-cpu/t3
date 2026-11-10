@@ -1242,7 +1242,7 @@ index 5fad238..d21351f 100644
  
  	CNetworkQAngle( m_angEyeAngles );
 diff --git a/src/game/server/player.cpp b/src/game/server/player.cpp
-index b8a0519..06da424 100644
+index b8a0519..1d89f6f 100644
 --- a/src/game/server/player.cpp
 +++ b/src/game/server/player.cpp
 @@ -947,7 +947,15 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
@@ -1286,6 +1286,29 @@ index b8a0519..06da424 100644
  	
  	// Insert a combat sound so that nearby NPCs hear battle
  	if ( attacker->IsNPC() )
+@@ -2309,11 +2335,22 @@ bool CBasePlayer::StartObserverMode(int mode)
+ 	return true;
+ }
+ 
++#ifdef TROK
++ConVar trok_espectador_livre( "trok_espectador_livre", "0", FCVAR_NOTIFY,
++	"1 = espectador pode usar câmera livre. 0 = só primeira pessoa (no olho) ou terceira (atrás de alguém)." );
++#endif
++
+ bool CBasePlayer::SetObserverMode(int mode )
+ {
+ 	if ( mode < OBS_MODE_NONE || mode >= NUM_OBSERVER_MODES )
+ 		return false;
+ 
++#ifdef TROK
++	// Sem câmera livre: a troca (spec_mode) alterna entre primeira e terceira pessoa.
++	if ( !trok_espectador_livre.GetBool() && ( mode == OBS_MODE_ROAMING || mode == OBS_MODE_POI ) )
++		mode = ( m_iObserverMode == OBS_MODE_CHASE ) ? OBS_MODE_IN_EYE : OBS_MODE_CHASE;
++#endif
++
+ 
+ 	// check mp_forcecamera settings for dead players
+ 	if ( mode > OBS_MODE_FIXED && GetTeamNumber() > TEAM_SPECTATOR )
 diff --git a/src/game/shared/SoundEmitterSystem.cpp b/src/game/shared/SoundEmitterSystem.cpp
 index 2c93c49..77acc5c 100644
 --- a/src/game/shared/SoundEmitterSystem.cpp

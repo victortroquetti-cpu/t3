@@ -941,4 +941,127 @@ bool TrokRules_IgnoresHeadshot( CBasePlayer *pVictim )
 	return TrokRules() && TrokRules()->IgnoresHeadshot( pVictim );
 }
 
+//-----------------------------------------------------------------------------
+// Explosões do Combat Arms (Chimera, specs/combat_arms/grenades.md, "Cover"):
+//   - dano cheio até trok_explosao_ca_nucleo x raio, depois cai em linha reta até 0 no raio;
+//   - só o mapa (paredes, pilastras, caixas do BSP) e portas/brushes sólidos protegem; outro
+//     jogador, prop solto ou granada no caminho NÃO protegem;
+//   - em jogador, dois traços (explosão -> centro e centro -> explosão); se algum bater,
+//     tenta de novo até o alto da cabeça; ainda bloqueado = sem dano. Cobertura que deixa a
+//     cabeça de fora não protege. Objetos (props, quebráveis) não têm teste de cobertura.
+// Isso faz o "olé" do CA: jogar a granada e se esconder atrás da pilastra na hora.
+// Com trok_explosao_ca 0 vale a explosão do HL2 (que contorna quinas perto do centro).
+//-----------------------------------------------------------------------------
+ConVar trok_explosao_ca( "trok_explosao_ca", "1", FCVAR_NOTIFY, "Explosões como no Combat Arms: parede bloqueia, gente e objetos soltos não. 0 = as do HL2." );
+ConVar trok_explosao_ca_nucleo( "trok_explosao_ca_nucleo", "0.25", FCVAR_NOTIFY, "Fração do raio com dano cheio (CA: 0,25)." );
+ConVar trok_granada_dano( "trok_granada_dano", "120", FCVAR_NOTIFY, "Dano da granada de mão (CA: M67, 60 aplicado duas vezes = 120). 0 = o do script." );
+ConVar trok_granada_raio( "trok_granada_raio", "450", FCVAR_NOTIFY, "Raio (u) da granada de mão (CA: M67 450). 0 = o do HL2 (250)." );
+
+// Só o mapa e brushes sólidos (portas, paredes que se mexem, quebráveis ainda inteiros).
+class CTrokTraceFilterExplosao : public CTraceFilterSimple
+{
+public:
+	CTrokTraceFilterExplosao( const IHandleEntity *pIgnore ) : CTraceFilterSimple( pIgnore, COLLISION_GROUP_NONE ) {}
+	virtual bool ShouldHitEntity( IHandleEntity *pHandleEntity, int contentsMask )
+	{
+		CBaseEntity *pEnt = EntityFromEntityHandle( pHandleEntity );
+		if ( !pEnt )
+			return false;
+		if ( pEnt->IsWorld() )
+			return true;
+		if ( !pEnt->IsSolid() )
+			return false;
+		if ( pEnt->IsBSPModel() || FClassnameIs( pEnt, "prop_door_rotating" ) )
+			return CTraceFilterSimple::ShouldHitEntity( pHandleEntity, contentsMask );
+		return false;
+	}
+};
+
+static bool TrokExplosaoBloqueada( const Vector &a, const Vector &b, CBaseEntity *pInflictor )
+{
+	if ( ( a - b ).LengthSqr() < 0.01f )
+		return false;	// traço de comprimento zero nunca bloqueia
+	CTrokTraceFilterExplosao filter( pInflictor );
+	trace_t tr;
+	UTIL_TraceLine( a, b, MASK_SOLID, &filter, &tr );
+	if ( tr.fraction < 1.0f || tr.startsolid )
+		return true;
+	UTIL_TraceLine( b, a, MASK_SOLID, &filter, &tr );
+	return tr.fraction < 1.0f || tr.startsolid;
+}
+
+void CTrokRules::RadiusDamage( const CTakeDamageInfo &info, const Vector &vecSrcIn, float flRadius, int iClassIgnore, CBaseEntity *pEntityIgnore )
+{
+	if ( !trok_explosao_ca.GetBool() )
+	{
+		BaseClass::RadiusDamage( info, vecSrcIn, flRadius, iClassIgnore, pEntityIgnore );
+		return;
+	}
+
+	CTakeDamageInfo infoBase = info;
+	CBaseEntity *pInflictor = info.GetInflictor();
+	if ( pInflictor && FClassnameIs( pInflictor, "npc_grenade_frag" ) )
+	{
+		if ( trok_granada_dano.GetFloat() > 0.0f )
+			infoBase.SetDamage( trok_granada_dano.GetFloat() );
+		if ( trok_granada_raio.GetFloat() > 0.0f )
+			flRadius = trok_granada_raio.GetFloat();
+	}
+	if ( flRadius <= 0.0f || infoBase.GetDamage() <= 0.0f )
+		return;
+
+	Vector vecSrc = vecSrcIn;
+	vecSrc.z += 1.0f;	// granada parada no chão
+	const bool bSrcNaAgua = ( UTIL_PointContents( vecSrc + Vector( 0, 0, 24 ) ) & MASK_WATER ) != 0;
+	const float flNucleo = clamp( trok_explosao_ca_nucleo.GetFloat(), 0.0f, 0.99f ) * flRadius;
+
+	CBaseEntity *pEntity = NULL;
+	for ( CEntitySphereQuery sphere( vecSrc, flRadius ); ( pEntity = sphere.GetCurrentEntity() ) != NULL; sphere.NextEntity() )
+	{
+		if ( pEntity == pEntityIgnore || pEntity->m_takedamage == DAMAGE_NO )
+			continue;
+		if ( iClassIgnore != CLASS_NONE && pEntity->Classify() == iClassIgnore )
+			continue;
+		// Explosão não entra nem sai da água funda.
+		if ( bSrcNaAgua != ( pEntity->GetWaterLevel() == 3 ) )
+			continue;
+
+		const Vector vecCentro = pEntity->WorldSpaceCenter();
+		const float d = ( vecCentro - vecSrc ).Length();
+		if ( d > flRadius )
+			continue;
+
+		// Cobertura: só para quem luta (jogadores e NPCs).
+		if ( pEntity->MyCombatCharacterPointer() && TrokExplosaoBloqueada( vecSrc, vecCentro, pInflictor ) )
+		{
+			Vector vecCabeca = vecCentro;
+			vecCabeca.z = pEntity->GetAbsOrigin().z + pEntity->CollisionProp()->OBBMaxs().z - 2.0f;
+			if ( TrokExplosaoBloqueada( vecSrc, vecCabeca, pInflictor ) )
+				continue;
+		}
+
+		const float m = ( d <= flNucleo ) ? 1.0f : 1.0f - ( d - flNucleo ) / ( flRadius - flNucleo );
+		if ( m <= 0.0f )
+			continue;
+
+		CTakeDamageInfo adjustedInfo = infoBase;
+		adjustedInfo.SetDamage( infoBase.GetDamage() * m );
+
+		Vector dir = vecCentro - vecSrc;
+		VectorNormalize( dir );
+		if ( adjustedInfo.GetDamagePosition() == vec3_origin || adjustedInfo.GetDamageForce() == vec3_origin )
+		{
+			if ( !( adjustedInfo.GetDamageType() & DMG_PREVENT_PHYSICS_FORCE ) )
+				CalculateExplosiveDamageForce( &adjustedInfo, dir, vecSrc );
+		}
+		else
+		{
+			adjustedInfo.SetDamageForce( dir * adjustedInfo.GetDamageForce().Length() * m );
+			adjustedInfo.SetDamagePosition( vecSrc );
+		}
+
+		pEntity->TakeDamage( adjustedInfo );
+	}
+}
+
 #endif // !CLIENT_DLL
