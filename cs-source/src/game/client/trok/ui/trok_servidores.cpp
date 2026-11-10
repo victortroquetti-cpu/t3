@@ -10,13 +10,14 @@
 #include "cbase.h"
 #include "trok_servidores.h"
 // Os cabeçalhos públicos da Steam usam strncpy de propósito (inline em matchmakingtypes.h);
-// o SDK troca strncpy por um nome que não existe, o que quebra a ligação. Libera só aqui.
+// o SDK troca strncpy por um nome que não existe, o que quebra a ligação. Aqui ela vira a V_strncpy.
 #ifdef strncpy
 #undef strncpy
 #endif
-#include <string.h>
+#define strncpy V_strncpy
 #include "steam/steam_api.h"
 #include "steam/isteammatchmaking.h"
+#undef strncpy
 #include "tier1/utlvector.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
