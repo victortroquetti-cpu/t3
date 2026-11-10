@@ -91,8 +91,10 @@ Desenho completo, comparação dos CoDs e decisões: **`design/modo-hordas.md`**
   jogador); velocidade sobe até correr na 7ª; tipos novos entram por rodada (Charger 5, Striker 8,
   Splicer 12, Crusher 15...). Matilha (corredores) a cada 4–6 rodadas; Colosso (chefe) a cada 10.
 - Pontos (separados do dinheiro da economia): acerto 10, abate 50, cabeça 100, faca 130, tábua 10.
-- Estações com E: arma na parede, porta paga (abre área), máquina de melhoria (MK I a MK V), caixa
-  misteriosa, bancada (colete, kit de reanimação, torreta...), chave de energia.
+- Estações com E: arma na parede, máquina de melhoria (MK I a MK V; com arma de defesa na mão, nível
+  de defesa I a III), caixa misteriosa, bancada, chave de energia. **Sem portas pagas** (decisão do dono).
+- **Armas de defesa** em destaque: torreta, claymore, mina e carga remota (as do CA), compradas e
+  repostas na bancada, com limite de postas por jogador (`trok_hordas_limite_*`).
 - Derrubado em vez de morrer; colega segura E 3 s para reviver; todos caídos = fim de jogo.
 - Bônus que caem: Reabastecimento, Abate certo, Pontos em dobro, Ataque aéreo, Reforço, Caixa barata.
 

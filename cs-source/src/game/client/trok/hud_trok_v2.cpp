@@ -59,6 +59,8 @@ static ConVar trok_hud_bussola( "trok_hud_bussola", "0", FCVAR_ARCHIVE, "Bússol
 static ConVar trok_hud_eventos( "trok_hud_eventos", "1", FCVAR_ARCHIVE, "Eventos à direita da mira (ABATE, NA CABEÇA, +$)." );
 static ConVar trok_hud_granada( "trok_hud_granada", "1", FCVAR_ARCHIVE, "Aviso de granada perto (ícone em volta da mira apontando para ela)." );
 static ConVar trok_hud_granada_raio( "trok_hud_granada_raio", "400", FCVAR_ARCHIVE, "Distância (u) até a qual a granada aparece no aviso." );
+static ConVar trok_hud_infectado( "trok_hud_infectado", "1", FCVAR_ARCHIVE, "Surto: textura por cima da tela inteira enquanto você é zumbi (como o InfectedTex do Quarantine do CA)." );
+static ConVar trok_hud_infectado_textura( "trok_hud_infectado_textura", "vgui/trok/surto_infectado", FCVAR_ARCHIVE, "Material da tela de infectado (sem o material, não desenha nada)." );
 static ConVar trok_hud_margem( "trok_hud_margem", "28", FCVAR_ARCHIVE, "Margem do HUD novo até a borda (px numa tela de 720 de altura)." );
 
 static const Color COR_BRANCO( 236, 238, 241, 255 );
@@ -69,10 +71,10 @@ static const Color COR_INIMIGO( 255, 90, 90, 255 );
 static const Color COR_ZUMBI( 217, 54, 43, 255 );		// infecção: vermelho-sangue (decisão do dono)
 static const Color COR_COLETE( 157, 183, 208, 255 );
 // Fúria (moeda do infectado): vermelho-sangue sobre roxo-escuro (decisão do dono; ui/trok_ui_comum.h
-// tem as mesmas COR_FURIA / COR_FURIA_FUNDO da loja). O número usa um tom mais claro para ler no roxo.
+// tem as mesmas COR_FURIA / COR_FURIA_FUNDO da loja). Aqui o roxo é o contorno do texto, sem caixa.
 static const Color COR_FURIA( 204, 32, 48, 255 );
 static const Color COR_FURIA_FUNDO( 34, 10, 38, 255 );
-static const Color COR_FURIA_TEXTO( 232, 65, 79, 255 );
+static const Color COR_FURIA_ROTULO( 168, 26, 40, 255 );
 static const Color COR_FUNDO( 11, 13, 16, 255 );
 static const Color COR_DESTAQUE_PADRAO( 242, 181, 68, 255 );
 
@@ -131,6 +133,8 @@ private:
 	int TextoCore( HFont f, int x, int yBase, const Color &c, const wchar_t *wsz, int iAlinh, float flEsp, bool bMono, bool bDesenhar );
 	int Texto( HFont f, int x, int yBase, const Color &c, const char *psz, int iAlinh = AL_ESQ, float flEsp = 0.0f, bool bMono = false );
 	int Larg( HFont f, const char *psz, float flEsp = 0.0f, bool bMono = false );
+	int TextoContorno( HFont f, int x, int yBase, const Color &c, const Color &cContorno, const char *psz, float flEsp, bool bMono );
+	void PaintInfectado( C_BasePlayer *pLocal );
 	void Rect( int x, int y, int w, int h, const Color &c );
 	void Veu( int x, int y, int w, int h, float a, int iLado );		// 0 escuro à direita, 1 à esquerda, 2 no meio
 	void Poly( Vertex_t *v, int n, const Color &c );
@@ -172,6 +176,9 @@ private:
 
 	// Fontes (criadas aqui no tamanho do HUD)
 	HFont m_fBig, m_fScore, m_fTimer, m_fMed, m_fText, m_fLabel, m_fName, m_fSmall;
+	HFont m_fTextNS, m_fLabelNS;	// sem sombra: a Fúria leva contorno roxo no lugar da sombra preta
+	int m_iTexInfectado;
+	char m_szTexInfectado[ 128 ];
 	int m_iFontesAlt;
 	float m_flFontesEsc;
 	int m_iTexBranca;
@@ -253,6 +260,9 @@ CHudTrokV2::CHudTrokV2( const char *pElementName ) : CHudElement( pElementName )
 	SetMouseInputEnabled( false );
 	SetKeyBoardInputEnabled( false );
 	m_fBig = m_fScore = m_fTimer = m_fMed = m_fText = m_fLabel = m_fName = m_fSmall = INVALID_FONT;
+	m_fTextNS = m_fLabelNS = INVALID_FONT;
+	m_iTexInfectado = -1;
+	m_szTexInfectado[ 0 ] = 0;
 	m_iFontesAlt = 0;
 	m_flFontesEsc = 0.0f;
 	m_iTexBranca = -1;
@@ -377,6 +387,12 @@ void CHudTrokV2::CriarFontes( void )
 		surface()->SetFontGlyphSet( *defs[ i ].pFont, defs[ i ].pszNome, MAX( 6, S( defs[ i ].flTall ) ), defs[ i ].iPeso, 0, 0,
 			ISurface::FONTFLAG_ANTIALIAS | ISurface::FONTFLAG_DROPSHADOW );
 	}
+	if ( m_fTextNS == INVALID_FONT )
+		m_fTextNS = surface()->CreateFont();
+	surface()->SetFontGlyphSet( m_fTextNS, "Barlow Condensed SemiBold", MAX( 6, S( 15.0f ) ), 600, 0, 0, ISurface::FONTFLAG_ANTIALIAS );
+	if ( m_fLabelNS == INVALID_FONT )
+		m_fLabelNS = surface()->CreateFont();
+	surface()->SetFontGlyphSet( m_fLabelNS, "Barlow Condensed SemiBold", MAX( 6, S( 11.0f ) ), 600, 0, 0, ISurface::FONTFLAG_ANTIALIAS );
 }
 
 // Texto letra a letra: espaçamento entre letras (px a 720) e, com bMono, algarismos em células
@@ -419,6 +435,19 @@ int CHudTrokV2::Texto( HFont f, int x, int yBase, const Color &c, const char *ps
 	wchar_t wsz[ 128 ];
 	V_UTF8ToUnicode( psz, wsz, sizeof( wsz ) );
 	return TextoCore( f, x, yBase, c, wsz, iAlinh, flEsp, bMono, true );
+}
+
+// Texto com contorno fino (1 px nas 8 direções) numa cor, em vez da sombra preta. Use fonte sem sombra.
+int CHudTrokV2::TextoContorno( HFont f, int x, int yBase, const Color &c, const Color &cContorno, const char *psz, float flEsp, bool bMono )
+{
+	wchar_t wsz[ 128 ];
+	V_UTF8ToUnicode( psz, wsz, sizeof( wsz ) );
+	const int o = S1( 1 );
+	for ( int dy = -1; dy <= 1; ++dy )
+		for ( int dx = -1; dx <= 1; ++dx )
+			if ( dx || dy )
+				TextoCore( f, x + dx * o, yBase + dy * o, cContorno, wsz, AL_ESQ, flEsp, bMono, true );
+	return TextoCore( f, x, yBase, c, wsz, AL_ESQ, flEsp, bMono, true );
 }
 
 int CHudTrokV2::Larg( HFont f, const char *psz, float flEsp, bool bMono )
@@ -1001,6 +1030,7 @@ void CHudTrokV2::Paint( void )
 	const bool bVivo = pLocal->IsAlive() && pLocal->GetTeamNumber() != TEAM_SPECTATOR;
 	if ( bVivo )
 	{
+		PaintInfectado( pLocal );
 		PaintVinhetas( pLocal );
 		PaintRadar( pLocal );
 		PaintBussola( pLocal );
@@ -1043,6 +1073,34 @@ void CHudTrokV2::PaintVinhetas( C_BasePlayer *pLocal )
 	if ( flDano >= 0.0f && flDano < 0.6f )
 		Vinheta( Color( 180, 20, 20, 255 ), (int)( 90.0f * ( 1.0f - flDano / 0.6f ) ) );
 
+}
+
+// Surto, você zumbi: a textura de infectado por cima da tela inteira, todo quadro, branco ×
+// textura com alfa normal, sem pulsar (como o InfectedTex do Quarantine do CA, Chimera
+// game_modes.md, "The screen effect"). Só textura: sem o material, não desenha nada.
+void CHudTrokV2::PaintInfectado( C_BasePlayer *pLocal )
+{
+	if ( !trok_hud_infectado.GetBool() || !TrokSurto_IsZumbi( pLocal ) )
+		return;
+	const char *pszMat = trok_hud_infectado_textura.GetString();
+	if ( !pszMat || !pszMat[ 0 ] )
+		return;
+	if ( V_strcmp( pszMat, m_szTexInfectado ) )
+	{
+		V_strncpy( m_szTexInfectado, pszMat, sizeof( m_szTexInfectado ) );
+		m_iTexInfectado = -1;
+		IMaterial *pMat = materials ? materials->FindMaterial( pszMat, TEXTURE_GROUP_VGUI, false ) : NULL;
+		if ( pMat && !pMat->IsErrorMaterial() )
+		{
+			m_iTexInfectado = surface()->CreateNewTextureID();
+			surface()->DrawSetTextureFile( m_iTexInfectado, pszMat, true, false );
+		}
+	}
+	if ( m_iTexInfectado < 0 )
+		return;
+	surface()->DrawSetColor( Color( 255, 255, 255, 255 ) );	// branco × textura (a opacidade do HUD não vale aqui)
+	surface()->DrawSetTexture( m_iTexInfectado );
+	surface()->DrawTexturedRect( 0, 0, ScreenWidth(), ScreenHeight() );
 }
 
 // Radar quadrado que gira com a visão: aliados sempre, inimigos quando vistos ou atirando.
@@ -1622,17 +1680,15 @@ void CHudTrokV2::PaintVitais( C_BasePlayer *pLocal )
 				const int iDin = TrokZumbis_Dinheiro( pLocal );
 				char szMil[ 24 ], szPreco[ 32 ];
 				Milhar( iDin, szMil, sizeof( szMil ) );
-				// plaquinha roxo-escuro com filete vermelho-sangue: cor própria da Fúria (igual à loja)
+				// Fúria só em texto, sem caixa: vermelho-sangue com contorno fino roxo-escuro no lugar
+				// da sombra preta; o rótulo FÚRIA num vermelho um pouco mais escuro.
 				const int xm = xt + wt + S( 14 );
 				Milhar( iPreco, szPreco, sizeof( szPreco ) );
 				char szPrecoT[ 40 ];
 				V_snprintf( szPrecoT, sizeof( szPrecoT ), "/ %s", szPreco );
-				const int wTot = S( 8 ) + Larg( m_fText, szMil, 0.0f, true ) + S( 4 ) + Larg( m_fText, szPrecoT, 0.0f, true ) + S( 6 ) + Larg( m_fLabel, "FÚRIA", 1.6f ) + S( 8 );
-				Rect( xm, yTopo - S( 16 ), wTot, S( 21 ), A( Color( COR_FURIA_FUNDO.r(), COR_FURIA_FUNDO.g(), COR_FURIA_FUNDO.b(), 235 ) ) );
-				Rect( xm, yTopo - S( 16 ), S1( 2 ), S( 21 ), A( COR_FURIA ) );
-				const int wd = Texto( m_fText, xm + S( 8 ), yTopo, A( COR_FURIA_TEXTO ), szMil, AL_ESQ, 0.0f, true );
-				const int wp = Texto( m_fText, xm + S( 8 ) + wd + S( 4 ), yTopo, iDin >= iPreco ? A( COR_CINZA2 ) : A( Accent() ), szPrecoT, AL_ESQ, 0.0f, true );
-				Texto( m_fLabel, xm + S( 8 ) + wd + S( 4 ) + wp + S( 6 ), yTopo - S( 2 ), A( COR_FURIA ), "FÚRIA", AL_ESQ, 1.6f );
+				const int wd = TextoContorno( m_fTextNS, xm, yTopo, A( COR_FURIA ), A( COR_FURIA_FUNDO ), szMil, 0.0f, true );
+				const int wp = Texto( m_fText, xm + wd + S( 4 ), yTopo, iDin >= iPreco ? A( COR_CINZA3 ) : A( Accent() ), szPrecoT, AL_ESQ, 0.0f, true );
+				TextoContorno( m_fLabelNS, xm + wd + S( 4 ) + wp + S( 6 ), yTopo - S( 2 ), A( COR_FURIA_ROTULO ), A( COR_FURIA_FUNDO ), "FÚRIA", 1.6f, false );
 			}
 			yTopo -= S( 26 );
 		}

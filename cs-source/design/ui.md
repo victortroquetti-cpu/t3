@@ -14,7 +14,7 @@ Tela inicial, Jogar contra bots, Arsenal, Configurações, Carregando, HUD, Plac
 | Fundo | `#0B0D10`, painéis `#14171C` a ~80%, linhas brancas a 8% |
 | Texto | `#ECEEF1` / `#A3A9B1` / `#80868E` |
 | Destaque | `#F2B544` (âmbar), ConVar `trok_ui_destaque "R G B"` |
-| Times | azul `#5AA2FF`, vermelho `#FF5A5A`; infecção/zumbi vermelho-sangue `#D9362B`; Fúria `#CC2030` sobre roxo-escuro `#220A26` (decisões do dono; humano do Surto sempre azul) |
+| Times | azul `#5AA2FF`, vermelho `#FF5A5A`; infecção/zumbi vermelho-sangue `#D9362B`; Fúria `#CC2030` com contorno roxo-escuro `#220A26` (decisões do dono; humano do Surto sempre azul) |
 | Fontes | Barlow Condensed (títulos, botões) e Barlow (texto), SIL OFL, em `resource/fonts/` |
 | Escala | concept em 1280x720; o código escala tudo pela altura da tela (`S(px)`) |
 
@@ -79,11 +79,26 @@ Sem bússola (o dono preferiu; `trok_hud_bussola 1` ainda liga): a direção do 
 | Lista de abates | canto sup. dir., linhas de 24 | atacante · ícone da arma (48×18) · ícone de cabeça/infecção (16) · vítima; véu à direita, traço âmbar nas suas linhas; sem ícone, o texto/losango de antes |
 | Vida | canto inf. esq. | número 46 px; barra de 10 partes (220×5) com rastro vermelho do dano; fôlego em linha âmbar só quando gasto |
 | Colete | traço fino (2 px) por cima da barra de vida | número menor (22 px) na cor do colete logo à direita do número da vida ("100 50"), sem rótulo |
-| Acima da vida | | "$ 1.250" (economia, âmbar no tempo de compra; só se `trok_hud_dinheiro` estiver desligado, senão é o `hud_trok_economia.cpp`); Surto humano: "[N] STRIKER" e a plaquinha da Fúria "1.800 / 2.350 FÚRIA" (fundo roxo-escuro `#220A26`, filete e rótulo vermelho-sangue `#CC2030`, número `#E8414F` para ler no roxo; preço âmbar se não dá) |
+| Acima da vida | | "$ 1.250" (economia, âmbar no tempo de compra; só se `trok_hud_dinheiro` estiver desligado, senão é o `hud_trok_economia.cpp`); Surto humano: "[N] STRIKER" e a Fúria "1.800 / 2.350 FÚRIA" só em texto, sem caixa: valor vermelho-sangue `#CC2030` com contorno fino roxo-escuro `#220A26` no lugar da sombra preta, rótulo FÚRIA `#A81A28` com o mesmo contorno; preço cinza (âmbar se não dá) |
 | Zumbi | | tipo do zumbi ao lado do número, barra vermelho-sangue, brilho curto correndo na barra enquanto regenera (sem texto) |
 | Arma | canto inf. dir. | ícone (48×18) · NOME · modo de tiro em texto pequeno; pente 46 px / reserva 22 px; uma marca por bala (pentes até 40); explosivos com ícone e número à esquerda; garras: ícone + "GARRAS" |
 | Corrida | acima da arma | "14/20" + escada (degrau atual âmbar e mais alto) e "› ESCOPETA" pequeno (próxima); ao subir, "DEGRAU 15 · ESCOPETA" sob a mira |
 | Centro | | mira com contorno (abre com a dispersão), X de acerto (abate vermelho e 35% maior, cabeça âmbar), cunha de dano em 3 faixas (raio 118), granada perto (anel 78, ícone, seta, metros; sem pulsar), eventos à direita (x +44, y +30: ABATE +$300 nome, NA CABEÇA, ZUMBI ABATIDO, INFECTOU +1), "[R] RECARREGAR" / "SEM MUNIÇÃO" (y +74, fixo), "PROTEGIDO" com barra, "[E] PEGAR FUZIL" (62% da altura) |
+
+### Tela de infectado (Surto, você zumbi)
+
+Enquanto o jogador local é zumbi, o HUD desenha **uma textura** por cima da tela inteira, todo quadro,
+branco × textura com alfa normal, antes da mira e de todo o resto do HUD, sem pulsar nem esmaecer
+(como o `InfectedTex` do Quarantine do CA: Chimera `design/chimera/specs/combat_arms/game_modes.md`, item 3
+"The screen effect"). Nada é desenhado por código: sem o material, não aparece nada.
+- Cvars: `trok_hud_infectado 1` e `trok_hud_infectado_textura "vgui/trok/surto_infectado"`.
+- **Por enquanto, a textura do CA (só no PC do dono, provisório pessoal):** vem do layout do HUD do CA,
+  registro `HUDLayout0`, campo `InfectedTex` (posição `InfectedPos`, tamanho `InfectedSize` 1024×768 =
+  tela inteira), de um `.rez` aberto do CA instalado. Converter para VTF (com alfa) e pôr em
+  `game/mod_trok/custom/ca_local/materials/vgui/trok/surto_infectado.vtf` + `.vmt` (fora do git e do zip,
+  regra 2 do `CLAUDE.md`). VMT:
+  `"UnlitGeneric" { "$basetexture" "vgui/trok/surto_infectado" "$translucent" 1 "$vertexalpha" 1 "$vertexcolor" 1 "$ignorez" 1 }`
+- Depois: trocar por arte própria com o mesmo nome em `game/mod_trok/materials/vgui/trok/`.
 
 ### Ícones (para o local fazer)
 

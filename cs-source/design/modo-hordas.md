@@ -5,6 +5,9 @@ na Equipe Armada (Fireteam) do CA. Pense na economia, armas auxiliares como torr
 sistema de upgrade de armas e loja em um lugar físico — não é só apertar B, tem que andar pelo mapa.
 O upgrade é igual àquela máquina do CoD (Pack-a-Punch), se não me engano tem 5 níveis."
 E depois: estudar os Zombies de todos os CoDs e montar o **nosso**, com o melhor de cada um.
+Correção do dono: **sem portas pagas** ("só tira as portas pagas e foca nessas armas: torreta,
+claymore, minas etc."). O mapa não se abre por pontos; o dinheiro vai para armas, melhoria e
+**armas de defesa** (seção 8A).
 
 Nome provisório: **Hordas**. Tudo o que é número está em `cfg/hordas.cfg`, `scripts/trok_hordas.txt`
 e `scripts/trok_upgrade.txt` (regra 4 do dono). Marcas: **PROPOSTA** = número nosso, ajustar jogando;
@@ -16,14 +19,16 @@ e `scripts/trok_upgrade.txt` (regra 4 do dono). Marcas: **PROPOSTA** = número n
 
 1. **Sobreviver em equipe, rodada após rodada.** A graça é a curva: começa calmo (andadores, pistola) e
    termina em pânico (corredores, tipos especiais, chefe). Não há vitória: há "até onde vocês foram".
-2. **O mapa é a loja.** Tudo se compra andando até um lugar e apertando E: arma na parede, porta,
-   máquina de melhoria, caixa, bancada. Isso cria rotas, risco e decisões ("abro a porta ou guardo
-   para a máquina?").
-3. **Pontos = desempenho.** Ganha quem atira (acerto), mata (abate, cabeça, faca) e defende
+2. **O mapa é a loja.** Tudo se compra andando até um lugar e apertando E: arma na parede,
+   máquina de melhoria, caixa, bancada de defesas. Isso cria rotas, risco e decisões ("ponho mais
+   uma torreta ou guardo para o MK III?").
+3. **Defender o lugar com equipamento.** Torreta, claymore, mina e carga remota são o "plano" do
+   time: onde pôr, quando repor, quem melhora as defesas. É a parte "Equipe Armada" do modo.
+4. **Pontos = desempenho.** Ganha quem atira (acerto), mata (abate, cabeça, faca) e defende
    (tábuas). Gasta-se no mapa. Uma moeda só, simples de ler.
-4. **Humano não tem poderes** (regra do dono). Nada de perks mágicos, gomas ou habilidades. O que o
+5. **Humano não tem poderes** (regra do dono). Nada de perks mágicos, gomas ou habilidades. O que o
    CoD dá como perk, aqui é **equipamento** (colete, kit) ou fica para o dono decidir.
-5. **Visual sóbrio militar.** Nomes de bônus e níveis militares ("Reabastecimento", "MK III"), sem
+6. **Visual sóbrio militar.** Nomes de bônus e níveis militares ("Reabastecimento", "MK III"), sem
    neon. A melhoria é "munição e ajuste de armeiro", não magia.
 
 ---
@@ -56,8 +61,8 @@ níveis da máquina. O nosso junta as duas ideias numa escada só, **5 níveis n
 | Do jogo | O que entra | Por quê |
 |---|---|---|
 | WaW / BO1 | curva clássica de vida e quantidade; pontos por acerto/abate/cabeça/faca; tábuas nas janelas | é a curva que todo mundo conhece e funciona; tábuas dão o que fazer entre as ondas |
-| BO1 | caixa misteriosa (950), portas pagas, energia que liga a máquina, rodada dos "cães" | rota e decisão pelo mapa; rodada especial quebra a rotina |
-| BO2 | equipamento montável (torreta) | é equipamento, não poder; cabe no CA (a torreta do CA já existe) |
+| BO1 | caixa misteriosa (950), energia que liga a máquina, rodada dos "cães" | rota e decisão pelo mapa; rodada especial quebra a rotina |
+| BO2 / Cold War | **armas de defesa** postas no chão (torreta, armadilhas) compradas numa bancada | é equipamento, não poder; a torreta, a claymore, a mina e a remota do CA já existem no mod |
 | BO3 / BO4 | munição especial nos níveis altos; repetir a máquina (vários níveis) | dá motivo para guardar pontos até o fim; nível alto "muda" a arma |
 | BO4 | 3 dificuldades | o CA (Equipe Armada) também tem 3 |
 | Cold War / BO6 | bancada (colete, kit de autorreanimação, granadas); nível visível da arma (cor) | troca os perks por equipamento, respeitando "humano sem poder" |
@@ -65,6 +70,9 @@ níveis da máquina. O nosso junta as duas ideias numa escada só, **5 níveis n
 
 ### O que fica de fora (por agora)
 
+- **Portas pagas e áreas que se abrem por pontos** (decisão do dono). A entidade
+  `func_trok_porta_paga` continua no código e no FGD como opcional, mas não entra no desenho nem no
+  mapa de teste; a progressão vem da energia, da máquina e das defesas.
 - **Perks, gomas, elixires, talismãs, altares, melhorias de campo** (habilidades): quebram a regra
   "humano não tem poderes". Ver seção 9 para os substitutos (DECISÃO DO DONO).
 - **Segunda moeda (sucata / salvage)** e raridade separada: complica a leitura; nosso nível da máquina
@@ -83,16 +91,16 @@ níveis da máquina. O nosso junta as duas ideias numa escada só, **5 níveis n
 ESPERA (sem ninguém) -> PREPARO 15 s -> RODADA 1 -> INTERVALO 10 s -> RODADA 2 -> ... -> FIM DE JOGO
 ```
 
-1. **Preparo:** todos nascem na área 1 com pistola, faca e granadas, e **500 pontos**.
-2. **Rodada:** o diretor faz nascer os zumbis da rodada aos poucos, nos nascedouros das áreas abertas,
+1. **Preparo:** todos nascem na sala inicial com pistola, faca e granadas, e **500 pontos**.
+2. **Rodada:** o diretor faz nascer os zumbis da rodada aos poucos, nos nascedouros do mapa,
    perto dos jogadores, nunca colado em ninguém. No máximo N vivos ao mesmo tempo; morreu um, nasce
    outro, até acabar o total da rodada.
 3. **Durante a rodada:** atirar dá pontos; zumbis quebram as tábuas das janelas; humanos consertam
    (E) entre um zumbi e outro; bônus caem de vez em quando.
-4. **Fim da rodada:** o último zumbi morre. Intervalo de 10 s: hora de comprar, abrir porta, melhorar
-   a arma, consertar tábuas. Quem morreu volta no começo da próxima rodada (com a pistola).
+4. **Fim da rodada:** o último zumbi morre. Intervalo de 10 s: hora de comprar, repor e reposicionar
+   as defesas (torreta, claymores, minas), melhorar a arma, consertar tábuas. Quem morreu volta no começo da próxima rodada (com a pistola).
 5. **Fim de jogo:** ninguém de pé (todos derrubados ou mortos). Mostra "FIM DE JOGO — RODADA N" e o
-   recorde do mapa; 12 s depois o mapa recomeça (portas fechadas, pontos de volta a 500).
+   recorde do mapa; 12 s depois o mapa recomeça (barricadas inteiras, defesas somem, pontos de volta a 500).
 
 ---
 
@@ -208,18 +216,21 @@ Os pontos vão em rede no estado do modo (`trok_hordas_estado`, um número por j
 | Escopeta | 1200 (munição 600) | parede |
 | Fuzil | 1500 (munição 750) | parede |
 | Munição de arma melhorada | 4500 | a mesma parede |
-| Porta / entulho | 750 a 1500 | `func_trok_porta_paga` |
 | Caixa misteriosa | 950 (10 com Caixa barata) | `func_trok_caixa_misteriosa` |
 | Colete (100 de armadura) | 1500 | `func_trok_bancada` |
-| Torreta | 2000 | bancada |
-| Claymore / granadas | 1000 / 250 (PROPOSTA) | bancada |
+| Torreta | 1500 (repor 1500) | bancada (seção 8A) |
+| Claymore | 1000 (repor as 2: 750) | bancada |
+| Mina | 750 (repor as 3: 500) | bancada |
+| Carga remota | 1000 (repor as 2: 750) | bancada |
+| Granadas (até 4) | 400 a reposição | bancada |
+| Nível de defesa I / II / III | 4000 / 9000 / 16000 | máquina, com uma arma de defesa na mão |
 | Kit de reanimação | 2500 | bancada (DECISÃO DO DONO, seção 9) |
 | Melhoria MK I → MK V | 5000 / 10000 / 15000 / 20000 / 30000 | `func_trok_maquina_upgrade` |
 
 **Ritmo esperado (solo, estimativa grosseira):** ~9 mil pontos até a rodada 5, ~37 mil até a 10,
 ~95 mil até a 15 e ~190 mil até a 20 (os acertos rendem mais quando a vida sobe). Uma arma MK V
 custa 80 mil no total: dá para fechar **uma** arma no máximo por volta da rodada 15 sozinho, menos
-portas, caixa e munição. Em 4 jogadores cada um ganha menos por zumbi, mas há mais zumbis. **MEDIR**
+caixa, munição e defesas. Em 4 jogadores cada um ganha menos por zumbi, mas há mais zumbis. **MEDIR**
 jogando e ajustar preços antes de mexer nas curvas.
 
 ---
@@ -244,6 +255,10 @@ classe zera). Números em `scripts/trok_upgrade.txt`.
   modelo de mundo e de primeira pessoa (5 camuflagens próprias, sóbrias).
 - Comparando: CoD clássico = 1 nível; BO4 = 1 + 4 repetições (+25% cada); CW/BO6 = 3 níveis + 5
   raridades. O nosso: 5 degraus visíveis, uma moeda, um lugar.
+- **Nível de defesa (I a III):** com uma arma de defesa na mão (torreta, claymore, mina, remota) a
+  mesma máquina sobe o nível de defesa **do jogador**: x1,75 / x3 / x5 no dano de tudo o que ele põe no
+  chão (bloco `defesa` do `trok_upgrade.txt`). Vale para o jogador, não para a arma (as armas de defesa
+  acabam e se compram de novo), e zera quando ele morre.
 - Futuro (DECISÃO DO DONO): escolher a munição especial no MK III em vez de ser fixa; tempo de
   espera na máquina (o CoD leva ~3 s e a arma fica na máquina).
 
@@ -258,18 +273,41 @@ vermelho se faltam pontos. Saídas `OnUsada` e `OnSemPontos`; entradas `Ligar`/`
 | Entidade | Faz | Chaves |
 |---|---|---|
 | `func_trok_compra_parede` | compra a arma (troca a da mesma classe) ou, tendo, compra munição | `arma`, `preco`, `preco_municao` |
-| `func_trok_porta_paga` | some ao pagar e abre a **área** (liga os nascedouros dela); portas da mesma área abrem juntas | `preco`, `area` |
+| `func_trok_porta_paga` | OPCIONAL, fora do desenho padrão (o dono não quer portas pagas): some ao pagar e liga os nascedouros de uma área | `preco`, `area` |
 | `func_trok_maquina_upgrade` | sobe a arma da mão um nível | `precisa_energia` (padrão 1) |
 | `func_trok_caixa_misteriosa` | paga, gira 4 s, oferece arma sorteada por 10 s só a quem pagou | `preco` (0 = 950) |
-| `func_trok_bancada` | um item: `colete`, `kit_reanimacao` ou uma arma (`weapon_trok_torreta`, `_claymore`, `_granada`...) | `item`, `preco` |
+| `func_trok_bancada` | um item: arma de defesa (`weapon_trok_torreta`, `_claymore`, `_mina`, `_remota`), `weapon_trok_granada`, `colete` ou `kit_reanimacao`; tendo a arma, repõe até o máximo | `item`, `preco`, `preco_municao` |
 | `func_trok_energia` | liga a energia (uma vez) | — |
 | `func_trok_grade` (do Surto) | **barricada de tábuas**: começa fechada, zumbis quebram, E conserta 1 tábua (+10) | `vida`, `tabuas` (6), `inicio_fechada 1` |
-| `info_trok_hordas_spawn` | nascedouro de zumbi | `area`, `chefe` |
+| `info_trok_hordas_spawn` | nascedouro de zumbi (padrão: sempre ativo) | `area` (0), `chefe` |
 | `trok_hordas_logica` | saídas OnRodadaInicio/Fim, OnEnergia, OnChefe, OnFimDeJogo, OnArea; entradas AbrirArea, LigarEnergia | — |
 
-**Torreta posicionável:** é a `weapon_trok_torreta` da outra frente (explosivos do CA): compra na
-bancada ou sai na caixa, arremessa, ela pousa e atira sozinha nos zumbis (inimigos do dono). Claymore e
-mina idem. São "armas auxiliares" do pedido do dono, sem poder nenhum.
+---
+
+## 8A. Armas de defesa (o foco pedido pelo dono)
+
+São as armas do CA que já existem no mod (`weapon_trok_explosivo` + `trok_projetil`, frente dos
+explosivos): arremessa ou planta, o objeto fica no chão e age sozinho contra os zumbis (são inimigos
+do dono). No Hordas elas se compram e se repõem na **bancada** (`func_trok_bancada`, uma por item),
+também saem na caixa misteriosa, e o **Reabastecimento** enche todas.
+
+| Arma | Faz (números do CA, `scripts/weapon_trok_*.txt`) | Preço / repor | Carrega (`trok_max_*`) | Postas ao mesmo tempo (`trok_hordas_limite_*`) | Papel |
+|---|---|---|---|---|---|
+| Torreta | pousa, arma em segundos e atira sozinha até acabar as balas (100); toma 3x de explosão | 1500 / 1500 | 1 | 2 (fora do Hordas: 1, regra do CA) | segura uma janela sozinha por um tempo |
+| Claymore | plantada, explode em cone quando o zumbi passa (ou no detonador) | 1000 / 750 | 2 | 4 | fecha corredor; ótima contra Striker |
+| Mina | arremessada, gruda no chão, zumbi encosta e explode | 750 / 500 | 3 | 6 | campo minado na frente da janela |
+| Carga remota | arremessada, explode no botão 2 | 1000 / 750 | 2 | 4 | "botão do pânico" quando a janela cai; contra o Crusher |
+| Granada | a M67 do CA | 400 a reposição | 4 (CoD: 4) | — | +2 por rodada de graça |
+
+- **Limite:** passou do limite de postas, a mais velha some (o mesmo jeito da torreta do CA).
+- **Nível de defesa I–III** na máquina (seção 7): x dano de tudo o que o jogador põe.
+- **Contra os tipos:** o Charger explode e leva as minas junto (cuidado onde ele morre); o Striker é
+  rápido demais para a torreta sozinha (claymore resolve); o Crusher aguenta muito: remota.
+- **Pontos:** abate de torreta, claymore e mina conta como do dono (mesmos pontos).
+- Comandos: `trok_hordas_defesas` lista as postas e o nível de cada um.
+- Para o local/dono (não feito): zumbi que **ataca a torreta** que o bloqueia (hoje bate só por acaso),
+  torreta com mais balas só no Hordas, mostrar no HUD as defesas postas e as balas da torreta,
+  arame farpado/saco de areia (seriam entidades novas).
 
 Fora do código ainda (o local faz): **caixa que muda de lugar** depois de N usos (o "ursinho"), modelo
 da arma girando em cima da caixa, animação/tempo da máquina, prop bonito para cada estação.
@@ -329,21 +367,25 @@ JOGAR hoje usa `bots por time x 2 + 2`; o local ajusta para o Hordas).
 
 ---
 
-## 12. Progressão do mapa
+## 12. Progressão do mapa (sem portas pagas)
 
-- O mapa é dividido em **áreas** (1 = início). Portas pagas abrem áreas; os nascedouros só valem nas
-  áreas abertas (o CoD faz isso por zonas). Portas com a mesma área abrem juntas (dois lados).
-- A **energia** fica numa área mais funda (cara de chegar); liga a máquina de melhoria (e o que o mapa
-  marcar com `precisa_energia`).
-- Desenho sugerido (o "mapa de CoD" de 3 a 5 áreas): área 1 com pistola/submetralhadora na parede e
-  a caixa; área 2 com escopeta e bancada de colete; área 3 com fuzil e energia; máquina numa área com
-  pouco espaço (risco ao melhorar). Portas 750 → 1000 → 1250 → 1500.
-- **Janelas com tábuas** em todas as áreas, nascedouros atrás delas. Medidas do CA em
+- **Sem portas pagas** (decisão do dono): o mapa é aberto desde a rodada 1. A progressão vem de
+  **comprar e melhorar** (arma na parede → caixa → máquina) e de **montar as defesas**.
+- A **energia** fica longe do começo (cara de chegar, perto de uma janela perigosa); liga a máquina
+  de melhoria (e o que o mapa marcar com `precisa_energia`, como o kit de reanimação).
+- Desenho sugerido: 2 ou 3 salas ligadas por passagens livres; sala 1 com pistola/submetralhadora
+  na parede e a caixa; sala 2 com escopeta, fuzil e a fileira de bancadas das defesas; energia e
+  máquina num canto com pouco espaço (risco ao melhorar). Um ou dois "pontos fortes" com poucas
+  entradas, bons para montar torretas e claymores.
+- **Janelas com tábuas** nas salas, nascedouros atrás delas. Medidas do CA em
   `design/medidas-mapas.md` (porta 64 x 128; corpo 100; janela de 128 x 128 para zumbi passar).
+- Áreas de nascedouro continuam possíveis pelo mapa (entrada `AbrirArea` do `trok_hordas_logica`),
+  para eventos de mapa, mas não por pontos.
 - **Mapa de teste:** `tools/mapas/gerar_hordas_teste.py` gera `game/mod_trok/mapsrc/trok_hordas_teste.vmf`
-  (2 áreas, porta 750, 3 paredes, caixa, energia, máquina, 3 bancadas, 2 janelas com barricada, 7
-  nascedouros). Compilar com o MCP `trok` (`mapa_compilar`). **Nav:** antes de `nav_generate`, abrir
-  tudo: `ent_fire func_trok_grade Abrir; ent_fire func_trok_porta_paga Abrir; nav_generate`.
+  (2 salas ligadas por passagem livre, 3 paredes de arma, caixa, energia, máquina, 7 bancadas: torreta,
+  claymore, mina, remota, granada, colete, kit; 2 janelas com barricada; 7 nascedouros). Compilar com
+  o MCP `trok` (`mapa_compilar`). **Nav:** antes de `nav_generate`, abrir as barricadas:
+  `ent_fire func_trok_grade Abrir; nav_generate`.
 - Mapas do CS:S também rodam (sem estações): os zumbis nascem nos pontos de nascimento do mapa,
   longe dos jogadores. Serve para testar a curva e os bots.
 
@@ -433,9 +475,12 @@ jogo rodando, mapa compilando, bots andando.
 1. Compilar, abrir com `trok_modo hordas`, `maxplayers 32`, `map de_dust2`: rodadas, bots nascendo
    longe e reaproveitados, HUD, pontos, fim de jogo e recomeço. Ver no console avisos de som/modelo.
 2. Compilar `mapsrc/trok_hordas_teste.vmf` (MCP `mapa_compilar`), gerar o nav com tudo aberto, e
-   testar cada estação: parede (comprar/munição), porta (área 2 liga os nascedouros), energia,
-   máquina MK I→V (pente, cor, efeitos), caixa (giro, oferta, só o dono pega), bancadas (colete, kit,
-   torreta), barricada (zumbi quebra, E conserta, +10, teto 500).
+   testar cada estação: parede (comprar/munição), energia, máquina MK I→V (pente, cor, efeitos) e
+   nível de defesa I→III, caixa (giro, oferta, só o dono pega), bancadas (comprar, repor, "cheio",
+   colete, kit), barricada (zumbi quebra, E conserta, +10, teto 500).
+2b. Armas de defesa: torreta matando zumbi e dando pontos ao dono, limite de 2 (a terceira some a
+   mais velha), claymore/mina/remota no cone e no raio, nível de defesa multiplicando o dano,
+   Reabastecimento enchendo, zumbi bot preso em torreta (se precisar, gancho no cérebro do zumbi).
 3. Conferir que o `E` do motor acha as estações (`sv_debug_player_use 1`) e que o aviso do HUD bate.
 4. Derrubado: zumbis ignorando, rastejar, reviver segurando E, sangrar, kit, fim de jogo com todos
    caídos. Ver se a troca de arma derrubado precisa ser travada.
@@ -460,6 +505,8 @@ jogo rodando, mapa compilando, bots andando.
 5. Nomes: "Hordas", "Matilha", "Colosso", "MK I..V" e os nomes dos bônus.
 6. Ter **exfiltração**/vitória (sair vivo numa rodada X) ou só sobreviver o máximo?
 7. Armadilhas pagas (choque/fogo do mapa) e caixa que muda de lugar: fazer?
+8. Armas de defesa: preços e limites da seção 8A; torreta com mais balas no Hordas; arame farpado e
+   saco de areia como itens novos?
 
 ---
 
