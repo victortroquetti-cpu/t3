@@ -19,15 +19,17 @@
 
 ConVar trok_zumbis_tipos( "trok_zumbis_tipos", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
 	"Surto: jogadores escolhem o tipo de zumbi (trok_zumbi_classe). 0 = todos normais." );
-// Dinheiro de infectado. Conta de equilíbrio (design/modo-surto.md, "Tipos de zumbi"): numa partida
+// Fúria (a moeda do infectado; decisão do dono). Conta de equilíbrio (design/modo-surto.md, "Tipos de zumbi"): numa partida
 // de 7 rodadas, um infectado médio junta ~3000–4000 e um bom passa de 6000; o tipo mais caro
 // (Crusher, 3500) sai uma ou duas vezes por partida para quem joga bem.
-ConVar trok_surto_inf_infectar( "trok_surto_inf_infectar", "250", FCVAR_NOTIFY, "Dinheiro de infectado por humano infectado." );
-ConVar trok_surto_inf_dano( "trok_surto_inf_dano", "0.5", FCVAR_NOTIFY, "Dinheiro de infectado por ponto de dano em humano que não infecta (explosão, nuvem, aura)." );
-ConVar trok_surto_inf_vitoria( "trok_surto_inf_vitoria", "400", FCVAR_NOTIFY, "Dinheiro de infectado para cada zumbi quando os zumbis vencem a rodada." );
-ConVar trok_surto_inf_derrota( "trok_surto_inf_derrota", "150", FCVAR_NOTIFY, "Dinheiro de infectado para cada zumbi quando os humanos vencem a rodada." );
-ConVar trok_surto_inf_inicial( "trok_surto_inf_inicial", "0", FCVAR_NOTIFY, "Dinheiro de infectado no começo do mapa." );
-ConVar trok_surto_inf_max( "trok_surto_inf_max", "10000", FCVAR_NOTIFY, "Teto do dinheiro de infectado." );
+ConVar trok_surto_inf_infectar( "trok_surto_inf_infectar", "250", FCVAR_NOTIFY, "Fúria (moeda do infectado) por humano infectado." );
+ConVar trok_surto_inf_dano( "trok_surto_inf_dano", "0.5", FCVAR_NOTIFY, "Fúria por ponto de dano em humano que não infecta (explosão, nuvem, aura)." );
+ConVar trok_surto_inf_vitoria( "trok_surto_inf_vitoria", "400", FCVAR_NOTIFY, "Fúria para cada zumbi quando os zumbis vencem a rodada." );
+ConVar trok_surto_inf_derrota( "trok_surto_inf_derrota", "150", FCVAR_NOTIFY, "Fúria para cada zumbi quando os humanos vencem a rodada." );
+ConVar trok_surto_inf_inicial( "trok_surto_inf_inicial", "0", FCVAR_NOTIFY, "Fúria no começo do mapa." );
+ConVar trok_surto_inf_max( "trok_surto_inf_max", "10000", FCVAR_NOTIFY, "Teto da Fúria." );
+ConVar trok_zumbis_gas_letal( "trok_zumbis_gas_letal", "0", FCVAR_NOTIFY,
+	"0 = gás (nuvem tóxica e aura) só fere e nunca mata, como no CA; 1 = pode matar (quem morre assim sai da rodada)." );
 ConVar trok_zumbis_arquivo( "trok_zumbis_arquivo", "scripts/trok_zumbis.txt", FCVAR_REPLICATED,
 	"Arquivo com os tipos de zumbi." );
 
@@ -217,6 +219,19 @@ static unsigned int s_aLiberado[ MAX_PLAYERS + 1 ];
 static float s_aProxBomba[ MAX_PLAYERS + 1 ];
 static float s_flProxAura = 0.0f;
 
+// Dano de gás: no CA só fere (não mata na hora); morte por gás não infectaria mesmo.
+static void TrokZumbis_DanoGas( CBasePlayer *pVitima, CBaseEntity *pInflictor, CBaseEntity *pAtacante, float flDano )
+{
+	if ( !pVitima || flDano <= 0.0f )
+		return;
+	if ( !trok_zumbis_gas_letal.GetBool() )
+		flDano = MIN( flDano, (float)( pVitima->GetHealth() - 1 ) );
+	if ( flDano < 1.0f )
+		return;
+	CTakeDamageInfo info( pInflictor, pAtacante, flDano, DMG_NERVEGAS );
+	pVitima->TakeDamage( info );
+}
+
 static void TrokZumbis_Lento( CBasePlayer *pPlayer, float flFator, float flTempo )
 {
 	CTrokSurtoEstado *pEstado = TrokSurto_Estado();
@@ -291,7 +306,7 @@ bool TrokZumbis_ClientCommand( CBasePlayer *pPlayer, const CCommand &args )
 			const TrokZumbiClasse_t &c = TrokZumbis_Classe( i );
 			if ( c.bJogavel || i == 0 )
 				ClientPrint( pPlayer, HUD_PRINTCONSOLE, UTIL_VarArgs( "  %s (%s) - %d%s\n", c.szNome, c.szTitulo, c.iPreco, TrokZumbis_Permitido( pPlayer, i ) ? "" : " - bloqueado" ) );
-		ClientPrint( pPlayer, HUD_PRINTCONSOLE, UTIL_VarArgs( "Seu dinheiro de infectado: %d\n", TrokZumbis_Dinheiro( pPlayer ) ) );
+		ClientPrint( pPlayer, HUD_PRINTCONSOLE, UTIL_VarArgs( "Sua Fúria: %d\n", TrokZumbis_Dinheiro( pPlayer ) ) );
 		}
 		return true;
 	}
@@ -304,7 +319,7 @@ bool TrokZumbis_ClientCommand( CBasePlayer *pPlayer, const CCommand &args )
 	pEstado->m_aEscolhaZumbi.Set( pPlayer->entindex(), i );
 	const TrokZumbiClasse_t &c = TrokZumbis_Classe( i );
 	if ( c.iPreco > 0 && !TrokZumbis_Gratis( pPlayer, i ) )
-		ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Quando virar zumbi: %s (%d de %d)", c.szTitulo, c.iPreco, TrokZumbis_Dinheiro( pPlayer ) ) );
+		ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Quando virar zumbi: %s (%d de %d de Fúria)", c.szTitulo, c.iPreco, TrokZumbis_Dinheiro( pPlayer ) ) );
 	else
 		ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Quando virar zumbi: %s", c.szTitulo ) );
 	return true;
@@ -327,7 +342,7 @@ int TrokZumbis_AoVirar( CBasePlayer *pPlayer )
 			pEstado->m_aDinheiroInf.Set( i, pEstado->m_aDinheiroInf[ i ] - iPreco );
 		else
 		{
-			ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Dinheiro de infectado insuficiente para %s (%d de %d)",
+			ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Fúria insuficiente para %s (%d de %d)",
 				TrokZumbis_Classe( iClasse ).szTitulo, (int)pEstado->m_aDinheiroInf[ i ], iPreco ) );
 			iClasse = 0;
 		}
@@ -432,8 +447,7 @@ public:
 				continue;
 			if ( ( p->WorldSpaceCenter() - GetAbsOrigin() ).LengthSqr() > m_flRaio * m_flRaio )
 				continue;
-			CTakeDamageInfo info( this, GetOwnerEntity() ? GetOwnerEntity() : this, m_flDps * flPasso, DMG_NERVEGAS );
-			p->TakeDamage( info );
+			TrokZumbis_DanoGas( p, this, GetOwnerEntity() ? GetOwnerEntity() : this, m_flDps * flPasso );
 			TrokZumbis_Lento( p, m_flLentidao, 0.5f );
 		}
 		SetNextThink( gpGlobals->curtime + flPasso );
@@ -517,8 +531,7 @@ void TrokZumbis_Think( void )
 					continue;
 				if ( ( p->WorldSpaceCenter() - pPlayer->WorldSpaceCenter() ).LengthSqr() > c.flAuraRaio * c.flAuraRaio )
 					continue;
-				CTakeDamageInfo info( pPlayer, pPlayer, c.flAuraDps * 0.5f, DMG_NERVEGAS );
-				p->TakeDamage( info );
+				TrokZumbis_DanoGas( p, pPlayer, pPlayer, c.flAuraDps * 0.5f );
 			}
 		}
 

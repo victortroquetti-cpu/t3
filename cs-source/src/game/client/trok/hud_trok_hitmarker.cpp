@@ -12,6 +12,7 @@
 #include "hud.h"
 #include "hudelement.h"
 #include "iclientmode.h"
+#include "trok/hud_trok_v2.h"
 #include <vgui/ISurface.h>
 #include <vgui_controls/Panel.h>
 
@@ -84,7 +85,8 @@ void CHudTrokHitmarker::ApplySchemeSettings( IScheme *pScheme )
 
 bool CHudTrokHitmarker::ShouldDraw( void )
 {
-	return trok_hitmarker.GetBool() && gpGlobals->curtime < m_flShowUntil && CHudElement::ShouldDraw();
+	// Com o HUD novo o desenho é dele (hud_trok_v2.cpp); aqui fica só o som.
+	return trok_hitmarker.GetBool() && !TrokHudV2_Ativo() && gpGlobals->curtime < m_flShowUntil && CHudElement::ShouldDraw();
 }
 
 void CHudTrokHitmarker::FireGameEvent( IGameEvent *event )

@@ -80,6 +80,8 @@ bool TrokHudV2_Ativo( void )
 	return trok_hud_estilo.GetInt() >= 2;
 }
 
+static bool OutroElementoLigado( const char *pszCvar );
+
 class CHudTrokV2;
 static CHudTrokV2 *s_pHudV2 = NULL;
 
@@ -801,7 +803,7 @@ void CHudTrokV2::OnThink( void )
 
 	// Créditos ganhos: vão no último evento (ou num novo).
 	CTrokPlacarExtra *pExtra = TrokPlacarExtra();
-	if ( pExtra && pExtra->IsEconomia() )
+	if ( pExtra && pExtra->IsEconomia() && !OutroElementoLigado( "trok_hud_dinheiro" ) )
 	{
 		const int iDin = pExtra->GetDinheiro( iLocal );
 		if ( m_iDinheiroAnt >= 0 && iDin > m_iDinheiroAnt && trok_hud_eventos.GetBool() )
@@ -1125,6 +1127,15 @@ static void TempoMapa( char *psz, int iSize )
 		const int iSec = (int)flLeft;
 		V_snprintf( psz, iSize, "%02d:%02d", iSec / 60, iSec % 60 );
 	}
+}
+
+// Outros elementos que já mostram a mesma coisa (outras sessões): o HUD novo não repete.
+// hud_trok_economia.cpp (trok_hud_dinheiro): dinheiro, +$/-$ e tempo de compra.
+// hud_trok_corrida.cpp (trok_corrida_hud): arma atual, próxima e avisos da Corrida.
+static bool OutroElementoLigado( const char *pszCvar )
+{
+	ConVarRef ref( pszCvar );
+	return ref.IsValid() && ref.GetBool();
 }
 
 static int LimiteAbates( void )
@@ -1500,12 +1511,28 @@ void CHudTrokV2::PaintVitais( C_BasePlayer *pLocal )
 			CaixaAlta( TrokZumbis_Classe( iEsc ).szTitulo, szTipo, sizeof( szTipo ) );
 			const int wk = Tecla( x, yTopo - S( 15 ), szTecla, A( COR_CINZA2 ) );
 			const int wl = Texto( m_fLabel, x + wk + S( 8 ), yTopo - S( 2 ), A( COR_CINZA3 ), "ZUMBI:", AL_ESQ, 1.6f );
-			Texto( m_fLabel, x + wk + S( 8 ) + wl + S( 6 ), yTopo - S( 2 ), A( COR_ZUMBI ), szTipo, AL_ESQ, 1.6f );
+			const int xt = x + wk + S( 8 ) + wl + S( 6 );
+			const int wt = Texto( m_fLabel, xt, yTopo - S( 2 ), A( COR_ZUMBI ), szTipo, AL_ESQ, 1.6f );
+			// Fúria (o dinheiro de infectado, a outra moeda do Surto) / preço do tipo escolhido: a fúria
+			// sempre verde; o preço em vermelho quando não dá para pagar.
+			const int iPreco = TrokZumbis_Classe( iEsc ).iPreco;
+			if ( iPreco > 0 )
+			{
+				const int iDin = TrokZumbis_Dinheiro( pLocal );
+				char szMil[ 24 ], szPreco[ 32 ];
+				Milhar( iDin, szMil, sizeof( szMil ) );
+				const int xm = xt + wt + S( 14 );
+				const int wd = Texto( m_fText, xm, yTopo, A( COR_ZUMBI ), szMil, AL_ESQ, 0.0f, true );
+				Milhar( iPreco, szMil, sizeof( szMil ) );
+				V_snprintf( szPreco, sizeof( szPreco ), "/ %s", szMil );
+				const int wp = Texto( m_fText, xm + wd + S( 4 ), yTopo, iDin >= iPreco ? A( COR_CINZA3 ) : A( COR_INIMIGO, 0.85f ), szPreco, AL_ESQ, 0.0f, true );
+				Texto( m_fLabel, xm + wd + S( 4 ) + wp + S( 6 ), yTopo - S( 2 ), A( COR_ZUMBI, 0.8f ), "FÚRIA", AL_ESQ, 1.6f );
+			}
 			yTopo -= S( 26 );
 		}
 	}
 	CTrokPlacarExtra *pExtra = TrokPlacarExtra();
-	if ( pExtra && pExtra->IsEconomia() && !m_bMin && !bZumbi )
+	if ( pExtra && pExtra->IsEconomia() && !m_bMin && !bZumbi && !OutroElementoLigado( "trok_hud_dinheiro" ) )
 	{
 		char szMil[ 24 ];
 		Milhar( pExtra->GetDinheiro( pLocal->entindex() ), szMil, sizeof( szMil ) );
@@ -1666,8 +1693,9 @@ void CHudTrokV2::PaintDegraus( C_BasePlayer *pLocal )
 	}
 
 	// próxima arma e quantos abates faltam
+	const bool bOutro = OutroElementoLigado( "trok_corrida_hud" );
 	const TrokCorridaEscada_t *pEsc = TrokCorrida_Escada( pC->GetMeta() );
-	if ( pEsc && iDeg < pEsc->nDegraus )
+	if ( pEsc && iDeg < pEsc->nDegraus && !bOutro )
 	{
 		char szNome[ 48 ];
 		CaixaAlta( pEsc->degraus[ iDeg ].szNome, szNome, sizeof( szNome ) );
@@ -1679,7 +1707,7 @@ void CHudTrokV2::PaintDegraus( C_BasePlayer *pLocal )
 
 	// subiu de degrau: linha âmbar sob a mira
 	const float d = gpGlobals->curtime - m_flDegrauTempo;
-	if ( d >= 0.0f && d < 1.4f && m_szDegrau[ 0 ] )
+	if ( d >= 0.0f && d < 1.4f && m_szDegrau[ 0 ] && !bOutro )
 	{
 		const float a = d < 0.1f ? d / 0.1f : ( d > 0.9f ? ( 1.4f - d ) / 0.5f : 1.0f );
 		const int dy = (int)( ( 1.0f - clamp( d / 0.3f, 0.0f, 1.0f ) ) * S( 10 ) );

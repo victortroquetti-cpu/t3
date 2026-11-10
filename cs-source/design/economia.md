@@ -13,7 +13,7 @@ todo mundo nasce com o que equipou. O CS tem dinheiro por rodada: ganha abatendo
 armadura **e** mais fôlego **e** mais velocidade, e **capacete** que tira o crítico do tiro na cabeça.
 
 **Surto: duas moedas.** O dinheiro desta economia é o de **humano**. Os tipos de zumbi são pagos com o
-**dinheiro de infectado** (outra moeda, de `shared/trok/trok_zumbis.cpp`: `TrokZumbis_Dinheiro`, ganho por
+**Fúria**, o dinheiro de infectado (outra moeda, de `shared/trok/trok_zumbis.cpp`: `TrokZumbis_Dinheiro`, ganho por
 infecção e fim de rodada, preço `preco` de cada tipo em `scripts/trok_zumbis.txt`, cobrado ao virar zumbi). Não
 são itens da loja de humano (decisão do dono).
 
@@ -92,8 +92,8 @@ Medir e decidir: manter a regra do HL2, ou trocar pela do CS (precisa de um ganc
   tempo de compra no alto, equipamento atual, categorias à esquerda (1..8), itens no meio (clique compra; mostra
   preço, "NA MÃO"/"EQUIPADO", vermelho sem dinheiro), detalhes do item à direita. Fecha com B, ESC, FECHAR, ao
   morrer ou quando o tempo acaba. O servidor confere tudo de novo.
-- **Surto:** o alto do menu mostra as duas moedas (INFECTADO em verde, HUMANO em âmbar) e há a aba **INFECTADO**
-  com os tipos de zumbi jogáveis, preço em dinheiro de infectado e saldo; clicar manda `trok_zumbi_classe <nome>`
+- **Surto:** o alto do menu mostra as duas moedas (FÚRIA em verde, HUMANO em âmbar) e há a aba **INFECTADO**
+  com os tipos de zumbi jogáveis, preço em Fúria e saldo; clicar manda `trok_zumbi_classe <nome>`
   (só escolhe; paga ao virar). Essa aba fica aberta a qualquer hora do Surto, mesmo morto ou zumbi.
 - Console: `trok_comprar <id> [<id> ...]`, `trok_loja_lista`, `trok_loja_recarregar` (cliente; o servidor relê a
   loja a cada mapa). Teste: `sv_cheats 1` e `trok_dinheiro_teste 10000`.
@@ -126,6 +126,16 @@ Medir e decidir: manter a regra do HL2, ou trocar pela do CS (precisa de um ganc
 9. Morrer: renasce só com o kit; colete e capacete somem.
 10. Surto: comprar no preparo; humano vivo no fim ganha $3000 e renasce com o que comprou; zumbi não compra.
 11. Surto, aba INFECTADO (tecla B, última aba; abre direto nela quando não dá para comprar de humano): mostra as
-    duas moedas, lista os tipos jogáveis com o preço em dinheiro de infectado; clicar escolhe
+    duas moedas, lista os tipos jogáveis com o preço em Fúria; clicar escolhe
     (`trok_zumbi_classe`) e marca ESCOLHIDO; ao virar zumbi o preço é cobrado (lógica de `trok_zumbis.cpp`).
 12. Kit de munição e kit médico; granadas até o máximo (dependem das armas da sessão de explosivos existirem).
+
+## Série de abates dá dinheiro (decisão do dono, 10/11/2026)
+- Equilibrado para não quebrar a economia (`cfg/economia.cfg` ou console, `trok_economia_serie_*`):
+  - multi-abate: duplo +$100, triplo +$150, 4 +$200, 5 +$250, 6 +$300, 7+ +$350;
+  - série da vida: +$200 aos 5 abates, +$400 aos 10, +$600 aos 15 e a cada 5 depois;
+  - vingança +$100, primeiro abate +$100;
+  - **teto de $2000 de bônus por vida** (quem domina não dispara na frente).
+- Comparação: um abate de fuzil dá $300; um abate duplo vale um terço disso a mais.
+- Zumbi no Surto recebe o bônus em **Fúria** (metade do valor), mesmo com a economia desligada.
+- Código: `TrokEconomia_BonusSerie` (`server/trok/trok_economia.cpp`), chamado pela série (`trok_killstreak.cpp`).

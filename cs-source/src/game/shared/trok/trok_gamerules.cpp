@@ -777,12 +777,17 @@ void CTrokRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info
 
 	const int i = pVictim->entindex();
 
-	// Estatísticas: infecção (zumbi matou humano) e zumbi abatido (humano matou zumbi).
+	// Infecção, como no CA (Chimera M8): só o golpe de garra do infectado infecta. Humano que morre
+	// de outro jeito (queda, granada, tiro, gás, explosão do Charger) sai da rodada e só assiste.
 	CBasePlayer *pAttacker = ToBasePlayer( info.GetAttacker() );
+	const bool bInfeccao = pAttacker && pAttacker != pVictim && pAttacker->GetTeamNumber() == TEAM_TROK_ZUMBIS &&
+		pVictim->GetTeamNumber() == TEAM_TROK_HUMANOS && ( info.GetDamageType() & ( DMG_CLUB | DMG_SLASH ) ) != 0;
+
+	// Estatísticas: infecção (zumbi matou humano) e zumbi abatido (humano matou zumbi).
 	if ( pAttacker && pAttacker != pVictim )
 	{
 		const int a = pAttacker->entindex();
-		if ( pAttacker->GetTeamNumber() == TEAM_TROK_ZUMBIS && pVictim->GetTeamNumber() == TEAM_TROK_HUMANOS )
+		if ( bInfeccao )
 		{
 			pEstado->m_aInfeccoes.Set( a, pEstado->m_aInfeccoes[ a ] + 1 );
 			++m_iRodadaInfec[ a ];
@@ -795,12 +800,13 @@ void CTrokRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info
 		}
 	}
 
-	if ( pVictim->GetTeamNumber() == TEAM_TROK_HUMANOS )
+	if ( pVictim->GetTeamNumber() == TEAM_TROK_HUMANOS && bInfeccao )
 	{
-		// Humano que morre na rodada (garra, queda, o que for) levanta zumbi.
+		// Infectado pela garra: levanta zumbi onde morreu.
 		m_vecMorte[ i ] = pVictim->GetAbsOrigin();
 		m_flVirar[ i ] = gpGlobals->curtime + MAX( 0.1f, trok_surto_virar_tempo.GetFloat() );
 	}
+	// Morte sem infecção: fica morto até a próxima rodada (SurtoEspectadores o põe para assistir).
 	else if ( pVictim->GetTeamNumber() == TEAM_TROK_ZUMBIS && trok_surto_zumbi_renasce.GetBool() )
 	{
 		m_vecMorte[ i ] = vec3_invalid;

@@ -2,7 +2,7 @@
 // design/ca-pesquisa/mutagenicos.md). O primeiro bloco é o zumbi normal.
 //
 // jogavel          1 = o jogador pode escolher no Surto (trok_zumbi_classe / tecla N)
-// preco            dinheiro de INFECTADO para virar este tipo; pago a cada vez que vira (sem dinheiro, vira o normal)
+// preco            FÚRIA (moeda do infectado) para virar este tipo; pago a cada vez que vira (sem dinheiro, vira o normal)
 // vida_hospedeiro / vida   vida do sorteado / de quem virou (<= 0 usa trok_surto_vida_*)
 // velocidade       x a velocidade do zumbi (trok_surto_zumbi_velocidade)
 // folego_infinito  1 = sprint sem cansar
@@ -27,7 +27,7 @@
 	}
 
 	// --- Mutagênicos do Quarantine ---
-// Preços (dinheiro de infectado): Charger 1000 < Striker 1800 < Splicer 2600 < Striker explosiva 2800
+// Preços (em Fúria): Charger 1000 < Striker 1800 < Splicer 2600 < Striker explosiva 2800
 // < Crusher 3500 < Crusher tóxico 4500.
 // Ganhos (cfg/surto.cfg): 250 por infecção, 400 por vitória dos zumbis, 150 por derrota, 0,5 por dano
 // que não infecta. Um infectado médio junta ~500–800 por rodada em que foi zumbi: Charger depois de
@@ -52,6 +52,7 @@
 		"regen"		"0.20"			// CA: 20% (o normal é 10%)
 		"velocidade"	"0.92"			// MEDIR
 		"garra_alcance"	"1.35"			// MEDIR (CA: mais alcance)
+		"garra_dano"	"1.5"			// dono: o Crusher bate mais forte (fura colete)
 		"garra_cadencia"	"1.6"			// MEDIR (CA: golpe com uma mão, mais lento)
 		"escala"	"1.15"			// MEDIR (CA: grande, pode tampar passagem)
 		"cor"		"140 170 255"		// azul
@@ -86,8 +87,9 @@
 		"cor"		"170 200 120"
 	}
 
-	// --- Variações (Equipe Armada): também compráveis no Surto. Abate pelas bolhas, nuvem ou aura
-	// também infecta (no Surto toda morte de humano na rodada vira zumbi e conta para quem causou). ---
+	// --- Variações (Equipe Armada): também compráveis no Surto. Como no CA, só o golpe de garra
+	// infecta: gás (nuvem, aura) só fere e não mata (trok_zumbis_gas_letal 0); quem morre por
+	// explosão/bolha sai da rodada e assiste. ---
 	"striker_bolhas"
 	{
 		"titulo"	"Striker explosiva"
@@ -110,11 +112,12 @@
 		"vida"		"330"
 		"velocidade"	"0.85"			// CA (Fireteam): muito lento
 		"garra_alcance"	"1.35"
+		"garra_dano"	"1.6"
 		"garra_cadencia"	"1.6"
 		"escala"	"1.2"
-		"aura_dps"	"6"			// CA (Fireteam): aura tóxica
+		"aura_dps"	"12"			// CA (Fireteam): aura tóxica
 		"aura_raio"	"120"
-		"nuvem_dps"	"10"			// CA: some numa nuvem de ácido azul ao morrer
+		"nuvem_dps"	"20"			// CA: some numa nuvem de ácido azul ao morrer
 		"nuvem_raio"	"150"
 		"nuvem_tempo"	"5"
 		"nuvem_lentidao"	"0.7"

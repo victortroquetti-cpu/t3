@@ -28,6 +28,7 @@
 #include "weapon_parse.h"
 #include "trok/weapon_trok_gun.h"
 #include "trok/trok_surto.h"
+#include "trok/hud_trok_v2.h"
 #include <vgui/ISurface.h>
 #include <vgui/IScheme.h>
 #include <vgui/ILocalize.h>
@@ -459,6 +460,14 @@ void CHudTrok::Paint( void )
 
 	const bool bSpectator = pLocal->GetTeamNumber() == TEAM_SPECTATOR;
 	const bool bDead = !pLocal->IsAlive() && !bSpectator;
+
+	// HUD novo (hud_trok_v2.cpp, trok_hud_estilo 2): ele desenha a partida; aqui só a tela de morte.
+	if ( TrokHudV2_Ativo() )
+	{
+		if ( bDead && m_bDeathValid )
+			PaintDeath( pLocal );
+		return;
+	}
 
 	if ( bDead && m_bDeathValid )
 	{

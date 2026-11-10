@@ -9,7 +9,7 @@
 //   charger (Equipe Armada: explode ao morrer)
 //   splicer (Equipe Armada: golpe paralisa, nuvem tóxica ao morrer)
 // O jogador escolhe com trok_zumbi_classe <nome> (ou trok_zumbi_classe_prox) e COMPRA o tipo
-// com o DINHEIRO DE INFECTADO (moeda separada do dinheiro de humano), pago na hora em que vira
+// com a FÚRIA, o dinheiro de infectado (moeda separada do dinheiro de humano), pago na hora em que vira
 // zumbi; sem dinheiro, vira o normal. Ganha-se dinheiro de infectado infectando, ferindo humanos
 // e no fim da rodada (trok_surto_inf_*). O estado vai pela entidade do Surto.
 //=============================================================================

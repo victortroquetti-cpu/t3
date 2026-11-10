@@ -55,6 +55,40 @@ do servidor no mesmo visual (barra escondida = desconectado).
 O HUD do HL2 (vida, colete, munição, energia, mortes, mira, indicador de dano) sai por `#ifndef TROK`.
 Minimapa com imagem do mapa: precisa de uma imagem de cada mapa (por enquanto é radar sem fundo).
 
+### HUD novo (10/11/2026, `trok_hud_estilo 2`, padrão)
+
+Pedido do dono: "muito aperfeiçoado, inspirado nos CoDs modernos, sofisticado". Pesquisa (MW2019,
+MWII/III, Cold War/BO6, BF2042/BF6, The Finals): `design/hud-pesquisa.md`. Prévia interativa (4 estados:
+Equipe, Surto humano, Surto zumbi, Corrida Armada, + minimalista): arquivo `hud.html` gerado na nuvem
+(publicado à parte). Código: `src/game/client/trok/hud_trok_v2.cpp` (o `hud_trok.cpp` antigo
+fica para `trok_hud_estilo 1` e desenha a tela de morte nos dois).
+
+Regras do visual: tudo preso à margem (`trok_hud_margem`, 28 px a 720); um número grande por canto;
+rótulos pequenos em caixa alta com espaçamento; algarismos de largura fixa (o código desenha letra a
+letra); traço fino em vez de moldura; véu escuro em degradê no lugar de caixa; uma cor de destaque
+(âmbar) para "mudou", vermelho só para perigo, azul/vermelho/verde só para lados; o HUD fixo não se
+mexe, só os eventos animam (entrada 0,12-0,25 s, saída 0,4-0,5 s; pulso só em alarme, sem munição e granada).
+
+| Elemento | Onde (px a 1280×720) | O quê |
+|---|---|---|
+| Radar | canto sup. esq., 168 (140 no minimalista) | gira com a visão, cantos marcados, anéis, cone da visão, "N" na borda; aliados triângulo, inimigos quadrado que some |
+| Bússola | topo, centro, 400 de largura, y 14 | marcas de 15°, N NE L SE S SO O NO, rumo no meio, marca vermelha do dano |
+| Placar | embaixo da bússola (y 66; 20 sem bússola) | Equipe: nós · tempo · eles + barras até a meta; Solo: você · tempo · melhor rival, "1º DE 8"; Surto: humanos · relógio (âmbar pulsando no alarme) · zumbis + frase; Corrida: você (posição) · degrau/total · líder |
+| Lista de abates | canto sup. dir., linhas de 24 | só texto, véu à direita, traço âmbar nas suas linhas, losango = cabeça, INFECTOU em verde |
+| Vida | canto inf. esq. | número 46 px; barra de 10 partes (220) com rastro vermelho do dano; colete em linha fina e "COLETE N"; fôlego em linha âmbar só quando gasto |
+| Acima da vida | | "LENTO"; Surto humano: "[N] ZUMBI: STRIKER 1.800 / 2.350 FÚRIA" (fúria = moeda do infectado, verde; preço vermelho se não dá); "CRÉDITOS $ 1.250" (economia, âmbar no tempo de compra) |
+| Zumbi | | tipo do zumbi no lugar de "VIDA", barra verde, "+ REGENERANDO", bordas verdes |
+| Arma | canto inf. dir. | NOME + [AUTO/SEMI]; pente 46 px / reserva 22 px; uma marca por bala (pentes até 40); explosivos com ícone e número à esquerda |
+| Corrida | acima da arma | escada (degrau atual âmbar e mais alto), "DEGRAU 14/20", "PRÓXIMA ESCOPETA · 1 ABATE"; ao subir, "DEGRAU 15 · ESCOPETA" sob a mira |
+| Centro | | mira com contorno (abre com a dispersão), X de acerto (abate vermelho e 35% maior, cabeça âmbar), cunha de dano em 3 faixas (raio 118), granada perto (anel 78, seta, metros), eventos à direita (x +44, y +30: ABATE +$300 nome, NA CABEÇA, ZUMBI ABATIDO, INFECTOU +1), "[R] RECARREGAR" / "SEM MUNIÇÃO" (y +74), "PROTEGIDO" com barra, "[E] PEGAR FUZIL" (62% da altura) |
+
+Opções (cvars, salvas): `trok_hud_estilo`, `trok_hud_escala` (0,6-1,6), `trok_hud_opacidade` (0,2-1),
+`trok_hud_minimalista` (sem bússola, rótulos, marcas de bala e créditos; radar menor), `trok_hud_bussola`,
+`trok_hud_eventos`, `trok_hud_granada`, `trok_hud_granada_raio`, `trok_hud_margem`; continuam valendo
+`trok_hud`, `trok_hud_mira`, `trok_hud_radar(_alcance)`, `trok_hud_vida_baixa`, `trok_hud_killfeed_tempo`,
+`trok_hitmarker(_tempo)`. Ganchos para outros elementos: `TrokHudV2_Ativo()`, `TrokHudV2_Prompt()`,
+`TrokHudV2_Evento()` (`hud_trok_v2.h`). A faixa da série de abates segue em `hud_trok_killstreak.cpp`.
+
 ## Telas dentro da partida e do menu (10/11/2026, nuvem; nada visto rodando)
 
 Base comum: `client/trok/ui/trok_ui_comum.cpp/.h` (`CTrokPainel`: tela cheia, desenho imediato como o

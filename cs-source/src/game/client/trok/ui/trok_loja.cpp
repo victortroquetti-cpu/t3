@@ -196,7 +196,7 @@ void CTrokLojaPainel::Desenhar( void )
 		const int wDin = Largura( m_hTitulo, szDin );
 		TextoDir( m_hPequena, x0 + wTotal - wDin - S( 10 ), y0 + Altura( m_hTitulo ) - Altura( m_hPequena ) - S( 4 ), COR_TEXTO3, "HUMANO" );
 		char szInf[ 48 ];
-		V_snprintf( szInf, sizeof( szInf ), "INFECTADO  %d", TrokZumbis_Dinheiro( pLocal ) );
+		V_snprintf( szInf, sizeof( szInf ), "FÚRIA  %d", TrokZumbis_Dinheiro( pLocal ) );
 		const int xInf = x0 + wTotal - wDin - S( 10 ) - Largura( m_hPequena, "HUMANO" ) - S( 28 );
 		TextoDir( m_hItem, xInf, y0 + Altura( m_hTitulo ) - Altura( m_hItem ) - S( 2 ), COR_ZUMBI, szInf );
 	}
@@ -359,7 +359,7 @@ void CTrokLojaPainel::DesenharDetalhe( int x, int y, int w, const TrokLojaItem_t
 	}
 }
 
-// Aba do Surto: tipos de zumbi pagos com o DINHEIRO DE INFECTADO (outra moeda, de
+// Aba do Surto: tipos de zumbi pagos com a FÚRIA (outra moeda, de
 // trok_zumbis.cpp). Clicar só escolhe o tipo (trok_zumbi_classe); paga-se ao virar zumbi.
 void CTrokLojaPainel::DesenharInfectado( int x, int y )
 {
@@ -370,7 +370,7 @@ void CTrokLojaPainel::DesenharInfectado( int x, int y )
 	const int w = S( 440 ), h = S( 46 );
 
 	char sz[ 128 ];
-	V_snprintf( sz, sizeof( sz ), "DINHEIRO DE INFECTADO: %d   (moeda separada do dinheiro de humano)", iSaldo );
+	V_snprintf( sz, sizeof( sz ), "FÚRIA: %d   (moeda do infectado, separada do dinheiro de humano)", iSaldo );
 	Texto( m_hPequena, x, y, COR_ZUMBI, sz );
 	Texto( m_hPequena, x, y + Altura( m_hPequena ) + S( 2 ), COR_TEXTO3, "Escolha o tipo agora; paga ao virar zumbi (sem saldo, vira o normal)." );
 	y += 2 * Altura( m_hPequena ) + S( 12 );
@@ -391,7 +391,7 @@ void CTrokLojaPainel::DesenharInfectado( int x, int y )
 		if ( bEscolhido )
 			V_strncpy( sz, "ESCOLHIDO", sizeof( sz ) );
 		else if ( c.iPreco > 0 )
-			V_snprintf( sz, sizeof( sz ), "%d INFECTADO", c.iPreco );
+			V_snprintf( sz, sizeof( sz ), "%d FÚRIA", c.iPreco );
 		else
 			V_strncpy( sz, "GRÁTIS", sizeof( sz ) );
 		TextoDir( m_hItem, x + w - S( 14 ), y + ( h - Altura( m_hItem ) ) / 2,

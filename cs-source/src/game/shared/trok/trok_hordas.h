@@ -138,6 +138,8 @@ public:
 	}
 	float GetBonusAte( int b ) const { return ( b >= 0 && b < HORDAS_BONUS_NUM ) ? m_aBonusAte[ b ] : 0.0f; }
 	bool BonusAtivo( int b ) const { return gpGlobals->curtime < GetBonusAte( b ); }
+	int GetUltimoBonus( void ) const { return m_iUltimoBonus; }		// último bônus pego (faixa no HUD)
+	float GetUltimoBonusHora( void ) const { return m_flUltimoBonus; }
 
 	CNetworkVar( int, m_iFase );
 	CNetworkVar( float, m_flFimFase );
@@ -154,6 +156,8 @@ public:
 	CNetworkArray( float, m_aVelZumbi, MAX_PLAYERS + 1 );
 	CNetworkArray( int, m_aNivel, ( MAX_PLAYERS + 1 ) * TROK_HORDAS_SLOTS );
 	CNetworkArray( float, m_aBonusAte, HORDAS_BONUS_NUM );
+	CNetworkVar( int, m_iUltimoBonus );
+	CNetworkVar( float, m_flUltimoBonus );
 };
 
 CTrokHordasEstado *TrokHordas_Estado( void );
@@ -162,6 +166,7 @@ bool TrokHordas_Caido( const CBaseEntity *pEnt );		// humano derrubado esperando
 int TrokHordas_NivelArma( const CBaseCombatWeapon *pArma );		// nível de melhoria (0 = nenhum)
 int TrokHordas_Pente( const CBaseCombatWeapon *pArma, int iBase );	// pente com a melhoria (weapon_trok_gun)
 float TrokHordas_VelocidadeZumbi( const CBaseEntity *pPlayer );	// x velocidade do zumbi pela rodada (1 fora do modo)
+int TrokHordas_PrecoCaixa( int iBase );						// preço da caixa (com o bônus Caixa barata)
 
 //-----------------------------------------------------------------------------
 // Estação de compra (todas as estações: uma classe só em rede; o tipo vem do nome da classe)
@@ -171,7 +176,9 @@ class CTrokHordasEstacao : public CBaseEntity
 public:
 	DECLARE_CLASS( CTrokHordasEstacao, CBaseEntity );
 	DECLARE_NETWORKCLASS();
+#ifndef CLIENT_DLL
 	DECLARE_DATADESC();
+#endif
 
 	CTrokHordasEstacao();
 	virtual ~CTrokHordasEstacao();
@@ -208,7 +215,6 @@ public:
 	void CaixaPensar( void );
 	void AbrirPorta( CBasePlayer *pPlayer );
 	void LigarEnergia( CBasePlayer *pPlayer );
-	void Reiniciar( void );		// fim de jogo: volta como estava no mapa
 	bool IsDesligada( void ) const { return m_bDesligada; }
 
 private:
@@ -224,6 +230,7 @@ private:
 	float m_flProxUso;
 	float m_flFimEstado;			// caixa: quando acaba de girar / de oferecer
 	bool m_bDesligada;				// entrada Desligar (o mapa pode esconder uma caixa)
+	int m_iEnergiaMapa;				// keyvalue precisa_energia (-1 = padrão do tipo)
 	COutputEvent m_OnUsada;			// comprou / abriu / ligou
 	COutputEvent m_OnSemPontos;
 #endif
@@ -263,7 +270,6 @@ void TrokHordas_PontosReparo( CBasePlayer *pPlayer );		// consertou uma tábua d
 void TrokHordas_AbrirArea( int iArea );
 bool TrokHordas_AreaAberta( int iArea );
 void TrokHordas_LigarEnergia( void );
-int TrokHordas_PrecoCaixa( void );							// com o bônus Caixa barata
 void TrokHordas_DarArma( CBasePlayer *pPlayer, const char *pszArma );	// troca a da mesma classe
 void TrokHordas_EncherMunicao( CBasePlayer *pPlayer, CBaseCombatWeapon *pArma );
 bool TrokHordas_Melhorar( CBasePlayer *pPlayer, CBaseCombatWeapon *pArma );	// sobe um nível

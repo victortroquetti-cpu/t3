@@ -12,6 +12,7 @@
 #include "ammodef.h"
 #include "collisionutils.h"
 #include "in_buttons.h"
+#include "trok/trok_zumbis.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -647,3 +648,78 @@ public:
 	}
 };
 static CTrokEconomiaSistema s_TrokEconomiaSistema;
+
+//-----------------------------------------------------------------------------
+// Bônus da série de abates (decisão do dono: a série pode dar dinheiro, equilibrado).
+// Conta: um abate de fuzil dá $300 (CS); um ABATE DUPLO soma +$100, um INACREDITÁVEL +$300, e a
+// série da vida paga +$200 aos 5, +$400 aos 10, +$600 a cada 5 depois. Teto de $2000 de bônus
+// por vida, para quem domina não disparar na frente. Zumbi no Surto recebe em Fúria (metade).
+//-----------------------------------------------------------------------------
+ConVar trok_economia_serie( "trok_economia_serie", "1", FCVAR_NOTIFY, "A série de abates dá dinheiro (humano) e Fúria (zumbi no Surto)." );
+ConVar trok_economia_serie_multi( "trok_economia_serie_multi", "0 0 100 150 200 250 300 350", FCVAR_NOTIFY,
+	"Bônus por multi-abate: valores para 0,1,2(duplo),3,4,5,6,7+ abates seguidos." );
+ConVar trok_economia_serie_vida( "trok_economia_serie_vida", "5 200 10 400 15 600", FCVAR_NOTIFY,
+	"Bônus da série da vida: pares 'abates valor'; depois do último, repete o último valor a cada 5." );
+ConVar trok_economia_serie_vinganca( "trok_economia_serie_vinganca", "100", FCVAR_NOTIFY, "Bônus de vingança." );
+ConVar trok_economia_serie_primeiro( "trok_economia_serie_primeiro", "100", FCVAR_NOTIFY, "Bônus do primeiro abate da partida/rodada." );
+ConVar trok_economia_serie_teto_vida( "trok_economia_serie_teto_vida", "2000", FCVAR_NOTIFY, "Máximo de bônus de série numa vida." );
+ConVar trok_economia_serie_furia( "trok_economia_serie_furia", "0.5", FCVAR_NOTIFY, "Zumbi no Surto: fração do bônus que vira Fúria." );
+
+static int s_aBonusVida[ MAX_PLAYERS + 1 ];
+
+void TrokEconomia_SerieNovaVida( CBasePlayer *pPlayer )
+{
+	if ( pPlayer && pPlayer->entindex() > 0 && pPlayer->entindex() <= MAX_PLAYERS )
+		s_aBonusVida[ pPlayer->entindex() ] = 0;
+}
+
+static int TrokBonusVida( int iSerie )
+{
+	int aPar[ 16 ] = {};
+	const int n = sscanf( trok_economia_serie_vida.GetString(), "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		&aPar[ 0 ], &aPar[ 1 ], &aPar[ 2 ], &aPar[ 3 ], &aPar[ 4 ], &aPar[ 5 ], &aPar[ 6 ], &aPar[ 7 ],
+		&aPar[ 8 ], &aPar[ 9 ], &aPar[ 10 ], &aPar[ 11 ], &aPar[ 12 ], &aPar[ 13 ], &aPar[ 14 ], &aPar[ 15 ] ) / 2;
+	if ( n <= 0 )
+		return 0;
+	for ( int k = 0; k < n; ++k )
+		if ( iSerie == aPar[ k * 2 ] )
+			return aPar[ k * 2 + 1 ];
+	const int iUltimo = aPar[ ( n - 1 ) * 2 ];
+	if ( iSerie > iUltimo && ( iSerie - iUltimo ) % 5 == 0 )
+		return aPar[ ( n - 1 ) * 2 + 1 ];
+	return 0;
+}
+
+void TrokEconomia_BonusSerie( CBasePlayer *pKiller, int iMulti, int iSerie, bool bVinganca, bool bPrimeiro )
+{
+	if ( !pKiller || !trok_economia_serie.GetBool() )
+		return;
+	const int i = pKiller->entindex();
+	if ( i <= 0 || i > MAX_PLAYERS )
+		return;
+
+	int aMulti[ 8 ] = {};
+	sscanf( trok_economia_serie_multi.GetString(), "%d %d %d %d %d %d %d %d",
+		&aMulti[ 0 ], &aMulti[ 1 ], &aMulti[ 2 ], &aMulti[ 3 ], &aMulti[ 4 ], &aMulti[ 5 ], &aMulti[ 6 ], &aMulti[ 7 ] );
+	int iBonus = aMulti[ clamp( iMulti, 0, 7 ) ] + TrokBonusVida( iSerie );
+	if ( bVinganca )
+		iBonus += trok_economia_serie_vinganca.GetInt();
+	if ( bPrimeiro )
+		iBonus += trok_economia_serie_primeiro.GetInt();
+	iBonus = MIN( iBonus, MAX( 0, trok_economia_serie_teto_vida.GetInt() - s_aBonusVida[ i ] ) );
+	if ( iBonus <= 0 )
+		return;
+	s_aBonusVida[ i ] += iBonus;
+
+	if ( TrokSurto_IsZumbi( pKiller ) )
+	{
+		const int iFuria = (int)( iBonus * trok_economia_serie_furia.GetFloat() );
+		TrokZumbis_Ganhar( pKiller, iFuria );
+		ClientPrint( pKiller, HUD_PRINTCONSOLE, UTIL_VarArgs( "Série: +%d de Fúria\n", iFuria ) );
+		return;
+	}
+	if ( !TrokEconomia_Ligada() )
+		return;
+	DarDinheiro( i, iBonus );
+	ClientPrint( pKiller, HUD_PRINTCONSOLE, UTIL_VarArgs( "Série: +$%d\n", iBonus ) );
+}

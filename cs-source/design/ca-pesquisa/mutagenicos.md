@@ -37,7 +37,8 @@ Ultralight 200/135, Light e Recon 225/150, Tactical 275/185, Medium e Combat 300
 Heavy 350/235, Tanker 375/250, Commando 400/275 (hospedeiro/infectado). O colete não muda a velocidade do infectado.
 
 ## No Rearmed
-- Implementado no Surto (`trok_surto_mutagenico_*` em `cfg/surto.cfg`): escolha por rodada com `trok_mutagenico 0|1|2`.
-- Com a economia ligada, cada mutagênico é um item da loja (`scripts/trok_loja.txt`); sem economia, todos podem escolher.
+- Implementado no Surto como **tipos de zumbi** (`scripts/trok_zumbis.txt`): escolha com a tecla N ou a aba FÚRIA da loja,
+  compra com **Fúria** (a moeda do infectado), paga a cada vez que vira zumbi.
+- Como no CA, só o golpe de garra infecta; gás só fere.
 - Números que a wiki não dá e ficaram de chute (MEDIR): o quanto a Striker é mais rápida, o alcance e o tempo do
   golpe do Crusher, o tamanho do Crusher.

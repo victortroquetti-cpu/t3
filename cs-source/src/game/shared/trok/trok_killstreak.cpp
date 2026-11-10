@@ -10,6 +10,7 @@
 #ifndef CLIENT_DLL
 	#include "igameevents.h"
 	#include "gamerules.h"
+	#include "trok/trok_economia.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -101,6 +102,7 @@ static CTrokSerieSistema s_TrokSerieSistema;
 void TrokSerie_PlayerSpawn( CBasePlayer *pPlayer )
 {
 	Slot( pPlayer );
+	TrokEconomia_SerieNovaVida( pPlayer );	// teto de bônus de série por vida
 }
 
 void TrokSerie_RodadaNova( void )
@@ -185,6 +187,9 @@ void TrokSerie_PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 
 	const float flSorte = trok_serie_sorte.GetFloat();
 	const bool bSorte = flSorte > 0.0f && RandomFloat( 0.0f, 1.0f ) < flSorte;
+
+	// Bônus em dinheiro (humano) ou Fúria (zumbi), equilibrado e com teto por vida (trok_economia.cpp).
+	TrokEconomia_BonusSerie( pKiller, k.iMulti, iSerie, bVinganca, bPrimeiro );
 
 	IGameEvent *pEvent = gameeventmanager->CreateEvent( "trok_serie" );
 	if ( pEvent )

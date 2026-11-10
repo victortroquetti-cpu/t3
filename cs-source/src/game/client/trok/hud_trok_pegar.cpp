@@ -12,6 +12,7 @@
 #include "ienginevgui.h"
 #include "c_basecombatweapon.h"
 #include "trok/trok_inventario.h"
+#include "trok/hud_trok_v2.h"
 #include <vgui/ISurface.h>
 #include <vgui/ILocalize.h>
 #include <vgui_controls/Panel.h>
@@ -36,6 +37,7 @@ public:
 private:
 	HFont m_hFonte;
 	wchar_t m_wszTexto[ 96 ];
+	char m_szNome[ 64 ];		// nome da arma (HUD novo: TrokHudV2_Prompt)
 };
 
 DECLARE_HUDELEMENT( CHudTrokPegar );
@@ -49,6 +51,7 @@ CHudTrokPegar::CHudTrokPegar( const char *pElementName ) : CHudElement( pElement
 	SetKeyBoardInputEnabled( false );
 	m_hFonte = INVALID_FONT;
 	m_wszTexto[ 0 ] = 0;
+	m_szNome[ 0 ] = 0;
 }
 
 void CHudTrokPegar::ApplySchemeSettings( IScheme *pScheme )
@@ -83,6 +86,7 @@ void CHudTrokPegar::OnThink( void )
 	if ( szNome[ 0 ] == '#' )
 		V_strncpy( szNome, pArma->GetClassname(), sizeof( szNome ) );
 	V_strupr( szNome );
+	V_strncpy( m_szNome, szNome, sizeof( m_szNome ) );
 	char szTexto[ 96 ];
 	V_snprintf( szTexto, sizeof( szTexto ), "E  —  PEGAR %s", szNome );
 	g_pVGuiLocalize->ConvertANSIToUnicode( szTexto, m_wszTexto, sizeof( m_wszTexto ) );
@@ -92,6 +96,16 @@ void CHudTrokPegar::Paint( void )
 {
 	if ( !m_wszTexto[ 0 ] || m_hFonte == INVALID_FONT )
 		return;
+	// HUD novo: mesmo aviso no estilo dele ("[E] PEGAR FUZIL").
+	if ( TrokHudV2_Ativo() )
+	{
+		const char *pszTecla = engine->Key_LookupBinding( "+use" );
+		char szTecla[ 16 ];
+		V_strncpy( szTecla, ( pszTecla && pszTecla[ 0 ] ) ? pszTecla : "E", sizeof( szTecla ) );
+		V_strupr( szTecla );
+		TrokHudV2_Prompt( szTecla, "PEGAR", m_szNome );
+		return;
+	}
 	int w, h;
 	surface()->GetTextSize( m_hFonte, m_wszTexto, w, h );
 	const int x = ( GetWide() - w ) / 2;

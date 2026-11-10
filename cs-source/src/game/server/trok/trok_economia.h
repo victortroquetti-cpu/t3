@@ -25,6 +25,9 @@ void TrokEconomia_PlayerSpawn( CBasePlayer *pPlayer );								// prazo e lugar d
 void TrokEconomia_PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info );	// ganho, perde o equipamento
 void TrokEconomia_FimRodada( int iTimeVencedor );									// bônus de rodada (0 = empate)
 bool TrokEconomia_ClientCommand( CBasePlayer *pPlayer, const CCommand &args );		// trok_comprar
+// Bônus da série de abates (trok_killstreak.cpp): dinheiro de humano; zumbi no Surto ganha Fúria.
+void TrokEconomia_BonusSerie( CBasePlayer *pKiller, int iMulti, int iSerie, bool bVinganca, bool bPrimeiro );
+void TrokEconomia_SerieNovaVida( CBasePlayer *pPlayer );
 
 // Gancho em CHL2MP_Player::GiveDefaultItems (hl2mp_player.cpp): com a economia ligada dá só
 // o kit inicial (pistola) e o que o jogador comprou e não perdeu. true = já deu tudo.
