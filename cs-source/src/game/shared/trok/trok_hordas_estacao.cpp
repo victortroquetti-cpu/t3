@@ -27,8 +27,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar trok_hordas_usar_distancia( "trok_hordas_usar_distancia", "110", FCVAR_REPLICATED,
-	"Hordas: distância (u) máxima do olho até a estação para usar com E e ver o aviso." );
+ConVar trok_hordas_usar_distancia( "trok_hordas_usar_distancia", "80", FCVAR_REPLICATED,
+	"Hordas: distância (u) do olho até a estação para o aviso aparecer (o E do motor alcança 80 u na horizontal, PLAYER_USE_RADIUS)." );
 ConVar trok_hordas_caixa_giro( "trok_hordas_caixa_giro", "4", FCVAR_REPLICATED, "Hordas: segundos que a caixa misteriosa gira." );
 ConVar trok_hordas_caixa_oferta( "trok_hordas_caixa_oferta", "10", FCVAR_REPLICATED, "Hordas: segundos que a arma sorteada fica esperando o dono pegar." );
 ConVar trok_hordas_caixa_preco( "trok_hordas_caixa_preco", "950", FCVAR_REPLICATED, "Hordas: preço da caixa misteriosa (quando o mapa não diz)." );
