@@ -9,6 +9,19 @@ O CA roda no **LithTech Jupiter EX**, o mesmo motor do F.E.A.R. e, com mudanças
 ferramentas feitas para o CrossFire também servem para o CA. **Falta testar nos arquivos de verdade**: a versão de
 cada formato muda de jogo para jogo.
 
+## Resultado do teste (10/11/2026, versão atual que o dono mandou)
+
+- **Os 109 `.rez` são protegidos.** Todos começam com a assinatura `RezMgr`, por isso parecem abertos à
+  primeira vista. Mas o cabeçalho foi alterado de propósito: os bytes de separação foram trocados e a posição
+  do índice está codificada. Nenhuma ferramenta comum lê esses pacotes, e o projeto **não contorna** essa
+  proteção (regra 2). O `tools/ca_extrator.py` detecta e pula esses pacotes com aviso.
+- **Soltos, fora dos `.rez`, e usáveis como provisório pessoal:**
+  - 61 músicas `.mp3` em `BGM/` (menu, modos, mapas);
+  - 10 sons `.wav`;
+  - 24 vídeos `.bik` (Bink; abertura e finais).
+- **Não usáveis:** `.dll` e `.fxd` (código e efeitos do jogo).
+- `tools/ca_extrator.py` continua servindo para versões ou instalações com `.rez` padrão (cabeçalho original).
+
 ## Resumo por formato
 
 | Arquivo | O que é | Dá para usar? | Ferramenta | Até o Source |
