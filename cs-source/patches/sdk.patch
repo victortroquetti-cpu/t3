@@ -1371,7 +1371,7 @@ index 30d2181..18f69f4 100644
  }
  
 diff --git a/src/game/server/hl2mp/hl2mp_player.cpp b/src/game/server/hl2mp/hl2mp_player.cpp
-index 9457928..bbc39ee 100644
+index 9457928..9ac43bb 100644
 --- a/src/game/server/hl2mp/hl2mp_player.cpp
 +++ b/src/game/server/hl2mp/hl2mp_player.cpp
 @@ -7,6 +7,12 @@
@@ -1449,9 +1449,9 @@ index 9457928..bbc39ee 100644
 +#ifdef TROK
 +// cs-source/: armas com que se nasce (lista de entidades separadas por espaço).
 +// Vazio = equipamento padrão do HL2MP.
-+ConVar trok_armas_iniciais( "trok_armas_iniciais", "weapon_trok_fuzil weapon_trok_pistola weapon_crowbar", FCVAR_NOTIFY,
++ConVar trok_armas_iniciais( "trok_armas_iniciais", "weapon_trok_fuzil weapon_trok_pistola weapon_trok_faca", FCVAR_NOTIFY,
 +	"Armas ao nascer (separadas por espaço). Vazio = as do HL2MP." );
-+ConVar trok_municao_inicial( "trok_municao_inicial", "SMG1 180 Pistol 72 Buckshot 24", FCVAR_NOTIFY,
++ConVar trok_municao_inicial( "trok_municao_inicial", "SMG1 90 Pistol 30 Buckshot 28", FCVAR_NOTIFY,
 +	"Munição ao nascer: pares \"tipo quantidade\" (tipos do HL2MP: SMG1, Pistol, Buckshot, AR2, 357)." );
 +#endif
 +

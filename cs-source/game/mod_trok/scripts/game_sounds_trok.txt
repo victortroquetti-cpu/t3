@@ -171,3 +171,130 @@
 	"soundlevel"	"SNDLVL_90dB"
 	"wave"			"physics/metal/metal_box_break1.wav"	// TROCAR (som do HL2)
 }
+
+// ---------------------------------------------------------------- Explosivos
+// shared/trok/weapon_trok_explosivo.cpp e server/trok/trok_projetil.cpp; nomes nos
+// blocos "TrokExplosivo" de scripts/weapon_trok_*.txt. CA: explosão ouvida a até 1500 u.
+"Trok.Granada.Pino"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_80dB"
+	"wave"			"weapons/pinpull.wav"	// TROCAR (CS:S). CA: todos ouvem a até ~1865 u
+}
+
+"Trok.Granada.Aviso"
+{
+	"channel"		"CHAN_VOICE"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_75dB"
+	"wave"			"radio/ct_fireinhole.wav"	// TROCAR (CS:S). CA: só o time, raio 500
+}
+
+"Trok.Granada.Quique"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_75dB"
+	"pitch"			"95,105"
+	"wave"			"weapons/hegrenade/he_bounce-1.wav"	// TROCAR (CS:S)
+}
+
+"Trok.Granada.Explosao"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_140dB"
+	"pitch"			"95,105"
+	"rndwave"
+	{
+		"wave"	"weapons/hegrenade/explode3.wav"	// TROCAR (CS:S)
+		"wave"	"weapons/hegrenade/explode4.wav"
+		"wave"	"weapons/hegrenade/explode5.wav"
+	}
+}
+
+"Trok.GranadaLuz.Quique"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_75dB"
+	"pitch"			"95,105"
+	"wave"			"weapons/flashbang/grenade_hit1.wav"	// TROCAR (CS:S)
+}
+
+"Trok.GranadaLuz.Explosao"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_140dB"
+	"rndwave"
+	{
+		"wave"	"weapons/flashbang/flashbang_explode1.wav"	// TROCAR (CS:S)
+		"wave"	"weapons/flashbang/flashbang_explode2.wav"
+	}
+}
+
+"Trok.GranadaFumaca.Quique"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_75dB"
+	"pitch"			"95,105"
+	"wave"			"weapons/smokegrenade/grenade_hit1.wav"	// TROCAR (CS:S)
+}
+
+"Trok.GranadaFumaca.Explosao"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_90dB"
+	"wave"			"weapons/smokegrenade/sg_explode.wav"	// TROCAR (CS:S)
+}
+
+"Trok.Mina.Ativa"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_80dB"
+	"wave"			"weapons/c4/c4_click.wav"	// TROCAR (CS:S)
+}
+
+"Trok.Detonador"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_70dB"
+	"wave"			"weapons/slam/buttonclick.wav"	// TROCAR (HL2)
+}
+
+"Trok.Foguete.Explosao"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_140dB"
+	"pitch"			"95,105"
+	"rndwave"
+	{
+		"wave"	"weapons/explode3.wav"	// TROCAR (HL2)
+		"wave"	"weapons/explode4.wav"
+		"wave"	"weapons/explode5.wav"
+	}
+}
+
+"Trok.Torreta.Arma"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_80dB"
+	"wave"			"npc/turret_floor/deploy.wav"	// TROCAR (HL2)
+}
+
+"Trok.Torreta.Tiro"
+{
+	"channel"		"CHAN_WEAPON"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_GUNFIRE"
+	"pitch"			"95,105"
+	"wave"			")npc/turret_floor/shoot1.wav"	// TROCAR (HL2)
+}

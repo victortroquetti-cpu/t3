@@ -1,0 +1,64 @@
+// Trok: claymore do CA. Números do Combat Arms (Chimera, design/chimera/specs/combat_arms/special_weapons.md 6.3
+// e data/weapons/claymore.toml). Modelo e som de PROTÓTIPO, do HL2/CS:S montados (não vão no
+// pacote). Distâncias e velocidades em unidades do CA (x trok_ca_escala); tempos em s.
+// Código: shared/trok/weapon_trok_explosivo.cpp (arma) e server/trok/trok_projetil.cpp (objeto).
+
+WeaponData
+{
+	"printname"			"Claymore"
+	"viewmodel"			"models/weapons/v_c4.mdl"
+	"playermodel"		"models/weapons/w_c4.mdl"
+	"anim_prefix"		"slam"
+	"bucket"			"3"
+	"bucket_position"	"4"
+
+	"clip_size"			"-1"
+	"clip2_size"		"-1"
+	"default_clip"		"2"
+	"default_clip2"		"-1"
+
+	"primary_ammo"		"TrokClaymore"
+	"secondary_ammo"	"None"
+
+	"weight"			"1"
+	"item_flags"		"0"
+
+	"TrokExplosivo"
+	{
+		"tipo"						"claymore"		// plantada à frente do pé, virada para onde o dono olha
+		"entidade"					"trok_claymore"
+		"saque"						"0.9"
+		"pino"						"1.0"		// pré-disparo
+		"laco"						"0"
+		"soltar"						"0.534"		// tecla do pós-disparo
+		"pos"						"0.7"
+		"recarga"					"0"
+		"detonar_atraso"				"0.075"		// botão 2 detona todas (tecla a 25 ms + 1 quadro); morrer também detona
+		"pavio"						"0"
+		"vida"						"300"
+		"caixa"						"6 6 6"
+		"cone_dano"					"240"		// 120 x2 no cone
+		"cone_raio"					"500"
+		"cone_angulo"				"80"		// meio ângulo: cone de 160 graus
+		"dano"						"120"		// fora do cone, perto: 60 x2
+		"raio"						"120"
+		"modelo"						"models/weapons/w_slam.mdl"		// PROVISÓRIO (HL2)
+		"som_ativo"					"Trok.Detonador"
+		"som_explosao"				"Trok.Granada.Explosao"
+	}
+
+	SoundData
+	{
+
+	}
+
+	TextureData
+	{
+		"weapon"		{ "font" "WeaponIcons"			"character" "o" }
+		"weapon_s"		{ "font" "WeaponIconsSelected"	"character" "o" }
+		"weapon_small"	{ "font" "WeaponIconsSmall"		"character" "o" }
+		"ammo"			{ "font" "WeaponIconsSmall"		"character" "o" }
+		"crosshair"		{ "font" "Crosshairs"			"character" "Q" }
+		"autoaim"		{ "file" "sprites/crosshairs" "x" "0" "y" "48" "width" "24" "height" "24" }
+	}
+}

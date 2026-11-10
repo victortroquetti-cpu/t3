@@ -1,0 +1,64 @@
+// Trok: granada remota (Mobile_Grenade do CA). Números do Combat Arms (Chimera, design/chimera/specs/combat_arms/special_weapons.md 6.4
+// e data/weapons/mobile_grenade.toml). Modelo e som de PROTÓTIPO, do HL2/CS:S montados (não vão no
+// pacote). Distâncias e velocidades em unidades do CA (x trok_ca_escala); tempos em s.
+// Código: shared/trok/weapon_trok_explosivo.cpp (arma) e server/trok/trok_projetil.cpp (objeto).
+
+WeaponData
+{
+	"printname"			"Granada remota"
+	"viewmodel"			"models/weapons/v_c4.mdl"
+	"playermodel"		"models/weapons/w_c4.mdl"
+	"anim_prefix"		"slam"
+	"bucket"			"3"
+	"bucket_position"	"5"
+
+	"clip_size"			"-1"
+	"clip2_size"		"-1"
+	"default_clip"		"2"
+	"default_clip2"		"-1"
+
+	"primary_ammo"		"TrokRemota"
+	"secondary_ammo"	"None"
+
+	"weight"			"1"
+	"item_flags"		"0"
+
+	"TrokExplosivo"
+	{
+		"tipo"						"remota"		// arremessada, gruda no chão; botão 2 detona todas, morrer também
+		"entidade"					"trok_granada_remota"
+		"saque"						"0.833"
+		"pino"						"1.767"		// pré-disparo
+		"laco"						"0.067"
+		"soltar"						"0.333"
+		"pos"						"0.633"
+		"recarga"					"0.4"		// CA: não medido (o da granada)
+		"detonar_atraso"				"0.45"		// tecla do controle a 400 ms + 1 quadro
+		"velocidade"					"600"
+		"gravidade"					"1"
+		"dispersao"					"0.001"
+		"pavio"						"0"
+		"vida"						"300"
+		"caixa"						"6 6 6"
+		"dano"						"200"		// 100 x2, para todo lado
+		"raio"						"450"
+		"modelo"						"models/weapons/w_c4_planted.mdl"		// PROVISÓRIO (CS:S)
+		"som_ativo"					"Trok.Detonador"
+		"som_explosao"				"Trok.Granada.Explosao"
+	}
+
+	SoundData
+	{
+
+	}
+
+	TextureData
+	{
+		"weapon"		{ "font" "WeaponIcons"			"character" "o" }
+		"weapon_s"		{ "font" "WeaponIconsSelected"	"character" "o" }
+		"weapon_small"	{ "font" "WeaponIconsSmall"		"character" "o" }
+		"ammo"			{ "font" "WeaponIconsSmall"		"character" "o" }
+		"crosshair"		{ "font" "Crosshairs"			"character" "Q" }
+		"autoaim"		{ "file" "sprites/crosshairs" "x" "0" "y" "48" "width" "24" "height" "24" }
+	}
+}

@@ -1,0 +1,62 @@
+// Trok: lança-foguetes (RPG-7 do CA). Números do Combat Arms (Chimera, design/chimera/specs/combat_arms/special_weapons.md seção 2
+// e data/weapons/rpg-7.toml). Modelo e som de PROTÓTIPO, do HL2/CS:S montados (não vão no
+// pacote). Distâncias e velocidades em unidades do CA (x trok_ca_escala); tempos em s.
+// Código: shared/trok/weapon_trok_explosivo.cpp (arma) e server/trok/trok_projetil.cpp (objeto).
+
+WeaponData
+{
+	"printname"			"Lança-foguetes"
+	"viewmodel"			"models/weapons/v_rpg.mdl"
+	"playermodel"		"models/weapons/w_rocket_launcher.mdl"
+	"anim_prefix"		"rpg"
+	"bucket"			"4"
+	"bucket_position"	"0"
+
+	"clip_size"			"1"
+	"clip2_size"		"-1"
+	"default_clip"		"3"
+	"default_clip2"		"-1"
+
+	"primary_ammo"		"RPG_Round"
+	"secondary_ammo"	"None"
+
+	"weight"			"1"
+	"item_flags"		"0"
+
+	"TrokExplosivo"
+	{
+		"tipo"						"impacto"		// explode no primeiro toque (parede: 1 u antes; corpo: no ponto)
+		"lancador"					"1"
+		"entidade"					"trok_foguete"
+		"saque"						"1.3"
+		"ciclo"						"0.9"		// disparo; pente vazio recarrega sozinho no fim
+		"recarga"					"3.0"
+		"coice"						"5.5"		// graus que a câmera sobe por tiro
+		"velocidade"					"1300"		// reto, sem gravidade
+		"gravidade"					"0"
+		"dispersao"					"0.001"
+		"pavio"						"10"		// explode no ar depois disso
+		"vida"						"50"		// dá para derrubar no ar com tiro
+		"caixa"						"5.6 5.6 5.6"		// CA: 44,8 de comprido; aqui a caixa é alinhada ao mundo, então fica um cubo
+		"dano"						"86"		// 43 x2: acerto direto não mata quem está com vida cheia (CA)
+		"raio"						"550"
+		"modelo"						"models/weapons/w_missile_launch.mdl"		// PROVISÓRIO (HL2)
+		"som_explosao"				"Trok.Foguete.Explosao"
+	}
+
+	SoundData
+	{
+		"single_shot"		"Weapon_RPG.Single"
+		"empty"		"Weapon_Pistol.Empty"
+	}
+
+	TextureData
+	{
+		"weapon"		{ "font" "WeaponIcons"			"character" "i" }
+		"weapon_s"		{ "font" "WeaponIconsSelected"	"character" "i" }
+		"weapon_small"	{ "font" "WeaponIconsSmall"		"character" "i" }
+		"ammo"			{ "font" "WeaponIconsSmall"		"character" "x" }
+		"crosshair"		{ "font" "Crosshairs"			"character" "Q" }
+		"autoaim"		{ "file" "sprites/crosshairs" "x" "0" "y" "48" "width" "24" "height" "24" }
+	}
+}

@@ -1,0 +1,68 @@
+// Trok: granada de fumaça (M18 do CA). Números do Combat Arms (Chimera, design/chimera/specs/combat_arms/grenades.md seção 11
+// e data/weapons/m18.toml). Modelo e som de PROTÓTIPO, do HL2/CS:S montados (não vão no
+// pacote). Distâncias e velocidades em unidades do CA (x trok_ca_escala); tempos em s.
+// Código: shared/trok/weapon_trok_explosivo.cpp (arma) e server/trok/trok_projetil.cpp (objeto).
+
+WeaponData
+{
+	"printname"			"Granada de fumaça"
+	"viewmodel"			"models/weapons/v_eq_smokegrenade.mdl"
+	"playermodel"		"models/weapons/w_eq_smokegrenade.mdl"
+	"anim_prefix"		"grenade"
+	"bucket"			"3"
+	"bucket_position"	"2"
+
+	"clip_size"			"-1"
+	"clip2_size"		"-1"
+	"default_clip"		"2"
+	"default_clip2"		"-1"
+
+	"primary_ammo"		"TrokGranadaFumaca"
+	"secondary_ammo"	"None"
+
+	"weight"			"1"
+	"item_flags"		"0"
+
+	"TrokExplosivo"
+	{
+		"tipo"						"granada"
+		"efeito"						"fumaca"		// só a nuvem: não bloqueia tiro, bot nem nome (como no CA)
+		"entidade"					"trok_granada_fumaca"
+		"saque"						"0.4"		// sacar (CA select 400 ms)
+		"pino"						"0.7"		// puxar o pino (pré-disparo 700 ms); segurar o botão NÃO encurta o pavio
+		"pino_som"					"0.507"
+		"laco"						"0.067"		// laço do arremesso enquanto segura o botão
+		"soltar"						"0.133"		// do soltar até sair da mão (tecla do pós-disparo)
+		"pos"						"0.366"		// animação depois de soltar
+		"recarga"					"0.4"		// pegar a próxima
+		"velocidade"					"1550"
+		"gravidade"					"1"
+		"dispersao"					"0"
+		"pavio"						"3"		// explode onde estiver, até no ar
+		"vida"						"50"
+		"caixa"						"10 6 10"
+		"meia_altura"				"10"
+		"velocidade_morte"			"500"
+		"fumaca_some"				"8"		// s depois da explosão em que a nuvem começa a sumir (partículas vivem 8-10 s)
+		"fumaca_fim"					"10"		// s em que não sobra nada
+		"modelo"						"models/weapons/w_eq_smokegrenade_thrown.mdl"		// PROVISÓRIO (CS:S)
+		"som_quique"					"Trok.GranadaFumaca.Quique"
+		"som_explosao"				"Trok.GranadaFumaca.Explosao"
+		"som_aviso"					"Trok.Granada.Aviso"
+	}
+
+	SoundData
+	{
+		"special1"		"Trok.Granada.Pino"
+	}
+
+	TextureData
+	{
+		"weapon"		{ "font" "WeaponIcons"			"character" "k" }
+		"weapon_s"		{ "font" "WeaponIconsSelected"	"character" "k" }
+		"weapon_small"	{ "font" "WeaponIconsSmall"		"character" "k" }
+		"ammo"			{ "font" "WeaponIconsSmall"		"character" "v" }
+		"crosshair"		{ "font" "Crosshairs"			"character" "Q" }
+		"autoaim"		{ "file" "sprites/crosshairs" "x" "0" "y" "48" "width" "24" "height" "24" }
+	}
+}

@@ -1,0 +1,71 @@
+// Trok: torreta automática (Auto-Turret do CA). Números do Combat Arms (Chimera, design/chimera/specs/combat_arms/special_weapons.md 6.7
+// e data/weapons/auto-turret.toml). Modelo e som de PROTÓTIPO, do HL2/CS:S montados (não vão no
+// pacote). Distâncias e velocidades em unidades do CA (x trok_ca_escala); tempos em s.
+// Código: shared/trok/weapon_trok_explosivo.cpp (arma) e server/trok/trok_projetil.cpp (objeto).
+
+WeaponData
+{
+	"printname"			"Torreta"
+	"viewmodel"			"models/weapons/v_c4.mdl"
+	"playermodel"		"models/weapons/w_c4.mdl"
+	"anim_prefix"		"slam"
+	"bucket"			"4"
+	"bucket_position"	"1"
+
+	"clip_size"			"-1"
+	"clip2_size"		"-1"
+	"default_clip"		"1"
+	"default_clip2"		"-1"
+
+	"primary_ammo"		"TrokTorreta"
+	"secondary_ammo"	"None"
+
+	"weight"			"1"
+	"item_flags"		"0"
+
+	"TrokExplosivo"
+	{
+		"tipo"						"torreta"
+		"entidade"					"trok_torreta"
+		"um_por_vez"					"1"		// uma nova some com a anterior
+		"saque"						"1.333"
+		"pino"						"0"
+		"laco"						"0"
+		"soltar"						"3.1"		// tecla do disparo (3100 ms)
+		"pos"						"3.666"
+		"recarga"					"0"
+		"velocidade"					"600"
+		"gravidade"					"1"
+		"dispersao"					"0.001"
+		"pavio"						"0"
+		"vida"						"350"		// toma 3x de explosão; destruída some sem explodir
+		"caixa"						"12 12 24"
+		"torreta_preparo"			"2.833"		// do pouso até atirar
+		"torreta_intervalo"			"0.13"		// s entre tiros
+		"torreta_alcance"			"800"		// busca o inimigo mais perto que o sensor vê
+		"torreta_balas"				"100"		// tiros até sumir
+		"torreta_bala_dano"			"12"		// até 800 u; 0,7x até 900; 0,35x até 1000
+		"torreta_erro"				"50"		// u de erro em cada eixo no ponto mirado
+		"torreta_ang_cima"			"60"
+		"torreta_ang_baixo"			"45"
+		"torreta_sensor"				"10"		// altura do sensor
+		"modelo"						"models/combine_turrets/floor_turret.mdl"		// PROVISÓRIO (HL2)
+		"som_ativo"					"Trok.Torreta.Arma"
+		"som_tiro"					"Trok.Torreta.Tiro"
+	}
+
+	SoundData
+	{
+
+	}
+
+	TextureData
+	{
+		"weapon"		{ "font" "WeaponIcons"			"character" "o" }
+		"weapon_s"		{ "font" "WeaponIconsSelected"	"character" "o" }
+		"weapon_small"	{ "font" "WeaponIconsSmall"		"character" "o" }
+		"ammo"			{ "font" "WeaponIconsSmall"		"character" "o" }
+		"crosshair"		{ "font" "Crosshairs"			"character" "Q" }
+		"autoaim"		{ "file" "sprites/crosshairs" "x" "0" "y" "48" "width" "24" "height" "24" }
+	}
+}

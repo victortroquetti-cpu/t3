@@ -902,7 +902,6 @@ void CTrokMenu::RunRoot( void )
 
 void CTrokMenu::RunPlay( void )
 {
-	const Color acc = Accent();
 	const int x0 = S( 64 );
 	const int xr = m_iWide - S( 56 );
 
@@ -1009,10 +1008,379 @@ void CTrokMenu::RunMapPanel( int mx, int top, int mw, int bottom )
 
 		const int bs = S( 34 );
 		if ( BoxButton( mx + mw - S( 18 ) - bs * 2 - S( 6 ), iy + S( 14 ), bs, bs, m_hButton, "‹", false, false ) && m_Maps.Count() )
-			m_iMap = ( m_iMap + m_Maps.Count() - 1 ) % m_Maps.Count();
+			StepMap( -1 );
 		if ( BoxButton( mx + mw - S( 18 ) - bs, iy + S( 14 ), bs, bs, m_hButton, "›", false, false ) && m_Maps.Count() )
-			m_iMap = ( m_iMap + 1 ) % m_Maps.Count();
+			StepMap( 1 );
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Modos (scripts/trok_modos.txt): cartões no estilo da sala do Combat Arms, regras, meta
+// e tempo lidos do cfg do modo, e o último mapa de cada modo.
+//-----------------------------------------------------------------------------
+
+// Lê "nome valor" de um cfg (ignora comentários). Devolve -1 se não achou.
+static int TrokLerValorCfg( const char *pszCfg, const char *pszCvar )
+{
+	if ( !pszCfg[ 0 ] || !pszCvar[ 0 ] )
+		return -1;
+	char szArq[ 96 ];
+	V_snprintf( szArq, sizeof( szArq ), "cfg/%s.cfg", pszCfg );
+	CUtlBuffer buf( 0, 0, CUtlBuffer::TEXT_BUFFER );
+	if ( !g_pFullFileSystem->ReadFile( szArq, "GAME", buf ) )
+		return -1;
+	int iValor = -1;
+	char szLinha[ 512 ];
+	while ( buf.IsValid() )
+	{
+		buf.GetLine( szLinha, sizeof( szLinha ) );
+		if ( !szLinha[ 0 ] )
+			break;
+		char *pCom = V_strstr( szLinha, "//" );
+		if ( pCom )
+			*pCom = 0;
+		char szNome[ 64 ] = "", szValor[ 64 ] = "";
+		if ( sscanf( szLinha, " %63s %63s", szNome, szValor ) == 2 && !V_stricmp( szNome, pszCvar ) )
+		{
+			char *pv = szValor;
+			if ( *pv == '"' )
+				++pv;
+			iValor = atoi( pv ); // a última linha vale, como no console
+		}
+	}
+	return iValor;
+}
+
+static int TrokLerLista( const char *psz, int *pOut, int iMax )
+{
+	int n = 0;
+	while ( psz && *psz && n < iMax )
+	{
+		while ( *psz == ' ' )
+			++psz;
+		if ( !*psz )
+			break;
+		pOut[ n++ ] = atoi( psz );
+		while ( *psz && *psz != ' ' )
+			++psz;
+	}
+	return n;
+}
+
+void CTrokMenu::BuildModes( void )
+{
+	if ( m_bModesBuilt )
+		return;
+	m_bModesBuilt = true;
+	m_Modos.RemoveAll();
+
+	KeyValues *pKV = new KeyValues( "Modos" );
+	if ( pKV->LoadFromFile( g_pFullFileSystem, "scripts/trok_modos.txt", "GAME" ) )
+	{
+		for ( KeyValues *p = pKV->GetFirstTrueSubKey(); p; p = p->GetNextTrueSubKey() )
+		{
+			Modo_t m;
+			V_memset( &m, 0, sizeof( m ) );
+			V_strncpy( m.szChave, p->GetName(), sizeof( m.szChave ) );
+			V_strncpy( m.szModo, p->GetString( "modo", p->GetName() ), sizeof( m.szModo ) );
+			V_strncpy( m.szNome, p->GetString( "nome", p->GetName() ), sizeof( m.szNome ) );
+			V_strncpy( m.szCurto, p->GetString( "curto", m.szNome ), sizeof( m.szCurto ) );
+			V_strncpy( m.szDescricao, p->GetString( "descricao" ), sizeof( m.szDescricao ) );
+			for ( int r = 0; r < 4; ++r )
+			{
+				char szChave[ 16 ];
+				V_snprintf( szChave, sizeof( szChave ), "regra%d", r + 1 );
+				V_strncpy( m.szRegras[ r ], p->GetString( szChave ), sizeof( m.szRegras[ r ] ) );
+			}
+			V_strncpy( m.szCfg, p->GetString( "cfg", m.szModo ), sizeof( m.szCfg ) );
+			V_strncpy( m.szMetaCvar, p->GetString( "meta_cvar" ), sizeof( m.szMetaCvar ) );
+			V_strncpy( m.szMetaRotulo, p->GetString( "meta_rotulo", "ABATES" ), sizeof( m.szMetaRotulo ) );
+			V_strncpy( m.szTempoCvar, p->GetString( "tempo_cvar" ), sizeof( m.szTempoCvar ) );
+			V_strncpy( m.szTempoUnidade, p->GetString( "tempo_unidade", "min" ), sizeof( m.szTempoUnidade ) );
+			V_strncpy( m.szMapas, p->GetString( "mapas" ), sizeof( m.szMapas ) );
+			V_strncpy( m.szMapaPadrao, p->GetString( "mapa_padrao" ), sizeof( m.szMapaPadrao ) );
+			m.nMetaOpcoes = TrokLerLista( p->GetString( "meta_opcoes" ), m.iMetaOpcoes, ARRAYSIZE( m.iMetaOpcoes ) );
+			m.nTempoOpcoes = TrokLerLista( p->GetString( "tempo_opcoes" ), m.iTempoOpcoes, ARRAYSIZE( m.iTempoOpcoes ) );
+			m.bTimes = p->GetBool( "times" );
+			m.bBots = p->GetBool( "bots", true );
+			m.bEmBreve = p->GetBool( "em_breve" );
+			m.iMetaCfg = TrokLerValorCfg( m.szCfg, m.szMetaCvar );
+			m.iTempoCfg = TrokLerValorCfg( m.szCfg, m.szTempoCvar );
+			m_Modos.AddToTail( m );
+		}
+	}
+	pKV->deleteThis();
+
+	if ( !m_Modos.Count() )
+	{
+		// Sem o script: os três modos de sempre, sem textos.
+		static const char *s_psz[][ 3 ] = { { "equipe", "MATA-MATA EM EQUIPE", "EQUIPE" }, { "solo", "EXÉRCITO SOLO", "SOLO" }, { "surto", "SURTO", "SURTO" } };
+		for ( int i = 0; i < ARRAYSIZE( s_psz ); ++i )
+		{
+			Modo_t m;
+			V_memset( &m, 0, sizeof( m ) );
+			V_strncpy( m.szChave, s_psz[ i ][ 0 ], sizeof( m.szChave ) );
+			V_strncpy( m.szModo, s_psz[ i ][ 0 ], sizeof( m.szModo ) );
+			V_strncpy( m.szCfg, s_psz[ i ][ 0 ], sizeof( m.szCfg ) );
+			V_strncpy( m.szNome, s_psz[ i ][ 1 ], sizeof( m.szNome ) );
+			V_strncpy( m.szCurto, s_psz[ i ][ 2 ], sizeof( m.szCurto ) );
+			m.bTimes = ( i == 0 );
+			m.bBots = true;
+			m.iMetaCfg = m.iTempoCfg = -1;
+			m_Modos.AddToTail( m );
+		}
+		Warning( "Trok: scripts/trok_modos.txt não encontrado; o menu usa só os modos básicos.\n" );
+	}
+
+	// Valor antigo de trok_ui_modo (0, 1, 2) vira a chave.
+	const char *pszAntigo = trok_ui_modo.GetString();
+	if ( pszAntigo[ 0 ] >= '0' && pszAntigo[ 0 ] <= '9' )
+	{
+		static const char *s_pszChaves[] = { "equipe", "solo", "surto" };
+		trok_ui_modo.SetValue( s_pszChaves[ clamp( atoi( pszAntigo ), 0, 2 ) ] );
+	}
+}
+
+int CTrokMenu::CurrentMode( void )
+{
+	const char *pszChave = trok_ui_modo.GetString();
+	FOR_EACH_VEC( m_Modos, i )
+	{
+		if ( !m_Modos[ i ].bEmBreve && !V_stricmp( m_Modos[ i ].szChave, pszChave ) )
+			return i;
+	}
+	FOR_EACH_VEC( m_Modos, i )
+	{
+		if ( !m_Modos[ i ].bEmBreve )
+			return i;
+	}
+	return 0;
+}
+
+bool CTrokMenu::MapAllowed( int iMap )
+{
+	if ( !m_Modos.Count() || iMap < 0 || iMap >= m_Maps.Count() )
+		return true;
+	const char *pszPrefixos = m_Modos[ CurrentMode() ].szMapas;
+	if ( !pszPrefixos[ 0 ] )
+		return true;
+	const char *pszMapa = m_Maps[ iMap ].Get();
+	const char *p = pszPrefixos;
+	while ( *p )
+	{
+		while ( *p == ' ' )
+			++p;
+		const char *pFim = p;
+		while ( *pFim && *pFim != ' ' )
+			++pFim;
+		const int iLen = (int)( pFim - p );
+		if ( iLen > 0 && !V_strnicmp( pszMapa, p, iLen ) )
+			return true;
+		p = pFim;
+	}
+	return false;
+}
+
+void CTrokMenu::StepMap( int iDir )
+{
+	const int n = m_Maps.Count();
+	for ( int k = 1; k <= n; ++k )
+	{
+		const int i = ( ( m_iMap + iDir * k ) % n + n ) % n;
+		if ( MapAllowed( i ) )
+		{
+			m_iMap = i;
+			break;
+		}
+	}
+	RememberMap();
+}
+
+// Guarda o mapa atual como o último deste modo (trok_ui_mapas "modo:mapa ...").
+void CTrokMenu::RememberMap( void )
+{
+	if ( !m_Maps.Count() || !m_Modos.Count() )
+		return;
+	const char *pszChave = m_Modos[ CurrentMode() ].szChave;
+	char szNovo[ 512 ] = "";
+	char szAtual[ 512 ];
+	V_strncpy( szAtual, trok_ui_mapas.GetString(), sizeof( szAtual ) );
+	for ( char *pTok = strtok( szAtual, " " ); pTok; pTok = strtok( NULL, " " ) )
+	{
+		const char *pDois = strchr( pTok, ':' );
+		if ( pDois && (int)( pDois - pTok ) == V_strlen( pszChave ) && !V_strnicmp( pTok, pszChave, V_strlen( pszChave ) ) )
+			continue;
+		if ( szNovo[ 0 ] )
+			V_strncat( szNovo, " ", sizeof( szNovo ) );
+		V_strncat( szNovo, pTok, sizeof( szNovo ) );
+	}
+	char szPar[ 128 ];
+	V_snprintf( szPar, sizeof( szPar ), "%s%s:%s", szNovo[ 0 ] ? " " : "", pszChave, m_Maps[ m_iMap ].Get() );
+	V_strncat( szNovo, szPar, sizeof( szNovo ) );
+	trok_ui_mapas.SetValue( szNovo );
+}
+
+void CTrokMenu::SelectMode( int iModo )
+{
+	if ( !m_Modos.IsValidIndex( iModo ) || m_Modos[ iModo ].bEmBreve )
+		return;
+	// JOGAR só mostra modos com bots.
+	if ( m_eState == STATE_PLAY && !m_Modos[ iModo ].bBots )
+	{
+		FOR_EACH_VEC( m_Modos, i )
+		{
+			if ( m_Modos[ i ].bBots && !m_Modos[ i ].bEmBreve )
+			{
+				iModo = i;
+				break;
+			}
+		}
+	}
+	trok_ui_modo.SetValue( m_Modos[ iModo ].szChave );
+	if ( !m_Maps.Count() )
+		return;
+
+	// Mapa: o último usado neste modo, senão o padrão do modo, senão o atual (se servir).
+	const char *pszChave = m_Modos[ iModo ].szChave;
+	char szLembrado[ 64 ] = "";
+	{
+		char szLista[ 512 ];
+		V_strncpy( szLista, trok_ui_mapas.GetString(), sizeof( szLista ) );
+		for ( char *pTok = strtok( szLista, " " ); pTok; pTok = strtok( NULL, " " ) )
+		{
+			const char *pDois = strchr( pTok, ':' );
+			if ( pDois && (int)( pDois - pTok ) == V_strlen( pszChave ) && !V_strnicmp( pTok, pszChave, V_strlen( pszChave ) ) )
+				V_strncpy( szLembrado, pDois + 1, sizeof( szLembrado ) );
+		}
+	}
+	const char *pszQuero[] = { szLembrado, m_Modos[ iModo ].szMapaPadrao };
+	for ( int q = 0; q < 2; ++q )
+	{
+		if ( !pszQuero[ q ][ 0 ] )
+			continue;
+		FOR_EACH_VEC( m_Maps, i )
+		{
+			if ( !V_stricmp( m_Maps[ i ], pszQuero[ q ] ) && MapAllowed( i ) )
+			{
+				m_iMap = i;
+				return;
+			}
+		}
+	}
+	if ( !MapAllowed( m_iMap ) )
+		StepMap( 1 );
+}
+
+// "80 ABATES DO TIME  ·  15 MIN" com os números do cfg do modo.
+void CTrokMenu::ModeGoalText( const Modo_t &m, char *pszOut, int iOutSize )
+{
+	char szMeta[ 64 ] = "", szTempo[ 64 ] = "";
+	if ( m.szMetaCvar[ 0 ] )
+	{
+		if ( m.iMetaCfg > 0 )
+			V_snprintf( szMeta, sizeof( szMeta ), "META %d %s", m.iMetaCfg, m.szMetaRotulo );
+		else
+			V_snprintf( szMeta, sizeof( szMeta ), "META: SEM LIMITE" );
+	}
+	if ( m.szTempoCvar[ 0 ] && m.iTempoCfg > 0 )
+	{
+		if ( !V_stricmp( m.szTempoUnidade, "s" ) )
+			V_snprintf( szTempo, sizeof( szTempo ), "RODADA %d:%02d", m.iTempoCfg / 60, m.iTempoCfg % 60 );
+		else
+			V_snprintf( szTempo, sizeof( szTempo ), "TEMPO %d MIN", m.iTempoCfg );
+	}
+	V_snprintf( pszOut, iOutSize, "%s%s%s", szMeta, ( szMeta[ 0 ] && szTempo[ 0 ] ) ? "  ·  " : "", szTempo );
+}
+
+// Faixa de cartões: um por modo; os "em breve" ficam apagados e não clicam.
+void CTrokMenu::RunModeCards( int x0, int xr, int y, bool bSoBots )
+{
+	const Color acc = Accent();
+	int nCartoes = 0;
+	FOR_EACH_VEC( m_Modos, i )
+	{
+		if ( !bSoBots || m_Modos[ i ].bBots || m_Modos[ i ].bEmBreve )
+			++nCartoes;
+	}
+	if ( !nCartoes )
+		return;
+	const int iAtual = CurrentMode();
+	const int iGap = S( 8 );
+	const int cw = MIN( S( 220 ), ( xr - x0 - iGap * ( nCartoes - 1 ) ) / nCartoes );
+	const int ch = S( 104 );
+	int cx = x0;
+	int iNum = 0;
+	FOR_EACH_VEC( m_Modos, i )
+	{
+		const Modo_t &m = m_Modos[ i ];
+		if ( bSoBots && !m.bBots && !m.bEmBreve )
+			continue;
+		++iNum;
+		const bool bAtual = ( i == iAtual );
+		const bool bHover = !m.bEmBreve && Hover( cx, y, cw, ch );
+		Rect( cx, y, cw, ch, bAtual ? COR_PAINEL_HOVER : ( bHover ? COR_PAINEL_HOVER : COR_PAINEL ) );
+		Outline( cx, y, cw, ch, bAtual ? acc : ( bHover ? COR_LINHA_FORTE : COR_LINHA ) );
+		if ( bAtual )
+			Rect( cx, y, cw, S( 3 ), acc );
+
+		char szNum[ 8 ];
+		V_snprintf( szNum, sizeof( szNum ), "%02d", iNum );
+		Text( m_hSmall, cx + S( 14 ), y + S( 12 ), m.bEmBreve ? COR_TEXTO3 : ( bAtual ? acc : COR_TEXTO3 ), szNum );
+		if ( m.bEmBreve )
+			Text( m_hSmall, cx + cw - S( 14 ) - TextWide( m_hSmall, "EM BREVE" ), y + S( 12 ), COR_TEXTO3, "EM BREVE" );
+		else if ( m.bTimes )
+			Text( m_hSmall, cx + cw - S( 14 ) - TextWide( m_hSmall, "TIMES" ), y + S( 12 ), COR_TEXTO3, "TIMES" );
+		TextSpaced( m_hHeading, cx + S( 14 ), y + S( 32 ), m.bEmBreve ? COR_TEXTO3 : COR_TEXTO, m.szCurto, S( 1 ) );
+		// Nome completo em letra pequena quando difere do curto
+		if ( V_stricmp( m.szNome, m.szCurto ) )
+			Text( m_hSmall, cx + S( 14 ), y + S( 62 ), m.bEmBreve ? Color( 128, 134, 142, 150 ) : COR_TEXTO2, m.szNome );
+		if ( !m.bEmBreve && Clicked( cx, y, cw, ch ) )
+			SelectMode( i );
+		if ( bHover )
+			m_iHoverId = 200 + i;
+		cx += cw + iGap;
+	}
+
+	// Linha do modo escolhido: descrição à esquerda, meta e tempo à direita.
+	if ( m_Modos.IsValidIndex( iAtual ) )
+	{
+		const Modo_t &m = m_Modos[ iAtual ];
+		const int ty = y + ch + S( 14 );
+		Text( m_hBody, x0, ty, COR_TEXTO2, m.szDescricao );
+		char szMeta[ 160 ];
+		ModeGoalText( m, szMeta, sizeof( szMeta ) );
+		if ( szMeta[ 0 ] )
+			Text( m_hSmall, xr - TextWide( m_hSmall, szMeta ), ty + S( 2 ), acc, szMeta );
+	}
+}
+
+// Bloco de regras do modo escolhido no painel da direita.
+int CTrokMenu::RunModeRules( int x, int y, int w )
+{
+	if ( !m_Modos.Count() )
+		return 0;
+	const Modo_t &m = m_Modos[ CurrentMode() ];
+	int yy = y;
+	Label( x, yy, "REGRAS" );
+	Text( m_hSmall, x + w - TextWide( m_hSmall, m.szNome ), yy, COR_TEXTO3, m.szNome );
+	yy += S( 20 );
+	const int iLinha = surface()->GetFontTall( m_hBody ) + S( 3 );
+	int nRegras = 0;
+	for ( int r = 0; r < 4 && nRegras < 3; ++r )
+	{
+		if ( !m.szRegras[ r ][ 0 ] )
+			continue;
+		Rect( x, yy + iLinha / 2 - S( 2 ), S( 4 ), S( 4 ), Accent() );
+		Text( m_hBody, x + S( 14 ), yy, COR_TEXTO2, m.szRegras[ r ] );
+		yy += iLinha;
+		++nRegras;
+	}
+	if ( !nRegras )
+	{
+		Text( m_hBody, x, yy, COR_TEXTO2, m.szDescricao );
+		yy += iLinha;
+	}
+	return ( yy - y ) + S( 14 );
 }
 
 void CTrokMenu::RunBottomBar( void )
@@ -1494,12 +1862,25 @@ bool CTrokMenu::TextField( int iField, int x, int y, int w, const char *pszValue
 	if ( Clicked( x, y, w, h ) && !bEditing )
 	{
 		if ( m_iTextField >= 0 )
-			( m_iTextField == 0 ? trok_ui_criar_nome : trok_ui_criar_senha ).SetValue( m_szText );
+			CommitTextField();
 		m_iTextField = iField;
 		V_strncpy( m_szText, pszValue, sizeof( m_szText ) );
 		return true;
 	}
 	return false;
+}
+
+void CTrokMenu::CommitTextField( void )
+{
+	switch ( m_iTextField )
+	{
+	case 0: trok_ui_criar_nome.SetValue( m_szText ); break;
+	case 1: trok_ui_criar_senha.SetValue( m_szText ); break;
+	case 2: trok_ui_servidor_ip.SetValue( m_szText ); break;
+	case 3: trok_ui_servidor_senha.SetValue( m_szText ); break;
+	default: break;
+	}
+	m_iTextField = -1;
 }
 
 void CTrokMenu::RunCreate( void )
@@ -1515,9 +1896,12 @@ void CTrokMenu::RunCreate( void )
 	const int iSep = x0 + TextWide( m_hSmall, "‹ VOLTAR" ) + S( 20 );
 	Rect( iSep, S( 46 ), 1, S( 22 ), COR_LINHA_FORTE );
 	TextSpaced( m_hTitle, iSep + S( 21 ), S( 36 ), COR_TEXTO, "CRIAR PARTIDA", S( 3 ) );
-	Text( m_hBody, x0, S( 96 ), COR_TEXTO2, "Seu servidor, suas regras. Os amigos entram pelo seu IP (veja o LEIA-ME: JOGAR COM AMIGOS)." );
+	Text( m_hBody, iSep + S( 21 ) + TextWide( m_hTitle, "CRIAR PARTIDA" ) + S( 40 ), S( 50 ), COR_TEXTO2, "Seu servidor, suas regras. Os amigos entram pelo seu IP (LEIA-ME: JOGAR COM AMIGOS)." );
 
-	const int top = S( 128 ), bottom = m_iTall - S( 72 );
+	// Cartões de modo (scripts/trok_modos.txt)
+	RunModeCards( x0, xr, S( 96 ), false );
+
+	const int top = S( 252 ), bottom = m_iTall - S( 72 );
 	RunMapPanel( x0, top, S( 380 ), bottom );
 
 	const int px = x0 + S( 380 ) + S( 16 ), pw = xr - px;
@@ -1526,20 +1910,7 @@ void CTrokMenu::RunCreate( void )
 	const int ix = px + S( 24 ), iw = pw - S( 48 );
 	const int iHalf = ( iw - S( 24 ) ) / 2;
 	int y = top + S( 18 );
-
-	// Modo
-	Label( ix, y, "MODO" );
-	{
-		const char *pszModos[] = { "EQUIPE", "EXÉRCITO SOLO", "SURTO" };
-		const int iModo = clamp( trok_ui_modo.GetInt(), 0, 2 );
-		const int mw = ( iw - S( 12 ) ) / 3;
-		for ( int i = 0; i < 3; ++i )
-		{
-			if ( BoxButton( ix + i * ( mw + S( 6 ) ), y + S( 18 ), mw, S( 34 ), m_hButton, pszModos[ i ], i == iModo, i == iModo ) )
-				trok_ui_modo.SetValue( i );
-		}
-	}
-	y += S( 66 );
+	const Modo_t *pModo = m_Modos.Count() ? &m_Modos[ CurrentMode() ] : NULL;
 
 	// Nome e senha
 	Label( ix, y, "NOME DA SALA" );
@@ -1570,33 +1941,48 @@ void CTrokMenu::RunCreate( void )
 	}
 	y += S( 66 );
 
-	// Meta e tempo
+	// Meta e tempo: as escolhas de cada modo vêm de scripts/trok_modos.txt (0 = a do cfg do modo).
 	{
-		static const int s_Metas[] = { 0, 30, 50, 80, 100, 150 };
-		static const int s_Tempos[] = { 0, 5, 10, 15, 20, 30 };
-		const bool bSurto = trok_ui_modo.GetInt() == 2;
-		int iMeta = 0, iTempo = 0;
-		for ( int i = 0; i < ARRAYSIZE( s_Metas ); ++i ) if ( trok_ui_criar_meta.GetInt() == s_Metas[ i ] ) iMeta = i;
-		for ( int i = 0; i < ARRAYSIZE( s_Tempos ); ++i ) if ( trok_ui_criar_tempo.GetInt() == s_Tempos[ i ] ) iTempo = i;
-		char szMeta[ 32 ], szTempo[ 32 ];
-		if ( s_Metas[ iMeta ] ) V_snprintf( szMeta, sizeof( szMeta ), "%d ABATES", s_Metas[ iMeta ] ); else V_strncpy( szMeta, "DO MODO", sizeof( szMeta ) );
-		if ( s_Tempos[ iTempo ] ) V_snprintf( szTempo, sizeof( szTempo ), "%d MIN", s_Tempos[ iTempo ] ); else V_strncpy( szTempo, "DO MODO", sizeof( szTempo ) );
-
 		int yl = y, yr = y;
-		if ( !bSurto )
+		if ( pModo && pModo->nMetaOpcoes > 0 )
 		{
-			Label( ix, y, "META DE ABATES" );
+			int iMeta = 0;
+			for ( int i = 0; i < pModo->nMetaOpcoes; ++i ) if ( trok_ui_criar_meta.GetInt() == pModo->iMetaOpcoes[ i ] ) iMeta = i;
+			char szMeta[ 48 ];
+			if ( pModo->iMetaOpcoes[ iMeta ] > 0 )
+				V_snprintf( szMeta, sizeof( szMeta ), "%d", pModo->iMetaOpcoes[ iMeta ] );
+			else if ( pModo->iMetaCfg > 0 )
+				V_snprintf( szMeta, sizeof( szMeta ), "%d (PADRÃO)", pModo->iMetaCfg );
+			else
+				V_strncpy( szMeta, "DO MODO", sizeof( szMeta ) );
+			char szRotulo[ 64 ];
+			V_snprintf( szRotulo, sizeof( szRotulo ), "META: %s", pModo->szMetaRotulo );
+			Label( ix, y, szRotulo );
 			yl += S( 18 );
 			if ( OptCycle( ix, yl, iHalf, "", szMeta, iDir ) )
-				trok_ui_criar_meta.SetValue( s_Metas[ ( iMeta + iDir + ARRAYSIZE( s_Metas ) ) % ARRAYSIZE( s_Metas ) ] );
+				trok_ui_criar_meta.SetValue( pModo->iMetaOpcoes[ ( iMeta + iDir + pModo->nMetaOpcoes ) % pModo->nMetaOpcoes ] );
+		}
+		if ( pModo && pModo->nTempoOpcoes > 0 )
+		{
+			int iTempo = 0;
+			for ( int i = 0; i < pModo->nTempoOpcoes; ++i ) if ( trok_ui_criar_tempo.GetInt() == pModo->iTempoOpcoes[ i ] ) iTempo = i;
+			char szTempo[ 48 ];
+			if ( pModo->iTempoOpcoes[ iTempo ] > 0 )
+				V_snprintf( szTempo, sizeof( szTempo ), "%d MIN", pModo->iTempoOpcoes[ iTempo ] );
+			else if ( pModo->iTempoCfg > 0 )
+				V_snprintf( szTempo, sizeof( szTempo ), "%d MIN (PADRÃO)", pModo->iTempoCfg );
+			else
+				V_strncpy( szTempo, "DO MODO", sizeof( szTempo ) );
 			Label( ix + iHalf + S( 24 ), y, "TEMPO DA PARTIDA" );
 			yr += S( 18 );
 			if ( OptCycle( ix + iHalf + S( 24 ), yr, iHalf, "", szTempo, iDir ) )
-				trok_ui_criar_tempo.SetValue( s_Tempos[ ( iTempo + iDir + ARRAYSIZE( s_Tempos ) ) % ARRAYSIZE( s_Tempos ) ] );
+				trok_ui_criar_tempo.SetValue( pModo->iTempoOpcoes[ ( iTempo + iDir + pModo->nTempoOpcoes ) % pModo->nTempoOpcoes ] );
 		}
-		else
+		if ( yl == y && yr == y )
 		{
-			Text( m_hSmall, ix, y + S( 6 ), COR_TEXTO3, "No Surto, os tempos da rodada vêm do cfg/surto.cfg." );
+			char szCfg[ 128 ];
+			V_snprintf( szCfg, sizeof( szCfg ), "Neste modo, a meta e os tempos vêm do cfg/%s.cfg.", pModo ? pModo->szCfg : "" );
+			Text( m_hSmall, ix, y + S( 6 ), COR_TEXTO3, szCfg );
 			yl += S( 30 );
 		}
 		y = MAX( yl, yr ) + S( 10 );
