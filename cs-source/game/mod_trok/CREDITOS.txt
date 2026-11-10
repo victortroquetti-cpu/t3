@@ -7,6 +7,10 @@ Código
   (https://github.com/NeotokyoRebuild/neo), Source 1 SDK License:
   neo/ui/neo_root.cpp e OverrideInterface.cpp.
 
+Números e regras de referência do Combat Arms
+- Especificações do DeCombat (https://github.com/argallo/DeCombat), MIT ou Apache-2.0:
+  movimento, armas, modos, radar e áudio do CA de 2009 (cópia em cs-source/design/decombat/).
+
 Fontes
 - Barlow e Barlow Condensed, Copyright 2017 The Barlow Project Authors
   (https://github.com/jpt/barlow), SIL Open Font License 1.1 (resource/fonts/OFL.txt).

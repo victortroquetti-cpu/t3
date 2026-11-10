@@ -125,7 +125,8 @@ Abrir com `-dev -console -novid` e consertar na ordem em que aparecer:
     empurrão por arma, zumbis bots cercando, humanos recuando.
 
 ### Fase 3: números do Combat Arms
-O dono tem o CA instalado e skills com os estudos. Medir e preencher todo valor marcado
+**Fonte principal:** `cs-source/design/decombat/` (especificações do CA de 2009 medidas pelo projeto DeCombat, MIT/Apache:
+movimento, armas, modos, radar, áudio). O dono também tem o CA instalado e skills com os estudos. Preencher todo valor marcado
 **MEDIR** em `cs-source/game/mod_trok/cfg/*.cfg` e nos `scripts/weapon_trok_*.txt`:
 velocidades, pulo, dano, cadência, recuo, tempos de modo, vida e regeneração do infectado.
 
