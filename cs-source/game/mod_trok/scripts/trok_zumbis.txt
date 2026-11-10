@@ -1,0 +1,117 @@
+// Trok: tipos de zumbi (código: src/game/shared/trok/trok_zumbis.cpp; dados do CA em
+// design/ca-pesquisa/mutagenicos.md). O primeiro bloco é o zumbi normal.
+//
+// jogavel          1 = o jogador pode escolher no Surto (trok_zumbi_classe / tecla N)
+// comprar          1 = com a economia ligada (trok_economia 1), precisa comprar (mutagênico)
+// vida_hospedeiro / vida   vida do sorteado / de quem virou (<= 0 usa trok_surto_vida_*)
+// velocidade       x a velocidade do zumbi (trok_surto_zumbi_velocidade)
+// folego_infinito  1 = sprint sem cansar
+// regen            fração da vida por segundo parado (-1 usa trok_surto_regen)
+// garra_dano / garra_alcance / garra_cadencia   x os números das garras (cadência maior = mais lento)
+// escala           tamanho do corpo
+// cor              tom provisório até ter modelo próprio (R G B)
+// explode_dano / explode_raio                         explode ao morrer
+// nuvem_dps / nuvem_raio / nuvem_tempo / nuvem_lentidao  nuvem tóxica ao morrer (lentidão = x velocidade)
+// aura_dps / aura_raio                                dano em volta enquanto vivo
+// bomba_intervalo / bomba_dano / bomba_raio / bomba_pavio   solta bolhas que explodem
+// golpe_lentidao / golpe_lentidao_tempo                golpe deixa o humano lento (paralisia)
+// bonus_humano_velocidade   x velocidade enquanto humano com este tipo escolhido (CA: mutagênico +3%)
+
+"TrokZumbis"
+{
+	"normal"
+	{
+		"titulo"	"Infectado"
+		"vida_hospedeiro"	"300"		// CA: depende do colete do humano (Medium/Combat 300/200)
+		"vida"		"200"
+	}
+
+	// --- Mutagênicos do Quarantine ---
+	"striker"
+	{
+		"titulo"	"Striker"
+		"comprar"	"1"
+		"vida_hospedeiro"	"280"		// CA: 275–285 (páginas divergem)
+		"vida"		"185"
+		"velocidade"	"1.15"			// MEDIR (CA: "a mais rápida")
+		"folego_infinito"	"1"
+		"cor"		"255 225 150"		// olhos com rastro amarelo
+		"bonus_humano_velocidade"	"1.03"
+	}
+	"crusher"
+	{
+		"titulo"	"Crusher"
+		"comprar"	"1"
+		"vida_hospedeiro"	"450"
+		"vida"		"305"
+		"regen"		"0.20"			// CA: 20% (o normal é 10%)
+		"velocidade"	"0.92"			// MEDIR
+		"garra_alcance"	"1.35"			// MEDIR (CA: mais alcance)
+		"garra_cadencia"	"1.6"			// MEDIR (CA: golpe com uma mão, mais lento)
+		"escala"	"1.15"			// MEDIR (CA: grande, pode tampar passagem)
+		"cor"		"140 170 255"		// azul
+		"bonus_humano_velocidade"	"1.03"
+	}
+
+	// --- Infectados da Equipe Armada (Fireteam) ---
+	"charger"
+	{
+		"titulo"	"Charger"
+		"comprar"	"1"
+		"vida_hospedeiro"	"200"		// CA (Fireteam): pele de 100 + 100 de vida
+		"vida"		"150"
+		"velocidade"	"1.1"			// CA: rápido, vai direto em quem vê
+		"explode_dano"	"100"			// MEDIR (CA: colete de dinamite, ferimentos graves)
+		"explode_raio"	"250"
+		"cor"		"200 120 90"
+	}
+	"splicer"
+	{
+		"titulo"	"Splicer"
+		"comprar"	"1"
+		"vida_hospedeiro"	"350"		// CA: pele de 150 e "resistência incrível"
+		"vida"		"250"
+		"garra_alcance"	"1.5"			// CA: alcance maior que o do Crusher
+		"golpe_lentidao"	"0.35"		// CA: o golpe paralisa (MEDIR)
+		"golpe_lentidao_tempo"	"1.5"
+		"nuvem_dps"	"15"			// CA: nuvem tóxica ao morrer que queima e paralisa
+		"nuvem_raio"	"160"
+		"nuvem_tempo"	"6"
+		"nuvem_lentidao"	"0.5"
+		"cor"		"170 200 120"
+	}
+
+	// --- Variações do modo Hordas (não escolhíveis no Surto) ---
+	"striker_bolhas"
+	{
+		"titulo"	"Striker explosiva"
+		"jogavel"	"0"
+		"vida_hospedeiro"	"250"
+		"vida"		"250"
+		"velocidade"	"1.15"
+		"folego_infinito"	"1"
+		"bomba_intervalo"	"6"			// CA (Fireteam): bolhas que caem e explodem ("Flash Explosion")
+		"bomba_dano"	"40"
+		"bomba_raio"	"180"
+		"bomba_pavio"	"1.5"
+		"cor"		"255 200 120"
+	}
+	"crusher_toxico"
+	{
+		"titulo"	"Crusher tóxico"
+		"jogavel"	"0"
+		"vida_hospedeiro"	"500"
+		"vida"		"500"
+		"velocidade"	"0.85"			// CA (Fireteam): muito lento
+		"garra_alcance"	"1.35"
+		"garra_cadencia"	"1.6"
+		"escala"	"1.2"
+		"aura_dps"	"6"			// CA (Fireteam): aura tóxica
+		"aura_raio"	"120"
+		"nuvem_dps"	"10"			// CA: some numa nuvem de ácido azul ao morrer
+		"nuvem_raio"	"150"
+		"nuvem_tempo"	"5"
+		"nuvem_lentidao"	"0.7"
+		"cor"		"110 150 255"
+	}
+}

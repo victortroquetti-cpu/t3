@@ -12,6 +12,7 @@
 #include "c_team.h"
 #include "hl2mp_gamerules.h"
 #include "trok/trok_surto.h"
+#include "trok/trok_corrida.h"
 #include <game/client/iviewport.h>
 #include <vgui/ISurface.h>
 #include <vgui/IScheme.h>
@@ -172,7 +173,9 @@ int CTrokScoreboard::PaintTeam( int x, int y, int w, int iTeam, const char *pszT
 	const int xPing = x + w - S( 18 );
 	const int xZumbis = pSurto ? xPing - iCol : xPing;
 	const int xInfec = pSurto ? xZumbis - iCol : xPing;
-	const int xKD = ( pSurto ? xInfec : xPing ) - iCol;
+	CTrokCorridaEstado *pCorrida = TrokCorrida_Estado();	// Corrida Armada: coluna ARMA (degrau)
+	const int xArma = pCorrida ? xPing - iCol : xPing;
+	const int xKD = ( pSurto ? xInfec : xArma ) - iCol;
 	const int xMortes = xKD - iCol;
 	const int xAbates = xMortes - iCol;
 	const int hy = y + S( 16 );
@@ -185,6 +188,8 @@ int CTrokScoreboard::PaintTeam( int x, int y, int w, int iTeam, const char *pszT
 		TextRight( m_hSmall, xInfec, hy, COR_TEXTO3, "INFECÇÕES" );
 		TextRight( m_hSmall, xZumbis, hy, COR_TEXTO3, "ZUMBIS" );
 	}
+	if ( pCorrida )
+		TextRight( m_hSmall, xArma, hy, COR_TEXTO3, "ARMA" );
 	TextRight( m_hSmall, xPing, hy, COR_TEXTO3, "PING" );
 
 	int ry = y + S( 3 ) + iHead;
@@ -229,6 +234,11 @@ int CTrokScoreboard::PaintTeam( int x, int y, int w, int iTeam, const char *pszT
 			V_snprintf( sz, sizeof( sz ), "%d", pSurto->GetZumbisAbatidos( i ) );
 			TextRight( m_hBody, xZumbis, ty, COR_TEXTO2, sz );
 		}
+		if ( pCorrida )
+		{
+			V_snprintf( sz, sizeof( sz ), "%d/%d", pCorrida->GetDegrau( i ) + 1, MAX( 1, pCorrida->GetDegraus() ) );
+			TextRight( m_hBody, xArma, ty, COR_TEXTO, sz );
+		}
 		if ( g_PR->IsFakePlayer( i ) )
 			V_strncpy( sz, "—", sizeof( sz ) );
 		else
@@ -263,7 +273,7 @@ void CTrokScoreboard::Paint( void )
 
 	// Cabeçalho
 	const Color acc = Accent();
-	Text( m_hSmall, x, y, acc, TrokSurto_Ativo() ? "SURTO" : ( bTeams ? "MATA-MATA EM EQUIPE" : "MATA-MATA" ) );
+	Text( m_hSmall, x, y, acc, TrokSurto_Ativo() ? "SURTO" : ( TrokCorrida_Ativo() ? "CORRIDA ARMADA" : ( bTeams ? "MATA-MATA EM EQUIPE" : "MATA-MATA" ) ) );
 	char szMap[ 128 ] = "";
 	if ( engine->GetLevelName() )
 	{

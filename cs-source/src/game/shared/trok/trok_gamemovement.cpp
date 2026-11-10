@@ -28,6 +28,8 @@
 #include "in_buttons.h"
 #include "movevars_shared.h"
 #include "trok_surto.h"
+#include "trok_placar_extra.h"	// TrokEquip_Velocidade (colete da loja)
+#include "trok_zumbis.h"
 #ifdef CLIENT_DLL
 #include "c_hl2mp_player.h"
 #include "c_world.h"
@@ -319,6 +321,8 @@ void CTrokGameMovement::CheckParameters( void )
 	BaseClass::CheckParameters();
 
 	float flScale = TrokWeapon_MoveSpeedScale( player );
+	if ( !trok_mov_ca.GetBool() )
+		flScale *= TrokEquip_Velocidade( player );	// colete da loja (no movimento do CA entra em CAVelocidadeAlvo)
 	if ( flScale > 0.0f && fabsf( flScale - 1.0f ) > 0.001f )
 	{
 		mv->m_flMaxSpeed *= flScale;
@@ -644,6 +648,8 @@ float CTrokGameMovement::CAVelocidadeAlvo( void ) const
 	if ( flArma <= 0.0f )
 		flArma = 1.0f;
 	s *= MAX( 0.0f, 1.0f - trok_ca_colete.GetFloat() ) * flArma;
+	s *= TrokEquip_Velocidade( player );	// colete comprado na loja (trok_placar_extra.cpp)
+	s *= TrokZumbis_VelocidadeDe( player );	// tipo de zumbi / humano lento ou com mutagênico (trok_zumbis.cpp)
 	return CAEsc( s );
 }
 

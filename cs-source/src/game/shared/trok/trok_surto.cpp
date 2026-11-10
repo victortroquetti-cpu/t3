@@ -10,7 +10,7 @@
 #include "tier0/memdbgon.h"
 
 ConVar trok_modo( "trok_modo", "equipe", FCVAR_REPLICATED | FCVAR_NOTIFY,
-	"Modo de jogo do próximo mapa: equipe (mata-mata em equipe), solo (exército solo, todos contra todos) ou surto (infecção)." );
+	"Modo de jogo do próximo mapa: equipe (mata-mata em equipe), solo (exército solo, todos contra todos), surto (infecção) ou corrida (corrida armada)." );
 ConVar trok_renascer_tempo( "trok_renascer_tempo", "5", FCVAR_REPLICATED | FCVAR_NOTIFY,
 	"Equipe e solo: segundos morto até renascer sozinho (com contagem na tela)." );
 ConVar trok_protecao( "trok_protecao", "3", FCVAR_REPLICATED | FCVAR_NOTIFY,
@@ -23,6 +23,8 @@ int TrokModo( void )
 		return TROK_MODO_SURTO;
 	if ( !V_stricmp( psz, "solo" ) || !V_stricmp( psz, "ffa" ) )
 		return TROK_MODO_SOLO;
+	if ( !V_stricmp( psz, "corrida" ) )
+		return TROK_MODO_CORRIDA;
 	return TROK_MODO_EQUIPE; // "equipe", "tdm" e qualquer outro
 }
 
@@ -48,6 +50,10 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokSurtoEstado, DT_TrokSurtoEstado )
 	RecvPropInt( RECVINFO( m_iDestaque ) ),
 	RecvPropInt( RECVINFO( m_iDestaqueTipo ) ),
 	RecvPropInt( RECVINFO( m_iDestaqueValor ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aClasseZumbi ), RecvPropInt( RECVINFO( m_aClasseZumbi[ 0 ] ) ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aEscolhaZumbi ), RecvPropInt( RECVINFO( m_aEscolhaZumbi[ 0 ] ) ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aLentoAte ), RecvPropFloat( RECVINFO( m_aLentoAte[ 0 ] ) ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aLentoFator ), RecvPropFloat( RECVINFO( m_aLentoFator[ 0 ] ) ) ),
 #else
 	SendPropInt( SENDINFO( m_iFase ), 3, SPROP_UNSIGNED ),
 	SendPropFloat( SENDINFO( m_flFimFase ), 0, SPROP_NOSCALE ),
@@ -62,6 +68,10 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokSurtoEstado, DT_TrokSurtoEstado )
 	SendPropInt( SENDINFO( m_iDestaque ), 7, SPROP_UNSIGNED ),
 	SendPropInt( SENDINFO( m_iDestaqueTipo ), 2, SPROP_UNSIGNED ),
 	SendPropInt( SENDINFO( m_iDestaqueValor ), 8, SPROP_UNSIGNED ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aClasseZumbi ), SendPropInt( SENDINFO_ARRAY( m_aClasseZumbi ), 5, SPROP_UNSIGNED ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aEscolhaZumbi ), SendPropInt( SENDINFO_ARRAY( m_aEscolhaZumbi ), 5, SPROP_UNSIGNED ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aLentoAte ), SendPropFloat( SENDINFO_ARRAY( m_aLentoAte ), 0, SPROP_NOSCALE ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aLentoFator ), SendPropFloat( SENDINFO_ARRAY( m_aLentoFator ), 0, SPROP_NOSCALE ) ),
 #endif
 END_NETWORK_TABLE()
 
@@ -81,6 +91,10 @@ CTrokSurtoEstado::CTrokSurtoEstado()
 		m_aInfeccoes.Set( i, 0 );
 		m_aZumbisAbatidos.Set( i, 0 );
 		m_aSobreviveu.Set( i, 0 );
+		m_aClasseZumbi.Set( i, 0 );
+		m_aEscolhaZumbi.Set( i, 0 );
+		m_aLentoAte.Set( i, 0.0f );
+		m_aLentoFator.Set( i, 1.0f );
 	}
 	m_iDestaque = 0;
 	m_iDestaqueTipo = SURTO_DESTAQUE_NENHUM;

@@ -28,6 +28,8 @@ public:
 	virtual void PrimaryAttack( void );
 	virtual void SecondaryAttack( void );
 	virtual void ItemPostFrame( void );
+	virtual void ItemBusyFrame( void );
+	virtual bool SendWeaponAnim( int iActivity );
 	virtual bool Reload( void );
 	virtual bool Deploy( void );
 	virtual bool Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
@@ -42,6 +44,8 @@ public:
 	float CurrentSpreadDegrees( void ) const;
 	bool IsAutomatic( void ) const;
 	bool HasADS( void ) const;
+	bool UsaCA( void ) const;					// segue a lei de tiro do Combat Arms (script "modelo_ca" 1)
+	int CAConeAtual( void ) const;				// cone do CA agora, em milésimos (padrão quadrado)
 #ifdef CLIENT_DLL
 	// Para o HUD: 0 = normal, 1 = correndo com a arma abaixada / mirando pelo cano.
 	float GetSprintBlend( void ) const { return m_flViewmodelSprint; }
@@ -59,6 +63,18 @@ private:
 #endif
 	float DamageAtDistance( float flDistance ) const;
 
+	// Modelo do Combat Arms (weapon_firing.md): medidores de dispersão a 80 Hz, cone
+	// quadrado, dano em degraus, recuo de câmera do jogador, tempos de recarga e de sacar.
+	void CATique( bool bAtirou );
+	void CAAtirar( CBasePlayer *pPlayer );
+	void CARecuo( CBasePlayer *pPlayer );
+	void CARecuoVolta( CBasePlayer *pPlayer );
+	float CAFaixa( float flDistancia ) const;
+	float CASaidaCorrida( void ) const;
+	bool SendWeaponAnimTempo( int iActivity, float flTempo );
+	void CARecargaBalaAvanca( CBasePlayer *pPlayer );
+	bool m_bCAAtirouNoTique;					// tiro neste tique (o 1º subpasso conta o tiro)
+
 	CNetworkVar( float, m_flExtraSpread );		// graus somados pelos tiros seguidos
 	CNetworkVar( int, m_iShotsInRow );
 	CNetworkVar( float, m_flLastShotTime );
@@ -66,6 +82,10 @@ private:
 	CNetworkVar( bool, m_bADS );
 	CNetworkVar( float, m_flSprintEndTime );		// quando parou de correr
 	CNetworkVar( bool, m_bWasSprinting );
+	CNetworkVar( float, m_flCAFogo );			// CA: medidor de dispersão do tiro (F, 0..1)
+	CNetworkVar( float, m_flCAMov );			// CA: medidor de dispersão do movimento (M, 0..1)
+	CNetworkVar( int, m_iRecargaFase );			// recarga bala por bala: 0 não, 1 início, 2 bala, 3 fim
+	CNetworkVar( float, m_flRecargaProx );		// ... quando acaba a fase atual
 
 	float m_flViewmodelSprint;					// só cliente: 0 = normal, 1 = correndo
 	float m_flBobPhase;							// só cliente: fase do passo (anda com a distância, não com o tempo)

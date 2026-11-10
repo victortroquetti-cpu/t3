@@ -8,6 +8,7 @@
 #include "weapon_hl2mpbasehlmpcombatweapon.h"
 #include "weapon_hl2mpbasebasebludgeon.h"
 #include "in_buttons.h"
+#include "trok_zumbis.h"
 
 #ifdef CLIENT_DLL
 	#include "c_hl2mp_player.h"
@@ -35,9 +36,10 @@ public:
 
 	CWeaponTrokGarras() {}
 
-	virtual float GetRange( void ) { return trok_surto_garra_alcance.GetFloat(); }
-	virtual float GetFireRate( void ) { return trok_surto_garra_cadencia.GetFloat(); }
-	virtual float GetDamageForActivity( Activity hitActivity ) { return trok_surto_garra_dano.GetFloat(); }
+	// Multiplicadores do tipo de zumbi (Crusher: mais alcance, mais lento; trok_zumbis.cpp).
+	virtual float GetRange( void ) { return trok_surto_garra_alcance.GetFloat() * TrokZumbis_GarraAlcance( GetOwner() ); }
+	virtual float GetFireRate( void ) { return trok_surto_garra_cadencia.GetFloat() * TrokZumbis_GarraCadencia( GetOwner() ); }
+	virtual float GetDamageForActivity( Activity hitActivity ) { return trok_surto_garra_dano.GetFloat() * TrokZumbis_GarraDano( GetOwner() ); }
 	virtual void SecondaryAttack( void ) {}
 
 	virtual void AddViewKick( void )

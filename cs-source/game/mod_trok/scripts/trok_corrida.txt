@@ -1,0 +1,67 @@
+// Trok: escadas de armas da Corrida Armada (trok_modo corrida). Lido pelo servidor e pelo HUD.
+// Para reler sem reiniciar: trok_corrida_recarregar (vale na próxima troca de arma).
+//
+// Uma "escada" por meta (mp_fraglimit). Sem escada para a meta escolhida, vale a de meta mais
+// perto e a meta passa a ser a dela. Cada "degrau":
+//   "abates"   abates em que o degrau começa (o primeiro é 0; depois crescente). A arma troca
+//              quando os abates de inimigo do jogador ficam IGUAIS a este número;
+//   "nome"     o que o HUD mostra;
+//   "armas"    candidatas e peso no sorteio (até 8; peso 0 tira do sorteio). Arma que não existe
+//              no jogo é pulada (vem a próxima candidata);
+//   "municao"  (opcional) reserva dada junto; sem ela, a de trok_municao_inicial para o tipo.
+//
+// Números do Combat Arms (padrão do modo, missions.md F4.8 / game_modes.md M14, especificações
+// do Chimera): meta 15, 30 ou 45, mesmos degraus e classe de arma de cada degrau. O CA usa uma
+// arma de cada classe; aqui vai a nossa da mesma classe. Ainda NÃO temos metralhadora nem
+// fuzil de precisão: esses degraus estão com o fuzil (trocar quando houver). A última arma do
+// CA é a granada de mão; a faca vem sempre junto (trok_corrida_extras).
+
+"TrokCorrida"
+{
+	"escada"
+	{
+		"meta"	"15"
+		"degrau"	{ "abates" "0"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de assalto
+		"degrau"	{ "abates" "4"	"nome" "SUBMETRALHADORA"	"armas" { "weapon_trok_submetralhadora" "100" } }	// CA: submetralhadora
+		"degrau"	{ "abates" "7"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: metralhadora (falta)
+		"degrau"	{ "abates" "10"	"nome" "ESCOPETA"			"armas" { "weapon_trok_escopeta" "100" } }			// CA: escopeta
+		"degrau"	{ "abates" "12"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de precisão (falta)
+		"degrau"	{ "abates" "13"	"nome" "PISTOLA"			"armas" { "weapon_trok_pistola" "100" } }			// CA: pistola
+		"degrau"	{ "abates" "14"	"nome" "GRANADA"			"armas" { "weapon_trok_granada" "100" } }			// CA: granada de mão (última)
+	}
+
+	"escada"
+	{
+		"meta"	"30"
+		"degrau"	{ "abates" "0"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de assalto
+		"degrau"	{ "abates" "4"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de batalha
+		"degrau"	{ "abates" "7"	"nome" "SUBMETRALHADORA"	"armas" { "weapon_trok_submetralhadora" "100" } }	// CA: submetralhadora
+		"degrau"	{ "abates" "11"	"nome" "SUBMETRALHADORA"	"armas" { "weapon_trok_submetralhadora" "100" } }	// CA: submetralhadora
+		"degrau"	{ "abates" "15"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: metralhadora (falta)
+		"degrau"	{ "abates" "18"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: metralhadora (falta)
+		"degrau"	{ "abates" "21"	"nome" "ESCOPETA"			"armas" { "weapon_trok_escopeta" "100" } }			// CA: escopeta
+		"degrau"	{ "abates" "23"	"nome" "ESCOPETA"			"armas" { "weapon_trok_escopeta" "100" } }			// CA: escopeta
+		"degrau"	{ "abates" "25"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de precisão (falta)
+		"degrau"	{ "abates" "27"	"nome" "PISTOLA"			"armas" { "weapon_trok_pistola" "100" } }			// CA: pistola
+		"degrau"	{ "abates" "29"	"nome" "GRANADA"			"armas" { "weapon_trok_granada" "100" } }			// CA: granada de mão (última)
+	}
+
+	"escada"
+	{
+		"meta"	"45"
+		"degrau"	{ "abates" "0"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de assalto
+		"degrau"	{ "abates" "4"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de batalha
+		"degrau"	{ "abates" "8"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de assalto
+		"degrau"	{ "abates" "11"	"nome" "SUBMETRALHADORA"	"armas" { "weapon_trok_submetralhadora" "100" } }	// CA: submetralhadora
+		"degrau"	{ "abates" "15"	"nome" "SUBMETRALHADORA"	"armas" { "weapon_trok_submetralhadora" "100" } }	// CA: submetralhadora
+		"degrau"	{ "abates" "19"	"nome" "SUBMETRALHADORA"	"armas" { "weapon_trok_submetralhadora" "100" } }	// CA: submetralhadora
+		"degrau"	{ "abates" "22"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: metralhadora (falta)
+		"degrau"	{ "abates" "26"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: metralhadora (falta)
+		"degrau"	{ "abates" "29"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: metralhadora (falta)
+		"degrau"	{ "abates" "32"	"nome" "ESCOPETA"			"armas" { "weapon_trok_escopeta" "100" } }			// CA: escopeta
+		"degrau"	{ "abates" "35"	"nome" "ESCOPETA"			"armas" { "weapon_trok_escopeta" "100" } }			// CA: escopeta
+		"degrau"	{ "abates" "38"	"nome" "FUZIL"				"armas" { "weapon_trok_fuzil" "100" } }			// CA: fuzil de precisão (falta)
+		"degrau"	{ "abates" "41"	"nome" "PISTOLA"			"armas" { "weapon_trok_pistola" "100" } }			// CA: pistola
+		"degrau"	{ "abates" "44"	"nome" "GRANADA"			"armas" { "weapon_trok_granada" "100" } }			// CA: granada de mão (última)
+	}
+}

@@ -1,0 +1,51 @@
+// Trok: Faca (classe 3, arma branca). Lógica no molde da faca M9 do Combat Arms
+// (shared/trok/weapon_trok_faca.cpp; números: design/chimera/games/combat_arms/data/weapons/m9.toml
+// e specs/combat_arms/inventory.md seção 8). Modelo e som de PROTÓTIPO: o pé de cabra do
+// HL2 (montado do SDK Base), como o weapon_crowbar que ela substitui.
+// Velocidade com a faca na mão: trok_faca_velocidade (CA: perda 0, corre mais que com arma).
+
+WeaponData
+{
+	"printname"				"Faca"
+	"viewmodel"				"models/weapons/v_crowbar.mdl"
+	"playermodel"			"models/weapons/w_crowbar.mdl"
+	"anim_prefix"			"crowbar"
+	"bucket"				"2"
+	"bucket_position"		"0"
+
+	"clip_size"				"-1"
+	"primary_ammo"			"None"
+	"secondary_ammo"		"None"
+
+	"weight"				"0"
+	"item_flags"			"0"
+
+	"Trok"
+	{
+		"modelo_ca"		"1"
+		"CA"
+		{
+			"faca_alcance"		"105"					// alcance do raio (u)
+			"faca_golpe"		"0.65 45 0.155 0.402"	// botão 1: duração, dano, 1º acerto, 2º acerto (s)
+			"faca_estocada"		"1.1 75 0.367"			// botão 2: duração, dano, acerto (s)
+			"dano_variacao"		"0.1"					// +-10%
+			"tempo_sacar"		"0.45"					// animação select 450 ms
+		}
+	}
+
+	SoundData
+	{
+		"single_shot"		"Weapon_Crowbar.Single"
+		"melee_hit"			"Weapon_Crowbar.Melee_Hit"
+		"melee_hit_world"	"Weapon_Crowbar.Melee_HitWorld"
+	}
+
+	TextureData
+	{
+		"weapon"		{ "font" "WeaponIcons"			"character" "c" }
+		"weapon_s"		{ "font" "WeaponIconsSelected"	"character" "c" }
+		"ammo"			{ "font" "WeaponIcons"			"character" "c" }
+		"crosshair"		{ "file" "sprites/crosshairs" "x" "0" "y" "48" "width" "24" "height" "24" }
+		"autoaim"		{ "file" "sprites/crosshairs" "x" "48" "y" "72" "width" "24" "height" "24" }
+	}
+}

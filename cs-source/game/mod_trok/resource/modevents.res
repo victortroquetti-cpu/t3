@@ -58,4 +58,17 @@
 		"parte"		"byte"		// HITGROUP_* (1 = cabeça)
 		"vida"		"short"		// vida que sobrou
 	}
+
+	"trok_serie"			// abate de inimigo, para o anúncio da série (shared/trok/trok_killstreak.cpp)
+	{
+		"atacante"	"short"		// user ID de quem abateu
+		"vitima"	"short"		// user ID de quem morreu
+		"multi"		"byte"		// multi-abate: abates a menos de trok_serie_janela um do outro (1 = sem série)
+		"serie"		"short"		// abates seguidos nesta vida
+		"abates"	"short"		// abates de inimigo do matador no mapa
+		"cabeca"	"bool"		// abate na cabeça (bala ou corpo a corpo)
+		"primeiro"	"bool"		// primeiro abate (do mapa ou da rodada)
+		"vinganca"	"bool"		// a vítima tinha te abatido trok_serie_vinganca vezes sem resposta
+		"sorte"		"bool"		// tiro de sorte (trok_serie_sorte)
+	}
 }

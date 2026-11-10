@@ -6,6 +6,7 @@
 #include "trok_gamerules.h"
 #include "movevars_shared.h"
 #include "in_buttons.h"
+#include "trok_zumbis.h"
 
 #ifndef CLIENT_DLL
 	#include "hl2mp_player.h"
@@ -16,6 +17,9 @@
 	#include "NextBot/NextBotInterface.h"
 	#include "NextBot/NextBotIntentionInterface.h"
 	#include "filesystem.h"
+	#include "trok/trok_killstreak.h"
+	#include "trok/trok_economia.h"
+	#include "trok/trok_corrida.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -122,11 +126,18 @@ CTrokRules::CTrokRules()
 		m_bTeamPlayEnabled = false;
 		engine->ServerCommand( "exec solo.cfg\n" );
 	}
+	else if ( m_iModo == TROK_MODO_CORRIDA )
+	{
+		// Corrida Armada: todos contra todos com escada de armas (trok_corrida.cpp).
+		m_bTeamPlayEnabled = false;
+		engine->ServerCommand( "exec corrida.cfg\n" );
+	}
 	else
 	{
 		m_bTeamPlayEnabled = true;
 		engine->ServerCommand( "exec equipe.cfg\n" );
 	}
+	TrokCorrida_Iniciar( m_iModo == TROK_MODO_CORRIDA );
 
 	// Partida criada pelo menu (CRIAR PARTIDA): meta, tempo, nome e senha escolhidos vêm por cima do cfg
 	// do modo. O menu escreve este arquivo ao criar e o apaga ao jogar contra bots pelo JOGAR.
@@ -169,6 +180,9 @@ void CTrokRules::PlayerSpawn( CBasePlayer *pPlayer )
 
 	// Corpo exato do CA (ver g_TrokCAViewVectors).
 	pPlayer->SetModelScale( trok_mov_ca.GetBool() ? clamp( trok_ca_corpo_escala.GetFloat(), 0.5f, 2.0f ) : 1.0f );
+
+	TrokSerie_PlayerSpawn( pPlayer );		// série de abates (trok_killstreak.cpp)
+	TrokEconomia_PlayerSpawn( pPlayer );	// prazo e lugar da compra (server/trok/trok_economia.cpp)
 
 	if ( !m_bSurto )
 	{
@@ -220,6 +234,7 @@ void CTrokRules::SurtoTrocarTime( CBasePlayer *pPlayer, int iTeam )
 void CTrokRules::SurtoAplicarHumano( CBasePlayer *pPlayer )
 {
 	pPlayer->SetRenderColor( 255, 255, 255 );
+	TrokZumbis_AoVirarHumano( pPlayer );	// tipos de zumbi (trok_zumbis.cpp)
 }
 
 // Zumbi: só garras, vida de zumbi, tom esverdeado (até haver modelo próprio), levanta onde morreu.
@@ -233,13 +248,24 @@ void CTrokRules::SurtoAplicarZumbi( CBasePlayer *pPlayer )
 	if ( pGarras )
 		pPlayer->Weapon_Switch( pGarras );
 
-	const int iVida = MAX( 1, m_bHospedeiro[ i ] ? trok_surto_vida_hospedeiro.GetInt() : trok_surto_vida_zumbi.GetInt() );
+	// Tipo de zumbi escolhido (normal, Striker, Crusher...; scripts/trok_zumbis.txt).
+	const TrokZumbiClasse_t &tipo = TrokZumbis_Classe( TrokZumbis_AoVirar( pPlayer ) );
+	const float flVidaTipo = m_bHospedeiro[ i ] ? tipo.flVidaHospedeiro : tipo.flVida;
+	const int iVida = MAX( 1, flVidaTipo > 0.0f ? (int)flVidaTipo : ( m_bHospedeiro[ i ] ? trok_surto_vida_hospedeiro.GetInt() : trok_surto_vida_zumbi.GetInt() ) );
 	pPlayer->SetMaxHealth( iVida );
 	pPlayer->SetHealth( iVida );
 	pPlayer->SetArmorValue( 0 );
+	if ( tipo.flEscala != 1.0f )
+		pPlayer->SetModelScale( pPlayer->GetModelScale() * clamp( tipo.flEscala, 0.5f, 2.0f ) );
 
 	int r = 150, g = 225, b = 140;
 	sscanf( trok_surto_cor_zumbi.GetString(), "%d %d %d", &r, &g, &b );
+	if ( tipo.iCor[ 0 ] >= 0 )
+	{
+		r = tipo.iCor[ 0 ];
+		g = tipo.iCor[ 1 ];
+		b = tipo.iCor[ 2 ];
+	}
 	pPlayer->SetRenderColor( clamp( r, 0, 255 ), clamp( g, 0, 255 ), clamp( b, 0, 255 ) );
 
 	if ( trok_surto_virar_no_lugar.GetBool() && m_vecMorte[ i ] != vec3_invalid )
@@ -265,6 +291,8 @@ void CTrokRules::Think( void )
 		SurtoThink();
 	else
 		ModoThink();
+	if ( m_iModo == TROK_MODO_CORRIDA )
+		TrokCorrida_Think();
 }
 
 //-----------------------------------------------------------------------------
@@ -464,6 +492,7 @@ void CTrokRules::SurtoThink( void )
 		}
 
 		SurtoRegenerar();
+		TrokZumbis_Think();		// fôlego infinito, aura, bolhas (trok_zumbis.cpp)
 		SurtoFolegoZumbi();
 		SurtoEspectadores();
 
@@ -497,6 +526,7 @@ void CTrokRules::SurtoPreparo( void )
 	// O CleanUpMap recria as entidades do mapa; o estado é nosso e fica (está na lista de
 	// classes preservadas do HL2MP? não: por isso ele é recriado se sumir, no SurtoThink).
 	CleanUpMap();
+	TrokSerie_RodadaNova();	// primeiro abate da rodada (trok_killstreak.cpp)
 	pEstado = m_hEstado.Get();
 	if ( !pEstado )
 		return;
@@ -629,6 +659,9 @@ void CTrokRules::SurtoFim( int iVencedor )
 	pEstado->m_iDestaqueTipo = iBestTipo;
 	pEstado->m_iDestaqueValor = iBestVal;
 
+	// Economia: bônus de vitória e derrota (server/trok/trok_economia.cpp).
+	TrokEconomia_FimRodada( iVencedor == SURTO_HUMANOS ? TEAM_TROK_HUMANOS : TEAM_TROK_ZUMBIS );
+
 	TrokSurto_DispararMapa( iVencedor == SURTO_HUMANOS ? 4 : 5 );
 }
 
@@ -638,14 +671,16 @@ void CTrokRules::SurtoFim( int iVencedor )
 void CTrokRules::SurtoRegenerar( void )
 {
 	const float flNow = gpGlobals->curtime;
-	const float flFrac = trok_surto_regen.GetFloat();
-	if ( flFrac <= 0.0f )
-		return;
 
 	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
 		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
 		if ( !IsPlaying( pPlayer ) || !pPlayer->IsAlive() || pPlayer->GetTeamNumber() != TEAM_TROK_ZUMBIS )
+			continue;
+		// Regeneração do tipo de zumbi (Crusher: 20%) ou a do modo.
+		const float flRegenTipo = TrokZumbis_Classe( TrokZumbis_ClasseDe( pPlayer ) ).flRegen;
+		const float flFrac = flRegenTipo >= 0.0f ? flRegenTipo : trok_surto_regen.GetFloat();
+		if ( flFrac <= 0.0f )
 			continue;
 
 		const bool bParado = pPlayer->GetAbsVelocity().Length() < 1.0f;
@@ -726,8 +761,14 @@ void CTrokRules::SurtoFolegoZumbi( void )
 //-----------------------------------------------------------------------------
 void CTrokRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 {
+	TrokZumbis_AoMorrer( pVictim );		// zumbi que explode / solta nuvem tóxica (trok_zumbis.cpp)
+	const int iFragsAntes = pVictim->FragCount();
 	BaseClass::PlayerKilled( pVictim, info );
 	m_flMorte[ pVictim->entindex() ] = gpGlobals->curtime;
+	if ( m_iModo == TROK_MODO_CORRIDA )
+		TrokCorrida_Abate( pVictim, info, iFragsAntes );	// escada de armas (trok_corrida.cpp)
+	TrokSerie_PlayerKilled( pVictim, info );		// série de abates (trok_killstreak.cpp)
+	TrokEconomia_PlayerKilled( pVictim, info );		// dinheiro do abate (server/trok/trok_economia.cpp)
 
 	CTrokSurtoEstado *pEstado = m_hEstado.Get();
 	if ( !m_bSurto || !pEstado || pEstado->GetFase() != SURTO_JOGO )
@@ -816,6 +857,8 @@ bool CTrokRules::CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pIt
 		if ( bGarras )
 			return false;
 	}
+	if ( m_iModo == TROK_MODO_CORRIDA && !TrokCorrida_PodeTerArma( pPlayer, pItem ) )
+		return false; // Corrida Armada: só a escada dá arma
 	return BaseClass::CanHavePlayerItem( pPlayer, pItem );
 }
 
@@ -823,6 +866,12 @@ bool CTrokRules::ClientCommand( CBaseEntity *pEdict, const CCommand &args )
 {
 	// No Surto o time é decidido pela rodada.
 	if ( m_bSurto && ( FStrEq( args[ 0 ], "jointeam" ) || FStrEq( args[ 0 ], "changeteam" ) ) )
+		return true;
+	// trok_comprar (server/trok/trok_economia.cpp)
+	if ( TrokEconomia_ClientCommand( ToBasePlayer( pEdict ), args ) )
+		return true;
+	// trok_zumbi_classe (trok_zumbis.cpp)
+	if ( TrokZumbis_ClientCommand( ToBasePlayer( pEdict ), args ) )
 		return true;
 	return BaseClass::ClientCommand( pEdict, args );
 }
@@ -840,6 +889,7 @@ void CTrokRules::OnPlayerDamaged( CBasePlayer *pVictim, const CTakeDamageInfo &i
 		return;
 	m_flUltimoDano[ pVictim->entindex() ] = gpGlobals->curtime;
 	m_flProxRegen[ pVictim->entindex() ] = gpGlobals->curtime + trok_surto_regen_espera.GetFloat();
+	TrokZumbis_AoAcertar( pVictim, info );	// golpe que paralisa (Splicer)
 
 	const float flScale = trok_surto_empurrao.GetFloat();
 	if ( flScale <= 0.0f || !TrokSurto_IsZumbi( pVictim ) )
@@ -988,7 +1038,8 @@ public:
 	}
 };
 
-static bool TrokExplosaoBloqueada( const Vector &a, const Vector &b, CBaseEntity *pInflictor )
+// Também usada pelo clarão e pela claymore (server/trok/trok_projetil.cpp).
+bool TrokExplosaoBloqueada( const Vector &a, const Vector &b, CBaseEntity *pInflictor )
 {
 	if ( ( a - b ).LengthSqr() < 0.01f )
 		return false;	// traço de comprimento zero nunca bloqueia

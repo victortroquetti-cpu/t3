@@ -1,0 +1,98 @@
+// Trok: anunciador da série de abates (client/trok/hud_trok_killstreak.cpp; trok_serie_recarregar relê).
+// Regras e números do Combat Arms: design/chimera/specs/combat_arms/kill_streaks.md (Parte B).
+// Textos são nossos (nada de nome ou arte do CA). Vozes PROVISÓRIAS do HL2 e do CS:S montados;
+// trocar por sound/trok/anunciador/*.wav quando houver voz própria. Voz liga/desliga: trok_serie_voz.
+//
+// Por evento: texto (faixa), som (voz; vazio = sem voz), nivel (faixa de nível menor que a da tela
+// é descartada), cor (do texto da faixa, "R G B"), lista (rótulo da linha da esquerda; vazio = sem
+// linha), cor_lista, topo (marca sobre a faixa).
+"Anunciador"
+{
+	// Faixa no alto da tela (CA B4). Segundos; escalas em vezes o tamanho normal.
+	"faixa"
+	{
+		"total"				"1.4"		// some em 1,4 s
+		"inicio"			"0.0"
+		"entrada"			"0.1"		// entra de 5x para 1x
+		"eco"				"0.15"		// eco cresce de 1x a 3x e a faixa treme
+		"saida_inicio"		"1.2"
+		"saida"				"0.2"		// sai de 1x para 5x sumindo
+		"escala_entrada"	"5.0"
+		"escala_eco"		"3.0"
+		"escala_saida"		"5.0"
+		"tremor"			"5"			// px de tela, para cada lado
+		"centro_y"			"0.266"		// centro da faixa, fração da altura (CA: 204 de 768)
+		"altura_texto"		"0.075"		// altura do texto na escala 1, fração da altura da tela
+	}
+
+	// Linhas do lado esquerdo (CA B6). x e y em px de uma tela 1280x720 (abaixo do radar).
+	"lista"
+	{
+		"x"				"32"
+		"y"				"222"
+		"tempo"			"3.75"
+		"fase1"			"1.0"
+		"fase2"			"1.375"
+		"fase3"			"2.375"
+		"escala"		"1.1"
+		"max"			"5"
+		"cor_aliado"	"90 162 255"
+		"cor_inimigo"	"255 90 90"
+	}
+
+	// Passos do multi-abate (abates a menos de 5 s um do outro). "7" vale para 7 ou mais.
+	"passos"
+	{
+		"2"	{ "texto" "ABATE DUPLO"		"lista" "ABATE DUPLO"		"cor_lista" "255 233 172"	"nivel" "5"	"som" "vo/npc/male01/gotone01.wav" }
+		"3"	{ "texto" "ABATE MÚLTIPLO"	"lista" "ABATE MÚLTIPLO"						"nivel" "5"	"som" "vo/npc/male01/gotone02.wav" }
+		"4"	{ "texto" "ULTRA ABATE"		"lista" "ULTRA ABATE"							"nivel" "5"	"som" "vo/npc/male01/yeah02.wav" }
+		"5"	{ "texto" "FANTÁSTICO"		"lista" "FANTÁSTICO"							"nivel" "5"	"som" "vo/npc/male01/fantastic01.wav" }
+		"6"	{ "texto" "INACREDITÁVEL"	"lista" "INACREDITÁVEL"		"cor_lista" "255 174 0"		"nivel" "5"	"som" "vo/npc/male01/fantastic02.wav" }
+		// CA: o 7+ repete a voz do 6.
+		"7"	{ "texto" "INACREDITÁVEL+"	"lista" "INACREDITÁVEL+"	"cor_lista" "255 174 0"		"nivel" "5"	"som" "vo/npc/male01/fantastic02.wav" }
+	}
+
+	"primeiro"
+	{
+		"texto"		"PRIMEIRO ABATE"
+		"lista"		"PRIMEIRO ABATE"
+		"cor"		"242 181 68"
+		"nivel"		"6"
+		"som"		"radio/enemydown.wav"		// CS:S
+	}
+
+	// CA: a vingança não tem voz; se foi na cabeça, fala a voz da cabeça.
+	"vinganca"
+	{
+		"texto"		"VINGANÇA"
+		"cor"		"242 181 68"
+		"nivel"		"6"
+		"som"		""
+	}
+
+	// Só aparece num abate sem série; numa série vira a marca "topo" sobre a faixa.
+	"cabeca"
+	{
+		"texto"		"NA CABEÇA"
+		"topo"		"CABEÇA"
+		"nivel"		"5"
+		"som"		"vo/npc/male01/nice.wav"
+	}
+
+	// Abate simples seu: "1 ABATE", depois "N ABATES" com o total do mapa. CA: sem voz.
+	"abate"
+	{
+		"texto"			"ABATE"
+		"texto_varios"	"ABATES"
+		"nivel"			"1"
+		"som"			""
+	}
+
+	"sorte"
+	{
+		"texto"		"TIRO DE SORTE"
+		"cor"		"242 181 68"
+		"nivel"		"11"
+		"som"		""
+	}
+}

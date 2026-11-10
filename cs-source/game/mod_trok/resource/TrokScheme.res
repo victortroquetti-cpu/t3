@@ -7,8 +7,39 @@ Scheme
 	Colors
 	{
 	}
+	// Cores dos controles VGUI que usam este esquema (o chat da partida: histórico RichText e
+	// campo TextEntry; hl2mp_hud_chat.cpp). Paleta de design/ui.md.
 	BaseSettings
 	{
+		"Panel.FgColor"					"236 238 241 255"
+		"Panel.BgColor"					"0 0 0 0"
+		"Label.TextColor"				"236 238 241 255"
+		"Label.BgColor"					"0 0 0 0"
+		"Label.DisabledFgColor1"		"128 134 142 255"
+		"Label.DisabledFgColor2"		"0 0 0 0"
+		"Label.SelectedTextColor"		"236 238 241 255"
+		"RichText.TextColor"			"236 238 241 255"
+		"RichText.BgColor"				"0 0 0 0"
+		"RichText.SelectedTextColor"	"11 13 16 255"
+		"RichText.SelectedBgColor"		"242 181 68 255"
+		"TextEntry.TextColor"			"236 238 241 255"
+		"TextEntry.BgColor"				"0 0 0 0"
+		"TextEntry.CursorColor"			"242 181 68 255"
+		"TextEntry.DisabledTextColor"	"128 134 142 255"
+		"TextEntry.DisabledBgColor"		"0 0 0 0"
+		"TextEntry.SelectedTextColor"	"11 13 16 255"
+		"TextEntry.SelectedBgColor"		"242 181 68 255"
+		"TextEntry.OutOfFocusSelectedBgColor"	"163 169 177 120"
+		"TextEntry.FocusEdgeColor"		"0 0 0 0"
+		"ScrollBarButton.FgColor"		"163 169 177 255"
+		"ScrollBarButton.BgColor"		"0 0 0 0"
+		"ScrollBarButton.ArmedFgColor"	"236 238 241 255"
+		"ScrollBarButton.ArmedBgColor"	"0 0 0 0"
+		"ScrollBarButton.DepressedFgColor"	"242 181 68 255"
+		"ScrollBarButton.DepressedBgColor"	"0 0 0 0"
+		"ScrollBarSlider.FgColor"		"255 255 255 60"
+		"ScrollBarSlider.BgColor"		"255 255 255 15"
+		"Chat.TypingText"				"236 238 241 255"
 	}
 	Fonts
 	{
@@ -59,6 +90,30 @@ Scheme
 		"TrokSmall"
 		{
 			"1"	{ "name" "Barlow Medium" "tall" "8" "weight" "400" "antialias" "1" }
+		}
+		// Chat da partida (hl2mp_hud_chat.cpp): histórico, campo de texto e o prompt TODOS:/TIME:.
+		// Barlow tem os acentos do português.
+		"ChatFont"
+		{
+			"1"	{ "name" "Barlow Medium" "tall" "9" "weight" "400" "antialias" "1" "dropshadow" "1" }
+		}
+		"TrokChatPrompt"
+		{
+			"1"	{ "name" "Barlow Condensed SemiBold" "tall" "9" "weight" "400" "antialias" "1" "dropshadow" "1" }
+		}
+		// Usadas pelos controles VGUI deste esquema (rótulo e setas da rolagem do chat).
+		"Default"
+		{
+			"1"	{ "name" "Barlow" "tall" "10" "weight" "400" "antialias" "1" }
+		}
+		"Marlett"
+		{
+			"1"	{ "name" "Marlett" "tall" "14" "weight" "0" "symbol" "1" }
+		}
+		// Mensagens do centro da tela e dicas (vgui_centerprint.cpp, hud_hintdisplay.cpp).
+		"TrokCentro"
+		{
+			"1"	{ "name" "Barlow Condensed SemiBold" "tall" "14" "weight" "400" "antialias" "1" "dropshadow" "1" }
 		}
 	}
 	Borders

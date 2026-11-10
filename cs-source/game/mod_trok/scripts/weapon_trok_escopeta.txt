@@ -1,6 +1,6 @@
 // Trok: Escopeta. Modelo e som de PROTÓTIPO, do CS:S montado do jogo do jogador
-// (não vão no pacote). Os números do bloco "Trok" são pontos de partida: preencher com
-// a referência do Combat Arms no local (ver cs-source/design/sistemas-jogabilidade.md).
+// (não vão no pacote). Números do Combat Arms (Remington 870, Chimera:
+// design/chimera/games/combat_arms/data/weapons/remington_870.toml) no sub-bloco "CA" do bloco "Trok".
 
 WeaponData
 {
@@ -11,9 +11,9 @@ WeaponData
 	"bucket"			"0"
 	"bucket_position"	"2"
 
-	"clip_size"			"8"
+	"clip_size"		"7"
 	"clip2_size"		"-1"
-	"default_clip"		"8"
+	"default_clip"		"7"
 	"default_clip2"		"-1"
 
 	"primary_ammo"		"Buckshot"
@@ -21,23 +21,23 @@ WeaponData
 
 	"weight"			"3"
 	"item_flags"		"0"
-	"damage"			"18"
+	"damage"		"9"
 
 	// Sistema de armas do Trok (shared/trok/weapon_trok_gun.cpp). Ângulos em graus,
 	// distâncias em u, tempos em s. Ajuste ao vivo da mira: trok_mira_ajuste / trok_mira_imprimir.
 	"Trok"
 	{
-		"tiros_por_minuto"		"70"
+		"tiros_por_minuto"		"100"		// CA: bombeada de 600 ms
 		"empurrao"		"40"		// u/s por bala acertada no zumbi (modo Surto) (por chumbo: 9 por tiro)
 		"segurar"		"0.06"		// fração da velocidade do zumbi que cada bala tira
 		"ca_empurrao"		"40"		// movimento do CA: força K do empurrão no infectado (MEDIR (padrão do CA: 40 / 0,3 s; por chumbo))
 		"ca_empurrao_tempo"	"0.3"
 		"automatica"		"0"
-		"balas_por_tiro"		"9"
-		"dano"		"18"
-		"queda_inicio"		"250"
-		"queda_fim"		"900"
-		"queda_minimo"		"0.25"
+		"balas_por_tiro"		"8"		// CA: 8 raios de 9
+		"dano"		"9"
+		"queda_inicio"		"800"
+		"queda_fim"		"1000"
+		"queda_minimo"		"0.35"
 		"dispersao_parado"		"6.0"
 		"dispersao_andando"		"7.5"
 		"dispersao_ar"		"10.0"
@@ -58,8 +58,37 @@ WeaponData
 		"mira_coice"		"2.0"		// mirando: quanto a arma vem para trás a cada tiro (u)
 		"mira_coice_angulo"	"1.5"		// ... e quanto levanta (graus)
 		"mira_animacao_tiro"	"0"		// 0 = mirando não toca a animação de tiro do modelo (a alça fica no centro)
-		"velocidade"		"0.92"		// R870 do CA: perda de 0,08 (movimento do CA: corrida x (1 - colete) x isto)
+		"velocidade"		"0.9111"		// CA: 285 x (1 - 0,10 - 0,08) = 233,7 u/s
 		"animacao"		"shotgun"
+
+		// Lei de tiro do Combat Arms (shared/trok/weapon_trok_gun.cpp; trok_arma_ca 0 volta ao modelo antigo,
+		// que usa os campos "dispersao_*", "recuo_*" e "queda_*" acima).
+		"modelo_ca"		"1"
+		"CA"
+		{
+			"dano"                  "9"	// por chumbo; 8 no peito até 600 u = 72
+			"dano_variacao"         "0.1"	// padrão
+			"alcance"               "1000"	// depois de 1000 u não acerta nada
+			"faixas"                "600 800 1000"
+			"faixas_dano"           "1.0 0.7 0.35"
+			"cone"                  "35 100"	// x1,2 = 42: cada chumbo em +-2,4 graus
+			"cone_velocidade"       "5.0 1.0"
+			"cone_fator"            "1.2"
+			"teto_tiro"             "0.45 0.45 0.45 0.45"
+			"alvo_movimento"        "0 0 0"	// correr e pular não abrem a escopeta
+			"espera_recuperar"      "0.1"
+			"recuo"                 "5"
+			"recuo_acel"            "0"
+			"recuo_max"             "25"
+			"recuo_lado_inicio"     "0"
+			"recuo_lado"            "-2 2"
+			"recuo_lado_max"        "50"
+			"recuo_lado_troca"      "0.015"	// padrão
+			"recuo_volta_espera"    "0.6"	// padrão
+			"recuo_volta"           "0.1 0.3"	// padrão
+			"recarga_por_bala"      "0.333 0.7 0.9"	// abrir, cada cartucho, fechar (s); atirar interrompe
+			"tempo_sacar"           "1.0"
+		}
 	}
 
 	// Arquivos .wav direto (o CS:S montado tem esses sons).

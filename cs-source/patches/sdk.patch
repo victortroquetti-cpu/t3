@@ -1,19 +1,20 @@
 diff --git a/src/game/client/cdll_client_int.cpp b/src/game/client/cdll_client_int.cpp
-index 7b47d82..a8a98d9 100644
+index 7b47d82..aeebe4a 100644
 --- a/src/game/client/cdll_client_int.cpp
 +++ b/src/game/client/cdll_client_int.cpp
-@@ -173,6 +173,10 @@ extern vgui::IInputInternal *g_InputInternal;
+@@ -173,6 +173,11 @@ extern vgui::IInputInternal *g_InputInternal;
  #include "sixense/in_sixense.h"
  #endif
  
 +#ifdef TROK
 +#include "trok/ui/trok_menu.h"
++bool TrokUI_CaptureESC( void ); // client/trok/ui/trok_ui_comum.cpp
 +#endif
 +
  // memdbgon must be the last include file in a .cpp file!!!
  #include "tier0/memdbgon.h"
  
-@@ -2550,6 +2554,11 @@ void CHLClient::ReloadFilesInList( IFileList *pFilesToReload )
+@@ -2550,6 +2555,14 @@ void CHLClient::ReloadFilesInList( IFileList *pFilesToReload )
  
  bool CHLClient::HandleUiToggle()
  {
@@ -21,15 +22,28 @@ index 7b47d82..a8a98d9 100644
 +	// ESC numa subtela do menu do Trok volta para a tela inicial em vez de fechar o menu.
 +	if ( TrokMenu_CaptureESC() )
 +		return true;
++	// ESC com a seleção de time ou as boas-vindas abertas na partida: fecha o painel.
++	if ( TrokUI_CaptureESC() )
++		return true;
 +#endif
  #if defined( REPLAY_ENABLED )
  	if ( !g_pEngineReplay || !g_pEngineReplay->IsSupportedModAndPlatform() )
  		return false;
 diff --git a/src/game/client/clientmode_shared.cpp b/src/game/client/clientmode_shared.cpp
-index 54933d2..d7c4528 100644
+index 54933d2..66eb792 100644
 --- a/src/game/client/clientmode_shared.cpp
 +++ b/src/game/client/clientmode_shared.cpp
-@@ -986,9 +986,17 @@ void ClientModeShared::Layout()
+@@ -741,7 +741,9 @@ int ClientModeShared::HandleSpectatorKeyInput( int down, ButtonCode_t keynum, co
+ 	// we are in spectator mode, open spectator menu
+ 	if ( down && pszCurrentBinding && Q_strcmp( pszCurrentBinding, "+duck" ) == 0 )
+ 	{
++#ifndef TROK // Trok: sem o menu de espectador do Source (tinha câmera livre); o painel é trok_espectador.cpp
+ 		m_pViewport->ShowPanel( PANEL_SPECMENU, true );
++#endif
+ 		return 0; // we handled it, don't handle twice or send to server
+ 	}
+ 	else if ( down && pszCurrentBinding && Q_strcmp( pszCurrentBinding, "+attack" ) == 0 )
+@@ -986,9 +988,17 @@ void ClientModeShared::Layout()
  	}
  }
  
@@ -140,7 +154,7 @@ index 416c930..bb82548 100644
  #define SUITPOWER_INIT -1
  
 diff --git a/src/game/client/hl2/hud_weaponselection.cpp b/src/game/client/hl2/hud_weaponselection.cpp
-index f560070..ef7c7ca 100644
+index f560070..6c084a0 100644
 --- a/src/game/client/hl2/hud_weaponselection.cpp
 +++ b/src/game/client/hl2/hud_weaponselection.cpp
 @@ -263,6 +263,11 @@ bool CHudWeaponSelection::ShouldDraw()
@@ -155,6 +169,26 @@ index f560070..ef7c7ca 100644
  	// draw weapon selection a little longer if in fastswitch so we can see what we've selected
  	if ( hud_fastswitch.GetBool() && ( gpGlobals->curtime - m_flSelectionTime ) < (FASTSWITCH_DISPLAY_TIMEOUT + FASTSWITCH_FADEOUT_TIME) )
  		return true;
+@@ -1323,6 +1328,19 @@ void CHudWeaponSelection::FastWeaponSwitch( int iWeaponSlot )
+ 		// start after this weapon
+ 		iPosition = pActiveWeapon->GetPosition();
+ 	}
++#ifdef TROK
++	else
++	{
++		// CA: a tecla de outra classe volta na arma dessa classe usada por último (trok_inventario.cpp).
++		extern C_BaseCombatWeapon *TrokInventario_UltimaDaClasse( int iSlot );
++		C_BaseCombatWeapon *pUltima = TrokInventario_UltimaDaClasse( iWeaponSlot );
++		if ( pUltima && pUltima != pActiveWeapon )
++		{
++			::input->MakeWeaponSelection( pUltima );
++			return;
++		}
++	}
++#endif
+ 
+ 	C_BaseCombatWeapon *pNextWeapon = NULL;
+ 
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.cpp b/src/game/client/hl2mp/c_hl2mp_player.cpp
 index 367a616..307043e 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.cpp
@@ -360,10 +394,20 @@ index bac7584..8bf1f8d 100644
  	
  	C_HL2MP_Player( const C_HL2MP_Player & );
 diff --git a/src/game/client/hl2mp/clientmode_hl2mpnormal.cpp b/src/game/client/hl2mp/clientmode_hl2mpnormal.cpp
-index 35bfd1c..e835688 100644
+index 35bfd1c..f9f21aa 100644
 --- a/src/game/client/hl2mp/clientmode_hl2mpnormal.cpp
 +++ b/src/game/client/hl2mp/clientmode_hl2mpnormal.cpp
-@@ -73,7 +73,12 @@ IViewPortPanel* CHudViewport::CreatePanelByName( const char *szPanelName )
+@@ -60,6 +60,9 @@ protected:
+ 	}
+ 
+ 	virtual IViewPortPanel *CreatePanelByName( const char *szPanelName );
++#ifdef TROK
++	virtual void CreateDefaultPanels( void );
++#endif
+ };
+ 
+ int ClientModeHL2MPNormal::GetDeathMessageStartHeight( void )
+@@ -73,23 +76,55 @@ IViewPortPanel* CHudViewport::CreatePanelByName( const char *szPanelName )
  
  	if ( Q_strcmp( PANEL_SCOREBOARD, szPanelName) == 0 )
  	{
@@ -376,6 +420,194 @@ index 35bfd1c..e835688 100644
  		return newpanel;
  	}
  	else if ( Q_strcmp(PANEL_INFO, szPanelName) == 0 )
+ 	{
++#ifdef TROK
++		extern IViewPortPanel *TrokMotd_Create( IViewPort *pViewPort ); // client/trok/ui/trok_motd.cpp
++		newpanel = TrokMotd_Create( this );
++#else
+ 		newpanel = new CHL2MPTextWindow( this );
++#endif
+ 		return newpanel;
+ 	}
+ 	else if ( Q_strcmp(PANEL_SPECGUI, szPanelName) == 0 )
+ 	{
+-		newpanel = new CHL2MPSpectatorGUI( this );	
++#ifdef TROK
++		extern IViewPortPanel *TrokEspectador_Create( IViewPort *pViewPort ); // client/trok/ui/trok_espectador.cpp
++		newpanel = TrokEspectador_Create( this );
++#else
++		newpanel = new CHL2MPSpectatorGUI( this );
++#endif
+ 		return newpanel;
+ 	}
++#ifdef TROK
++	else if ( Q_strcmp( PANEL_TEAM, szPanelName ) == 0 )
++	{
++		extern IViewPortPanel *TrokTimeMenu_Create( IViewPort *pViewPort ); // client/trok/ui/trok_time.cpp
++		newpanel = TrokTimeMenu_Create( this );
++		return newpanel;
++	}
++#endif
++
+ 
+-	
+-	return BaseClass::CreatePanelByName( szPanelName ); 
++	return BaseClass::CreatePanelByName( szPanelName );
++}
++
++#ifdef TROK
++// Painéis do Trok que o CBaseViewport não cria sozinho (seleção de time).
++void CHudViewport::CreateDefaultPanels( void )
++{
++	BaseClass::CreateDefaultPanels();
++	AddNewPanel( CreatePanelByName( PANEL_TEAM ), "PANEL_TEAM" );
+ }
++#endif
+ 
+ //-----------------------------------------------------------------------------
+ // ClientModeHLNormal implementation
+diff --git a/src/game/client/hl2mp/hl2mp_hud_chat.cpp b/src/game/client/hl2mp/hl2mp_hud_chat.cpp
+index 67f4714..9b9bc78 100644
+--- a/src/game/client/hl2mp/hl2mp_hud_chat.cpp
++++ b/src/game/client/hl2mp/hl2mp_hud_chat.cpp
+@@ -15,6 +15,13 @@
+ #include "c_hl2mp_player.h"
+ #include "hl2mp_gamerules.h"
+ #include "ihudlcd.h"
++#ifdef TROK
++#include "trok/ui/trok_ui_comum.h"
++#include "iclientmode.h"
++#include <vgui_controls/TextEntry.h>
++#include <vgui_controls/Label.h>
++#include <vgui_controls/Button.h>
++#endif
+ 
+ 
+ 
+@@ -67,8 +74,75 @@ void CHudChat::CreateChatLines( void )
+ void CHudChat::ApplySchemeSettings( vgui::IScheme *pScheme )
+ {
+ 	BaseClass::ApplySchemeSettings( pScheme );
++#ifdef TROK
++	TrokEstilo();
++#endif
+ }
+ 
++#ifdef TROK
++//-----------------------------------------------------------------------------
++// Trok: fontes e cores do mod no chat do Source (o histórico que some, a rolagem e o
++// campo de texto com acento continuam os do CBaseHudChat). Cores em design/ui.md.
++//-----------------------------------------------------------------------------
++void CHudChat::TrokEstilo( void )
++{
++	vgui::HFont hFonte = TrokUI::Fonte( "ChatFont" );
++	if ( hFonte == vgui::INVALID_FONT )
++		return;
++	// Fundo do painel com a cor dos painéis do mod (o alfa continua com o FadeChatHistory).
++	SetBgColor( Color( 20, 23, 28, GetBgColor().a() ) );
++	// Histórico e campo de texto passam a usar o TrokScheme ("ChatFont" e as cores de
++	// RichText/TextEntry de lá), então a fonte do mod volta sozinha quando o esquema é reaplicado.
++	const vgui::HScheme hTrok = TrokUI::Esquema();
++	if ( GetChatHistory() )
++	{
++		if ( GetChatHistory()->GetScheme() != hTrok )
++			GetChatHistory()->SetScheme( hTrok );
++		GetChatHistory()->SetFont( hFonte );
++	}
++	if ( m_pChatInput && m_pChatInput->GetScheme() != hTrok )
++		m_pChatInput->SetScheme( hTrok );
++	if ( m_pChatInput )
++	{
++		vgui::Label *pPrompt = m_pChatInput->GetPrompt();
++		if ( pPrompt )
++		{
++			const vgui::HFont hPrompt = TrokUI::Fonte( "TrokChatPrompt" );
++			pPrompt->SetFont( hPrompt != vgui::INVALID_FONT ? hPrompt : hFonte );
++			pPrompt->SetFgColor( TrokUI::Destaque() );
++		}
++		vgui::TextEntry *pEntry = dynamic_cast< vgui::TextEntry * >( m_pChatInput->GetInputPanel() );
++		if ( pEntry )
++		{
++			pEntry->SetFont( hFonte );
++			pEntry->SetFgColor( TrokUI::COR_TEXTO );
++		}
++	}
++	// O botão de filtros do Source não existe no Trok.
++	if ( m_pFiltersButton )
++		m_pFiltersButton->SetVisible( false );
++}
++
++void CHudChat::StartMessageMode( int iMessageModeType )
++{
++	BaseClass::StartMessageMode( iMessageModeType );
++	// O CBaseHudChat volta a fonte do ClientScheme ao abrir: põe a do mod de novo.
++	TrokEstilo();
++	if ( m_pChatInput )
++	{
++		m_pChatInput->SetPrompt( iMessageModeType == MM_SAY_TEAM ? L"TIME:" : L"TODOS:" );
++		vgui::Label *pPrompt = m_pChatInput->GetPrompt();
++		if ( pPrompt )
++			pPrompt->SetFgColor( iMessageModeType == MM_SAY_TEAM ? TrokUI::COR_ALIADO : TrokUI::Destaque() );
++	}
++}
++
++Color CHudChat::GetDefaultTextColor( void )
++{
++	return TrokUI::COR_TEXTO;
++}
++#endif
++
+ 
+ void CHudChat::Init( void )
+ {
+@@ -98,6 +172,23 @@ int CHudChat::GetChatInputOffset( void )
+ 
+ Color CHudChat::GetClientColor( int clientIndex )
+ {
++#ifdef TROK
++	// Trok: cor relativa (seu time azul, o outro vermelho; no Surto, zumbi verde).
++	// Mensagem do servidor na cor de destaque; sem times, texto claro.
++	if ( clientIndex == 0 )
++		return TrokUI::Destaque();
++	if ( g_PR )
++	{
++		const int iTeam = g_PR->GetTeam( clientIndex );
++		if ( iTeam == TEAM_COMBINE || iTeam == TEAM_REBELS )
++		{
++			Color c = TrokUI::CorDoTime( iTeam );
++			return ( c == TrokUI::COR_TEXTO2 ) ? TrokUI::COR_TEXTO : c;
++		}
++		return TrokUI::COR_TEXTO2;
++	}
++	return TrokUI::COR_TEXTO;
++#else
+ 	if ( clientIndex == 0 ) // console msg
+ 	{
+ 		return g_ColorYellow;
+@@ -113,4 +204,5 @@ Color CHudChat::GetClientColor( int clientIndex )
+ 	}
+ 
+ 	return g_ColorYellow;
++#endif
+ }
+\ No newline at end of file
+diff --git a/src/game/client/hl2mp/hl2mp_hud_chat.h b/src/game/client/hl2mp/hl2mp_hud_chat.h
+index 1f08e60..acaca19 100644
+--- a/src/game/client/hl2mp/hl2mp_hud_chat.h
++++ b/src/game/client/hl2mp/hl2mp_hud_chat.h
+@@ -60,6 +60,12 @@ public:
+ 	int				GetChatInputOffset( void );
+ 
+ 	virtual Color	GetClientColor( int clientIndex );
++#ifdef TROK
++	// Trok: chat no visual do mod (fontes do TrokScheme, cores de time relativas, prompt em português).
++	virtual void	StartMessageMode( int iMessageModeType );
++	virtual Color	GetDefaultTextColor( void );
++	void			TrokEstilo( void );
++#endif
+ };
+ 
+ #endif	//CS_HUD_CHAT_H
 diff --git a/src/game/client/hl2mp/hud_deathnotice.cpp b/src/game/client/hl2mp/hud_deathnotice.cpp
 index 400fcf0..92dc8bd 100644
 --- a/src/game/client/hl2mp/hud_deathnotice.cpp
@@ -404,6 +636,48 @@ index fc7714f..8ae52bb 100644
  	bool bNeedsDraw;
  
  	if ( m_bHideCrosshair )
+diff --git a/src/game/client/hud_hintdisplay.cpp b/src/game/client/hud_hintdisplay.cpp
+index 040ce5b..e7c2ac9 100644
+--- a/src/game/client/hud_hintdisplay.cpp
++++ b/src/game/client/hud_hintdisplay.cpp
+@@ -107,6 +107,17 @@ void CHudHintDisplay::ApplySchemeSettings( vgui::IScheme *pScheme )
+ 	SetFgColor( GetSchemeColor("HintMessageFg", pScheme) );
+ 	m_hFont = pScheme->GetFont( "HudHintText", true );
+ 	m_pLabel->SetBgColor( GetSchemeColor("HintMessageBg", pScheme) );
++#ifdef TROK
++	{
++		// Trok: dica no visual do mod (texto claro, fundo dos painéis, fonte "TrokCentro").
++		extern vgui::HFont TrokUI_FonteCentro( void ); // client/trok/ui/trok_ui_comum.cpp
++		const vgui::HFont hTrok = TrokUI_FonteCentro();
++		if ( hTrok != vgui::INVALID_FONT )
++			m_hFont = hTrok;
++		SetFgColor( Color( 236, 238, 241, 255 ) );
++		m_pLabel->SetBgColor( Color( 20, 23, 28, 210 ) );
++	}
++#endif
+ 	m_pLabel->SetPaintBackgroundType( 2 );
+ 	m_pLabel->SetSize( 0, GetTall() );		// Start tiny, it'll grow.
+ }
+diff --git a/src/game/client/vgui_centerstringpanel.cpp b/src/game/client/vgui_centerstringpanel.cpp
+index 13057cc..18db2fe 100644
+--- a/src/game/client/vgui_centerstringpanel.cpp
++++ b/src/game/client/vgui_centerstringpanel.cpp
+@@ -124,6 +124,15 @@ void CCenterStringLabel::ApplySchemeSettings(vgui::IScheme *pScheme)
+ 
+ 	// Use a large font
+ 	m_hFont = pScheme->GetFont( "Trebuchet24", true );
++#ifdef TROK
++	{
++		// Trok: mensagem do centro com a fonte do mod (TrokScheme.res, "TrokCentro").
++		extern vgui::HFont TrokUI_FonteCentro( void ); // client/trok/ui/trok_ui_comum.cpp
++		const vgui::HFont hTrok = TrokUI_FonteCentro();
++		if ( hTrok != vgui::INVALID_FONT )
++			m_hFont = hTrok;
++	}
++#endif
+ 	assert( m_hFont );
+ 	SetFont( m_hFont );
+ 
 diff --git a/src/game/client/vgui_int.cpp b/src/game/client/vgui_int.cpp
 index 8fb97d5..c23eb93 100644
 --- a/src/game/client/vgui_int.cpp
@@ -1097,21 +1371,23 @@ index 30d2181..18f69f4 100644
  }
  
 diff --git a/src/game/server/hl2mp/hl2mp_player.cpp b/src/game/server/hl2mp/hl2mp_player.cpp
-index 9457928..ce7b89c 100644
+index 9457928..bbc39ee 100644
 --- a/src/game/server/hl2mp/hl2mp_player.cpp
 +++ b/src/game/server/hl2mp/hl2mp_player.cpp
-@@ -7,6 +7,10 @@
+@@ -7,6 +7,12 @@
  #include "cbase.h"
  #include "weapon_hl2mpbasehlmpcombatweapon.h"
  #include "hl2mp_player.h"
 +#ifdef TROK
 +#include "trok_playeranimstate.h"
 +extern void TE_TrokAnimEvent( CBasePlayer *pPlayer, PlayerAnimEvent_t event, int nData );
++#include "trok_inventario.h"
++#include "trok_corrida.h"
 +#endif
  #include "globalstate.h"
  #include "game.h"
  #include "gamerules.h"
-@@ -54,6 +58,19 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
+@@ -54,6 +60,19 @@ BEGIN_SEND_TABLE_NOBASE( CHL2MP_Player, DT_HL2MPLocalPlayerExclusive )
  
  	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
  	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
@@ -1131,7 +1407,7 @@ index 9457928..ce7b89c 100644
  
  END_SEND_TABLE()
  
-@@ -143,6 +160,20 @@ const char *g_ppszRandomCombineModels[] =
+@@ -143,6 +162,20 @@ const char *g_ppszRandomCombineModels[] =
  CHL2MP_Player::CHL2MP_Player() : m_PlayerAnimState( this )
  {
  	m_angEyeAngles.Init();
@@ -1152,7 +1428,7 @@ index 9457928..ce7b89c 100644
  
  	m_iLastWeaponFireUsercmd = 0;
  
-@@ -161,6 +192,13 @@ CHL2MP_Player::CHL2MP_Player() : m_PlayerAnimState( this )
+@@ -161,6 +194,13 @@ CHL2MP_Player::CHL2MP_Player() : m_PlayerAnimState( this )
  
  CHL2MP_Player::~CHL2MP_Player( void )
  {
@@ -1166,7 +1442,7 @@ index 9457928..ce7b89c 100644
  
  }
  
-@@ -239,10 +277,42 @@ void CHL2MP_Player::GiveAllItems( void )
+@@ -239,10 +279,49 @@ void CHL2MP_Player::GiveAllItems( void )
  	
  }
  
@@ -1184,6 +1460,13 @@ index 9457928..ce7b89c 100644
  	EquipSuit();
  
 +#ifdef TROK
++	// Corrida Armada: a arma do degrau da escada e a faca (trok/trok_corrida.cpp).
++	if ( TrokCorrida_DarArmas( this ) )
++		return;
++	// Economia ligada: só o kit inicial (pistola) e o que comprou e não perdeu (trok/trok_economia.cpp).
++	extern bool TrokEconomia_DarEquipamento( CBasePlayer *pPlayer );
++	if ( TrokEconomia_DarEquipamento( this ) )
++		return;
 +	if ( trok_armas_iniciais.GetString()[ 0 ] )
 +	{
 +		CUtlVector< CUtlString > ammo;
@@ -1209,7 +1492,17 @@ index 9457928..ce7b89c 100644
  	CBasePlayer::GiveAmmo( 255,	"Pistol");
  	CBasePlayer::GiveAmmo( 45,	"SMG1");
  	CBasePlayer::GiveAmmo( 1,	"grenade" );
-@@ -619,6 +689,11 @@ void CHL2MP_Player::PostThink( void )
+@@ -602,6 +681,9 @@ void CHL2MP_Player::PreThink( void )
+ 
+ 	SetLocalAngles( vTempAngles );
+ 
++#ifdef TROK
++	TrokInventario_PreThink( this );	// E mirando numa arma no chão: troca (antes do PlayerUse)
++#endif
+ 	BaseClass::PreThink();
+ 	State_PreThink();
+ 
+@@ -619,6 +701,11 @@ void CHL2MP_Player::PostThink( void )
  		SetCollisionBounds( VEC_CROUCH_TRACE_MIN, VEC_CROUCH_TRACE_MAX );
  	}
  
@@ -1221,7 +1514,20 @@ index 9457928..ce7b89c 100644
  	m_PlayerAnimState.Update();
  
  	// Store the eye angles pitch so the client can compute its animation state correctly.
-@@ -736,8 +811,39 @@ Activity CHL2MP_Player::TranslateTeamActivity( Activity ActToTranslate )
+@@ -646,7 +733,11 @@ void CHL2MP_Player::FireBullets ( const FireBulletsInfo_t &info )
+ 
+ 	CWeaponHL2MPBase *pWeapon = dynamic_cast<CWeaponHL2MPBase *>( GetActiveWeapon() );
+ 
+-	if ( pWeapon )
++	if ( pWeapon
++#ifdef TROK
++		&& !pWeapon->GetHL2MPWpnData().m_bTrok	// Trok: a arma já calculou o dano (queda por distância)
++#endif
++		)
+ 	{
+ 		modinfo.m_iPlayerDamage = modinfo.m_flDamage = pWeapon->GetHL2MPWpnData().m_iPlayerDamage;
+ 	}
+@@ -736,8 +827,39 @@ Activity CHL2MP_Player::TranslateTeamActivity( Activity ActToTranslate )
  extern ConVar hl2_normspeed;
  
  // Set the activity based on an event or current state
@@ -1261,7 +1567,46 @@ index 9457928..ce7b89c 100644
  	int animDesired;
  
  	float speed;
-@@ -1414,6 +1520,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
+@@ -916,6 +1038,12 @@ bool CHL2MP_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
+ 	if ( !IsAllowedToPickupWeapons() )
+ 		return false;
+ 
++#ifdef TROK
++	// Como no CA: arma no chão não é pega andando por cima, só olhando e apertando E (trok_inventario.cpp).
++	if ( TrokInventario_BloqueiaEncostar( this, pWeapon ) )
++		return false;
++#endif
++
+ 	if ( pOwner || !Weapon_CanUse( pWeapon ) || !g_pGameRules->CanHavePlayerItem( this, pWeapon ) )
+ 	{
+ 		if ( gEvilImpulse101 )
+@@ -1265,7 +1393,14 @@ void CHL2MP_Player::Weapon_Drop( CBaseCombatWeapon *pWeapon, const Vector *pvecT
+ 		}
+ 	}
+ 
++#ifdef TROK
++	if ( TrokInventario_BloqueiaLargar( this, pWeapon ) )	// morrendo: só cai o que o CA deixa cair
++		return;
++#endif
+ 	BaseClass::Weapon_Drop( pWeapon, pvecTarget, pVelocity );
++#ifdef TROK
++	TrokInventario_AoLargar( this, pWeapon );	// no pé, sem velocidade, some em 20 s
++#endif
+ }
+ 
+ int CHL2MP_Player::GetMaxAmmo( int iAmmoIndex ) const
+@@ -1310,6 +1445,10 @@ void CHL2MP_Player::Event_Killed( const CTakeDamageInfo &info )
+ 
+ 	DetonateTripmines();
+ 
++#ifdef TROK
++	TrokCorrida_AntesDeMorrer( this );	// Corrida Armada: nada cai (tira as armas antes)
++	TrokInventario_AoMorrer( this );	// caem a principal e a secundária, com a munição
++#endif
+ 	BaseClass::Event_Killed( subinfo );
+ 
+ 	if ( info.GetDamageType() & DMG_DISSOLVE )
+@@ -1414,6 +1553,18 @@ CBaseEntity* CHL2MP_Player::EntSelectSpawnPoint( void )
  		}
  	}
  
@@ -1372,18 +1717,19 @@ index a955c3a..d0b2c5b 100644
  
  #define NAV_MAGIC_NUMBER 0xFEEDFACE				// to help identify nav files
 diff --git a/src/game/server/player.cpp b/src/game/server/player.cpp
-index b8a0519..1d89f6f 100644
+index b8a0519..65a4ea8 100644
 --- a/src/game/server/player.cpp
 +++ b/src/game/server/player.cpp
-@@ -947,7 +947,15 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
+@@ -947,7 +947,16 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
  		case HITGROUP_GENERIC:
  			break;
  		case HITGROUP_HEAD:
 +#ifdef TROK
 +		{
 +			extern bool TrokRules_IgnoresHeadshot( CBasePlayer *pVictim ); // trok/trok_gamerules.cpp
++			extern float TrokEquip_MultCabeca( CBasePlayer *pVictim, float flMult ); // trok/trok_economia.cpp (capacete)
 +			if ( !TrokRules_IgnoresHeadshot( this ) )
-+				info.ScaleDamage( sk_player_head.GetFloat() );
++				info.ScaleDamage( TrokEquip_MultCabeca( this, sk_player_head.GetFloat() ) );
 +		}
 +#else
  			info.ScaleDamage( sk_player_head.GetFloat() );
@@ -1391,7 +1737,7 @@ index b8a0519..1d89f6f 100644
  			break;
  		case HITGROUP_CHEST:
  			info.ScaleDamage( sk_player_chest.GetFloat() );
-@@ -1658,6 +1666,24 @@ int CBasePlayer::OnTakeDamage_Alive( const CTakeDamageInfo &info )
+@@ -1658,6 +1667,24 @@ int CBasePlayer::OnTakeDamage_Alive( const CTakeDamageInfo &info )
  
          gameeventmanager->FireEvent( event );
  	}
@@ -1416,7 +1762,7 @@ index b8a0519..1d89f6f 100644
  	
  	// Insert a combat sound so that nearby NPCs hear battle
  	if ( attacker->IsNPC() )
-@@ -2309,11 +2335,22 @@ bool CBasePlayer::StartObserverMode(int mode)
+@@ -2309,11 +2336,22 @@ bool CBasePlayer::StartObserverMode(int mode)
  	return true;
  }
  
@@ -1542,20 +1888,39 @@ index e54f63d..95c9f1d 100644
  	static CHL2GameMovement g_GameMovement;
  	IGameMovement *g_pGameMovement = ( IGameMovement * )&g_GameMovement;
 diff --git a/src/game/shared/hl2mp/hl2mp_gamerules.cpp b/src/game/shared/hl2mp/hl2mp_gamerules.cpp
-index 87a3cf6..1653b68 100644
+index 87a3cf6..57d6b1a 100644
 --- a/src/game/shared/hl2mp/hl2mp_gamerules.cpp
 +++ b/src/game/shared/hl2mp/hl2mp_gamerules.cpp
-@@ -92,6 +92,9 @@ static const char *s_PreserveEnts[] =
+@@ -92,6 +92,10 @@ static const char *s_PreserveEnts[] =
  	"ai_network",
  	"ai_hint",
  	"hl2mp_gamerules",
 +#ifdef TROK
 +	"trok_surto_estado",	// estado da rodada do modo Surto (sobrevive à limpeza entre rodadas)
++	"trok_placar_extra",	// série de abates, dinheiro e equipamento de cada jogador
 +#endif
  	"team_manager",
  	"player_manager",
  	"env_soundscape",
-@@ -972,7 +975,11 @@ CAmmoDef *GetAmmoDef()
+@@ -963,6 +967,17 @@ CAmmoDef *GetAmmoDef()
+ 		def.AddAmmoType("SMG1_Grenade",		DMG_BURN,					TRACER_NONE,			0,			0,			3,			0,							0 );
+ 		def.AddAmmoType("Grenade",			DMG_BURN,					TRACER_NONE,			0,			0,			5,			0,							0 );
+ 		def.AddAmmoType("slam",				DMG_BURN,					TRACER_NONE,			0,			0,			5,			0,							0 );
++#ifdef TROK
++		// Explosivos do Trok (shared/trok/weapon_trok_explosivo.cpp): um tipo por arma, para a
++		// contagem de cada uma ser separada. Quantos carrega: ConVars trok_max_* (cfg/explosivos.cfg).
++		def.AddAmmoType("TrokGranada",		DMG_BLAST,	TRACER_NONE,	NULL,	NULL,	"trok_max_granada",			0,	0 );
++		def.AddAmmoType("TrokGranadaLuz",	DMG_BLAST,	TRACER_NONE,	NULL,	NULL,	"trok_max_granada_luz",		0,	0 );
++		def.AddAmmoType("TrokGranadaFumaca",DMG_BLAST,	TRACER_NONE,	NULL,	NULL,	"trok_max_granada_fumaca",	0,	0 );
++		def.AddAmmoType("TrokMina",			DMG_BLAST,	TRACER_NONE,	NULL,	NULL,	"trok_max_mina",			0,	0 );
++		def.AddAmmoType("TrokClaymore",		DMG_BLAST,	TRACER_NONE,	NULL,	NULL,	"trok_max_claymore",		0,	0 );
++		def.AddAmmoType("TrokRemota",		DMG_BLAST,	TRACER_NONE,	NULL,	NULL,	"trok_max_remota",			0,	0 );
++		def.AddAmmoType("TrokTorreta",		DMG_BLAST,	TRACER_NONE,	NULL,	NULL,	"trok_max_torreta",			0,	0 );
++#endif
+ 	}
+ 
+ 	return &def;
+@@ -972,7 +987,11 @@ CAmmoDef *GetAmmoDef()
  
  	ConVar cl_autowepswitch(
  		"cl_autowepswitch",
@@ -1582,10 +1947,10 @@ index 78da217..b4fa5da 100644
  	CNetworkVar( float, m_flGameStartTime );
  	CUtlVector<EHANDLE> m_hRespawnableItemsAndWeapons;
 diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
-index 9b83dce..79a3458 100644
+index 9b83dce..902cc47 100644
 --- a/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
 +++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.cpp
-@@ -19,6 +19,43 @@ FileWeaponInfo_t* CreateWeaponInfo()
+@@ -19,6 +19,44 @@ FileWeaponInfo_t* CreateWeaponInfo()
  CHL2MPSWeaponInfo::CHL2MPSWeaponInfo()
  {
  	m_iPlayerDamage = 0;
@@ -1625,11 +1990,12 @@ index 9b83dce..79a3458 100644
 +	m_flTrokStagger = 0.08f;
 +	m_flTrokCAEmpurrao = 0.0f;
 +	m_flTrokCAEmpurraoTempo = 0.0f;
++	TrokArmaCA_Padrao( m_TrokCA );
 +#endif
  }
  
  
-@@ -27,6 +64,52 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
+@@ -27,6 +65,53 @@ void CHL2MPSWeaponInfo::Parse( KeyValues *pKeyValuesData, const char *szWeaponNa
  	BaseClass::Parse( pKeyValuesData, szWeaponName );
  
  	m_iPlayerDamage = pKeyValuesData->GetInt( "damage", 0 );
@@ -1678,15 +2044,26 @@ index 9b83dce..79a3458 100644
 +		m_flTrokMoveSpeed = pTrok->GetFloat( "velocidade", m_flTrokMoveSpeed );
 +		Q_strncpy( m_szTrokAnim, pTrok->GetString( "animacao", m_szTrokAnim ), sizeof( m_szTrokAnim ) );
 +	}
++	TrokArmaCA_Ler( pTrok, m_TrokCA );
 +#endif
  }
  
  
 diff --git a/src/game/shared/hl2mp/hl2mp_weapon_parse.h b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
-index 2ec16dd..49f0082 100644
+index 2ec16dd..686fa53 100644
 --- a/src/game/shared/hl2mp/hl2mp_weapon_parse.h
 +++ b/src/game/shared/hl2mp/hl2mp_weapon_parse.h
-@@ -29,6 +29,45 @@ public:
+@@ -13,6 +13,9 @@
+ 
+ #include "weapon_parse.h"
+ #include "networkvar.h"
++#ifdef TROK
++#include "trok_arma_ca.h"
++#endif
+ 
+ 
+ //--------------------------------------------------------------------------------------------------------
+@@ -29,6 +32,46 @@ public:
  public:
  
  	int m_iPlayerDamage;
@@ -1728,6 +2105,7 @@ index 2ec16dd..49f0082 100644
 +	float m_flTrokStagger;			// fração da velocidade que cada bala tira do zumbi (o "segurar")
 +	float m_flTrokCAEmpurrao;		// movimento do CA: forca K do empurrao no infectado (DamageMovePenalty)
 +	float m_flTrokCAEmpurraoTempo;	// ... duracao em s (DamageMovePenaltyDuration)
++	TrokArmaCA_t m_TrokCA;			// sub-bloco "CA": lei de tiro do Combat Arms (shared/trok/trok_arma_ca.h)
 +#endif
  };
  

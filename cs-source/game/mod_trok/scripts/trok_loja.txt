@@ -1,0 +1,258 @@
+// Trok: loja da economia estilo CS (trok_economia 1). Ver design/economia.md.
+// Lido pelo servidor (vende: server/trok/trok_economia.cpp, relê a cada mapa) e pelo cliente
+// (menu da tecla B: client/trok/ui/trok_loja.cpp; trok_loja_recarregar relê).
+// Preços de partida tirados do CS:S (design/chimera/games/cs_source/data/economy.toml e
+// specs/cs_source/weapons.md "Economy"); o que o CS:S não tem está marcado PROPOSTA.
+"Loja"
+{
+	// Ordem = ordem no menu (teclas 1..9). "id" "Nome na tela".
+	"Categorias"
+	{
+		"pistolas"			"PISTOLAS"
+		"submetralhadoras"	"SUBMETRALHADORAS"
+		"fuzis"				"FUZIS"
+		"escopetas"			"ESCOPETAS"
+		"especiais"			"ESPECIAIS"
+		"explosivos"		"EXPLOSIVOS"
+		"equipamentos"		"EQUIPAMENTOS"
+	}
+
+	// Classe de cada arma ou projétil, para o ganho por abate (bloco "Abate").
+	"Classes"
+	{
+		"weapon_trok_pistola"			"pistola"
+		"weapon_trok_submetralhadora"	"submetralhadora"
+		"weapon_trok_fuzil"				"fuzil"
+		"weapon_trok_escopeta"			"escopeta"
+		"weapon_crowbar"				"faca"
+		"weapon_trok_garras"			"garras"
+		"weapon_frag"					"granada"
+		"npc_grenade_frag"				"granada"
+		"weapon_trok_granada"			"granada"
+		"weapon_trok_mina"				"granada"
+		"weapon_trok_claymore"			"granada"
+		"weapon_trok_remota"			"granada"
+		"weapon_trok_foguete"			"especial"
+	}
+
+	// $ por abate de inimigo, por classe. CS:S paga 300 por qualquer arma (o que vai aqui).
+	// O CS:GO paga por classe (faca 1500, escopeta 900, submetralhadora 600, AWP 100): se o dono
+	// quiser esse estilo, é só trocar os números. Abate de aliado: trok_economia_aliado (cfg).
+	"Abate"
+	{
+		"padrao"			"300"
+		"pistola"			"300"
+		"submetralhadora"	"300"
+		"fuzil"				"300"
+		"escopeta"			"300"
+		"faca"				"300"
+		"granada"			"300"
+		"especial"			"300"
+		"garras"			"300"		// infecção no Surto
+	}
+
+	// Itens. O nome do bloco é o id do "trok_comprar <id>".
+	// tipo: arma | colete | capacete | municao | medico
+	// arma: entidade, municao (reserva dada junto; -1 = cheia, como no CS:S), max (arremesso: quantas carrega)
+	// colete: nivel (só compra nível maior), armadura (pontos, até 255), folego e velocidade (multiplicadores)
+	// capacete: protecao (fração do dano extra da cabeça que tira; 1 = sem crítico), golpes (0 = não quebra)
+	// municao: slot (bucket da arma; -1 = todas), municao (quanto dá; 0 = enche)
+	// medico: vida (devolvida na hora, até a máxima)
+	// time: 0 = todos; 2 ou 3 = só esse time (mata-mata em equipe)
+	"Itens"
+	{
+		// ---------------------------------------------------------------- Pistolas
+		"pistola"
+		{
+			"nome"		"Pistola"
+			"categoria"	"pistolas"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_pistola"
+			"preco"		"400"		// CS:S Glock 400
+			"descricao"	"Pistola padrão. Já vem no kit inicial."
+		}
+
+		// ---------------------------------------------------------------- Submetralhadoras
+		"submetralhadora"
+		{
+			"nome"		"Submetralhadora"
+			"categoria"	"submetralhadoras"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_submetralhadora"
+			"preco"		"1500"		// CS:S MP5 1500
+			"descricao"	"Cadência alta, boa de perto e correndo."
+		}
+
+		// ---------------------------------------------------------------- Fuzis
+		"fuzil"
+		{
+			"nome"		"Fuzil"
+			"categoria"	"fuzis"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_fuzil"
+			"preco"		"2500"		// CS:S AK-47 2500 (M4A1 3100)
+			"descricao"	"Fuzil de assalto: dano e alcance."
+		}
+
+		// ---------------------------------------------------------------- Escopetas
+		"escopeta"
+		{
+			"nome"		"Escopeta"
+			"categoria"	"escopetas"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_escopeta"
+			"preco"		"1700"		// CS:S M3 1700
+			"descricao"	"Bombeamento. Decide de perto."
+		}
+
+		// ---------------------------------------------------------------- Especiais
+		"foguete"
+		{
+			"nome"		"Lança-foguete"
+			"categoria"	"especiais"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_foguete"
+			"preco"		"4750"		// PROPOSTA (no CS:S a arma mais cara comum é a AWP, 4750)
+			"descricao"	"Explosivo de longe. Pouca munição."
+		}
+
+		// ---------------------------------------------------------------- Explosivos
+		"granada"
+		{
+			"nome"		"Granada"
+			"categoria"	"explosivos"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_granada"
+			"preco"		"300"		// CS:S HE 300
+			"max"		"1"
+			"descricao"	"Granada de fragmentação."
+		}
+		"granada_luz"
+		{
+			"nome"		"Granada de luz"
+			"categoria"	"explosivos"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_granada_luz"
+			"preco"		"200"		// CS:S flashbang 200, carrega 2
+			"max"		"2"
+			"descricao"	"Cega quem olha."
+		}
+		"granada_fumaca"
+		{
+			"nome"		"Granada de fumaça"
+			"categoria"	"explosivos"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_granada_fumaca"
+			"preco"		"300"		// CS:S fumaça 300
+			"max"		"1"
+			"descricao"	"Cortina de fumaça."
+		}
+		"mina"
+		{
+			"nome"		"Mina"
+			"categoria"	"explosivos"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_mina"
+			"preco"		"500"		// PROPOSTA
+			"max"		"1"
+		}
+		"claymore"
+		{
+			"nome"		"Claymore"
+			"categoria"	"explosivos"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_claymore"
+			"preco"		"600"		// PROPOSTA
+			"max"		"1"
+		}
+		"remota"
+		{
+			"nome"		"Carga remota"
+			"categoria"	"explosivos"
+			"tipo"		"arma"
+			"entidade"	"weapon_trok_remota"
+			"preco"		"700"		// PROPOSTA
+			"max"		"1"
+		}
+
+		// ---------------------------------------------------------------- Equipamentos
+		// Coletes: decisão do dono, colete dá armadura E mais fôlego E mais velocidade. Números PROPOSTA.
+		// A armadura usa a absorção do HL2 (o colete segura a maior parte do dano enquanto tiver
+		// pontos): por isso os pontos são baixos. Medir no jogo.
+		"colete_leve"
+		{
+			"nome"		"Colete leve"
+			"categoria"	"equipamentos"
+			"tipo"		"colete"
+			"nivel"		"1"
+			"armadura"	"30"
+			"folego"	"1.10"
+			"velocidade"	"1.02"
+			"preco"		"400"
+			"descricao"	"Proteção básica, quase não pesa."
+		}
+		"colete"
+		{
+			"nome"		"Colete"
+			"categoria"	"equipamentos"
+			"tipo"		"colete"
+			"nivel"		"2"
+			"armadura"	"60"
+			"folego"	"1.20"
+			"velocidade"	"1.04"
+			"preco"		"650"		// CS:S kevlar 650
+			"descricao"	"Colete tático padrão."
+		}
+		"colete_tatico"
+		{
+			"nome"		"Colete tático"
+			"categoria"	"equipamentos"
+			"tipo"		"colete"
+			"nivel"		"3"
+			"armadura"	"100"
+			"folego"	"1.30"
+			"velocidade"	"1.06"
+			"preco"		"1200"
+			"descricao"	"O melhor colete: mais armadura, fôlego e velocidade."
+		}
+		"capacete"
+		{
+			"nome"		"Capacete"
+			"categoria"	"equipamentos"
+			"tipo"		"capacete"
+			"protecao"	"0.5"
+			"golpes"	"0"
+			"preco"		"350"		// CS:S capacete 350 (sobre o kevlar)
+			"descricao"	"Tira metade do dano extra do tiro na cabeça."
+		}
+		"capacete_balistico"
+		{
+			"nome"		"Capacete balístico"
+			"categoria"	"equipamentos"
+			"tipo"		"capacete"
+			"protecao"	"1.0"
+			"golpes"	"2"
+			"preco"		"800"		// PROPOSTA
+			"descricao"	"Segura todo o crítico de 2 tiros na cabeça, depois quebra."
+		}
+		"kit_municao"
+		{
+			"nome"		"Kit de munição"
+			"categoria"	"equipamentos"
+			"tipo"		"municao"
+			"slot"		"-1"
+			"municao"	"0"
+			"preco"		"0"			// CS:S: munição é de graça
+			"descricao"	"Enche a reserva de todas as armas."
+		}
+		"kit_medico"
+		{
+			"nome"		"Kit médico"
+			"categoria"	"equipamentos"
+			"tipo"		"medico"
+			"vida"		"50"
+			"preco"		"400"		// PROPOSTA (o CS:S não vende vida)
+			"descricao"	"Devolve 50 de vida na hora."
+		}
+	}
+}

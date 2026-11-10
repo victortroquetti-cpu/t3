@@ -13,12 +13,16 @@
 // O desenho é imediato: Run() desenha (MODE_PAINT) e trata o clique (MODE_CLICK)
 // com o mesmo código, então o que se vê é exatamente onde se clica.
 //
-// CONFIGURAÇÕES e CRIAR PARTIDA são próprias (mais abaixo). Ainda do GameUI (pendências em
-// design/ui.md): lista de servidores e caixas de confirmação. A tela de carregamento é trok_loading.cpp.
+// CONFIGURAÇÕES, CRIAR PARTIDA e SERVIDORES são próprias (mais abaixo; a lista vem de
+// trok_servidores.cpp). Os modos de JOGAR e CRIAR PARTIDA vêm de scripts/trok_modos.txt.
+// Ainda do GameUI (pendências em design/ui.md): caixas de confirmação. A tela de carregamento
+// é trok_loading.cpp.
 //=============================================================================
 
 #include "cbase.h"
 #include "trok_menu.h"
+#include "trok_servidores.h"
+#include "tier1/KeyValues.h"
 #include "ienginevgui.h"
 #include "GameUI/IGameUI.h"
 #include "filesystem.h"
@@ -46,7 +50,12 @@ static ConVar trok_ui_bots_dificuldade( "trok_ui_bots_dificuldade", "1", FCVAR_A
 static ConVar trok_ui_bots_por_time( "trok_ui_bots_por_time", "5", FCVAR_ARCHIVE, "Menu: últimos bots por time." );
 static ConVar trok_ui_bots_estilos( "trok_ui_bots_estilos", "31", FCVAR_ARCHIVE, "Menu: estilos marcados (bits: equilibrado, entry, lurker, ancora, suporte)." );
 static ConVar trok_ui_mapa( "trok_ui_mapa", "", FCVAR_ARCHIVE, "Menu: último mapa escolhido." );
-static ConVar trok_ui_modo( "trok_ui_modo", "0", FCVAR_ARCHIVE, "Menu: modo escolhido (0 = mata-mata em equipe, 1 = exército solo, 2 = Surto)." );
+static ConVar trok_ui_modo( "trok_ui_modo", "equipe", FCVAR_ARCHIVE, "Menu: modo escolhido (chave de scripts/trok_modos.txt: equipe, solo, surto, corrida)." );
+static ConVar trok_ui_mapas( "trok_ui_mapas", "", FCVAR_ARCHIVE, "Menu: último mapa de cada modo (modo:mapa separados por espaço)." );
+// SERVIDORES
+static ConVar trok_ui_servidores_internet( "trok_ui_servidores_internet", "1", FCVAR_ARCHIVE, "Servidores: 1 = lista da internet, 0 = rede local/VPN." );
+static ConVar trok_ui_servidor_ip( "trok_ui_servidor_ip", "", FCVAR_ARCHIVE, "Servidores: último endereço digitado em CONECTAR POR IP." );
+static ConVar trok_ui_servidor_senha( "trok_ui_servidor_senha", "", 0, "Servidores: senha para entrar (não fica salva)." );
 // CRIAR PARTIDA (0 na meta ou no tempo = o valor do cfg do modo)
 static ConVar trok_ui_criar_nome( "trok_ui_criar_nome", "Sala Rearmed", FCVAR_ARCHIVE, "Criar partida: nome da sala." );
 static ConVar trok_ui_criar_senha( "trok_ui_criar_senha", "", 0, "Criar partida: senha (não fica salva)." );
@@ -129,7 +138,7 @@ class CTrokMenu : public Panel
 {
 	DECLARE_CLASS_SIMPLE( CTrokMenu, Panel );
 public:
-	enum State_t { STATE_ROOT = 0, STATE_PLAY, STATE_OPTIONS, STATE_CREATE };
+	enum State_t { STATE_ROOT = 0, STATE_PLAY, STATE_OPTIONS, STATE_CREATE, STATE_SERVERS };
 
 	CTrokMenu();
 	virtual ~CTrokMenu();
@@ -141,7 +150,7 @@ public:
 	bool IsCapturingKey( void ) const { return m_eState == STATE_OPTIONS && m_iCapture >= 0; }
 	void CaptureButton( ButtonCode_t code );
 	// A tecla capturada também chega depois como "digitada": não pode virar ESC/Enter do menu.
-	bool IsEditingText( void ) const { return m_eState == STATE_CREATE && m_iTextField >= 0; }
+	bool IsEditingText( void ) const { return ( m_eState == STATE_CREATE || m_eState == STATE_SERVERS ) && m_iTextField >= 0; }
 	void OnRelayedChar( wchar_t ch );
 	bool SwallowTyped( KeyCode code ) { const bool b = ( code == m_eSwallowTyped ); m_eSwallowTyped = BUTTON_CODE_INVALID; return b; }
 
@@ -189,6 +198,38 @@ private:
 	void RunMapPanel( int mx, int top, int mw, int bottom );
 	void RunBottomBar( void );
 	bool TextField( int iField, int x, int y, int w, const char *pszValue, bool bHidden );
+	void CommitTextField( void );		// grava o texto em edição na ConVar do campo
+	void RunServers( void );
+	void ConnectTo( const char *pszEndereco );
+
+	// Modos (scripts/trok_modos.txt)
+	struct Modo_t
+	{
+		char szChave[ 32 ], szModo[ 32 ], szNome[ 64 ], szCurto[ 32 ], szDescricao[ 160 ];
+		char szRegras[ 4 ][ 160 ];
+		char szCfg[ 32 ], szMetaCvar[ 48 ], szMetaRotulo[ 48 ], szTempoCvar[ 48 ], szTempoUnidade[ 8 ];
+		char szMapas[ 128 ], szMapaPadrao[ 64 ];
+		int iMetaOpcoes[ 12 ], nMetaOpcoes;
+		int iTempoOpcoes[ 12 ], nTempoOpcoes;
+		int iMetaCfg, iTempoCfg;	// lidos do cfg do modo (-1 = não achou)
+		bool bTimes, bBots, bEmBreve;
+	};
+	void BuildModes( void );
+	int CurrentMode( void );						// índice em m_Modos do modo escolhido
+	void SelectMode( int iModo );					// troca o modo e o mapa (o último deste modo)
+	bool MapAllowed( int iMap );					// o mapa serve para o modo escolhido
+	void StepMap( int iDir );
+	void RememberMap( void );
+	void RunModeCards( int x0, int xr, int y, bool bSoBots );
+	int RunModeRules( int x, int y, int w );		// regras do modo; devolve a altura usada
+	void ModeGoalText( const Modo_t &m, char *pszOut, int iOutSize );
+	CUtlVector< Modo_t > m_Modos;
+	bool m_bModesBuilt;
+
+	// Servidores
+	int m_iServerSel;
+	int m_iServerScroll;
+	float m_flServerClickTime;
 
 	// Configurações: uma linha por opção (rótulo à esquerda, controle à direita)
 	void OptHeader( int x, int &y, int w, const char *pszText );
@@ -228,7 +269,8 @@ private:
 	bool m_bVideoPending;
 	ButtonCode_t m_eSwallowTyped;
 
-	// Criar partida: campo de texto em edição (-1 = nenhum, 0 = nome, 1 = senha)
+	// Campo de texto em edição (-1 = nenhum; 0 = nome e 1 = senha da sala em CRIAR PARTIDA;
+	// 2 = endereço e 3 = senha em SERVIDORES)
 	int m_iTextField;
 	char m_szText[ 64 ];
 
@@ -305,6 +347,10 @@ CTrokMenu::CTrokMenu() : BaseClass( NULL, "TrokMenu" )
 	m_eSwallowTyped = BUTTON_CODE_INVALID;
 	m_iTextField = -1;
 	m_szText[ 0 ] = 0;
+	m_bModesBuilt = false;
+	m_iServerSel = -1;
+	m_iServerScroll = 0;
+	m_flServerClickTime = 0.0f;
 
 	SetProportional( false );
 	SetPaintBackgroundEnabled( false );
@@ -400,15 +446,24 @@ void CTrokMenu::SetState( State_t eState )
 	}
 	if ( eState == STATE_OPTIONS && m_eState != STATE_OPTIONS )
 		BuildVideoModes();
-	if ( m_eState == STATE_CREATE && m_iTextField >= 0 )
-	{
-		( m_iTextField == 0 ? trok_ui_criar_nome : trok_ui_criar_senha ).SetValue( m_szText );
-		m_iTextField = -1;
-	}
+	if ( m_iTextField >= 0 )
+		CommitTextField();
+	if ( m_eState == STATE_SERVERS && eState != STATE_SERVERS )
+		TrokServidores::Parar();
 	m_eState = eState;
 	m_iLastHoverId = -1;
 	if ( eState == STATE_PLAY || eState == STATE_CREATE )
+	{
+		BuildModes();
 		BuildMapList();
+		SelectMode( CurrentMode() ); // mapa do modo escolhido (e um modo que sirva para esta tela)
+	}
+	if ( eState == STATE_SERVERS )
+	{
+		m_iServerSel = -1;
+		m_iServerScroll = 0;
+		TrokServidores::Atualizar( trok_ui_servidores_internet.GetBool() );
+	}
 	m_pInput->RequestFocus();
 }
 
@@ -447,6 +502,8 @@ void CTrokMenu::OnMouseWheeled( int delta )
 {
 	if ( IsCapturingKey() )
 		CaptureButton( delta > 0 ? MOUSE_WHEEL_UP : MOUSE_WHEEL_DOWN );
+	else if ( m_eState == STATE_SERVERS )
+		m_iServerScroll = MAX( 0, m_iServerScroll - delta * 3 );
 }
 
 void CTrokMenu::OnRelayedKey( KeyCode code )
@@ -469,10 +526,25 @@ void CTrokMenu::OnRelayedKey( KeyCode code )
 		}
 		else if ( code == KEY_ENTER || code == KEY_PAD_ENTER || code == KEY_ESCAPE || code == KEY_TAB )
 		{
-			( m_iTextField == 0 ? trok_ui_criar_nome : trok_ui_criar_senha ).SetValue( m_szText );
-			m_iTextField = -1;
+			const bool bConectar = ( m_iTextField == 2 && ( code == KEY_ENTER || code == KEY_PAD_ENTER ) );
+			CommitTextField();
+			if ( bConectar && trok_ui_servidor_ip.GetString()[ 0 ] )
+				ConnectTo( trok_ui_servidor_ip.GetString() );
 		}
 		return;
+	}
+	if ( m_eState == STATE_SERVERS )
+	{
+		if ( ( code == KEY_ENTER || code == KEY_PAD_ENTER ) && m_iServerSel >= 0 && m_iServerSel < TrokServidores::Quantos() )
+		{
+			ConnectTo( TrokServidores::Servidor( m_iServerSel ).szEndereco );
+			return;
+		}
+		if ( code == KEY_F5 )
+		{
+			TrokServidores::Atualizar( trok_ui_servidores_internet.GetBool() );
+			return;
+		}
 	}
 	if ( code == KEY_ESCAPE && m_eState != STATE_ROOT )
 	{
@@ -666,11 +738,72 @@ void CTrokMenu::Run( Mode_t eMode )
 	case STATE_PLAY: RunPlay(); break;
 	case STATE_OPTIONS: RunOptions(); break;
 	case STATE_CREATE: RunCreate(); break;
+	case STATE_SERVERS: RunServers(); break;
 	default: RunRoot(); break;
 	}
 
 	RunBottomBar();
 	m_eMode = MODE_PAINT;
+}
+
+static ConVar trok_ui_fundo_animado( "trok_ui_fundo_animado", "1", FCVAR_ARCHIVE, "Menu sem mapa de fundo: 1 = fundo animado (grade, varredura e poeira), 0 = liso." );
+
+// Fundo animado do menu, desenhado por código (sem mapa): grade tática que desliza devagar,
+// uma faixa de luz que atravessa a tela, uma linha de varredura e poeira subindo.
+// Tudo bem fraco, para não brigar com o texto (direção sóbria de design/lore-e-arte.md).
+static void TrokFundoAnimado( int w, int h, float flEscala )
+{
+	const float t = (float)Plat_FloatTime();
+	ISurface *pS = surface();
+
+	// Grade
+	const int iCelula = MAX( 8, (int)( 48.0f * flEscala ) );
+	const int iDesl = (int)fmodf( t * 4.0f * flEscala, (float)iCelula );
+	pS->DrawSetColor( Color( 255, 255, 255, 7 ) );
+	for ( int x = -iCelula + iDesl; x < w; x += iCelula )
+		pS->DrawFilledRect( x, 0, x + 1, h );
+	for ( int y = -iCelula + iDesl / 2; y < h; y += iCelula )
+		pS->DrawFilledRect( 0, y, w, y + 1 );
+
+	// Faixa de luz (atravessa em 26 s)
+	{
+		const float f = fmodf( t / 26.0f, 1.0f );
+		const int bw = w / 3;
+		const int bx = (int)( -bw + f * ( w + bw * 2 ) ) - bw / 2;
+		pS->DrawSetColor( Color( 120, 140, 160, 255 ) );
+		pS->DrawFilledRectFade( bx, 0, bx + bw / 2, h, 0, 10, true );
+		pS->DrawFilledRectFade( bx + bw / 2, 0, bx + bw, h, 10, 0, true );
+	}
+
+	// Linha de varredura (desce em 9 s) com rastro
+	{
+		const float f = fmodf( t / 9.0f, 1.0f );
+		const int y = (int)( f * h );
+		const int iRastro = (int)( 90.0f * flEscala );
+		pS->DrawSetColor( Color( 255, 255, 255, 255 ) );
+		pS->DrawFilledRectFade( 0, y - iRastro, w, y, 0, 6, false );
+		pS->DrawSetColor( Color( 255, 255, 255, 16 ) );
+		pS->DrawFilledRect( 0, y, w, y + 1 );
+	}
+
+	// Poeira: posições fixas por índice, subindo devagar
+	for ( int i = 0; i < 48; ++i )
+	{
+		const unsigned int a = ( i * 2654435761u ) ^ 0x9E3779B9u;
+		const float fx = ( ( a & 0xFFFF ) / 65535.0f );
+		const float fv = 0.01f + ( ( ( a >> 16 ) & 0xFF ) / 255.0f ) * 0.025f;		// velocidade (tela/s)
+		const float fy = 1.0f - fmodf( ( ( a >> 8 ) & 0xFFFF ) / 65535.0f + t * fv, 1.0f );
+		const int px = (int)( fx * w + sinf( t * 0.3f + i ) * 12.0f * flEscala );
+		const int py = (int)( fy * h );
+		const int iTam = ( i % 3 == 0 ) ? 2 : 1;
+		pS->DrawSetColor( Color( 210, 220, 230, 18 + ( i % 4 ) * 6 ) );
+		pS->DrawFilledRect( px, py, px + iTam, py + iTam );
+	}
+
+	// Vinheta em baixo e em cima
+	pS->DrawSetColor( Color( 0, 0, 0, 255 ) );
+	pS->DrawFilledRectFade( 0, h * 7 / 10, w, h, 0, 140, false );
+	pS->DrawFilledRectFade( 0, 0, w, h / 6, 90, 0, false );
 }
 
 void CTrokMenu::RunBackground( void )
@@ -683,10 +816,13 @@ void CTrokMenu::RunBackground( void )
 	}
 	else if ( !engine->IsLevelMainMenuBackground() )
 	{
-		// Sem mapa de fundo: fundo liso com um degradê leve (o mapa ao vivo entra quando existir).
+		// Sem mapa de fundo: fundo escuro com um degradê leve e a animação por código
+		// (um background01.bsp próprio substitui isto; ver design/ui.md, "Fundo do menu").
 		Rect( 0, 0, w, h, COR_FUNDO );
 		surface()->DrawSetColor( Color( 27, 34, 43, 255 ) );
 		surface()->DrawFilledRectFade( 0, 0, w, h * 6 / 10, 255, 0, false );
+		if ( trok_ui_fundo_animado.GetBool() )
+			TrokFundoAnimado( w, h, m_flScale );
 	}
 	// Escurece à esquerda, onde fica o menu (por cima do mapa de fundo ou da partida).
 	surface()->DrawSetColor( COR_FUNDO );
@@ -744,7 +880,7 @@ void CTrokMenu::RunRoot( void )
 			SetState( STATE_PLAY );
 		y += S( 6 );
 		if ( MenuItem( 2, x0, y, "02", "SERVIDORES", NULL, false ) )
-			Command( "OpenServerBrowser" );
+			SetState( STATE_SERVERS );
 		if ( MenuItem( 3, x0, y, "03", "CRIAR PARTIDA", NULL, false ) )
 			SetState( STATE_CREATE );
 		if ( MenuItem( 4, x0, y, "04", "CONFIGURAÇÕES", NULL, false ) )
@@ -780,35 +916,10 @@ void CTrokMenu::RunPlay( void )
 	Rect( iSep, S( 46 ), 1, S( 22 ), COR_LINHA_FORTE );
 	TextSpaced( m_hTitle, iSep + S( 21 ), S( 36 ), COR_TEXTO, "JOGAR", S( 3 ) );
 
-	// Cartões de modo
-	{
-		const char *pszNome[] = { "CONTRA BOTS", "SERVIDORES", "CRIAR PARTIDA" };
-		const char *pszDesc[] = { "Você e seu time contra a IA, offline.", "Lista de servidores com filtros.", "Seu servidor, suas regras." };
-		const int iGap = S( 16 );
-		const int cw = ( xr - x0 - iGap * 2 ) / 3;
-		const int ch = S( 108 );
-		for ( int i = 0; i < 3; ++i )
-		{
-			const int cx = x0 + i * ( cw + iGap ), cy = S( 112 );
-			const bool bHover = Hover( cx, cy, cw, ch );
-			Rect( cx, cy, cw, ch, bHover ? COR_PAINEL_HOVER : COR_PAINEL );
-			Outline( cx, cy, cw, ch, bHover ? COR_LINHA_FORTE : COR_LINHA );
-			if ( i == 0 )
-				Rect( cx, cy, cw, S( 3 ), acc );
-			TextSpaced( m_hHeading, cx + S( 18 ), cy + S( 20 ), COR_TEXTO, pszNome[ i ], S( 1 ) );
-			Text( m_hBody, cx + S( 18 ), cy + S( 56 ), COR_TEXTO2, pszDesc[ i ] );
-			if ( Clicked( cx, cy, cw, ch ) )
-			{
-				if ( i == 1 )
-					Command( "OpenServerBrowser" );
-				else if ( i == 2 )
-				{
-					SetState( STATE_CREATE );
-					return;
-				}
-			}
-		}
-	}
+	Text( m_hBody, iSep + S( 21 ) + TextWide( m_hTitle, "JOGAR" ) + S( 30 ), S( 50 ), COR_TEXTO2, "Contra bots, offline. Escolha o modo, o mapa e os bots." );
+
+	// Cartões de modo (scripts/trok_modos.txt)
+	RunModeCards( x0, xr, S( 96 ), true );
 
 	const int top = S( 252 ), bottom = m_iTall - S( 72 );
 
@@ -823,22 +934,8 @@ void CTrokMenu::RunPlay( void )
 		const int ix = px + S( 24 ), iw = pw - S( 48 );
 		int y = top + S( 22 );
 
-		Label( ix, y, "MODO" );
-		{
-			const char *pszModos[] = { "EQUIPE", "EXÉRCITO SOLO", "SURTO" };
-			const char *pszDesc[] = { "Mata-mata em equipe: o time que chegar primeiro na meta de abates vence.",
-									  "Todos contra todos: quem chegar primeiro na meta de abates vence.",
-									  "Infecção: sobreviva até o fim do tempo. Os bots viram zumbis com você." };
-			const int iModo = clamp( trok_ui_modo.GetInt(), 0, 2 );
-			const int mw = ( iw - S( 12 ) ) / 3;
-			for ( int i = 0; i < 3; ++i )
-			{
-				if ( BoxButton( ix + i * ( mw + S( 6 ) ), y + S( 18 ), mw, S( 36 ), m_hButton, pszModos[ i ], i == iModo, i == iModo ) )
-					trok_ui_modo.SetValue( i );
-			}
-			Text( m_hSmall, ix, y + S( 60 ), COR_TEXTO2, pszDesc[ iModo ] );
-		}
-		y += S( 84 );
+		// Regras do modo escolhido (os cartões ficam em cima)
+		y += RunModeRules( ix, y, iw );
 
 		Label( ix, y, "DIFICULDADE DOS BOTS" );
 		const int iNivel = clamp( trok_ui_bots_dificuldade.GetInt(), 0, 3 );
@@ -852,7 +949,8 @@ void CTrokMenu::RunPlay( void )
 		Text( m_hBody, ix, y + S( 66 ), COR_TEXTO2, s_pszNivelDescricao[ iNivel ] );
 		y += S( 92 );
 
-		Label( ix, y, trok_ui_modo.GetInt() == 0 ? "BOTS POR TIME" : "BOTS (METADE DO TOTAL)" );
+		const bool bTimes = m_Modos.Count() ? m_Modos[ CurrentMode() ].bTimes : true;
+		Label( ix, y, bTimes ? "BOTS POR TIME" : "BOTS (METADE DO TOTAL)" );
 		const int bs = S( 34 );
 		const int iCount = clamp( trok_ui_bots_por_time.GetInt(), 1, 16 );
 		if ( BoxButton( ix, y + S( 18 ), bs, bs, m_hButton, "−", false, false ) )

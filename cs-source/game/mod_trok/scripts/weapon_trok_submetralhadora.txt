@@ -1,6 +1,6 @@
 // Trok: Submetralhadora. Modelo e som de PROTÓTIPO, do CS:S montado do jogo do jogador
-// (não vão no pacote). Os números do bloco "Trok" são pontos de partida: preencher com
-// a referência do Combat Arms no local (ver cs-source/design/sistemas-jogabilidade.md).
+// (não vão no pacote). Números do Combat Arms (MP5A4, Chimera:
+// design/chimera/games/combat_arms/data/weapons/mp5a4.toml) no sub-bloco "CA" do bloco "Trok".
 
 WeaponData
 {
@@ -11,7 +11,7 @@ WeaponData
 	"bucket"			"0"
 	"bucket_position"	"0"
 
-	"clip_size"			"30"
+	"clip_size"		"30"
 	"clip2_size"		"-1"
 	"default_clip"		"30"
 	"default_clip2"		"-1"
@@ -21,23 +21,23 @@ WeaponData
 
 	"weight"			"3"
 	"item_flags"		"0"
-	"damage"			"24"
+	"damage"		"29"
 
 	// Sistema de armas do Trok (shared/trok/weapon_trok_gun.cpp). Ângulos em graus,
 	// distâncias em u, tempos em s. Ajuste ao vivo da mira: trok_mira_ajuste / trok_mira_imprimir.
 	"Trok"
 	{
-		"tiros_por_minuto"		"800"
+		"tiros_por_minuto"		"750"		// CA: animação de tiro de 80 ms
 		"empurrao"		"28"		// u/s por bala acertada no zumbi (modo Surto)
 		"segurar"		"0.08"		// fração da velocidade do zumbi que cada bala tira
 		"ca_empurrao"		"40"		// movimento do CA: força K do empurrão no infectado (MEDIR (padrão do CA: 40 / 0,3 s))
 		"ca_empurrao_tempo"	"0.3"
 		"automatica"		"1"
 		"balas_por_tiro"		"1"
-		"dano"		"24"
-		"queda_inicio"		"600"
-		"queda_fim"		"1800"
-		"queda_minimo"		"0.55"
+		"dano"		"29"
+		"queda_inicio"		"2000"
+		"queda_fim"		"2500"
+		"queda_minimo"		"0.35"
 		"dispersao_parado"		"1.0"
 		"dispersao_andando"		"3.0"
 		"dispersao_ar"		"7.0"
@@ -50,7 +50,7 @@ WeaponData
 		"recuo_lateral"		"0.35"
 		"mira_zoom"		"1.2"		// aumento mirando, relativo ao campo de visão do jogador (0 = usa mira_fov)
 		"mira_fov"		"70"		// só se mira_zoom for 0
-		"mira_tempo"		"0.14"
+		"mira_tempo"		"0.15"		// CA: ZoomTime
 		"mira_posicao"		"-3.0 1.0 -1.5"
 		"mira_angulos"		"0 0 0"
 		"mira_velocidade"		"0.7"
@@ -58,8 +58,39 @@ WeaponData
 		"mira_coice"		"0.8"		// mirando: quanto a arma vem para trás a cada tiro (u)
 		"mira_coice_angulo"	"0.4"		// ... e quanto levanta (graus)
 		"mira_animacao_tiro"	"0"		// 0 = mirando não toca a animação de tiro do modelo (a alça fica no centro)
-		"velocidade"		"0.93"		// MP5 do CA: perda de 0,07 (movimento do CA: corrida x (1 - colete) x isto)
+		"velocidade"		"0.9222"		// CA: 285 x (1 - 0,10 - 0,07) = 236,55 u/s
 		"animacao"		"smg1"
+
+		// Lei de tiro do Combat Arms (shared/trok/weapon_trok_gun.cpp; trok_arma_ca 0 volta ao modelo antigo,
+		// que usa os campos "dispersao_*", "recuo_*" e "queda_*" acima).
+		"modelo_ca"		"1"
+		"CA"
+		{
+			"dano"                  "29"	// InstDamage 9mm
+			"dano_variacao"         "0.1"	// padrão do CA (registro não traz)
+			"alcance"               "2500"	// Range
+			"faixas"                "500 2000 2500"	// Effectrange0..2
+			"faixas_dano"           "1.1 0.7 0.35"	// perto dá MAIS dano: 31,9 / 20,3 / 10,15
+			"cone"                  "8 100"
+			"cone_mira"             "7 17"
+			"cone_velocidade"       "0.8 0.37"
+			"cone_velocidade_mira"  "0.8 0.37"
+			"cone_fator"            "1.0"
+			"teto_tiro"             "0.18 0.20 0.17 0.19"
+			"alvo_movimento"        "0.09 0.10 0.58"	// correr quase não abre
+			"espera_recuperar"      "0.180"	// DecDelay 180 ms
+			"recuo"                 "1.4"
+			"recuo_acel"            "0"	// padrão
+			"recuo_max"             "7"
+			"recuo_lado_inicio"     "0.03"
+			"recuo_lado"            "-1.2 1.2"
+			"recuo_lado_max"        "15"
+			"recuo_lado_troca"      "0.015"	// padrão
+			"recuo_volta_espera"    "0.6"	// padrão (JitterDecDelay 600 ms)
+			"recuo_volta"           "0.1 0.3"	// padrão
+			"tempo_recarga"         "2.0"	// 2000 ms
+			"tempo_sacar"           "1.0"	// 1000 ms
+		}
 	}
 
 	// Arquivos .wav direto (o CS:S montado tem esses sons).

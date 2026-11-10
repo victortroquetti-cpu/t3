@@ -1,0 +1,137 @@
+// Trok: lista de modos que o menu mostra em JOGAR (contra bots) e CRIAR PARTIDA
+// (client/trok/ui/trok_menu.cpp). Só texto e escolhas da tela: as regras de verdade ficam
+// no código do modo e nos números do cfg de cada modo.
+//
+// Campos de cada modo:
+//   "modo"          valor de trok_modo (equipe, solo, surto, corrida)
+//   "nome"          nome grande do cartão           "curto"   rótulo pequeno
+//   "descricao"     uma linha                       "regra1".."regra4"  regras principais
+//   "cfg"           cfg do modo (cfg/<cfg>.cfg): o menu lê dele a meta e o tempo padrão
+//   "meta_cvar"     ConVar da meta no cfg (vazio = o modo não tem meta)
+//   "meta_rotulo"   como a meta aparece ("ABATES DO TIME", "ABATES")
+//   "meta_opcoes"   escolhas de meta em CRIAR PARTIDA, separadas por espaço (0 = a do cfg)
+//   "tempo_cvar"    ConVar do tempo no cfg          "tempo_unidade"  min ou s
+//   "tempo_opcoes"  escolhas de tempo em minutos em CRIAR PARTIDA (vazio = sem escolha)
+//   "times"         1 = dois times (Mercenários x Remanescentes)
+//   "bots"          1 = dá para jogar contra bots em JOGAR
+//   "mapas"         começo do nome dos mapas aceitos, separados por espaço (vazio = todos)
+//   "mapa_padrao"   mapa escolhido na primeira vez
+//   "em_breve"      1 = aparece desabilitado, com a marca EM BREVE
+"Modos"
+{
+	"equipe"
+	{
+		"modo"			"equipe"
+		"nome"			"MATA-MATA EM EQUIPE"
+		"curto"			"EQUIPE"
+		"descricao"		"Mercenários contra Remanescentes. O primeiro time a chegar na meta vence."
+		"regra1"		"Renasce sozinho depois de alguns segundos, longe dos inimigos."
+		"regra2"		"Proteção curta ao nascer (acaba quando você atira)."
+		"regra3"		"Cada abate conta para o time."
+		"cfg"			"equipe"
+		"meta_cvar"		"mp_fraglimit"
+		"meta_rotulo"	"ABATES DO TIME"
+		"meta_opcoes"	"0 30 50 80 100 120 140"
+		"tempo_cvar"	"mp_timelimit"
+		"tempo_unidade"	"min"
+		"tempo_opcoes"	"0 5 10 15 20 30"
+		"times"			"1"
+		"bots"			"1"
+		"mapas"			""
+		"mapa_padrao"	"de_dust2"
+	}
+	"solo"
+	{
+		"modo"			"solo"
+		"nome"			"EXÉRCITO SOLO"
+		"curto"			"SOLO"
+		"descricao"		"Todos contra todos. Quem chegar primeiro na meta de abates vence."
+		"regra1"		"Sem time: qualquer um é inimigo."
+		"regra2"		"Renasce sozinho, no ponto mais longe dos outros."
+		"regra3"		"Proteção curta ao nascer."
+		"cfg"			"solo"
+		"meta_cvar"		"mp_fraglimit"
+		"meta_rotulo"	"ABATES"
+		"meta_opcoes"	"0 15 30 45"
+		"tempo_cvar"	"mp_timelimit"
+		"tempo_unidade"	"min"
+		"tempo_opcoes"	"0 5 10 15 20"
+		"times"			"0"
+		"bots"			"1"
+		"mapas"			""
+		"mapa_padrao"	"de_dust2"
+	}
+	"surto"
+	{
+		"modo"			"surto"
+		"nome"			"SURTO"
+		"curto"			"SURTO"
+		"descricao"		"Infecção: um sorteado vira zumbi. Sobreviva até o fim do tempo."
+		"regra1"		"Quem morre para um zumbi vira zumbi no mesmo lugar."
+		"regra2"		"O alarme abre os abrigos: segure a porta até o fim."
+		"regra3"		"Humanos vencem se alguém sobreviver; zumbis, se pegarem todos."
+		"regra4"		"Rodadas seguidas; o time muda a cada rodada."
+		"cfg"			"surto"
+		"meta_cvar"		""
+		"meta_rotulo"	""
+		"meta_opcoes"	""
+		"tempo_cvar"	"trok_surto_tempo"
+		"tempo_unidade"	"s"
+		"tempo_opcoes"	""
+		"times"			"0"
+		"bots"			"1"
+		"mapas"			""
+		"mapa_padrao"	"de_dust2"
+	}
+	"corrida"
+	{
+		"modo"			"corrida"
+		"nome"			"CORRIDA ARMADA"
+		"curto"			"CORRIDA"
+		"descricao"		"Todos contra todos: cada abate sobe um degrau na escada de armas."
+		"regra1"		"Começa com a primeira arma da escada; abates trocam a arma."
+		"regra2"		"Ao renascer, volta com a arma do seu degrau."
+		"regra3"		"Vence quem chegar na meta de abates."
+		"cfg"			"corrida"
+		"meta_cvar"		"mp_fraglimit"
+		"meta_rotulo"	"ABATES"
+		"meta_opcoes"	"0 15 30 45"
+		"tempo_cvar"	"mp_timelimit"
+		"tempo_unidade"	"min"
+		"tempo_opcoes"	"0 10 15 20"
+		"times"			"0"
+		"bots"			"1"
+		"mapas"			""
+		"mapa_padrao"	"de_dust2"
+	}
+
+	// Ainda não existem: aparecem desabilitados.
+	"bandeira"
+	{
+		"nome"			"CAPTURA DE BANDEIRA"
+		"curto"			"BANDEIRA"
+		"descricao"		"Leve a bandeira inimiga até a sua base."
+		"em_breve"		"1"
+	}
+	"bomba"
+	{
+		"nome"			"BUSCA E DESTRUIÇÃO"
+		"curto"			"BOMBA"
+		"descricao"		"Rodadas sem renascer: plantar ou desarmar a bomba."
+		"em_breve"		"1"
+	}
+	"ultimo"
+	{
+		"nome"			"ÚLTIMO DE PÉ"
+		"curto"			"ÚLTIMO"
+		"descricao"		"Rodadas sem renascer, todos contra todos."
+		"em_breve"		"1"
+	}
+	"escolta"
+	{
+		"nome"			"ESCOLTA"
+		"curto"			"ESCOLTA"
+		"descricao"		"Proteja o alvo até a saída do mapa."
+		"em_breve"		"1"
+	}
+}

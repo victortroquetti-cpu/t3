@@ -71,6 +71,13 @@ public:
 	int GetDestaqueTipo( void ) const { return m_iDestaqueTipo; }		// TrokSurtoDestaque_t
 	int GetDestaqueValor( void ) const { return m_iDestaqueValor; }
 
+	// Tipos de zumbi (trok_zumbis.cpp): o tipo de quem é zumbi agora, o escolhido para a
+	// próxima vez que virar e até quando está lento (golpe que paralisa, nuvem tóxica).
+	int GetClasseZumbi( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aClasseZumbi[ i ] : 0; }
+	int GetEscolhaZumbi( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aEscolhaZumbi[ i ] : 0; }
+	float GetLentoAte( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aLentoAte[ i ] : 0.0f; }
+	float GetLentoFator( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aLentoFator[ i ] : 1.0f; }
+
 	CNetworkVar( int, m_iFase );
 	CNetworkVar( float, m_flFimFase );		// curtime em que a fase acaba
 	CNetworkVar( int, m_iVencedor );
@@ -84,6 +91,10 @@ public:
 	CNetworkVar( int, m_iDestaque );
 	CNetworkVar( int, m_iDestaqueTipo );
 	CNetworkVar( int, m_iDestaqueValor );
+	CNetworkArray( int, m_aClasseZumbi, MAX_PLAYERS + 1 );
+	CNetworkArray( int, m_aEscolhaZumbi, MAX_PLAYERS + 1 );
+	CNetworkArray( float, m_aLentoAte, MAX_PLAYERS + 1 );
+	CNetworkArray( float, m_aLentoFator, MAX_PLAYERS + 1 );
 };
 
 CTrokSurtoEstado *TrokSurto_Estado( void );
@@ -98,6 +109,7 @@ enum TrokModo_t
 	TROK_MODO_EQUIPE = 0,
 	TROK_MODO_SOLO,
 	TROK_MODO_SURTO,
+	TROK_MODO_CORRIDA,		// Corrida Armada (escada de armas; shared/trok/trok_corrida.cpp)
 };
 int TrokModo( void );
 

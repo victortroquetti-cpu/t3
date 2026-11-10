@@ -1,6 +1,6 @@
 // Trok: Fuzil. Modelo e som de PROTÓTIPO, do CS:S montado do jogo do jogador
-// (não vão no pacote). Os números do bloco "Trok" são pontos de partida: preencher com
-// a referência do Combat Arms no local (ver cs-source/design/sistemas-jogabilidade.md).
+// (não vão no pacote). Números do Combat Arms (M4A1, Chimera:
+// design/chimera/games/combat_arms/data/weapons/m4a1.toml) no sub-bloco "CA" do bloco "Trok".
 
 WeaponData
 {
@@ -11,7 +11,7 @@ WeaponData
 	"bucket"			"0"
 	"bucket_position"	"1"
 
-	"clip_size"			"30"
+	"clip_size"		"30"
 	"clip2_size"		"-1"
 	"default_clip"		"30"
 	"default_clip2"		"-1"
@@ -21,23 +21,23 @@ WeaponData
 
 	"weight"			"3"
 	"item_flags"		"0"
-	"damage"			"33"
+	"damage"		"35"
 
 	// Sistema de armas do Trok (shared/trok/weapon_trok_gun.cpp). Ângulos em graus,
 	// distâncias em u, tempos em s. Ajuste ao vivo da mira: trok_mira_ajuste / trok_mira_imprimir.
 	"Trok"
 	{
-		"tiros_por_minuto"		"600"
+		"tiros_por_minuto"		"571.43"		// CA: animação de tiro de 105 ms
 		"empurrao"		"45"		// u/s por bala acertada no zumbi (modo Surto)
 		"segurar"		"0.12"		// fração da velocidade do zumbi que cada bala tira
 		"ca_empurrao"		"40"		// movimento do CA: força K do empurrão no infectado (CA: M4A1 40 / 0,3 s)
 		"ca_empurrao_tempo"	"0.3"
 		"automatica"		"1"
 		"balas_por_tiro"		"1"
-		"dano"		"33"
-		"queda_inicio"		"1000"
-		"queda_fim"		"3000"
-		"queda_minimo"		"0.7"
+		"dano"		"35"
+		"queda_inicio"		"2500"
+		"queda_fim"		"3500"
+		"queda_minimo"		"0.35"
 		"dispersao_parado"		"0.6"
 		"dispersao_andando"		"5.0"
 		"dispersao_ar"		"10.0"
@@ -50,7 +50,7 @@ WeaponData
 		"recuo_lateral"		"0.45"
 		"mira_zoom"		"1.3"		// aumento mirando, relativo ao campo de visão do jogador (0 = usa mira_fov)
 		"mira_fov"		"60"		// só se mira_zoom for 0
-		"mira_tempo"		"0.18"
+		"mira_tempo"		"0.15"		// CA: ZoomTime
 		"mira_posicao"		"-3.0 1.0 -1.5"
 		"mira_angulos"		"0 0 0"
 		"mira_velocidade"		"0.6"
@@ -58,8 +58,40 @@ WeaponData
 		"mira_coice"		"1.2"		// mirando: quanto a arma vem para trás a cada tiro (u)
 		"mira_coice_angulo"	"0.6"		// ... e quanto levanta (graus)
 		"mira_animacao_tiro"	"0"		// 0 = mirando não toca a animação de tiro do modelo (a alça fica no centro)
-		"velocidade"		"0.90"		// M4A1 do CA: perda de 0,10 (movimento do CA: corrida x (1 - colete) x isto)
+		"velocidade"		"0.8889"		// CA: 285 x (1 - 0,10 colete - 0,10 M4A1) = 228 u/s; o movimento multiplica por (1 - colete)
 		"animacao"		"ar2"
+
+		// Lei de tiro do Combat Arms (shared/trok/weapon_trok_gun.cpp; trok_arma_ca 0 volta ao modelo antigo,
+		// que usa os campos "dispersao_*", "recuo_*" e "queda_*" acima).
+		"modelo_ca"		"1"
+		"CA"
+		{
+			"dano"                  "35"	// InstDamage 5.56mm
+			"dano_variacao"         "0.05"	// DamageRFacter: +-5%
+			"alcance"               "3500"	// Range (u)
+			"faixas"                "2500 3000 3500"	// Effectrange0..2
+			"faixas_dano"           "1.0 0.7 0.35"	// Rangedamage0..2: 35 / 24,5 / 12,25
+			"cone"                  "3 100"	// MinPerturb MaxPerturb (milésimos)
+			"cone_mira"             "2 30"	// ZoomedMin/MaxPerturb (mirando pelo cano)
+			"cone_velocidade"       "1.3 0.3"	// PerturbIncSpeed DecSpeed
+			"cone_velocidade_mira"  "1.3 0.3"
+			"cone_fator"            "1.0"	// DynamicPerturbFactor
+			"teto_tiro"             "0.30 0.38 0.30 0.38"	// FirePerturb: parado, andando, agachado, agachado andando
+			"alvo_movimento"        "0.04 0.25 0.70"	// WalkPerturb RunPerturb JumpPerturb
+			"espera_recuperar"      "0.095"	// DecDelay 95 ms
+			"recuo"                 "1.3"	// BaseCamRecoilPitch (graus)
+			"recuo_acel"            "0.2"	// BaseCamRecoilAccelPitch
+			"recuo_max"             "5"	// MaxCamRecoilPitch: sobe até 10 graus
+			"recuo_lado_inicio"     "0.02"	// MaxRandomPitch (rad)
+			"recuo_lado"            "-1.2 1.2"	// BaseCamRecoilWagR WagL (graus)
+			"recuo_lado_max"        "15"	// MaxCamRecoilWag
+			"recuo_lado_troca"      "0.01"	// MaxRandomwag (rad)
+			"recuo_volta_espera"    "0.095"	// JitterDecDelay 95 ms
+			"recuo_volta"           "0.1 0.2"	// JitterWaitRecover JitterRecover (rad/s)
+			"tempo_recarga"         "2.3"	// animação reload 2300 ms
+			"tempo_sacar"           "1.2"	// animação select 1200 ms
+			"saida_corrida"         "0.367"	// PostRush 367 ms
+		}
 	}
 
 	// Arquivos .wav direto (o CS:S montado tem esses sons).
