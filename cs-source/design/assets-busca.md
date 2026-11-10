@@ -61,7 +61,5 @@ por tipo:
 **Sons:** "gunshot foley", "rifle reload", "shell casing", "zombie growl", "creature scream", "squelch", "spore burst",
 "radio static", "alarm siren", "geiger", "industrial ambience", "wind interior", "heartbeat".
 
-## Cuidados
-- Prefira CC0. CC-BY: anotar autor e link em `CREDITOS.txt`.
-- Fugir de "NC" (não comercial) só se um dia o jogo for vendido; hoje ele é grátis.
-- Nada tirado de outros jogos (rips): vem de lojas e acervos com licença clara.
+## Crédito
+- CC-BY: anotar autor e link em `game/mod_trok/CREDITOS.txt`.
