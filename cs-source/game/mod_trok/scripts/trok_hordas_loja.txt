@@ -143,7 +143,7 @@
 			"nome"		"Kit de reanimação"
 			"preco"		"2500"
 			"energia"	"1"
-			"descricao"	"Ao cair, levanta sozinho em 4 s (gasta o kit). DECISÃO DO DONO: fica?"
+			"descricao"	"Ao cair, levanta sozinho em 4 s (gasta o kit)."	// decisão do dono pendente: o kit fica? (design/modo-hordas.md, seção 18)
 		}
 	}
 }

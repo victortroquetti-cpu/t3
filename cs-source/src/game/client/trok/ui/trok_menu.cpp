@@ -1366,7 +1366,7 @@ int CTrokMenu::RunModeRules( int x, int y, int w )
 	yy += S( 20 );
 	const int iLinha = surface()->GetFontTall( m_hBody ) + S( 3 );
 	int nRegras = 0;
-	for ( int r = 0; r < 4 && nRegras < 3; ++r )
+	for ( int r = 0; r < 4; ++r )	// até 4 regras (o Surto e o Hordas usam a 4ª)
 	{
 		if ( !m.szRegras[ r ][ 0 ] )
 			continue;
@@ -2289,7 +2289,7 @@ void CTrokMenu::BuildMapList( void )
 			continue;
 		char szName[ 128 ];
 		V_StripExtension( pszFile, szName, sizeof( szName ) );
-		if ( V_strnicmp( szName, "background", 10 ) == 0 || V_stristr( szName, "test" ) )
+		if ( V_strnicmp( szName, "background", 10 ) == 0 || ( V_stristr( szName, "test" ) && V_strnicmp( szName, "trok_", 5 ) != 0 ) )	// mapas de teste nossos (trok_*) aparecem
 			continue;
 		bool bDup = false;
 		FOR_EACH_VEC( withNav, i ) bDup |= ( V_stricmp( withNav[ i ], szName ) == 0 );

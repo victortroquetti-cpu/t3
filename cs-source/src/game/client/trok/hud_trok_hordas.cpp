@@ -36,7 +36,7 @@ static ConVar trok_hordas_hud( "trok_hordas_hud", "1", FCVAR_ARCHIVE, "Hordas: m
 static const Color COR_BRANCO( 236, 238, 241, 255 );
 static const Color COR_CINZA( 190, 196, 204, 220 );
 static const Color COR_DESTAQUE( 242, 181, 68, 255 );
-static const Color COR_PERIGO( 214, 72, 58, 255 );
+static const Color COR_PERIGO( 217, 54, 43, 255 );	// vermelho-sangue da paleta (infecção/zumbi)
 static const Color COR_FUNDO( 11, 13, 16, 170 );
 
 static const char *s_pszBonusNome[ HORDAS_BONUS_NUM ] =
@@ -379,8 +379,7 @@ void CHudTrokHordas::PintarCaidos( CTrokHordasEstado *pEstado, C_BasePlayer *pLo
 		if ( !GetVectorInScreenSpace( p->GetAbsOrigin() + Vector( 0, 0, 40 ), x, y ) )
 			continue;
 		const int t = S( 7 );
-		const float flPisca = ( (int)( gpGlobals->curtime * 3.0f ) % 2 ) ? 1.0f : 0.6f;
-		surface()->DrawSetColor( Color( 214, 72, 58, (int)( 255 * flPisca ) ) );
+		surface()->DrawSetColor( COR_PERIGO );	// fixo: nada piscando (decisão do dono)
 		surface()->DrawFilledRect( x - t, y - S( 2 ), x + t, y + S( 2 ) );
 		surface()->DrawFilledRect( x - S( 2 ), y - t, x + S( 2 ), y + t );
 		char sz[ 32 ];

@@ -165,7 +165,16 @@ int CTrokLojaPainel::Possui( const TrokLojaItem_t &it ) const
 	case LOJA_COLETE:
 		return ( pPlacar && pPlacar->GetColete( i ) >= it.iNivel ) ? 2 : 0;
 	case LOJA_CAPACETE:
-		return ( pPlacar && pPlacar->GetCapacete( i ) > 0 ) ? 1 : 0;
+	{
+		// 255 = capacete que não quebra; 1..254 = balístico (tiros que ainda aguenta). O servidor deixa trocar por
+		// um de proteção maior, então o balístico só conta como "já tem" quando é ele que está na cabeça.
+		const int iCap = pPlacar ? pPlacar->GetCapacete( i ) : 0;
+		if ( iCap <= 0 )
+			return 0;
+		if ( it.iGolpes > 0 )
+			return iCap < 255 ? 2 : 0;
+		return iCap == 255 ? 2 : 0;	// com o balístico, o simples aparece com preço e o servidor recusa ("já tem")
+	}
 	default:
 		return 0;
 	}
@@ -199,8 +208,10 @@ void CTrokLojaPainel::Desenhar( void )
 		V_snprintf( szInf, sizeof( szInf ), "FÚRIA  %d", TrokZumbis_Dinheiro( pLocal ) );
 		const int xInf = x0 + wTotal - wDin - S( 10 ) - Largura( m_hPequena, "HUMANO" ) - S( 28 );
 		const int yInf = y0 + Altura( m_hTitulo ) - Altura( m_hItem ) - S( 2 );
-		const int wInf = Largura( m_hItem, szInf );
-		Ret( xInf - wInf - S( 8 ), yInf - S( 3 ), wInf + S( 16 ), Altura( m_hItem ) + S( 6 ), COR_FURIA_FUNDO );
+		// Fúria: vermelho-sangue com contorno fino roxo-escuro, sem placa (decisão do dono)
+		const Color cContorno( COR_FURIA_FUNDO.r(), COR_FURIA_FUNDO.g(), COR_FURIA_FUNDO.b(), 255 );
+		for ( int d = 0; d < 4; ++d )
+			TextoDir( m_hItem, xInf + ( d == 0 ? 1 : d == 1 ? -1 : 0 ), yInf + ( d == 2 ? 1 : d == 3 ? -1 : 0 ), cContorno, szInf );
 		TextoDir( m_hItem, xInf, yInf, COR_FURIA, szInf );
 	}
 	float flFalta = 0.0f;
@@ -243,7 +254,7 @@ void CTrokLojaPainel::Desenhar( void )
 		char szTecla[ 8 ];
 		V_snprintf( szTecla, sizeof( szTecla ), "%d", c + 1 );
 		const int y = yCorpo + c * ( hCat + S( 6 ) );
-		const char *pszNome = ( c == iAbaInf ) ? "INFECTADO" : loja.m_Categorias[ c ].szNome;
+		const char *pszNome = ( c == iAbaInf ) ? "FÚRIA" : loja.m_Categorias[ c ].szNome;
 		if ( Botao( x0, y, wCat, hCat, m_hBotao, pszNome, c == m_iCategoria, szTecla ) )
 			m_iCategoria = c;
 	}
@@ -251,7 +262,11 @@ void CTrokLojaPainel::Desenhar( void )
 	{
 		DesenharInfectado( x0 + wCat + S( 24 ), yCorpo );
 		int xDica = x0;
+		Dica( xDica, m_iAltura - S( 48 ), "1-9", "CATEGORIA" );
+		Dica( xDica, m_iAltura - S( 48 ), "CLIQUE", "ESCOLHER" );
 		Dica( xDica, m_iAltura - S( 48 ), "B", "FECHAR" );
+		if ( Botao( x0 + wTotal - S( 140 ), m_iAltura - S( 60 ), S( 140 ), S( 36 ), m_hBotao, "FECHAR", false ) )
+			Mostrar( false );
 		return;
 	}
 	if ( loja.m_Categorias.Count() == 0 )
@@ -374,8 +389,13 @@ void CTrokLojaPainel::DesenharInfectado( int x, int y )
 
 	char sz[ 128 ];
 	V_snprintf( sz, sizeof( sz ), "FÚRIA: %d   (moeda do infectado, separada do dinheiro de humano)", iSaldo );
-	Ret( x - S( 6 ), y - S( 2 ), Largura( m_hPequena, sz ) + S( 12 ), Altura( m_hPequena ) + S( 4 ), COR_FURIA_FUNDO );
-	Texto( m_hPequena, x, y, COR_FURIA, sz );
+	{
+		// Fúria: contorno fino roxo-escuro, sem placa (decisão do dono)
+		const Color cContorno( COR_FURIA_FUNDO.r(), COR_FURIA_FUNDO.g(), COR_FURIA_FUNDO.b(), 255 );
+		for ( int d = 0; d < 4; ++d )
+			Texto( m_hPequena, x + ( d == 0 ? 1 : d == 1 ? -1 : 0 ), y + ( d == 2 ? 1 : d == 3 ? -1 : 0 ), cContorno, sz );
+		Texto( m_hPequena, x, y, COR_FURIA, sz );
+	}
 	Texto( m_hPequena, x, y + Altura( m_hPequena ) + S( 2 ), COR_TEXTO3, "Escolha o tipo agora; paga ao virar zumbi (sem saldo, vira o normal)." );
 	y += 2 * Altura( m_hPequena ) + S( 12 );
 
