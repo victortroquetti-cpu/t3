@@ -17,6 +17,7 @@
 #include "trok/trok_loja.h"
 #include "trok/trok_placar_extra.h"
 #include "trok/trok_surto.h"
+#include "trok/trok_zumbis.h"
 #include <vgui/ISurface.h>
 #include <vgui/IVGui.h>
 #include <vgui/IInput.h>
@@ -63,6 +64,8 @@ private:
 	bool PodeComprarAgora( float *pflFalta ) const;
 	int Possui( const TrokLojaItem_t &it ) const;	// 0 não, 1 tem, 2 tem igual ou melhor (colete)
 	void DesenharDetalhe( int x, int y, int w, const TrokLojaItem_t &it );
+	void DesenharInfectado( int x, int y );
+	int AbaInfectado( void ) const;		// índice da aba "INFECTADO" (só no Surto; -1 fora)
 
 	int m_iCategoria;
 	int m_iItemSobre;
@@ -114,9 +117,15 @@ void CTrokLojaPainel::OnTick( void )
 {
 	if ( !IsVisible() )
 		return;
-	// Fora da partida, morto ou sem tempo de compra: fecha sozinho.
-	if ( !engine->IsInGame() || !PodeComprarAgora( NULL ) )
+	// Fora da partida, morto ou sem tempo de compra: fecha sozinho (no Surto a aba de infectado
+	// fica aberta: o tipo de zumbi se escolhe a qualquer hora).
+	if ( !engine->IsInGame() || ( !PodeComprarAgora( NULL ) && AbaInfectado() < 0 ) )
 		Mostrar( false );
+}
+
+int CTrokLojaPainel::AbaInfectado( void ) const
+{
+	return TrokSurto_Ativo() ? TrokLoja().m_Categorias.Count() : -1;
 }
 
 void CTrokLojaPainel::OnKeyCodePressed( KeyCode code )
@@ -133,7 +142,7 @@ void CTrokLojaPainel::OnKeyCodePressed( KeyCode code )
 		iNum = code - KEY_1;
 	else if ( code >= KEY_PAD_1 && code <= KEY_PAD_9 )
 		iNum = code - KEY_PAD_1;
-	if ( iNum >= 0 && iNum < loja.m_Categorias.Count() )
+	if ( iNum >= 0 && ( iNum < loja.m_Categorias.Count() || iNum == AbaInfectado() ) )
 	{
 		m_iCategoria = iNum;
 		return;
@@ -176,11 +185,20 @@ void CTrokLojaPainel::Desenhar( void )
 	const int x0 = S( 64 ), y0 = S( 56 );
 	const int wTotal = m_iLargura - 2 * x0;
 
-	// Cabeçalho: LOJA, dinheiro e tempo de compra.
+	// Cabeçalho: LOJA, dinheiro e tempo de compra. No Surto são duas moedas, lado a lado.
 	Texto( m_hTitulo, x0, y0, COR_TEXTO, "LOJA" );
 	char szDin[ 32 ];
 	FormatarDinheiro( iDinheiro, szDin, sizeof( szDin ) );
 	TextoDir( m_hTitulo, x0 + wTotal, y0, acc, szDin );
+	if ( AbaInfectado() >= 0 )
+	{
+		const int wDin = Largura( m_hTitulo, szDin );
+		TextoDir( m_hPequena, x0 + wTotal - wDin - S( 10 ), y0 + Altura( m_hTitulo ) - Altura( m_hPequena ) - S( 4 ), COR_TEXTO3, "HUMANO" );
+		char szInf[ 48 ];
+		V_snprintf( szInf, sizeof( szInf ), "INFECTADO  %d", TrokZumbis_Dinheiro( pLocal ) );
+		const int xInf = x0 + wTotal - wDin - S( 10 ) - Largura( m_hPequena, "HUMANO" ) - S( 28 );
+		TextoDir( m_hItem, xInf, y0 + Altura( m_hTitulo ) - Altura( m_hItem ) - S( 2 ), COR_ZUMBI, szInf );
+	}
 	float flFalta = 0.0f;
 	const bool bPode = PodeComprarAgora( &flFalta );
 	char szTempo[ 64 ];
@@ -213,14 +231,24 @@ void CTrokLojaPainel::Desenhar( void )
 
 	// Categorias
 	const int wCat = S( 220 ), hCat = S( 40 );
-	m_iCategoria = clamp( m_iCategoria, 0, MAX( 0, loja.m_Categorias.Count() - 1 ) );
-	for ( int c = 0; c < loja.m_Categorias.Count(); ++c )
+	const int iAbaInf = AbaInfectado();
+	const int nAbas = loja.m_Categorias.Count() + ( iAbaInf >= 0 ? 1 : 0 );
+	m_iCategoria = clamp( m_iCategoria, 0, MAX( 0, nAbas - 1 ) );
+	for ( int c = 0; c < nAbas; ++c )
 	{
 		char szTecla[ 8 ];
 		V_snprintf( szTecla, sizeof( szTecla ), "%d", c + 1 );
 		const int y = yCorpo + c * ( hCat + S( 6 ) );
-		if ( Botao( x0, y, wCat, hCat, m_hBotao, loja.m_Categorias[ c ].szNome, c == m_iCategoria, szTecla ) )
+		const char *pszNome = ( c == iAbaInf ) ? "INFECTADO" : loja.m_Categorias[ c ].szNome;
+		if ( Botao( x0, y, wCat, hCat, m_hBotao, pszNome, c == m_iCategoria, szTecla ) )
 			m_iCategoria = c;
+	}
+	if ( m_iCategoria == iAbaInf )
+	{
+		DesenharInfectado( x0 + wCat + S( 24 ), yCorpo );
+		int xDica = x0;
+		Dica( xDica, m_iAltura - S( 48 ), "B", "FECHAR" );
+		return;
 	}
 	if ( loja.m_Categorias.Count() == 0 )
 	{
@@ -330,6 +358,52 @@ void CTrokLojaPainel::DesenharDetalhe( int x, int y, int w, const TrokLojaItem_t
 	}
 }
 
+// Aba do Surto: tipos de zumbi pagos com o DINHEIRO DE INFECTADO (outra moeda, de
+// trok_zumbis.cpp). Clicar só escolhe o tipo (trok_zumbi_classe); paga-se ao virar zumbi.
+void CTrokLojaPainel::DesenharInfectado( int x, int y )
+{
+	C_BasePlayer *pLocal = C_BasePlayer::GetLocalPlayer();
+	const int iSaldo = TrokZumbis_Dinheiro( pLocal );
+	const int iEscolha = TrokZumbis_EscolhaDe( pLocal );
+	const Color acc = Destaque();
+	const int w = S( 440 ), h = S( 46 );
+
+	char sz[ 128 ];
+	V_snprintf( sz, sizeof( sz ), "DINHEIRO DE INFECTADO: %d   (moeda separada do dinheiro de humano)", iSaldo );
+	Texto( m_hPequena, x, y, COR_ZUMBI, sz );
+	Texto( m_hPequena, x, y + Altura( m_hPequena ) + S( 2 ), COR_TEXTO3, "Escolha o tipo agora; paga ao virar zumbi (sem saldo, vira o normal)." );
+	y += 2 * Altura( m_hPequena ) + S( 12 );
+
+	for ( int i = 0; i < TrokZumbis_Num(); ++i )
+	{
+		const TrokZumbiClasse_t &c = TrokZumbis_Classe( i );
+		if ( !c.bJogavel )
+			continue;
+		const bool bSobre = Sobre( x, y, w, h );
+		const bool bEscolhido = ( i == iEscolha );
+		const bool bCaro = c.iPreco > iSaldo;
+		Ret( x, y, w, h, bSobre ? COR_PAINEL_HOVER : COR_PAINEL );
+		Contorno( x, y, w, h, bSobre ? COR_LINHA_FORTE : COR_LINHA );
+		if ( bEscolhido )
+			Ret( x, y, S( 3 ), h, COR_ZUMBI );
+		Texto( m_hItem, x + S( 14 ), y + ( h - Altura( m_hItem ) ) / 2, bCaro ? COR_TEXTO3 : COR_TEXTO, c.szTitulo );
+		if ( bEscolhido )
+			V_strncpy( sz, "ESCOLHIDO", sizeof( sz ) );
+		else if ( c.iPreco > 0 )
+			V_snprintf( sz, sizeof( sz ), "%d INFECTADO", c.iPreco );
+		else
+			V_strncpy( sz, "GRÁTIS", sizeof( sz ) );
+		TextoDir( m_hItem, x + w - S( 14 ), y + ( h - Altura( m_hItem ) ) / 2,
+			bEscolhido ? acc : ( bCaro ? COR_INIMIGO : COR_ZUMBI ), sz );
+		if ( Clicou( x, y, w, h ) && !bEscolhido )
+		{
+			V_snprintf( sz, sizeof( sz ), "trok_zumbi_classe %s\n", c.szNome );
+			engine->ClientCmd( sz );
+		}
+		y += h + S( 6 );
+	}
+}
+
 //-----------------------------------------------------------------------------
 // Comandos
 //-----------------------------------------------------------------------------
@@ -351,14 +425,11 @@ CON_COMMAND( trok_loja, "Abre ou fecha o menu de compra (economia: trok_economia
 		return;
 	}
 	C_BasePlayer *pLocal = C_BasePlayer::GetLocalPlayer();
-	if ( !pLocal || !pLocal->IsAlive() || TrokSurto_IsZumbi( pLocal ) )
+	const bool bPodeHumano = pLocal && pLocal->IsAlive() && !TrokSurto_IsZumbi( pLocal ) &&
+		pPlacar->GetCompraAte( pLocal->entindex() ) > gpGlobals->curtime;
+	if ( !bPodeHumano && !TrokSurto_Ativo() )
 	{
-		Msg( "Agora você não pode comprar.\n" );
-		return;
-	}
-	if ( pPlacar->GetCompraAte( pLocal->entindex() ) <= gpGlobals->curtime )
-	{
-		Msg( "O tempo de compra acabou.\n" );
+		Msg( "Agora você não pode comprar (morto, zumbi ou o tempo de compra acabou).\n" );
 		return;
 	}
 	s_pLoja->Mostrar( true );

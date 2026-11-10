@@ -55,16 +55,67 @@ do servidor no mesmo visual (barra escondida = desconectado).
 O HUD do HL2 (vida, colete, munição, energia, mortes, mira, indicador de dano) sai por `#ifndef TROK`.
 Minimapa com imagem do mapa: precisa de uma imagem de cada mapa (por enquanto é radar sem fundo).
 
+## Telas dentro da partida e do menu (10/11/2026, nuvem; nada visto rodando)
+
+Base comum: `client/trok/ui/trok_ui_comum.cpp/.h` (`CTrokPainel`: tela cheia, desenho imediato como o
+menu, `Desenhar()` pinta e trata o clique; cores, `CorDoTime` relativa, `NomeDoTime`, `ModoComTimes`).
+Os painéis de viewport são criados no `CHudViewport::CreatePanelByName` (patch em
+`clientmode_hl2mpnormal.cpp`); o `PANEL_TEAM` entra por `CreateDefaultPanels`.
+
+| Tela | Arquivo | O que faz |
+|---|---|---|
+| Seleção de time (`PANEL_TEAM`) | `trok_time.cpp` | Só no mata-mata em equipe. MERCENÁRIOS (1, `TEAM_COMBINE`) e REMANESCENTES (2, `TEAM_REBELS`) com quantos e quem; AUTOMÁTICO (3, time com menos gente, decidido no cliente); ASSISTIR (4). Manda `jointeam N`. Abre ao entrar (depois das boas-vindas, 1 s depois de chegar o gamerules; `trok_ui_time_ao_entrar 0` desliga) e na tecla M (`trok_menu_time`). ESC/M fecham. Fecha sozinha se o modo não tem times. |
+| Boas-vindas (`PANEL_INFO`, MOTD) | `trok_motd.cpp` | Título = hostname, texto do `motd.txt` (prefere `motd_text`); HTML vira texto; link vira botão ABRIR PÁGINA (overlay da Steam). Rolagem (roda, setas, PgUp/PgDn). ENTER/ESPAÇO/ESC fecham e chamam a seleção de time. Partida aberta pelo próprio PC ou texto vazio: pula direto (`trok_ui_motd_local 1` mostra). |
+| Espectador (`PANEL_SPECGUI`) | `trok_espectador.cpp` | Cartão embaixo: ASSISTINDO + time (cor relativa) + nome + vida (barra); teclas lidas dos binds (`+attack` próximo, `+attack2` anterior, `+jump` 1ª/3ª pessoa). Quem só assiste vê "M escolher time". Não desenha na câmera da morte. O menu de espectador do Source (`+duck`) foi desligado (`clientmode_shared.cpp`). |
+| Chat | patch em `hl2mp_hud_chat.cpp/.h` | Re-estilizado (não substituído): histórico e campo usam o `TrokScheme` (`ChatFont` = Barlow Medium, acentos ok), fundo `#14171C`, prompt TODOS:/TIME:, cores de nome relativas (`GetClientColor`), sem botão de filtros. O histórico que some (`hud_saytext_time`) e a rolagem são os do Source. Textos `(TIME)`, `(MORTO)`, "entrou na partida" em `resource/mod_trok_english.txt` e `_brazilian.txt` (UTF-16 LE). |
+| Centro e dicas | patches em `vgui_centerstringpanel.cpp`, `hud_hintdisplay.cpp` | Fonte `TrokCentro` (Barlow Condensed SemiBold); dica com texto claro e fundo dos painéis. |
+| SERVIDORES | `trok_menu.cpp` (`RunServers`) + `trok_servidores.cpp/.h` | `ISteamMatchmakingServers` do cliente: INTERNET (`RequestInternetServerList` com filtro `gamedir` = pasta do mod) e REDE LOCAL / VPN (`RequestLANServerList`, só a mesma pasta). Ordem por ping, SENHA marcada, cheio em vermelho, clique duplo/ENTRAR, F5. CONECTAR POR IP (`trok_ui_servidor_ip`) e senha (`password`). VPN: Radmin/ZeroTier repassam a busca da LAN; Hamachi às vezes não, aí é por IP. Sem favoritos/histórico ainda. |
+| Seleção de modo | `trok_menu.cpp` (`RunModeCards`, `RunModeRules`) + `scripts/trok_modos.txt` | JOGAR e CRIAR PARTIDA: cartões de modo no estilo da sala do CA (Equipe, Exército solo, Surto, Corrida Armada; EM BREVE desabilitados), descrição, regras, meta e tempo **lidos do cfg do modo**, mapa lembrado por modo (`trok_ui_mapas`), filtro de mapas por prefixo (`mapas`), opções de meta e tempo do modo em CRIAR PARTIDA. Novo modo = um bloco no script. |
+| Fundo do menu | `trok_menu.cpp` (`TrokFundoAnimado`) | Sem mapa de fundo: grade que desliza, faixa de luz, linha de varredura e poeira, tudo fraco. `trok_ui_fundo_animado 0` volta ao liso. |
+
+**Testar no PC** (nesta ordem):
+1. Entrar num servidor de equipe (ou `map de_dust2` com `trok_modo equipe`): a seleção de time aparece
+   ~1 s depois; mouse livre; 1/2/3/4 e clique funcionam; ESC fecha **sem** abrir o menu; M abre/fecha.
+   Trocar de time vivo mata (regra do HL2MP: conta como suicídio). Em `trok_modo solo`/`surto` não abre.
+2. Servidor dedicado com `motd.txt`: boas-vindas aparece, rola, CONTINUAR leva à seleção de time.
+3. `spectate` (ou ASSISTIR): cartão do espectador, MOUSE1/MOUSE2 trocam o alvo, ESPAÇO alterna 1ª/3ª;
+   CTRL não abre mais o menu do Source.
+4. Chat (Y e U): fonte do mod, acento digitado (á, ç, ã), cores de time, prompt; mensagens "(TIME)"
+   em português (se aparecer `HL2MP_Chat_All` cru, o motor não leu `mod_trok_<idioma>.txt`: conferir o nome
+   com `con_logfile` / o idioma da Steam).
+5. `centerprint`/avisos do servidor e `HintText` com a fonte nova.
+6. SERVIDORES: aba INTERNET lista (ou diz que não há); abrir uma sala em REDE LOCAL num PC e ver no outro;
+   CONECTAR POR IP; servidor com senha.
+7. JOGAR/CRIAR PARTIDA: cartões de modo, trocar de modo troca o mapa lembrado, meta/tempo mostrados batem
+   com `cfg/<modo>.cfg`, Corrida inicia com `trok_modo corrida`.
+8. Fundo animado leve (sem queda de FPS) e o texto do menu legível por cima.
+
+**Não feito / pendente:**
+- **Console**: o console é do GameUI e usa o `SourceScheme.res` inteiro (cores `Console.TextColor`,
+  `Console.DevTextColor`, fonte `ConsoleText`, cores de `Frame`). Não dá para mudar só um pedaço: o arquivo
+  do mod substitui o do HL2 inteiro (e o `#base` não alcança o arquivo de dentro do VPK). Receita para o PC:
+  extrair `resource/SourceScheme.res` do `hl2_misc_dir.vpk` do SDK Base (VPK tool / GCFScape), copiar para
+  `game/mod_trok/resource/`, trocar as cores (`Frame.BgColor` `20 23 28 240`, `Console.TextColor`
+  `236 238 241 255`, `Console.DevTextColor` `242 181 68 255`) e a fonte `ConsoleText` (Barlow 9 ou uma
+  monoespaçada), e listar os .ttf em `CustomFontFiles`. Conferir que as outras janelas do GameUI que ainda
+  aparecem (confirmações) continuam legíveis.
+- **Indicador de voz**: continua o do HL2MP (`hud_voicestatus.cpp`). Próximo: um elemento do HUD do Trok com
+  `GetClientVoiceMgr()->IsPlayerSpeaking(i)` e esconder o do Source.
+- "Escolher time" ainda não está na lista de teclas de CONFIGURAÇÕES > Controles (a coluna já está cheia
+  em 720p; precisa de rolagem). O bind padrão é M no `config_default.cfg`.
+- Servidores: favoritos, histórico e filtros (cheio, senha, mapa) ainda não.
+
 ## Ainda do GameUI (com cara de Source) e próximos passos
 
 1. **Testar no jogo** (nada foi visto rodando): fontes carregando (nome da família no Windows), escala,
    foco do teclado, ESC na partida, clique em cada item. Ajustar posições olhando a tela.
-2. Configurações, lista de servidores e criar partida ainda abrem os diálogos do GameUI
-   (`OpenOptionsDialog`, `OpenServerBrowser`, `OpenCreateMultiplayerGameDialog`). Próximo: opções
-   próprias (receita do NT;RE em `neo_root_settings.cpp`: cópia das ConVars, salvar/descartar,
-   teclas por `kb_act.lst`).
+2. Configurações, criar partida e servidores já são próprios. Ainda do GameUI: caixas de confirmação e o
+   console (ver acima).
 3. Tela de carregamento: feita; falta a arte de cada mapa no fundo.
-4. Mapa de fundo: fazer um `background01.bsp` próprio (câmera lenta) e o `chapterbackgrounds.txt`.
+4. Mapa de fundo: hoje é a animação por código. Para um mapa ao vivo: fazer `maps/background01.bsp` próprio
+   (câmera lenta, `point_viewcontrol`), pôr `"background01"` em `scripts/chapterbackgrounds.txt` do mod
+   (o motor sorteia um mapa dessa lista) e `map_background background01` no `autoexec`; o menu já escurece o
+   lado esquerdo por cima do mapa (`RunBackground`). Mapa do CS:S não serve: precisa ser compilado como fundo.
 5. Arsenal e Perfil (concepts prontos): precisam de sistema de loadout no servidor (hoje é
    `trok_armas_iniciais`).
 6. Placar do TAB: feito (`client/trok/ui/trok_scoreboard.cpp`, troca o do HL2MP no
