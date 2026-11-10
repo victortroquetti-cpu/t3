@@ -2,7 +2,7 @@
 // design/ca-pesquisa/mutagenicos.md). O primeiro bloco é o zumbi normal.
 //
 // jogavel          1 = o jogador pode escolher no Surto (trok_zumbi_classe / tecla N)
-// comprar          1 = com a economia ligada (trok_economia 1), precisa comprar (mutagênico)
+// preco            dinheiro de INFECTADO para virar este tipo; pago a cada vez que vira (sem dinheiro, vira o normal)
 // vida_hospedeiro / vida   vida do sorteado / de quem virou (<= 0 usa trok_surto_vida_*)
 // velocidade       x a velocidade do zumbi (trok_surto_zumbi_velocidade)
 // folego_infinito  1 = sprint sem cansar
@@ -27,10 +27,15 @@
 	}
 
 	// --- Mutagênicos do Quarantine ---
+// Preços (dinheiro de infectado): Charger 1000 < Striker 1800 < Splicer 2600 < Striker explosiva 2800
+// < Crusher 3500 < Crusher tóxico 4500.
+// Ganhos (cfg/surto.cfg): 250 por infecção, 400 por vitória dos zumbis, 150 por derrota, 0,5 por dano
+// que não infecta. Um infectado médio junta ~500–800 por rodada em que foi zumbi: Charger depois de
+// ~2 rodadas, Striker ~3, Crusher só no meio/fim da partida para quem joga bem.
 	"striker"
 	{
 		"titulo"	"Striker"
-		"comprar"	"1"
+		"preco"		"1800"
 		"vida_hospedeiro"	"280"		// CA: 275–285 (páginas divergem)
 		"vida"		"185"
 		"velocidade"	"1.15"			// MEDIR (CA: "a mais rápida")
@@ -41,7 +46,7 @@
 	"crusher"
 	{
 		"titulo"	"Crusher"
-		"comprar"	"1"
+		"preco"		"3500"
 		"vida_hospedeiro"	"450"
 		"vida"		"305"
 		"regen"		"0.20"			// CA: 20% (o normal é 10%)
@@ -57,7 +62,7 @@
 	"charger"
 	{
 		"titulo"	"Charger"
-		"comprar"	"1"
+		"preco"		"1000"
 		"vida_hospedeiro"	"200"		// CA (Fireteam): pele de 100 + 100 de vida
 		"vida"		"150"
 		"velocidade"	"1.1"			// CA: rápido, vai direto em quem vê
@@ -68,7 +73,7 @@
 	"splicer"
 	{
 		"titulo"	"Splicer"
-		"comprar"	"1"
+		"preco"		"2600"
 		"vida_hospedeiro"	"350"		// CA: pele de 150 e "resistência incrível"
 		"vida"		"250"
 		"garra_alcance"	"1.5"			// CA: alcance maior que o do Crusher
@@ -81,13 +86,14 @@
 		"cor"		"170 200 120"
 	}
 
-	// --- Variações do modo Hordas (não escolhíveis no Surto) ---
+	// --- Variações (Equipe Armada): também compráveis no Surto. Abate pelas bolhas, nuvem ou aura
+	// também infecta (no Surto toda morte de humano na rodada vira zumbi e conta para quem causou). ---
 	"striker_bolhas"
 	{
 		"titulo"	"Striker explosiva"
-		"jogavel"	"0"
-		"vida_hospedeiro"	"250"
-		"vida"		"250"
+		"preco"		"2800"
+		"vida_hospedeiro"	"280"
+		"vida"		"185"
 		"velocidade"	"1.15"
 		"folego_infinito"	"1"
 		"bomba_intervalo"	"6"			// CA (Fireteam): bolhas que caem e explodem ("Flash Explosion")
@@ -99,9 +105,9 @@
 	"crusher_toxico"
 	{
 		"titulo"	"Crusher tóxico"
-		"jogavel"	"0"
-		"vida_hospedeiro"	"500"
-		"vida"		"500"
+		"preco"		"4500"			// o mais caro
+		"vida_hospedeiro"	"480"
+		"vida"		"330"
 		"velocidade"	"0.85"			// CA (Fireteam): muito lento
 		"garra_alcance"	"1.35"
 		"garra_cadencia"	"1.6"

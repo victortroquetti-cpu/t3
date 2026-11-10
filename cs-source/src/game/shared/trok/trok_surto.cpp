@@ -54,6 +54,7 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokSurtoEstado, DT_TrokSurtoEstado )
 	RecvPropArray3( RECVINFO_ARRAY( m_aEscolhaZumbi ), RecvPropInt( RECVINFO( m_aEscolhaZumbi[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aLentoAte ), RecvPropFloat( RECVINFO( m_aLentoAte[ 0 ] ) ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_aLentoFator ), RecvPropFloat( RECVINFO( m_aLentoFator[ 0 ] ) ) ),
+	RecvPropArray3( RECVINFO_ARRAY( m_aDinheiroInf ), RecvPropInt( RECVINFO( m_aDinheiroInf[ 0 ] ) ) ),
 #else
 	SendPropInt( SENDINFO( m_iFase ), 3, SPROP_UNSIGNED ),
 	SendPropFloat( SENDINFO( m_flFimFase ), 0, SPROP_NOSCALE ),
@@ -72,6 +73,7 @@ BEGIN_NETWORK_TABLE_NOBASE( CTrokSurtoEstado, DT_TrokSurtoEstado )
 	SendPropArray3( SENDINFO_ARRAY3( m_aEscolhaZumbi ), SendPropInt( SENDINFO_ARRAY( m_aEscolhaZumbi ), 5, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aLentoAte ), SendPropFloat( SENDINFO_ARRAY( m_aLentoAte ), 0, SPROP_NOSCALE ) ),
 	SendPropArray3( SENDINFO_ARRAY3( m_aLentoFator ), SendPropFloat( SENDINFO_ARRAY( m_aLentoFator ), 0, SPROP_NOSCALE ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_aDinheiroInf ), SendPropInt( SENDINFO_ARRAY( m_aDinheiroInf ), 16, SPROP_UNSIGNED ) ),
 #endif
 END_NETWORK_TABLE()
 
@@ -95,6 +97,7 @@ CTrokSurtoEstado::CTrokSurtoEstado()
 		m_aEscolhaZumbi.Set( i, 0 );
 		m_aLentoAte.Set( i, 0.0f );
 		m_aLentoFator.Set( i, 1.0f );
+		m_aDinheiroInf.Set( i, 0 );
 	}
 	m_iDestaque = 0;
 	m_iDestaqueTipo = SURTO_DESTAQUE_NENHUM;

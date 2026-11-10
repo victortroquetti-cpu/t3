@@ -598,11 +598,13 @@ void CTrokProjetil::SomQuique( float flVolume )
 {
 	if ( !m_Info.szSomQuique[ 0 ] || flVolume < 0.05f )
 		return;
-	CPASAttenuationFilter filter( this, m_Info.szSomQuique );
-	EmitSound_t ep;
-	ep.m_pSoundName = m_Info.szSomQuique;
-	ep.m_flVolume = flVolume;
-	ep.m_nFlags = SND_CHANGE_VOL;
+	// Volume menor nos quiques fracos (CA: |v|·h/200 quando < 1).
+	CSoundParameters params;
+	if ( !GetParametersForSound( m_Info.szSomQuique, params, NULL ) )
+		return;
+	CPASAttenuationFilter filter( m_vecPos, params.soundlevel );
+	EmitSound_t ep( params );
+	ep.m_flVolume = params.volume * flVolume;
 	ep.m_pOrigin = &m_vecPos;
 	EmitSound( filter, entindex(), ep );
 }

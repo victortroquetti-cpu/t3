@@ -19,6 +19,15 @@
 
 ConVar trok_zumbis_tipos( "trok_zumbis_tipos", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
 	"Surto: jogadores escolhem o tipo de zumbi (trok_zumbi_classe). 0 = todos normais." );
+// Dinheiro de infectado. Conta de equilíbrio (design/modo-surto.md, "Tipos de zumbi"): numa partida
+// de 7 rodadas, um infectado médio junta ~3000–4000 e um bom passa de 6000; o tipo mais caro
+// (Crusher, 3500) sai uma ou duas vezes por partida para quem joga bem.
+ConVar trok_surto_inf_infectar( "trok_surto_inf_infectar", "250", FCVAR_NOTIFY, "Dinheiro de infectado por humano infectado." );
+ConVar trok_surto_inf_dano( "trok_surto_inf_dano", "0.5", FCVAR_NOTIFY, "Dinheiro de infectado por ponto de dano em humano que não infecta (explosão, nuvem, aura)." );
+ConVar trok_surto_inf_vitoria( "trok_surto_inf_vitoria", "400", FCVAR_NOTIFY, "Dinheiro de infectado para cada zumbi quando os zumbis vencem a rodada." );
+ConVar trok_surto_inf_derrota( "trok_surto_inf_derrota", "150", FCVAR_NOTIFY, "Dinheiro de infectado para cada zumbi quando os humanos vencem a rodada." );
+ConVar trok_surto_inf_inicial( "trok_surto_inf_inicial", "0", FCVAR_NOTIFY, "Dinheiro de infectado no começo do mapa." );
+ConVar trok_surto_inf_max( "trok_surto_inf_max", "10000", FCVAR_NOTIFY, "Teto do dinheiro de infectado." );
 ConVar trok_zumbis_arquivo( "trok_zumbis_arquivo", "scripts/trok_zumbis.txt", FCVAR_REPLICATED,
 	"Arquivo com os tipos de zumbi." );
 
@@ -32,6 +41,7 @@ static void TrokZumbis_Padrao( TrokZumbiClasse_t &c, const char *pszNome )
 	Q_strncpy( c.szNome, pszNome, sizeof( c.szNome ) );
 	Q_strncpy( c.szTitulo, pszNome, sizeof( c.szTitulo ) );
 	c.bJogavel = true;
+	c.iPreco = 0;
 	c.flVidaHospedeiro = -1.0f;
 	c.flVida = -1.0f;
 	c.flVelocidade = 1.0f;
@@ -56,7 +66,7 @@ static void TrokZumbis_Carregar( void )
 			TrokZumbis_Padrao( c, pSub->GetName() );
 			Q_strncpy( c.szTitulo, pSub->GetString( "titulo", pSub->GetName() ), sizeof( c.szTitulo ) );
 			c.bJogavel = pSub->GetInt( "jogavel", 1 ) != 0;
-			c.bPrecisaLiberar = pSub->GetInt( "comprar", 0 ) != 0;
+			c.iPreco = MAX( 0, pSub->GetInt( "preco", 0 ) );
 			c.flVidaHospedeiro = pSub->GetFloat( "vida_hospedeiro", -1.0f );
 			c.flVida = pSub->GetFloat( "vida", -1.0f );
 			c.flVelocidade = pSub->GetFloat( "velocidade", 1.0f );
@@ -168,6 +178,12 @@ float TrokZumbis_VelocidadeDe( const CBaseEntity *pPlayer )
 	return f;
 }
 
+int TrokZumbis_Dinheiro( const CBaseEntity *pPlayer )
+{
+	CTrokSurtoEstado *pEstado = TrokSurto_Estado();
+	return ( pEstado && pPlayer ) ? pEstado->GetDinheiroInfectado( pPlayer->entindex() ) : 0;
+}
+
 float TrokZumbis_GarraDano( const CBaseEntity *pOwner ) { return TrokZumbis_Classe( TrokZumbis_ClasseDe( pOwner ) ).flGarraDano; }
 float TrokZumbis_GarraAlcance( const CBaseEntity *pOwner ) { return TrokZumbis_Classe( TrokZumbis_ClasseDe( pOwner ) ).flGarraAlcance; }
 float TrokZumbis_GarraCadencia( const CBaseEntity *pOwner ) { return TrokZumbis_Classe( TrokZumbis_ClasseDe( pOwner ) ).flGarraCadencia; }
@@ -221,13 +237,37 @@ bool TrokZumbis_Permitido( CBasePlayer *pPlayer, int iClasse )
 	const TrokZumbiClasse_t &c = TrokZumbis_Classe( iClasse );
 	if ( iClasse == 0 )
 		return true;
-	if ( !c.bJogavel || !trok_zumbis_tipos.GetBool() )
-		return false;
-	// Com a economia ligada, mutagênico precisa ser comprado (trok_loja).
-	static ConVarRef s_economia( "trok_economia" );
-	if ( c.bPrecisaLiberar && s_economia.IsValid() && s_economia.GetBool() )
-		return ( s_aLiberado[ pPlayer->entindex() ] & ( 1u << iClasse ) ) != 0;
-	return true;
+	return c.bJogavel && trok_zumbis_tipos.GetBool();
+}
+
+static bool TrokZumbis_Gratis( CBasePlayer *pPlayer, int iClasse )
+{
+	return iClasse >= 0 && iClasse < 32 && ( s_aLiberado[ pPlayer->entindex() ] & ( 1u << iClasse ) ) != 0;
+}
+
+void TrokZumbis_Ganhar( CBasePlayer *pPlayer, int iValor )
+{
+	CTrokSurtoEstado *pEstado = TrokSurto_Estado();
+	if ( !pEstado || !pPlayer || iValor == 0 )
+		return;
+	const int i = pPlayer->entindex();
+	pEstado->m_aDinheiroInf.Set( i, clamp( pEstado->m_aDinheiroInf[ i ] + iValor, 0, MAX( 0, trok_surto_inf_max.GetInt() ) ) );
+}
+
+void TrokZumbis_Infectou( CBasePlayer *pZumbi )
+{
+	TrokZumbis_Ganhar( pZumbi, trok_surto_inf_infectar.GetInt() );
+}
+
+void TrokZumbis_FimRodada( bool bZumbisVenceram )
+{
+	const int iValor = bZumbisVenceram ? trok_surto_inf_vitoria.GetInt() : trok_surto_inf_derrota.GetInt();
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CBasePlayer *p = UTIL_PlayerByIndex( i );
+		if ( p && p->GetTeamNumber() == TEAM_TROK_ZUMBIS )
+			TrokZumbis_Ganhar( p, iValor );
+	}
 }
 
 void TrokZumbis_Liberar( CBasePlayer *pPlayer, int iClasse )
@@ -250,7 +290,8 @@ bool TrokZumbis_ClientCommand( CBasePlayer *pPlayer, const CCommand &args )
 		{
 			const TrokZumbiClasse_t &c = TrokZumbis_Classe( i );
 			if ( c.bJogavel || i == 0 )
-				ClientPrint( pPlayer, HUD_PRINTCONSOLE, UTIL_VarArgs( "  %s (%s)%s\n", c.szNome, c.szTitulo, TrokZumbis_Permitido( pPlayer, i ) ? "" : " - bloqueado" ) );
+				ClientPrint( pPlayer, HUD_PRINTCONSOLE, UTIL_VarArgs( "  %s (%s) - %d%s\n", c.szNome, c.szTitulo, c.iPreco, TrokZumbis_Permitido( pPlayer, i ) ? "" : " - bloqueado" ) );
+		ClientPrint( pPlayer, HUD_PRINTCONSOLE, UTIL_VarArgs( "Seu dinheiro de infectado: %d\n", TrokZumbis_Dinheiro( pPlayer ) ) );
 		}
 		return true;
 	}
@@ -261,7 +302,11 @@ bool TrokZumbis_ClientCommand( CBasePlayer *pPlayer, const CCommand &args )
 		return true;
 	}
 	pEstado->m_aEscolhaZumbi.Set( pPlayer->entindex(), i );
-	ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Quando virar zumbi: %s", TrokZumbis_Classe( i ).szTitulo ) );
+	const TrokZumbiClasse_t &c = TrokZumbis_Classe( i );
+	if ( c.iPreco > 0 && !TrokZumbis_Gratis( pPlayer, i ) )
+		ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Quando virar zumbi: %s (%d de %d)", c.szTitulo, c.iPreco, TrokZumbis_Dinheiro( pPlayer ) ) );
+	else
+		ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Quando virar zumbi: %s", c.szTitulo ) );
 	return true;
 }
 
@@ -274,6 +319,19 @@ int TrokZumbis_AoVirar( CBasePlayer *pPlayer )
 	int iClasse = pEstado->GetEscolhaZumbi( i );
 	if ( !TrokZumbis_Permitido( pPlayer, iClasse ) )
 		iClasse = 0;
+	// Compra: paga o preço com o dinheiro de infectado; sem dinheiro, vira o normal.
+	const int iPreco = TrokZumbis_Classe( iClasse ).iPreco;
+	if ( iClasse != 0 && iPreco > 0 && !TrokZumbis_Gratis( pPlayer, iClasse ) )
+	{
+		if ( pEstado->m_aDinheiroInf[ i ] >= iPreco )
+			pEstado->m_aDinheiroInf.Set( i, pEstado->m_aDinheiroInf[ i ] - iPreco );
+		else
+		{
+			ClientPrint( pPlayer, HUD_PRINTCENTER, UTIL_VarArgs( "Dinheiro de infectado insuficiente para %s (%d de %d)",
+				TrokZumbis_Classe( iClasse ).szTitulo, (int)pEstado->m_aDinheiroInf[ i ], iPreco ) );
+			iClasse = 0;
+		}
+	}
 	pEstado->m_aClasseZumbi.Set( i, iClasse );
 	s_aProxBomba[ i ] = gpGlobals->curtime + TrokZumbis_Classe( iClasse ).flBombaIntervalo;
 	return iClasse;
@@ -420,8 +478,9 @@ void TrokZumbis_AoAcertar( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 	CBasePlayer *pAttacker = ToBasePlayer( info.GetAttacker() );
 	if ( !pVictim || !pAttacker || !TrokSurto_IsZumbi( pAttacker ) || TrokSurto_IsZumbi( pVictim ) )
 		return;
-	if ( !( info.GetDamageType() & DMG_CLUB ) && !( info.GetDamageType() & DMG_SLASH ) )
-		return;
+	// Dano em humano que não infectou na hora (explosão, nuvem, aura, golpe fraco) rende um pouco.
+	if ( pVictim->GetHealth() > 0 )
+		TrokZumbis_Ganhar( pAttacker, (int)( info.GetDamage() * trok_surto_inf_dano.GetFloat() ) );
 	const TrokZumbiClasse_t &c = TrokZumbis_Classe( TrokZumbis_ClasseDe( pAttacker ) );
 	TrokZumbis_Lento( pVictim, c.flGolpeLentidao, c.flGolpeLentidaoTempo );
 }

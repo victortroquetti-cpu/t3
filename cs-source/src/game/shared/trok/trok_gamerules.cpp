@@ -661,6 +661,7 @@ void CTrokRules::SurtoFim( int iVencedor )
 
 	// Economia: bônus de vitória e derrota (server/trok/trok_economia.cpp).
 	TrokEconomia_FimRodada( iVencedor == SURTO_HUMANOS ? TEAM_TROK_HUMANOS : TEAM_TROK_ZUMBIS );
+	TrokZumbis_FimRodada( iVencedor == SURTO_ZUMBIS );	// dinheiro de infectado (trok_zumbis.cpp)
 
 	TrokSurto_DispararMapa( iVencedor == SURTO_HUMANOS ? 4 : 5 );
 }
@@ -785,6 +786,7 @@ void CTrokRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info
 		{
 			pEstado->m_aInfeccoes.Set( a, pEstado->m_aInfeccoes[ a ] + 1 );
 			++m_iRodadaInfec[ a ];
+			TrokZumbis_Infectou( pAttacker );	// dinheiro de infectado (trok_zumbis.cpp)
 		}
 		else if ( pAttacker->GetTeamNumber() == TEAM_TROK_HUMANOS && pVictim->GetTeamNumber() == TEAM_TROK_ZUMBIS )
 		{

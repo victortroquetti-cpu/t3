@@ -211,7 +211,7 @@ bool TrokCorrida_Ativo( void )
 //=============================================================================
 ConVar trok_corrida_chance( "trok_corrida_chance", "80", FCVAR_NOTIFY,
 	"Corrida Armada: sorteio de 0 a 100 ao trocar de arma; abaixo disto vem a arma da escada, senão a sua da mesma classe (CA: 80, ou seja 80/101). 101 = sempre a da escada." );
-ConVar trok_corrida_extras( "trok_corrida_extras", "weapon_crowbar", FCVAR_NOTIFY,
+ConVar trok_corrida_extras( "trok_corrida_extras", "weapon_trok_faca", FCVAR_NOTIFY,
 	"Corrida Armada: armas que o jogador tem junto com a da escada (separadas por espaço; vazio = só a da escada)." );
 ConVar trok_corrida_saida_jogadores( "trok_corrida_saida_jogadores", "2", FCVAR_NOTIFY,
 	"Corrida Armada: alguém sai e sobram (contando quem saiu) estes jogadores ou menos: a partida acaba (CA: 2)." );

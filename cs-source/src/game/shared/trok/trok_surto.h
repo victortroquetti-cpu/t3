@@ -77,6 +77,7 @@ public:
 	int GetEscolhaZumbi( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aEscolhaZumbi[ i ] : 0; }
 	float GetLentoAte( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aLentoAte[ i ] : 0.0f; }
 	float GetLentoFator( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aLentoFator[ i ] : 1.0f; }
+	int GetDinheiroInfectado( int i ) const { return ( i > 0 && i <= MAX_PLAYERS ) ? m_aDinheiroInf[ i ] : 0; }
 
 	CNetworkVar( int, m_iFase );
 	CNetworkVar( float, m_flFimFase );		// curtime em que a fase acaba
@@ -95,6 +96,7 @@ public:
 	CNetworkArray( int, m_aEscolhaZumbi, MAX_PLAYERS + 1 );
 	CNetworkArray( float, m_aLentoAte, MAX_PLAYERS + 1 );
 	CNetworkArray( float, m_aLentoFator, MAX_PLAYERS + 1 );
+	CNetworkArray( int, m_aDinheiroInf, MAX_PLAYERS + 1 );	// dinheiro de infectado (compra os tipos de zumbi)
 };
 
 CTrokSurtoEstado *TrokSurto_Estado( void );

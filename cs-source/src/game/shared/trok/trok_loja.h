@@ -20,7 +20,6 @@ enum TrokLojaTipo_t
 	LOJA_CAPACETE,		// protege o tiro na cabeça (reduz ou impede o crítico)
 	LOJA_MUNICAO,		// enche a reserva da arma de um slot (ou de todas)
 	LOJA_MEDICO,		// devolve vida na hora
-	LOJA_MUTAGENICO,	// Surto: libera um tipo de zumbi (trok_zumbis.cpp) para quando virar zumbi
 };
 
 struct TrokLojaItem_t
@@ -43,7 +42,6 @@ struct TrokLojaItem_t
 	float flProtecao;			// capacete: fração do dano extra da cabeça que tira (1 = sem crítico)
 	int iGolpes;				// capacete: tiros na cabeça que aguenta (0 = não quebra)
 	int iVida;					// médico: vida devolvida (até a máxima)
-	char szZumbi[ 32 ];			// mutagênico: nome do tipo em scripts/trok_zumbis.txt
 };
 
 struct TrokLojaCategoria_t

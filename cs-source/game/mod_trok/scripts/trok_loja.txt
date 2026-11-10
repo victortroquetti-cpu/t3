@@ -15,7 +15,6 @@
 		"especiais"			"ESPECIAIS"
 		"explosivos"		"EXPLOSIVOS"
 		"equipamentos"		"EQUIPAMENTOS"
-		"mutagenicos"		"MUTAGÊNICOS"
 	}
 
 	// Classe de cada arma ou projétil, para o ganho por abate (bloco "Abate").
@@ -25,6 +24,7 @@
 		"weapon_trok_submetralhadora"	"submetralhadora"
 		"weapon_trok_fuzil"				"fuzil"
 		"weapon_trok_escopeta"			"escopeta"
+		"weapon_trok_faca"				"faca"
 		"weapon_crowbar"				"faca"
 		"weapon_trok_garras"			"garras"
 		"weapon_frag"					"granada"
@@ -59,8 +59,6 @@
 	// capacete: protecao (fração do dano extra da cabeça que tira; 1 = sem crítico), golpes (0 = não quebra)
 	// municao: slot (bucket da arma; -1 = todas), municao (quanto dá; 0 = enche)
 	// medico: vida (devolvida na hora, até a máxima)
-	// mutagenico: zumbi (tipo em scripts/trok_zumbis.txt); só no Surto. Libera o tipo para quando
-	//   virar zumbi; a escolha é na tecla N (trok_zumbi_classe). Os tipos com "comprar" "1" exigem.
 	// time: 0 = todos; 2 ou 3 = só esse time (mata-mata em equipe)
 	"Itens"
 	{
@@ -256,43 +254,6 @@
 			"vida"		"50"
 			"preco"		"400"		// PROPOSTA (o CS:S não vende vida)
 			"descricao"	"Devolve 50 de vida na hora."
-		}
-
-		// ---------------------------------------------------------------- Mutagênicos (Surto)
-		// No CA eram comprados fora da partida; aqui na loja da rodada. Preços PROPOSTA.
-		"mutagenico_striker"
-		{
-			"nome"		"Mutagênico veloz"
-			"categoria"	"mutagenicos"
-			"tipo"		"mutagenico"
-			"zumbi"		"striker"
-			"preco"		"1000"
-			"descricao"	"Ao virar zumbi: o tipo mais rápido."
-		}
-		"mutagenico_crusher"
-		{
-			"nome"		"Mutagênico brutamontes"
-			"categoria"	"mutagenicos"
-			"tipo"		"mutagenico"
-			"zumbi"		"crusher"
-			"preco"		"1000"
-			"descricao"	"Ao virar zumbi: mais alcance e regeneração, mais lento."
-		}
-		"mutagenico_charger"
-		{
-			"nome"		"Mutagênico de investida"
-			"categoria"	"mutagenicos"
-			"tipo"		"mutagenico"
-			"zumbi"		"charger"
-			"preco"		"1000"
-		}
-		"mutagenico_splicer"
-		{
-			"nome"		"Mutagênico tóxico"
-			"categoria"	"mutagenicos"
-			"tipo"		"mutagenico"
-			"zumbi"		"splicer"
-			"preco"		"1000"
 		}
 	}
 }

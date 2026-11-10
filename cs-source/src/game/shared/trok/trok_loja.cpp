@@ -29,8 +29,6 @@ static int TipoDoTexto( const char *psz )
 		return LOJA_MUNICAO;
 	if ( !V_stricmp( psz, "medico" ) )
 		return LOJA_MEDICO;
-	if ( !V_stricmp( psz, "mutagenico" ) )
-		return LOJA_MUTAGENICO;
 	return LOJA_ARMA;
 }
 
@@ -112,7 +110,6 @@ void CTrokLojaDados::Carregar( void )
 			it.flProtecao = clamp( k->GetFloat( "protecao", 0.0f ), 0.0f, 1.0f );
 			it.iGolpes = MAX( 0, k->GetInt( "golpes", 0 ) );
 			it.iVida = MAX( 0, k->GetInt( "vida", 0 ) );
-			V_strncpy( it.szZumbi, k->GetString( "zumbi", "" ), sizeof( it.szZumbi ) );
 		}
 	}
 

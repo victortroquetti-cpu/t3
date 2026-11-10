@@ -7,7 +7,6 @@
 #include "trok/trok_loja.h"
 #include "trok/trok_placar_extra.h"
 #include "trok/trok_surto.h"
-#include "trok/trok_zumbis.h"
 #include "hl2_player.h"
 #include "hl2mp_gamerules.h"
 #include "ammodef.h"
@@ -29,8 +28,8 @@ ConVar trok_economia_derrota( "trok_economia_derrota", "1400", FCVAR_NOTIFY, "Ro
 ConVar trok_economia_derrota_passo( "trok_economia_derrota_passo", "500", FCVAR_NOTIFY, "A mais por derrota seguida (CS:S 500)." );
 ConVar trok_economia_derrota_max( "trok_economia_derrota_max", "3400", FCVAR_NOTIFY, "Máximo do bônus de derrota (CS:S 3400)." );
 ConVar trok_economia_sobreviver( "trok_economia_sobreviver", "0", FCVAR_NOTIFY, "A mais para quem termina a rodada vivo (não zumbi). CS:S: 0." );
-ConVar trok_economia_armas_iniciais( "trok_economia_armas_iniciais", "weapon_trok_pistola weapon_crowbar", FCVAR_NOTIFY, "Com a economia: armas ao nascer (o resto se compra)." );
-ConVar trok_economia_municao_inicial( "trok_economia_municao_inicial", "Pistol 72", FCVAR_NOTIFY, "Com a economia: munição ao nascer, pares \"tipo quantidade\"." );
+ConVar trok_economia_armas_iniciais( "trok_economia_armas_iniciais", "weapon_trok_pistola weapon_trok_faca", FCVAR_NOTIFY, "Com a economia: armas ao nascer (o resto se compra)." );
+ConVar trok_economia_municao_inicial( "trok_economia_municao_inicial", "Pistol 30", FCVAR_NOTIFY, "Com a economia: munição ao nascer, pares \"tipo quantidade\"." );
 ConVar trok_economia_largar( "trok_economia_largar", "1", FCVAR_NOTIFY, "Comprar arma no lugar de outra do mesmo slot: 1 = larga a velha no chão (CS:S), 0 = some." );
 ConVar trok_economia_manter( "trok_economia_manter", "1", FCVAR_NOTIFY, "Quem sobrevive à rodada fica com o que comprou (CS:S). 0 = todo nascimento recomeça do kit." );
 
@@ -322,29 +321,6 @@ static bool Entregar( CBasePlayer *pPlayer, int i, const TrokLojaItem_t &it, boo
 			return false;
 		}
 		pPlayer->SetHealth( MIN( pPlayer->GetMaxHealth(), pPlayer->GetHealth() + MAX( 1, it.iVida ) ) );
-		return true;
-	}
-
-	case LOJA_MUTAGENICO:
-	{
-		// Surto: libera o tipo de zumbi; a escolha é na tecla N (trok_zumbi_classe).
-		if ( !TrokSurto_Ativo() )
-		{
-			*ppszMotivo = "Mutagênico só vale no Surto.";
-			return false;
-		}
-		const int iClasse = TrokZumbis_Achar( it.szZumbi );
-		if ( iClasse < 0 )
-		{
-			*ppszMotivo = "Tipo de zumbi desconhecido (scripts/trok_zumbis.txt).";
-			return false;
-		}
-		if ( TrokZumbis_Permitido( pPlayer, iClasse ) )
-		{
-			*ppszMotivo = "Esse mutagênico já está liberado.";
-			return false;
-		}
-		TrokZumbis_Liberar( pPlayer, iClasse );
 		return true;
 	}
 	}

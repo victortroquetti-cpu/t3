@@ -123,8 +123,18 @@ static int TrokExplosivo_EfeitoPorNome( const char *psz )
 
 const TrokExplosivoInfo_t &TrokExplosivo_Info( const char *pszArma )
 {
-	if ( !pszArma )
-		pszArma = "";
+	if ( !pszArma || !pszArma[ 0 ] )
+	{
+		// Arma ainda sem script lido (cliente no primeiro quadro): números da M67, sem aviso.
+		static TrokExplosivoInfo_t s_Padrao;
+		static bool s_bPronto = false;
+		if ( !s_bPronto )
+		{
+			TrokExplosivo_Padrao( s_Padrao );
+			s_bPronto = true;
+		}
+		return s_Padrao;
+	}
 
 	unsigned short idx = s_ExplosivoInfos.Find( pszArma );
 	if ( idx != s_ExplosivoInfos.InvalidIndex() )
@@ -300,6 +310,7 @@ private:
 	void Detonar( CBasePlayer *pPlayer );
 #ifndef CLIENT_DLL
 	void CriarObjeto( CBasePlayer *pPlayer, bool bMorte );
+	void PinoThink( void );
 #endif
 
 	CNetworkVar( int, m_iEstado );
@@ -529,6 +540,11 @@ void CWeaponTrokExplosivo::FrameArremesso( CBasePlayer *pPlayer )
 			m_flTimeWeaponIdle = FLT_MAX;
 			if ( e.flPino > 0.0f )
 				Anim( ACT_VM_PULLPIN, ACT_VM_PULLBACK_HIGH, e.flPino );
+#ifndef CLIENT_DLL
+			// Vigia a morte com o pino puxado (o morto não roda ItemPostFrame).
+			if ( e.iTipo == TROK_EXP_GRANADA )
+				SetContextThink( &CWeaponTrokExplosivo::PinoThink, gpGlobals->curtime + 0.05f, "TrokPinoThink" );
+#endif
 		}
 		else if ( ( pPlayer->m_nButtons & IN_ATTACK2 ) && Detonador() && flAgora >= m_flNextSecondaryAttack )
 		{
@@ -733,7 +749,24 @@ void CWeaponTrokExplosivo::FrameLancador( CBasePlayer *pPlayer )
 }
 
 #ifndef CLIENT_DLL
-// Morreu com o pino puxado: a granada cai do corpo, com o pavio inteiro (grenades.md 14).
+// Morreu com o pino puxado: a granada cai do corpo, com o pavio inteiro, sem gastar a
+// contagem (grenades.md 14 e Quirk 5).
+void CWeaponTrokExplosivo::PinoThink( void )
+{
+	if ( !PinoPuxado() )
+		return;
+	CBasePlayer *pPlayer = Dono();
+	if ( !pPlayer )
+		return;
+	if ( !pPlayer->IsAlive() )
+	{
+		CriarObjeto( pPlayer, true );
+		m_iEstado = EXP_PRONTA;
+		return;
+	}
+	SetContextThink( &CWeaponTrokExplosivo::PinoThink, gpGlobals->curtime + 0.05f, "TrokPinoThink" );
+}
+
 // Explosivo nunca fica no chão para outro pegar (CA: não cai ao morrer).
 void CWeaponTrokExplosivo::Drop( const Vector &vecVelocity )
 {

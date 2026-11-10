@@ -1394,7 +1394,13 @@ void CTrokMenu::RunBottomBar( void )
 
 	int x = m_iWide - S( 56 ) - S( 300 );
 	if ( IsEditingText() )
-		KeyHint( x, ty, "ENTER", "Confirmar" );
+		KeyHint( x, ty, "ENTER", m_iTextField == 2 ? "Conectar" : "Confirmar" );
+	else if ( m_eState == STATE_SERVERS )
+	{
+		x -= S( 90 );
+		KeyHint( x, ty, "F5", "Atualizar" );
+		KeyHint( x, ty, "ENTER", "Entrar" );
+	}
 	else if ( m_eState == STATE_PLAY || m_eState == STATE_CREATE )
 		KeyHint( x, ty, "ENTER", "Iniciar" );
 	else if ( IsCapturingKey() )
@@ -2022,12 +2028,13 @@ void CTrokMenu::StartCreatedGame( void )
 	if ( !m_Maps.Count() )
 		return;
 	if ( m_iTextField >= 0 )
-	{
-		( m_iTextField == 0 ? trok_ui_criar_nome : trok_ui_criar_senha ).SetValue( m_szText );
-		m_iTextField = -1;
-	}
+		CommitTextField();
 	const char *pszMap = m_Maps[ m_iMap ].Get();
 	trok_ui_mapa.SetValue( pszMap );
+	RememberMap();
+	BuildModes();
+	const Modo_t *pModo = m_Modos.Count() ? &m_Modos[ CurrentMode() ] : NULL;
+	const char *pszModo = pModo ? pModo->szModo : "equipe";
 
 	char szNome[ 64 ], szSenha[ 64 ];
 	TrokLimparTexto( trok_ui_criar_nome.GetString(), szNome, sizeof( szNome ) );
@@ -2044,10 +2051,30 @@ void CTrokMenu::StartCreatedGame( void )
 	buf.Printf( "hostname \"%s\"\n", szNome );
 	buf.Printf( "sv_password \"%s\"\n", szSenha );
 	buf.Printf( "sv_lan %d\n", bOnline ? 0 : 1 );
-	if ( trok_ui_criar_meta.GetInt() > 0 && trok_ui_modo.GetInt() != 2 )
-		buf.Printf( "mp_fraglimit %d\n", trok_ui_criar_meta.GetInt() );
-	if ( trok_ui_criar_tempo.GetInt() > 0 && trok_ui_modo.GetInt() != 2 )
-		buf.Printf( "mp_timelimit %d\n", trok_ui_criar_tempo.GetInt() );
+	// Meta e tempo só se o modo oferece a escolha (e o valor escolhido é uma das opções dele).
+	if ( pModo && pModo->szMetaCvar[ 0 ] && trok_ui_criar_meta.GetInt() > 0 )
+	{
+		for ( int i = 0; i < pModo->nMetaOpcoes; ++i )
+		{
+			if ( pModo->iMetaOpcoes[ i ] == trok_ui_criar_meta.GetInt() )
+			{
+				buf.Printf( "%s %d\n", pModo->szMetaCvar, trok_ui_criar_meta.GetInt() );
+				break;
+			}
+		}
+	}
+	if ( pModo && pModo->szTempoCvar[ 0 ] && trok_ui_criar_tempo.GetInt() > 0 )
+	{
+		const bool bSegundos = !V_stricmp( pModo->szTempoUnidade, "s" );
+		for ( int i = 0; i < pModo->nTempoOpcoes; ++i )
+		{
+			if ( pModo->iTempoOpcoes[ i ] == trok_ui_criar_tempo.GetInt() )
+			{
+				buf.Printf( "%s %d\n", pModo->szTempoCvar, trok_ui_criar_tempo.GetInt() * ( bSegundos ? 60 : 1 ) );
+				break;
+			}
+		}
+	}
 	g_pFullFileSystem->WriteFile( "cfg/partida_menu.cfg", "MOD", buf );
 
 	// Partida para outras pessoas: o online.cfg (sem trapaças) passa a valer em cada mapa.
@@ -2055,10 +2082,187 @@ void CTrokMenu::StartCreatedGame( void )
 	V_snprintf( szCmd, sizeof( szCmd ),
 		"progress_enable; disconnect; exec online; trok_modo %s; hl2mp_bot_difficulty %d; "
 		"hl2mp_bot_quota %d; hl2mp_bot_quota_mode fill; maxplayers %d; map %s\n",
-		( trok_ui_modo.GetInt() == 2 ) ? "surto" : ( trok_ui_modo.GetInt() == 1 ? "solo" : "equipe" ),
+		pszModo,
 		clamp( trok_ui_bots_dificuldade.GetInt(), 0, 3 ),
 		trok_ui_criar_bots.GetBool() ? MAX( 1, iJog - 2 ) : 0, iJog, pszMap ); // "fill": sobram 2 vagas; cada amigo que entra tira um bot
 	engine->ClientCmd_Unrestricted( szCmd );
+}
+
+//-----------------------------------------------------------------------------
+// Servidores (substitui o navegador de servidores do GameUI; lista em trok_servidores.cpp)
+//-----------------------------------------------------------------------------
+void CTrokMenu::ConnectTo( const char *pszEndereco )
+{
+	char szEnd[ 64 ], szSenha[ 64 ];
+	TrokLimparTexto( pszEndereco, szEnd, sizeof( szEnd ) );
+	TrokLimparTexto( trok_ui_servidor_senha.GetString(), szSenha, sizeof( szSenha ) );
+	for ( char *p = szEnd; *p; ++p )
+	{
+		if ( *p == ' ' )
+		{
+			*p = 0;
+			break;
+		}
+	}
+	if ( !szEnd[ 0 ] )
+		return;
+	TrokServidores::Parar();
+	// Partida contra bots ou sala criada antes não deve valer num servidor de fora.
+	char szCmd[ 256 ];
+	V_snprintf( szCmd, sizeof( szCmd ), "progress_enable; password \"%s\"; connect %s\n", szSenha, szEnd );
+	engine->ClientCmd_Unrestricted( szCmd );
+}
+
+void CTrokMenu::RunServers( void )
+{
+	const Color acc = Accent();
+	const int x0 = S( 64 );
+	const int xr = m_iWide - S( 56 );
+
+	if ( LinkButton( x0, S( 52 ), m_hSmall, "‹ VOLTAR" ) )
+	{
+		SetState( STATE_ROOT );
+		return;
+	}
+	const int iSep = x0 + TextWide( m_hSmall, "‹ VOLTAR" ) + S( 20 );
+	Rect( iSep, S( 46 ), 1, S( 22 ), COR_LINHA_FORTE );
+	TextSpaced( m_hTitle, iSep + S( 21 ), S( 36 ), COR_TEXTO, "SERVIDORES", S( 3 ) );
+
+	// Abas e atualizar
+	const int ty = S( 100 );
+	const bool bInternet = trok_ui_servidores_internet.GetBool();
+	if ( BoxButton( x0, ty, S( 150 ), S( 34 ), m_hButton, "INTERNET", bInternet, bInternet ) && !bInternet )
+	{
+		trok_ui_servidores_internet.SetValue( 1 );
+		m_iServerSel = -1;
+		m_iServerScroll = 0;
+		TrokServidores::Atualizar( true );
+	}
+	if ( BoxButton( x0 + S( 156 ), ty, S( 190 ), S( 34 ), m_hButton, "REDE LOCAL / VPN", !bInternet, !bInternet ) && bInternet )
+	{
+		trok_ui_servidores_internet.SetValue( 0 );
+		m_iServerSel = -1;
+		m_iServerScroll = 0;
+		TrokServidores::Atualizar( false );
+	}
+	if ( BoxButton( xr - S( 140 ), ty, S( 140 ), S( 34 ), m_hButton, TrokServidores::Atualizando() ? "PROCURANDO..." : "ATUALIZAR", false, false ) )
+	{
+		m_iServerSel = -1;
+		TrokServidores::Atualizar( bInternet );
+	}
+	{
+		char szStatus[ 160 ];
+		const int n = TrokServidores::Quantos();
+		if ( TrokServidores::Erro()[ 0 ] && !n )
+			V_strncpy( szStatus, TrokServidores::Erro(), sizeof( szStatus ) );
+		else if ( TrokServidores::Atualizando() )
+			V_snprintf( szStatus, sizeof( szStatus ), "Procurando servidores... %d encontrado%s", n, n == 1 ? "" : "s" );
+		else
+			V_snprintf( szStatus, sizeof( szStatus ), n == 1 ? "1 servidor" : "%d servidores", n );
+		Text( m_hSmall, x0 + S( 362 ), ty + ( S( 34 ) - surface()->GetFontTall( m_hSmall ) ) / 2, COR_TEXTO3, szStatus );
+	}
+
+	// Lista
+	const int lx = x0, lw = xr - x0;
+	const int ly = S( 148 ), lb = m_iTall - S( 168 );
+	Rect( lx, ly, lw, lb - ly, COR_PAINEL );
+	Outline( lx, ly, lw, lb - ly, COR_LINHA );
+	const int xNome = lx + S( 18 );
+	const int xPing = lx + lw - S( 18 );
+	const int xJog = xPing - S( 90 );
+	const int xMapa = xJog - S( 120 ) - S( 220 );
+	const int hy = ly + S( 12 );
+	Label( xNome, hy, "NOME" );
+	Label( xMapa, hy, "MAPA" );
+	Text( m_hSmall, xJog - TextWide( m_hSmall, "JOGADORES" ), hy, COR_TEXTO3, "JOGADORES" );
+	Text( m_hSmall, xPing - TextWide( m_hSmall, "PING" ), hy, COR_TEXTO3, "PING" );
+	const int iRow = S( 32 );
+	const int ry0 = ly + S( 34 );
+	Rect( lx + S( 6 ), ry0 - 1, lw - S( 12 ), 1, COR_LINHA );
+	const int nCabem = MAX( 1, ( lb - ry0 - S( 6 ) ) / iRow );
+	const int n = TrokServidores::Quantos();
+	m_iServerScroll = clamp( m_iServerScroll, 0, MAX( 0, n - nCabem ) );
+	const int bodyTall = surface()->GetFontTall( m_hBody );
+	for ( int r = 0; r < nCabem && m_iServerScroll + r < n; ++r )
+	{
+		const int i = m_iServerScroll + r;
+		const TrokServidor_t &sv = TrokServidores::Servidor( i );
+		const int ry = ry0 + r * iRow;
+		const bool bSel = ( i == m_iServerSel );
+		const bool bHover = Hover( lx + 1, ry, lw - 2, iRow );
+		if ( bSel )
+			Rect( lx + 1, ry, lw - 2, iRow, Color( acc.r(), acc.g(), acc.b(), 34 ) );
+		else if ( bHover )
+			Rect( lx + 1, ry, lw - 2, iRow, Color( 255, 255, 255, 10 ) );
+		const int tyRow = ry + ( iRow - bodyTall ) / 2;
+		const bool bCheio = sv.iMaximo > 0 && sv.iJogadores >= sv.iMaximo;
+		int nx = xNome;
+		if ( sv.bSenha )
+		{
+			Text( m_hSmall, nx, tyRow + S( 2 ), acc, "SENHA" );
+			nx += TextWide( m_hSmall, "SENHA" ) + S( 10 );
+		}
+		Text( m_hBody, nx, tyRow, bCheio ? COR_TEXTO3 : COR_TEXTO, sv.szNome );
+		Text( m_hBody, xMapa, tyRow, COR_TEXTO2, sv.szMapa );
+		char sz[ 48 ];
+		if ( sv.iBots > 0 )
+			V_snprintf( sz, sizeof( sz ), "%d/%d +%d bots", sv.iJogadores, sv.iMaximo, sv.iBots );
+		else
+			V_snprintf( sz, sizeof( sz ), "%d/%d", sv.iJogadores, sv.iMaximo );
+		Text( m_hBody, xJog - TextWide( m_hBody, sz ), tyRow, bCheio ? Color( 255, 90, 90, 255 ) : COR_TEXTO2, sz );
+		V_snprintf( sz, sizeof( sz ), "%d", sv.iPing );
+		Text( m_hBody, xPing - TextWide( m_hBody, sz ), tyRow, sv.iPing > 150 ? COR_TEXTO3 : COR_TEXTO2, sz );
+		if ( Clicked( lx + 1, ry, lw - 2, iRow ) )
+		{
+			const bool bDuplo = ( i == m_iServerSel ) && ( Plat_FloatTime() - m_flServerClickTime < 0.4 );
+			m_iServerSel = i;
+			m_flServerClickTime = (float)Plat_FloatTime();
+			if ( bDuplo )
+			{
+				ConnectTo( sv.szEndereco );
+				return;
+			}
+		}
+	}
+	if ( !n )
+	{
+		const char *pszVazio = bInternet ? "Nenhum servidor do Rearmed encontrado na internet." :
+			"Nenhuma sala na rede. Numa VPN (Radmin, ZeroTier, Hamachi) a sala só aparece se a VPN repassar a busca; senão, use CONECTAR POR IP.";
+		Text( m_hBody, xNome, ry0 + S( 14 ), COR_TEXTO3, TrokServidores::Atualizando() ? "Procurando..." : pszVazio );
+	}
+	if ( n > nCabem )
+	{
+		const int bx = lx + lw - S( 6 ), bh = lb - ry0 - S( 6 );
+		Rect( bx, ry0, S( 3 ), bh, COR_LINHA );
+		const int th = MAX( S( 20 ), bh * nCabem / n );
+		Rect( bx, ry0 + ( bh - th ) * m_iServerScroll / MAX( 1, n - nCabem ), S( 3 ), th, COR_LINHA_FORTE );
+	}
+
+	// Conectar por IP e entrar
+	const int by = lb + S( 18 );
+	Label( x0, by, "CONECTAR POR IP (IP:PORTA)" );
+	TextField( 2, x0, by + S( 18 ), S( 300 ), trok_ui_servidor_ip.GetString(), false );
+	if ( BoxButton( x0 + S( 308 ), by + S( 18 ), S( 120 ), S( 34 ), m_hButton, "CONECTAR", false, false ) )
+	{
+		if ( m_iTextField >= 0 )
+			CommitTextField();
+		if ( trok_ui_servidor_ip.GetString()[ 0 ] )
+		{
+			ConnectTo( trok_ui_servidor_ip.GetString() );
+			return;
+		}
+	}
+	Label( x0 + S( 452 ), by, "SENHA DO SERVIDOR" );
+	TextField( 3, x0 + S( 452 ), by + S( 18 ), S( 220 ), trok_ui_servidor_senha.GetString(), true );
+
+	const int gw = S( 180 ), gh = S( 52 );
+	const bool bTemSel = ( m_iServerSel >= 0 && m_iServerSel < n );
+	if ( BoxButton( xr - gw, by + S( 6 ), gw, gh, m_hHeading, "ENTRAR", bTemSel, bTemSel ) && bTemSel )
+	{
+		if ( m_iTextField >= 0 )
+			CommitTextField();
+		ConnectTo( TrokServidores::Servidor( m_iServerSel ).szEndereco );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -2122,6 +2326,9 @@ void CTrokMenu::StartBotGame( void )
 
 	const char *pszMap = m_Maps[ m_iMap ].Get();
 	trok_ui_mapa.SetValue( pszMap );
+	RememberMap();
+	BuildModes();
+	const char *pszModo = m_Modos.Count() ? m_Modos[ CurrentMode() ].szModo : "equipe";
 
 	// Partida contra bots: sem as regras de uma sala criada antes.
 	if ( g_pFullFileSystem->FileExists( "cfg/partida_menu.cfg", "MOD" ) )
@@ -2147,7 +2354,7 @@ void CTrokMenu::StartBotGame( void )
 	V_snprintf( szCmd, sizeof( szCmd ),
 		"progress_enable; lservercfgfile listenserver.cfg; trok_modo %s; hl2mp_bot_difficulty %d; trok_bot_estilo \"\"; trok_bot_estilos \"%s\"; "
 		"hl2mp_bot_quota %d; hl2mp_bot_quota_mode fill; maxplayers %d; map %s\n",
-		( trok_ui_modo.GetInt() == 2 ) ? "surto" : ( trok_ui_modo.GetInt() == 1 ? "solo" : "equipe" ), iNivel, szEstilos, iPorTime * 2, MIN( 32, iPorTime * 2 + 2 ), pszMap );
+		pszModo, iNivel, szEstilos, iPorTime * 2, MIN( 32, iPorTime * 2 + 2 ), pszMap );
 	engine->ClientCmd_Unrestricted( szCmd );
 }
 

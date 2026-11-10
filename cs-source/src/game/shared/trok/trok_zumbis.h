@@ -8,8 +8,10 @@
 //   crusher (mutagênico: grande, mais vida, regenera 20%, golpe mais longo e lento)
 //   charger (Equipe Armada: explode ao morrer)
 //   splicer (Equipe Armada: golpe paralisa, nuvem tóxica ao morrer)
-// O jogador escolhe com trok_zumbi_classe <nome> (ou trok_zumbi_classe_prox) e o tipo vale a
-// próxima vez que virar zumbi. O estado (tipo de cada um) vai pela entidade do Surto.
+// O jogador escolhe com trok_zumbi_classe <nome> (ou trok_zumbi_classe_prox) e COMPRA o tipo
+// com o DINHEIRO DE INFECTADO (moeda separada do dinheiro de humano), pago na hora em que vira
+// zumbi; sem dinheiro, vira o normal. Ganha-se dinheiro de infectado infectando, ferindo humanos
+// e no fim da rodada (trok_surto_inf_*). O estado vai pela entidade do Surto.
 //=============================================================================
 #ifndef TROK_ZUMBIS_H
 #define TROK_ZUMBIS_H
@@ -24,7 +26,7 @@ struct TrokZumbiClasse_t
 	char szNome[ 32 ];				// nome interno (comando)
 	char szTitulo[ 48 ];			// nome que o jogador vê
 	bool bJogavel;					// pode ser escolhido no Surto
-	bool bPrecisaLiberar;			// com a economia ligada, precisa comprar (mutagênico)
+	int iPreco;						// dinheiro de infectado para virar este tipo (pago ao virar, a cada vez)
 	float flVidaHospedeiro;			// <= 0: usa trok_surto_vida_hospedeiro
 	float flVida;					// <= 0: usa trok_surto_vida_zumbi
 	float flVelocidade;				// multiplica trok_surto_zumbi_velocidade
@@ -55,11 +57,15 @@ float TrokZumbis_VelocidadeDe( const CBaseEntity *pPlayer );	// zumbi: tipo; hum
 float TrokZumbis_GarraDano( const CBaseEntity *pOwner );
 float TrokZumbis_GarraAlcance( const CBaseEntity *pOwner );
 float TrokZumbis_GarraCadencia( const CBaseEntity *pOwner );
+int TrokZumbis_Dinheiro( const CBaseEntity *pPlayer );		// dinheiro de infectado
 
 #ifndef CLIENT_DLL
 class CTakeDamageInfo;
 bool TrokZumbis_ClientCommand( CBasePlayer *pPlayer, const CCommand &args );
-void TrokZumbis_Liberar( CBasePlayer *pPlayer, int iClasse );		// economia: comprou o mutagênico
+void TrokZumbis_Liberar( CBasePlayer *pPlayer, int iClasse );		// libera o tipo de graça (evento/admin)
+void TrokZumbis_Ganhar( CBasePlayer *pPlayer, int iValor );			// dinheiro de infectado
+void TrokZumbis_Infectou( CBasePlayer *pZumbi );					// zumbi infectou um humano
+void TrokZumbis_FimRodada( bool bZumbisVenceram );
 bool TrokZumbis_Permitido( CBasePlayer *pPlayer, int iClasse );
 int TrokZumbis_AoVirar( CBasePlayer *pPlayer );			// define o tipo ao virar zumbi; devolve o tipo
 void TrokZumbis_AoVirarHumano( CBasePlayer *pPlayer );
