@@ -62,20 +62,28 @@ ConVar trok_surto_cor_zumbi( "trok_surto_cor_zumbi", "150 225 140", FCVAR_NOTIFY
 //-----------------------------------------------------------------------------
 // Caixa e olho do jogador no movimento do Combat Arms (design/decombat/specs/MOVEMENT_2009.md
 // e as specs de movimento do Chimera): no CA o corpo tem 100u em pé e 80u agachado (só 20% mais
-// baixo; no Source é 50%), olho a 83u em pé e 60u agachado. Aqui vão as proporções sobre a caixa de
-// 72u do Source (os mapas são do Source); largura também a do Source.
+// baixo; no Source é 50%), olho a 83u em pé e 60u agachado, caixa de 30u de largura.
+//
+// ESCALA EXATA DO CA (decisão do dono): estes números são os do CA x 0,72 e o jogador nasce com
+// escala de modelo trok_ca_corpo_escala (100/72). O Source multiplica a caixa e o olho pela escala
+// do modelo (VEC_*_SCALED), então o resultado é exatamente o do CA: 30 x 30 x 100 em pé, 80
+// agachado, olho a 83 e 60; e o boneco do HL2/CS:S (72u) fica com 100u, como o do CA. Velocidades,
+// pulo e gravidade já são os do CA em unidades 1:1 (trok_ca_escala 1). Com trok_ca_corpo_escala 1
+// fica o corpo proporcional ao CA na altura do Source (72u).
 //-----------------------------------------------------------------------------
 extern ConVar trok_mov_ca;
+ConVar trok_ca_corpo_escala( "trok_ca_corpo_escala", "1.3888889", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Movimento do CA: escala do corpo do jogador. 1.3888889 = corpo exato do CA (100u em pé); 1 = altura do Source (72u). Vale ao renascer." );
 static CViewVectors g_TrokCAViewVectors(
-	Vector( 0, 0, 60 ),			// olho em pé (83% da altura)
-	Vector( -16, -16, 0 ),		// caixa em pé
-	Vector( 16, 16, 72 ),
-	Vector( -16, -16, 0 ),		// caixa agachado (80% da altura)
-	Vector( 16, 16, 58 ),
-	Vector( 0, 0, 43 ),			// olho agachado
-	Vector( -10, -10, -10 ),	// espectador
+	Vector( 0, 0, 59.76f ),				// olho em pé (83 do CA x 0,72)
+	Vector( -10.8f, -10.8f, 0 ),		// caixa em pé (30 x 100 do CA x 0,72)
+	Vector( 10.8f, 10.8f, 72 ),
+	Vector( -10.8f, -10.8f, 0 ),		// caixa agachado (80 do CA x 0,72)
+	Vector( 10.8f, 10.8f, 57.6f ),
+	Vector( 0, 0, 43.2f ),				// olho agachado (60 do CA x 0,72)
+	Vector( -10, -10, -10 ),			// espectador
 	Vector( 10, 10, 10 ),
-	Vector( 0, 0, 14 ) );		// olho do morto
+	Vector( 0, 0, 14 ) );				// olho do morto
 
 const CViewVectors *CTrokRules::GetViewVectors() const
 {
@@ -158,6 +166,9 @@ void CTrokRules::PlayerSpawn( CBasePlayer *pPlayer )
 	pPlayer->SetMaxHealth( iHealth );
 	pPlayer->SetHealth( iHealth );
 	pPlayer->SetArmorValue( MAX( 0, trok_colete.GetInt() ) );
+
+	// Corpo exato do CA (ver g_TrokCAViewVectors).
+	pPlayer->SetModelScale( trok_mov_ca.GetBool() ? clamp( trok_ca_corpo_escala.GetFloat(), 0.5f, 2.0f ) : 1.0f );
 
 	if ( !m_bSurto )
 	{

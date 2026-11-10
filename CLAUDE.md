@@ -50,11 +50,21 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
      (sobreviventes táticos bem treinados, cada um com seu kit); **Especialistas** = elite dos
      sobreviventes, com skins de arma próprias (só visual por enquanto);
    - tecnologia/fungo controlado = **itens raros** no futuro, sem exagero; **equipamentos ainda não**;
-   - nome do jogo provisório **Rearmed** (complemento e nome da corporação ainda em aberto);
-   - **vai ter killstreak** (série de abates), como no Combat Arms, porém mais moderno. As
-     recompensas e os números ainda não foram definidos: perguntar ao dono antes de fazer;
+   - nome do jogo **Rearmed** com o complemento **Reloaded** (decisão de 10/11/2026); nome da
+     corporação ainda em aberto;
+   - **killstreak:** por enquanto **exatamente como no Combat Arms**; depois o dono cria as nossas;
    - **sem nível, XP ou patente por enquanto** (decisão do dono). Não fazer nem sugerir agora;
-   - tudo **de graça**: nada pago.
+   - tudo **de graça**: nada pago;
+   - **mais parecido possível com o CA** em tudo o que dá (decisão de 10/11/2026), inclusive a
+     **escala exata do CA** (corpo 30 × 100, agachado 80, olho 83/60, unidades 1:1; ver
+     `cs-source/design/medidas-mapas.md`);
+   - **lanterna (F) fica**; **sem tecla de largar arma**: como no CA, só a principal cai ao morrer
+     e para trocar pela arma do chão é olhar para ela e apertar **E**;
+   - **slots como no CA:** 1 principal, 2 secundária, 3 branca, 4 arremesso (granadas e minas),
+     5 especial, 6 objetivo;
+   - **economia estilo CS** (dinheiro por abate, sobrevivência etc., começa com pistola e compra
+     sub/fuzil/escopeta/especiais): a nuvem deixou só a base, desligada (`trok_economia 0`); o dono
+     termina no PC (`cs-source/design/economia.md`).
 
 ## Ler primeiro (nesta ordem)
 

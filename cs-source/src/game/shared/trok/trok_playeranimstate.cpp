@@ -438,8 +438,10 @@ void CTrokPlayerAnimState::ComputePoseParam_AimYaw( CStudioHdr *pStudioHdr )
 // move_yaw normalizado (receita do ZMR).
 float CTrokPlayerAnimState::GetCurrentMaxGroundSpeed()
 {
+	// O corpo do CA é o modelo com escala (100/72): a passada cresce junto.
+	const float flEscala = MAX( 0.01f, GetBasePlayer()->GetModelScale() );
 	if ( m_bIs9Way )
-		return BaseClass::GetCurrentMaxGroundSpeed();
+		return BaseClass::GetCurrentMaxGroundSpeed() * flEscala;
 
 	CBasePlayer *pPlayer = GetBasePlayer();
 	CStudioHdr *pStudioHdr = pPlayer->GetModelPtr();
@@ -451,5 +453,5 @@ float CTrokPlayerAnimState::GetCurrentMaxGroundSpeed()
 	pPlayer->SetPoseParameter( pStudioHdr, m_PoseParameterData.m_iMoveY, d == 0.0f ? 0.0f : flPrev / d );
 	const float flSpeed = pPlayer->GetSequenceGroundSpeed( pPlayer->GetSequence() );
 	pPlayer->SetPoseParameter( pStudioHdr, m_PoseParameterData.m_iMoveY, flPrev );
-	return flSpeed;
+	return flSpeed * flEscala;
 }

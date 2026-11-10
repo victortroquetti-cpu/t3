@@ -156,7 +156,7 @@ index f560070..ef7c7ca 100644
  	if ( hud_fastswitch.GetBool() && ( gpGlobals->curtime - m_flSelectionTime ) < (FASTSWITCH_DISPLAY_TIMEOUT + FASTSWITCH_FADEOUT_TIME) )
  		return true;
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.cpp b/src/game/client/hl2mp/c_hl2mp_player.cpp
-index 367a616..269e125 100644
+index 367a616..307043e 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.cpp
 +++ b/src/game/client/hl2mp/c_hl2mp_player.cpp
 @@ -7,6 +7,11 @@
@@ -306,6 +306,16 @@ index 367a616..269e125 100644
  bool C_HL2MP_Player::ShouldDraw( void )
  {
  	// If we're dead, our ragdoll will be drawn for us instead.
+@@ -1082,6 +1169,9 @@ void C_HL2MPRagdoll::CreateHL2MPRagdoll( void )
+ 	
+ 	if ( pPlayer && !pPlayer->IsDormant() )
+ 	{
++#ifdef TROK
++		SetModelScale( pPlayer->GetModelScale() );	// corpo do CA (escala do modelo)
++#endif
+ 		// move my current model instance to the ragdoll's so decals are preserved.
+ 		pPlayer->SnatchModelInstance( this );
+ 
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.h b/src/game/client/hl2mp/c_hl2mp_player.h
 index bac7584..8bf1f8d 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.h
@@ -900,6 +910,44 @@ index 3262148..a9ddcc4 100644
  	float m_goalTolerance;
  };
  
+diff --git a/src/game/server/NextBot/Player/NextBotPlayerLocomotion.h b/src/game/server/NextBot/Player/NextBotPlayerLocomotion.h
+index 5da7260..4f48311 100644
+--- a/src/game/server/NextBot/Player/NextBotPlayerLocomotion.h
++++ b/src/game/server/NextBot/Player/NextBotPlayerLocomotion.h
+@@ -128,6 +128,25 @@ private:
+ };
+ 
+ 
++#ifdef TROK
++// Trok: os números do movimento do Combat Arms (ver nav.h).
++inline float PlayerLocomotion::GetStepHeight( void ) const
++{
++	return StepHeight;
++}
++
++
++inline float PlayerLocomotion::GetMaxJumpHeight( void ) const
++{
++	return JumpCrouchHeight;
++}
++
++
++inline float PlayerLocomotion::GetDeathDropHeight( void ) const
++{
++	return DeathDrop;
++}
++#else
+ inline float PlayerLocomotion::GetStepHeight( void ) const
+ {
+ 	return 18.0f;
+@@ -144,6 +163,7 @@ inline float PlayerLocomotion::GetDeathDropHeight( void ) const
+ {
+ 	return 200.0f;
+ }
++#endif
+ 
+ 
+ inline float PlayerLocomotion::GetMaxAcceleration( void ) const
 diff --git a/src/game/server/hl2mp/bot/behavior/hl2mp_bot_behavior.h b/src/game/server/hl2mp/bot/behavior/hl2mp_bot_behavior.h
 index d74717c..1607b3e 100644
 --- a/src/game/server/hl2mp/bot/behavior/hl2mp_bot_behavior.h
@@ -996,6 +1044,41 @@ index 45f331d..efe639a 100644
  	ALLOCATE_INTENTION_INTERFACE( CHL2MPBot );
  
  	m_spawnArea = NULL;
+diff --git a/src/game/server/hl2mp/bot/hl2mp_bot_locomotion.cpp b/src/game/server/hl2mp/bot/hl2mp_bot_locomotion.cpp
+index 6fe9531..deac29c 100644
+--- a/src/game/server/hl2mp/bot/hl2mp_bot_locomotion.cpp
++++ b/src/game/server/hl2mp/bot/hl2mp_bot_locomotion.cpp
+@@ -45,6 +45,13 @@ float CHL2MPBotLocomotion::GetDeathDropHeight( void ) const
+ {
+ 	CHL2MPBot* me = ( CHL2MPBot* )GetBot()->GetEntity();
+ 
++#ifdef TROK
++	// Queda do CA: sem dano até trok_ca_queda_min (300u).
++	static ConVarRef s_quedaMin( "trok_ca_queda_min" );
++	if ( s_quedaMin.IsValid() )
++		return s_quedaMin.GetFloat();
++#endif
++
+ 	// misyl: Fall damage only deals 10 health otherwise. 
+ 	if ( falldamage.GetInt() != 1 )
+ 	{
+diff --git a/src/game/server/hl2mp/bot/hl2mp_bot_locomotion.h b/src/game/server/hl2mp/bot/hl2mp_bot_locomotion.h
+index 2536f17..080fee4 100644
+--- a/src/game/server/hl2mp/bot/hl2mp_bot_locomotion.h
++++ b/src/game/server/hl2mp/bot/hl2mp_bot_locomotion.h
+@@ -35,8 +35,12 @@ protected:
+ 
+ inline float CHL2MPBotLocomotion::GetMaxJumpHeight( void ) const
+ {
++#ifdef TROK
++	return JumpCrouchHeight;	// movimento do CA (nav.h)
++#else
+ 	// https://developer.valvesoftware.com/wiki/Dimensions_(Half-Life_2_and_Counter-Strike:_Source)#Jumping
+ 	return 56.0f;
++#endif
+ }
+ 
+ #endif // HL2MP_BOT_LOCOMOTION_H
 diff --git a/src/game/server/hl2mp/hl2mp_client.cpp b/src/game/server/hl2mp/hl2mp_client.cpp
 index 30d2181..18f69f4 100644
 --- a/src/game/server/hl2mp/hl2mp_client.cpp
@@ -1241,6 +1324,53 @@ index 5fad238..d21351f 100644
  private:
  
  	CNetworkQAngle( m_angEyeAngles );
+diff --git a/src/game/server/nav.h b/src/game/server/nav.h
+index a955c3a..d0b2c5b 100644
+--- a/src/game/server/nav.h
++++ b/src/game/server/nav.h
+@@ -20,6 +20,15 @@
+  * @todo Move these into TheNavMesh singleton.
+  */
+ const float GenerationStepSize = 25.0f;			// (30) was 20, but bots can't fit always fit
++#ifdef TROK
++// Trok: corpo e movimento EXATOS do Combat Arms (caixa 30 x 100, agachado 80, olho 83/60, degrau 30,
++// pulo de 49,5u = 330^2 / (2 x 1100), pulo agachado ~59u). Gere o .nav de novo (nav_generate).
++const float JumpHeight = 47.0f;
++const float JumpCrouchHeight = 58.0f;
++const float StepHeight = 30.0f;
++const float DeathDrop = 300.0f;					// o CA começa a tirar vida a partir de 300u de queda
++const float ClimbUpHeight = 200.0f;
++#else
+ const float JumpHeight = 41.8f;					// if delta Z is less than this, we can jump up on it
+ 
+ #if defined(CSTRIKE_DLL)
+@@ -43,16 +52,26 @@ const float ClimbUpHeight = JumpCrouchHeight;	// CSBots assume all jump up links
+ #else
+ const float ClimbUpHeight = 200.0f;				// height to check for climbing up
+ #endif
++#endif // TROK
+ 
+ const float CliffHeight = 300.0f;				// height which we consider a significant cliff which we would not want to fall off of
+ 
+ // TERROR: Converted these values to use the same numbers as the player bounding boxes etc
++#ifdef TROK
++#define HalfHumanWidth			15
++#define HalfHumanHeight			50
++#define HumanHeight				100
++#define HumanEyeHeight			83
++#define HumanCrouchHeight		80
++#define HumanCrouchEyeHeight	60
++#else
+ #define HalfHumanWidth			16
+ #define HalfHumanHeight			35.5
+ #define HumanHeight				71
+ #define HumanEyeHeight			62
+ #define HumanCrouchHeight		55
+ #define HumanCrouchEyeHeight	37
++#endif
+ 
+ 
+ #define NAV_MAGIC_NUMBER 0xFEEDFACE				// to help identify nav files
 diff --git a/src/game/server/player.cpp b/src/game/server/player.cpp
 index b8a0519..1d89f6f 100644
 --- a/src/game/server/player.cpp
