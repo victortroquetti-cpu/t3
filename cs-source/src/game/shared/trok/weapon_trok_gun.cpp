@@ -31,6 +31,7 @@
 #include "weapon_trok_gun.h"
 #include "weapon_hl2mpbasebasebludgeon.h"
 #include "trok_surto.h"
+#include "trok_hordas.h"
 #ifdef CLIENT_DLL
 #include "prediction.h"
 #include "eventlist.h"
@@ -273,6 +274,12 @@ acttable_t *CWeaponTrokGun::ActivityList( int &iActivityCount )
 float CWeaponTrokGun::GetFireRate( void )
 {
 	return 60.0f / MAX( 1.0f, Info().m_flTrokRPM );
+}
+
+// Modo Hordas: a máquina de melhoria aumenta o pente (trok_hordas.cpp; 1x fora do modo).
+int CWeaponTrokGun::GetMaxClip1( void ) const
+{
+	return TrokHordas_Pente( this, BaseClass::GetMaxClip1() );
 }
 
 //-----------------------------------------------------------------------------

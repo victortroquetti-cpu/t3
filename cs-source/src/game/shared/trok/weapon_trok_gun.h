@@ -36,6 +36,7 @@ public:
 	virtual void Drop( const Vector &vecVelocity );
 	virtual const Vector &GetBulletSpread( void );
 	virtual float GetFireRate( void );
+	virtual int GetMaxClip1( void ) const;		// pente com a melhoria do modo Hordas
 	virtual acttable_t *ActivityList( int &iActivityCount );
 	virtual void AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles );
 

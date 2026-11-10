@@ -101,8 +101,9 @@ public:
 
 CTrokSurtoEstado *TrokSurto_Estado( void );
 bool TrokSurto_Ativo( void );					// existe estado e a fase não é DESLIGADO
-bool TrokSurto_IsZumbi( const CBaseEntity *pEnt );	// jogador no time dos zumbis, com o modo ativo
-bool TrokSurto_IsHumano( const CBaseEntity *pEnt );
+bool TrokSurto_IsZumbi( const CBaseEntity *pEnt );	// jogador no time dos zumbis, com o modo ativo (Surto ou Hordas)
+bool TrokSurto_IsHumano( const CBaseEntity *pEnt );	// no Hordas, o derrubado não conta (zumbis o ignoram)
+bool TrokModoZumbi_Ativo( void );				// Surto ativo ou modo Hordas (trok_hordas.h)
 
 // Modos do Trok (trok_modo): equipe (mata-mata em equipe), solo (exército solo, todos contra
 // todos) e surto (infecção). Vale no próximo mapa.
@@ -112,6 +113,7 @@ enum TrokModo_t
 	TROK_MODO_SOLO,
 	TROK_MODO_SURTO,
 	TROK_MODO_CORRIDA,		// Corrida Armada (escada de armas; shared/trok/trok_corrida.cpp)
+	TROK_MODO_HORDAS,		// Hordas (cooperativo contra zumbis por rodadas; shared/trok/trok_hordas.cpp)
 };
 int TrokModo( void );
 

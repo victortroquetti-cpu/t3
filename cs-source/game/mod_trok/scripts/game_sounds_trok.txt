@@ -298,3 +298,92 @@
 	"pitch"			"95,105"
 	"wave"			")npc/turret_floor/shoot1.wav"	// TROCAR (HL2)
 }
+
+// ---------------------------------------------------------------- Modo Hordas (design/modo-hordas.md)
+"Trok.Hordas.Compra"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_70dB"
+	"wave"			"items/ammo_pickup.wav"		// TROCAR (HL2): comprou na parede/bancada/caixa
+}
+
+"Trok.Hordas.SemPontos"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_60dB"
+	"wave"			"buttons/button10.wav"		// TROCAR (HL2): pontos insuficientes
+}
+
+"Trok.Hordas.Porta"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_85dB"
+	"wave"			"doors/heavy_metal_move1.wav"	// TROCAR (HL2): porta paga abrindo
+}
+
+"Trok.Hordas.Melhoria"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_80dB"
+	"wave"			"items/suitchargeok1.wav"	// TROCAR (HL2): máquina de melhoria
+}
+
+"Trok.Hordas.Caixa"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_80dB"
+	"wave"			"buttons/lever7.wav"		// TROCAR (HL2): caixa misteriosa abrindo
+}
+
+"Trok.Hordas.Energia"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_NONE"
+	"wave"			"ambient/machines/thumper_startup1.wav"	// TROCAR (HL2): energia ligada (todos ouvem)
+}
+
+"Trok.Hordas.RodadaInicio"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_NONE"
+	"wave"			"ambient/alarms/warningbell1.wav"	// TROCAR (HL2): rodada começa
+}
+
+"Trok.Hordas.RodadaFim"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"0.8"
+	"soundlevel"	"SNDLVL_NONE"
+	"wave"			"ambient/alarms/klaxon1.wav"	// TROCAR (HL2): rodada acabou
+}
+
+"Trok.Hordas.Bonus"
+{
+	"channel"		"CHAN_STATIC"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_NONE"
+	"wave"			"items/battery_pickup.wav"		// TROCAR (HL2): pegou um bônus
+}
+
+"Trok.Hordas.Caido"
+{
+	"channel"		"CHAN_VOICE"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_85dB"
+	"wave"			"player/pl_pain5.wav"		// TROCAR (HL2): humano derrubado
+}
+
+"Trok.Hordas.Reviver"
+{
+	"channel"		"CHAN_ITEM"
+	"volume"		"1.0"
+	"soundlevel"	"SNDLVL_75dB"
+	"wave"			"items/smallmedkit1.wav"	// TROCAR (HL2): revivido
+}

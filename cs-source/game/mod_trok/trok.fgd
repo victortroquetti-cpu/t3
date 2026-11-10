@@ -25,6 +25,7 @@
 	"infectados quebram batendo. Aberta fica translúcida (mostra onde fecha)."
 [
 	vida(integer) : "Vida" : 1500 : "Dano de garra que aguenta fechada."
+	tabuas(integer) : "Tábuas (Hordas)" : 6 : "Modo Hordas: a vida dividida em tábuas; cada E conserta uma (+10 pontos). Use 'Começa fechada' = Sim."
 	inicio_fechada(choices) : "Começa fechada" : 0 =
 	[
 		0 : "Não"

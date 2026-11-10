@@ -1,0 +1,141 @@
+// Trok: modo Hordas, tabelas do diretor (código: src/game/server/trok/trok_hordas_diretor.cpp;
+// desenho: design/modo-hordas.md). Números gerais em cfg/hordas.cfg.
+// Recarregar sem reiniciar: trok_hordas_recarregar (cheat).
+//
+// "tipos": quem pode nascer numa rodada normal (sorteio por peso).
+//   classe           tipo de zumbi de scripts/trok_zumbis.txt (vida base, garras, habilidades)
+//   a_partir         primeira rodada em que aparece
+//   peso             peso no sorteio na rodada "a_partir"; peso_por_rodada soma a cada rodada; peso_max teto
+//   max_por_rodada   no máximo N por rodada (0 = sem limite)
+//   vida             x vida da rodada (a do zumbi normal: cfg/hordas.cfg)
+//   velocidade       x velocidade da rodada (já multiplica a "velocidade" do tipo)
+//   pontos           x pontos do abate
+//   escala           x tamanho (além da escala do tipo)
+// "matilha": rodada especial só de corredores fracos (os "cães" do CoD); no fim solta munição.
+//   primeira, a_cada_min, a_cada_max   primeira rodada (+ sorteio) e o intervalo até a próxima
+//   por_jogador      zumbis por jogador
+// "chefe": o Colosso, a cada N rodadas, nasce no meio da rodada; ataque aéreo não o mata.
+// "caixa": armas da caixa misteriosa e peso de cada uma.
+// "bonus": peso de cada bônus que cai dos zumbis.
+
+"TrokHordas"
+{
+	"tipos"
+	{
+		"normal"
+		{
+			"classe"		"normal"
+			"a_partir"		"1"
+			"peso"			"100"
+		}
+		"charger"			// explode ao morrer: castiga quem mata de perto
+		{
+			"classe"		"charger"
+			"a_partir"		"5"
+			"peso"			"4"
+			"peso_por_rodada"	"1"
+			"peso_max"		"14"
+			"vida"			"0.8"
+			"pontos"		"1.2"
+		}
+		"striker"			// rápido e sem cansar: quebra a defesa parada
+		{
+			"classe"		"striker"
+			"a_partir"		"8"
+			"peso"			"6"
+			"peso_por_rodada"	"1"
+			"peso_max"		"18"
+			"vida"			"0.75"
+			"velocidade"	"1.15"
+			"pontos"		"1.2"
+		}
+		"splicer"			// golpe que paralisa e nuvem tóxica ao morrer
+		{
+			"classe"		"splicer"
+			"a_partir"		"12"
+			"peso"			"4"
+			"peso_por_rodada"	"0.5"
+			"peso_max"		"10"
+			"vida"			"1.3"
+			"pontos"		"1.5"
+		}
+		"crusher"			// tanque: poucos por rodada
+		{
+			"classe"		"crusher"
+			"a_partir"		"15"
+			"peso"			"3"
+			"peso_por_rodada"	"0.25"
+			"peso_max"		"6"
+			"max_por_rodada"	"3"
+			"vida"			"4"
+			"velocidade"	"0.9"
+			"pontos"		"3"
+		}
+		"striker_bolhas"	// solta bolhas que explodem
+		{
+			"classe"		"striker_bolhas"
+			"a_partir"		"18"
+			"peso"			"3"
+			"peso_por_rodada"	"0.5"
+			"peso_max"		"8"
+			"vida"			"0.9"
+			"pontos"		"1.5"
+		}
+		"crusher_toxico"	// aura tóxica: obriga a mudar de lugar
+		{
+			"classe"		"crusher_toxico"
+			"a_partir"		"22"
+			"peso"			"2"
+			"peso_por_rodada"	"0.25"
+			"peso_max"		"5"
+			"max_por_rodada"	"2"
+			"vida"			"5"
+			"pontos"		"4"
+		}
+	}
+
+	"matilha"
+	{
+		"classe"		"striker"
+		"primeira"		"5"			// rodada 5 a 7 (sorteio), depois a cada 4 a 6 rodadas (CoD: cães)
+		"a_cada_min"	"4"
+		"a_cada_max"	"6"
+		"por_jogador"	"6"
+		"vida"			"0.5"
+		"velocidade"	"1.3"
+		"pontos"		"1.5"
+	}
+
+	"chefe"
+	{
+		"classe"		"crusher_toxico"
+		"a_cada"		"10"		// rodadas 10, 20, 30...
+		"quantos"		"1"
+		"vida"			"20"		// x vida da rodada (rodada 10: ~21 mil)
+		"velocidade"	"0.9"
+		"escala"		"1.35"
+		"pontos"		"2"
+		"bonus_pontos"	"1000"		// para quem dá o último tiro
+	}
+
+	"caixa"
+	{
+		"weapon_trok_fuzil"				"10"
+		"weapon_trok_submetralhadora"	"10"
+		"weapon_trok_escopeta"			"10"
+		"weapon_trok_foguete"			"3"
+		"weapon_trok_torreta"			"3"
+		"weapon_trok_claymore"			"5"
+		"weapon_trok_mina"				"4"
+	}
+
+	"bonus"
+	{
+		"municao"		"25"
+		"abate_certo"	"20"
+		"pontos_dobro"	"20"
+		"ataque_aereo"	"12"
+		"reforco"		"13"
+		"caixa_barata"	"10"
+	}
+}

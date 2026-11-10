@@ -20,6 +20,7 @@
 	#include "trok/trok_killstreak.h"
 	#include "trok/trok_economia.h"
 	#include "trok/trok_corrida.h"
+	#include "trok/trok_hordas.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -132,12 +133,19 @@ CTrokRules::CTrokRules()
 		m_bTeamPlayEnabled = false;
 		engine->ServerCommand( "exec corrida.cfg\n" );
 	}
+	else if ( m_iModo == TROK_MODO_HORDAS )
+	{
+		// Hordas: humanos (cooperativo) contra zumbis bots, por rodadas (trok_hordas_diretor.cpp).
+		m_bTeamPlayEnabled = true;
+		engine->ServerCommand( "exec hordas.cfg\n" );
+	}
 	else
 	{
 		m_bTeamPlayEnabled = true;
 		engine->ServerCommand( "exec equipe.cfg\n" );
 	}
 	TrokCorrida_Iniciar( m_iModo == TROK_MODO_CORRIDA );
+	TrokHordas_Iniciar( m_iModo == TROK_MODO_HORDAS );
 
 	// Partida criada pelo menu (CRIAR PARTIDA): meta, tempo, nome e senha escolhidos vêm por cima do cfg
 	// do modo. O menu escreve este arquivo ao criar e o apaga ao jogar contra bots pelo JOGAR.
@@ -184,6 +192,12 @@ void CTrokRules::PlayerSpawn( CBasePlayer *pPlayer )
 	TrokSerie_PlayerSpawn( pPlayer );		// série de abates (trok_killstreak.cpp)
 	TrokEconomia_PlayerSpawn( pPlayer );	// prazo e lugar da compra (server/trok/trok_economia.cpp)
 
+	if ( m_iModo == TROK_MODO_HORDAS )
+	{
+		// Hordas: zumbi do diretor ou humano; sem proteção ao nascer (trok_hordas_diretor.cpp).
+		TrokHordas_PlayerSpawn( pPlayer );
+		return;
+	}
 	if ( !m_bSurto )
 	{
 		// Equipe e solo: proteção ao nascer.
@@ -289,10 +303,11 @@ void CTrokRules::Think( void )
 		return;
 	if ( m_bSurto )
 		SurtoThink();
-	else
+	else if ( m_iModo != TROK_MODO_HORDAS )
 		ModoThink();
 	if ( m_iModo == TROK_MODO_CORRIDA )
 		TrokCorrida_Think();
+	TrokHordas_Think();		// rodadas do Hordas (e, nos outros modos, tira bots que sobraram dele)
 }
 
 //-----------------------------------------------------------------------------
@@ -349,6 +364,8 @@ void CTrokRules::OnPlayerFired( CBasePlayer *pPlayer )
 
 bool CTrokRules::FPlayerCanTakeDamage( CBasePlayer *pPlayer, CBaseEntity *pAttacker, const CTakeDamageInfo &info )
 {
+	if ( m_iModo == TROK_MODO_HORDAS && !TrokHordas_PodeLevarDano( pPlayer, pAttacker ) )
+		return false;	// derrubado e fogo amigo (trok_hordas_diretor.cpp)
 	if ( !m_bSurto && pPlayer && m_flProtegido[ pPlayer->entindex() ] > gpGlobals->curtime &&
 		 pAttacker && pAttacker->IsPlayer() && pAttacker != pPlayer )
 		return false;
@@ -768,6 +785,8 @@ void CTrokRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info
 	m_flMorte[ pVictim->entindex() ] = gpGlobals->curtime;
 	if ( m_iModo == TROK_MODO_CORRIDA )
 		TrokCorrida_Abate( pVictim, info, iFragsAntes );	// escada de armas (trok_corrida.cpp)
+	if ( m_iModo == TROK_MODO_HORDAS )
+		TrokHordas_Abate( pVictim, info );		// pontos, bônus, humano que morreu (trok_hordas_diretor.cpp)
 	TrokSerie_PlayerKilled( pVictim, info );		// série de abates (trok_killstreak.cpp)
 	TrokEconomia_PlayerKilled( pVictim, info );		// dinheiro do abate (server/trok/trok_economia.cpp)
 
@@ -816,6 +835,8 @@ void CTrokRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info
 
 bool CTrokRules::FPlayerCanRespawn( CBasePlayer *pPlayer )
 {
+	if ( m_iModo == TROK_MODO_HORDAS )
+		return TrokHordas_PodeRenascer( pPlayer ) && BaseClass::FPlayerCanRespawn( pPlayer );	// o diretor traz de volta
 	if ( m_bSurto )
 	{
 		CTrokSurtoEstado *pEstado = m_hEstado.Get();
@@ -867,6 +888,8 @@ bool CTrokRules::CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pIt
 	}
 	if ( m_iModo == TROK_MODO_CORRIDA && !TrokCorrida_PodeTerArma( pPlayer, pItem ) )
 		return false; // Corrida Armada: só a escada dá arma
+	if ( m_iModo == TROK_MODO_HORDAS && !TrokHordas_PodeTerArma( pPlayer, pItem ) )
+		return false; // Hordas: zumbi só com garras
 	return BaseClass::CanHavePlayerItem( pPlayer, pItem );
 }
 
@@ -874,6 +897,9 @@ bool CTrokRules::ClientCommand( CBaseEntity *pEdict, const CCommand &args )
 {
 	// No Surto o time é decidido pela rodada.
 	if ( m_bSurto && ( FStrEq( args[ 0 ], "jointeam" ) || FStrEq( args[ 0 ], "changeteam" ) ) )
+		return true;
+	// Hordas: todos humanos (trok_hordas_diretor.cpp)
+	if ( TrokHordas_ClientCommand( ToBasePlayer( pEdict ), args ) )
 		return true;
 	// trok_comprar (server/trok/trok_economia.cpp)
 	if ( TrokEconomia_ClientCommand( ToBasePlayer( pEdict ), args ) )
@@ -893,6 +919,12 @@ bool CTrokRules::IgnoresHeadshot( CBasePlayer *pVictim ) const
 // No Surto, bala de humano em zumbi "segura" (tira velocidade) e empurra, conforme a arma.
 void CTrokRules::OnPlayerDamaged( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 {
+	if ( m_iModo == TROK_MODO_HORDAS )
+	{
+		// Pontos por acerto, arma melhorada, bônus, derrubado (trok_hordas_diretor.cpp).
+		TrokHordas_Dano( pVictim, info );
+		return;
+	}
 	if ( !m_bSurto || !pVictim )
 		return;
 	m_flUltimoDano[ pVictim->entindex() ] = gpGlobals->curtime;

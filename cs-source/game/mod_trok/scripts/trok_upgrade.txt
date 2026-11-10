@@ -1,0 +1,81 @@
+// Trok: máquina de melhoria do modo Hordas (func_trok_maquina_upgrade; o "Pack-a-Punch" nosso).
+// Código: src/game/shared/trok/trok_hordas.cpp (leitura), server/trok/trok_hordas_diretor.cpp
+// (efeitos). Desenho e motivos: design/modo-hordas.md, "Máquina de melhoria".
+//
+// Cinco níveis, um por vez, na arma que está na mão. Cada nível vale para aquela arma
+// (trocar de arma zera). Recarregar: trok_hordas_upgrade_recarregar (cheat).
+//   nome            como aparece ("MELHORAR FUZIL PARA MK II")
+//   preco           pontos para chegar neste nível
+//   dano            x dano da bala (o dano a mais sai da vida do zumbi depois do tiro)
+//   pente           x tamanho do pente
+//   reserva         x reserva cheia (cfg: trok_hordas_reserva_pentes)
+//   efeito          "", "atordoante" (deixa lento), "incendiaria" (queima), "explosiva" (estilhaços)
+//   efeito_chance   chance por acerto (0..1)
+//   efeito_forca    atordoante: x velocidade; incendiária: fração da vida máxima por segundo;
+//                   explosiva: fração do dano do tiro nos zumbis em volta
+//   efeito_tempo    s (atordoante, incendiária); efeito_raio u (explosiva)
+//   cor             tom provisório da arma no mundo (R G B) até haver camuflagem própria
+// "municao_preco": encher a munição de uma arma melhorada na parede (CoD: 4500).
+
+"TrokUpgrade"
+{
+	"municao_preco"	"4500"
+
+	"1"
+	{
+		"nome"		"MK I"
+		"preco"		"5000"
+		"dano"		"1.6"
+		"pente"		"1.25"
+		"reserva"	"1.5"
+		"cor"		"200 200 205"
+	}
+	"2"
+	{
+		"nome"		"MK II"
+		"preco"		"10000"
+		"dano"		"2.5"
+		"pente"		"1.5"
+		"reserva"	"1.75"
+		"cor"		"120 160 210"
+	}
+	"3"
+	{
+		"nome"		"MK III"
+		"preco"		"15000"
+		"dano"		"3.8"
+		"pente"		"1.5"
+		"reserva"	"2"
+		"efeito"	"atordoante"
+		"efeito_chance"	"0.15"
+		"efeito_forca"	"0.4"
+		"efeito_tempo"	"2"
+		"cor"		"150 120 210"
+	}
+	"4"
+	{
+		"nome"		"MK IV"
+		"preco"		"20000"
+		"dano"		"5.5"
+		"pente"		"1.75"
+		"reserva"	"2.25"
+		"efeito"	"incendiaria"
+		"efeito_chance"	"0.12"
+		"efeito_forca"	"0.12"
+		"efeito_tempo"	"4"
+		"cor"		"220 140 60"
+	}
+	"5"
+	{
+		"nome"		"MK V"
+		"preco"		"30000"
+		"dano"		"8"
+		"pente"		"2"
+		"reserva"	"2.5"
+		"efeito"	"explosiva"
+		"efeito_chance"	"0.10"
+		"efeito_forca"	"0.5"
+		"efeito_raio"	"140"
+		"cor"		"230 200 90"
+	}
+}

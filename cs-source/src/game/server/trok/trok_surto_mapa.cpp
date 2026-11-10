@@ -15,6 +15,9 @@
 #include "trok_surto_mapa.h"
 #include "trok/trok_surto.h"
 #include "entityoutput.h"
+#include "trok/trok_hordas.h"
+#include "trok_hordas_mapa.h"
+#include "collisionutils.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -97,6 +100,7 @@ public:
 		m_bQuebrada = false;
 		m_bLiberada = false;
 		m_flProxUso = 0.0f;
+		m_iTabuas = 6;
 	}
 
 	virtual void Precache( void )
@@ -127,6 +131,11 @@ public:
 	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 	{
 		CBasePlayer *pPlayer = ToBasePlayer( pActivator );
+		if ( TrokHordas_Ativo() )
+		{
+			ReparoHordas( pPlayer );	// Hordas: barricada de tábuas (conserta uma por vez)
+			return;
+		}
 		if ( !pPlayer || TrokSurto_IsZumbi( pPlayer ) || !m_bLiberada || m_bQuebrada || gpGlobals->curtime < m_flProxUso )
 			return;
 		m_flProxUso = gpGlobals->curtime + 0.8f;
@@ -197,7 +206,47 @@ public:
 	void Liberar( void ) { m_bLiberada = true; }
 	bool LiberaNosAbrigos( void ) const { return m_bLiberarNosAbrigos; }
 
+	// Modo Hordas: a vida é dividida em "tabuas"; cada E conserta uma (pontos), e quebrada
+	// volta a fechar. Não conserta com zumbi dentro da passagem (ficaria preso).
+	int VidaPorTabua( void ) const { return MAX( 1, m_iVidaMax / MAX( 1, m_iTabuas ) ); }
+	void ReparoHordas( CBasePlayer *pPlayer )
+	{
+		if ( !pPlayer || !pPlayer->IsAlive() || TrokSurto_IsZumbi( pPlayer ) || TrokHordas_Caido( pPlayer ) || gpGlobals->curtime < m_flProxUso )
+			return;
+		if ( !m_bQuebrada && m_bFechada && m_iVida >= m_iVidaMax )
+			return;
+		Vector vecMin, vecMax;
+		CollisionProp()->WorldSpaceAABB( &vecMin, &vecMax );
+		vecMin -= Vector( 24, 24, 24 );
+		vecMax += Vector( 24, 24, 24 );
+		for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+		{
+			CBasePlayer *p = UTIL_PlayerByIndex( i );
+			if ( p && p->IsAlive() && TrokSurto_IsZumbi( p ) && IsPointInBox( p->WorldSpaceCenter(), vecMin, vecMax ) )
+				return;
+		}
+		m_flProxUso = gpGlobals->curtime + 0.9f;
+		m_iVida = m_bQuebrada ? VidaPorTabua() : MIN( m_iVidaMax, m_iVida + VidaPorTabua() );
+		m_bQuebrada = false;
+		m_bLiberada = true;
+		if ( !m_bFechada )
+			SetFechada( true );
+		else
+			EmitSound( "Trok.Grade.Fecha" );
+		Aplicar();
+		TrokHordas_PontosReparo( pPlayer );
+	}
+	void ReforcoHordas( void )
+	{
+		m_bQuebrada = false;
+		m_bLiberada = true;
+		m_iVida = m_iVidaMax;
+		m_bFechada = true;
+		Aplicar();
+	}
+
 private:
+	int m_iTabuas;
 	int m_iVidaMax;
 	int m_iVida;
 	bool m_bInicioFechada;
@@ -217,6 +266,7 @@ LINK_ENTITY_TO_CLASS( func_trok_grade, CTrokGrade );
 
 BEGIN_DATADESC( CTrokGrade )
 	DEFINE_KEYFIELD( m_iVidaMax, FIELD_INTEGER, "vida" ),
+	DEFINE_KEYFIELD( m_iTabuas, FIELD_INTEGER, "tabuas" ),
 	DEFINE_KEYFIELD( m_bInicioFechada, FIELD_BOOLEAN, "inicio_fechada" ),
 	DEFINE_KEYFIELD( m_bLiberarNosAbrigos, FIELD_BOOLEAN, "liberar_nos_abrigos" ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "Liberar", InputLiberar ),
@@ -291,4 +341,23 @@ float TrokSurto_AbrigoRaio( CBaseEntity *pAbrigo )
 {
 	CTrokAbrigo *p = dynamic_cast< CTrokAbrigo * >( pAbrigo );
 	return p ? MAX( 64.0f, p->m_flRaio ) : 300.0f;
+}
+
+//-----------------------------------------------------------------------------
+// Modo Hordas: as grades viram barricadas de tábuas (ver CTrokGrade::ReparoHordas)
+//-----------------------------------------------------------------------------
+void TrokHordas_GradesReparar( void )
+{
+	CBaseEntity *pEnt = NULL;
+	while ( ( pEnt = gEntList.FindEntityByClassname( pEnt, "func_trok_grade" ) ) != NULL )
+		static_cast< CTrokGrade * >( pEnt )->ReforcoHordas();
+}
+
+int TrokHordas_NumGrades( void )
+{
+	int n = 0;
+	CBaseEntity *pEnt = NULL;
+	while ( ( pEnt = gEntList.FindEntityByClassname( pEnt, "func_trok_grade" ) ) != NULL )
+		++n;
+	return n;
 }

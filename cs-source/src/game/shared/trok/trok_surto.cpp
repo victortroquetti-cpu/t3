@@ -5,12 +5,13 @@
 
 #include "cbase.h"
 #include "trok_surto.h"
+#include "trok_hordas.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 ConVar trok_modo( "trok_modo", "equipe", FCVAR_REPLICATED | FCVAR_NOTIFY,
-	"Modo de jogo do próximo mapa: equipe (mata-mata em equipe), solo (exército solo, todos contra todos), surto (infecção) ou corrida (corrida armada)." );
+	"Modo de jogo do próximo mapa: equipe (mata-mata em equipe), solo (exército solo, todos contra todos), surto (infecção), corrida (corrida armada) ou hordas (cooperativo contra zumbis por rodadas)." );
 ConVar trok_renascer_tempo( "trok_renascer_tempo", "5", FCVAR_REPLICATED | FCVAR_NOTIFY,
 	"Equipe e solo: segundos morto até renascer sozinho (com contagem na tela)." );
 ConVar trok_protecao( "trok_protecao", "3", FCVAR_REPLICATED | FCVAR_NOTIFY,
@@ -25,6 +26,8 @@ int TrokModo( void )
 		return TROK_MODO_SOLO;
 	if ( !V_stricmp( psz, "corrida" ) )
 		return TROK_MODO_CORRIDA;
+	if ( !V_stricmp( psz, "hordas" ) )
+		return TROK_MODO_HORDAS;
 	return TROK_MODO_EQUIPE; // "equipe", "tdm" e qualquer outro
 }
 
@@ -122,12 +125,18 @@ bool TrokSurto_Ativo( void )
 	return p && p->GetFase() != SURTO_DESLIGADO;
 }
 
+bool TrokModoZumbi_Ativo( void )
+{
+	return TrokSurto_Ativo() || TrokHordas_Ativo();
+}
+
 bool TrokSurto_IsZumbi( const CBaseEntity *pEnt )
 {
-	return pEnt && pEnt->IsPlayer() && TrokSurto_Ativo() && pEnt->GetTeamNumber() == TEAM_TROK_ZUMBIS;
+	return pEnt && pEnt->IsPlayer() && TrokModoZumbi_Ativo() && pEnt->GetTeamNumber() == TEAM_TROK_ZUMBIS;
 }
 
 bool TrokSurto_IsHumano( const CBaseEntity *pEnt )
 {
-	return pEnt && pEnt->IsPlayer() && TrokSurto_Ativo() && pEnt->GetTeamNumber() == TEAM_TROK_HUMANOS;
+	return pEnt && pEnt->IsPlayer() && TrokModoZumbi_Ativo() && pEnt->GetTeamNumber() == TEAM_TROK_HUMANOS &&
+		!TrokHordas_Caido( pEnt );
 }

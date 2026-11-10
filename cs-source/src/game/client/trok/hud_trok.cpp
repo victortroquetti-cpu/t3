@@ -28,6 +28,7 @@
 #include "weapon_parse.h"
 #include "trok/weapon_trok_gun.h"
 #include "trok/trok_surto.h"
+#include "trok/trok_hordas.h"
 #include "trok/hud_trok_v2.h"
 #include <vgui/ISurface.h>
 #include <vgui/IScheme.h>
@@ -509,6 +510,8 @@ void CHudTrok::PaintTop( void )
 		PaintSurtoTop();
 		return;
 	}
+	if ( TrokHordas_Ativo() )
+		return;	// Hordas: rodada e zumbis no hud_trok_hordas.cpp
 
 	int iMine = 0, iTheirs = 0;
 	if ( HL2MPRules() && HL2MPRules()->IsTeamplay() )
@@ -1108,6 +1111,8 @@ void CHudTrok::PaintDeath( C_BasePlayer *pLocal )
 		const char *pszHint = szRenascer;
 		if ( TrokSurto_Ativo() )
 			pszHint = ( pLocal->GetTeamNumber() == TEAM_TROK_HUMANOS ) ? "VOCÊ VAI LEVANTAR COMO ZUMBI" : "ESPERE A PRÓXIMA RODADA";
+		else if ( TrokHordas_Ativo() )
+			pszHint = "VOCÊ VOLTA NA PRÓXIMA RODADA";
 		Text( m_hText, w / 2 - TextWide( m_hText, pszHint ) / 2, h - S( 96 ), bInfectado ? COR_ZUMBI : COR_BRANCO, pszHint );
 	}
 }

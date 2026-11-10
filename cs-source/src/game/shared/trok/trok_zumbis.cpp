@@ -6,6 +6,7 @@
 #include "filesystem.h"
 #include "trok_zumbis.h"
 #include "trok_surto.h"
+#include "trok_hordas.h"
 
 #ifndef CLIENT_DLL
 #include "explode.h"
@@ -165,10 +166,10 @@ int TrokZumbis_EscolhaDe( const CBaseEntity *pPlayer )
 float TrokZumbis_VelocidadeDe( const CBaseEntity *pPlayer )
 {
 	CTrokSurtoEstado *pEstado = TrokSurto_Estado();
-	if ( !pEstado || !pPlayer || !TrokSurto_Ativo() )
+	if ( !pEstado || !pPlayer || !TrokModoZumbi_Ativo() )
 		return 1.0f;
-	if ( TrokSurto_IsZumbi( pPlayer ) )
-		return TrokZumbis_Classe( TrokZumbis_ClasseDe( pPlayer ) ).flVelocidade;
+	if ( TrokSurto_IsZumbi( pPlayer ) )	// no Hordas, x a velocidade da rodada (trok_hordas.cpp)
+		return TrokZumbis_Classe( TrokZumbis_ClasseDe( pPlayer ) ).flVelocidade * TrokHordas_VelocidadeZumbi( pPlayer );
 
 	// Humano: bônus do mutagênico escolhido e lentidão (golpe que paralisa, nuvem tóxica).
 	float f = 1.0f;
@@ -350,6 +351,17 @@ int TrokZumbis_AoVirar( CBasePlayer *pPlayer )
 	pEstado->m_aClasseZumbi.Set( i, iClasse );
 	s_aProxBomba[ i ] = gpGlobals->curtime + TrokZumbis_Classe( iClasse ).flBombaIntervalo;
 	return iClasse;
+}
+
+// Modo Hordas: o diretor escolhe o tipo (sem escolha nem compra do jogador).
+void TrokZumbis_DefinirClasse( CBasePlayer *pPlayer, int iClasse )
+{
+	CTrokSurtoEstado *pEstado = TrokSurto_Estado();
+	if ( !pEstado || !pPlayer )
+		return;
+	iClasse = clamp( iClasse, 0, TrokZumbis_Num() - 1 );
+	pEstado->m_aClasseZumbi.Set( pPlayer->entindex(), iClasse );
+	s_aProxBomba[ pPlayer->entindex() ] = gpGlobals->curtime + TrokZumbis_Classe( iClasse ).flBombaIntervalo;
 }
 
 void TrokZumbis_AoVirarHumano( CBasePlayer *pPlayer )

@@ -68,6 +68,7 @@ void TrokZumbis_Infectou( CBasePlayer *pZumbi );					// zumbi infectou um humano
 void TrokZumbis_FimRodada( bool bZumbisVenceram );
 bool TrokZumbis_Permitido( CBasePlayer *pPlayer, int iClasse );
 int TrokZumbis_AoVirar( CBasePlayer *pPlayer );			// define o tipo ao virar zumbi; devolve o tipo
+void TrokZumbis_DefinirClasse( CBasePlayer *pPlayer, int iClasse );	// modo Hordas: o diretor escolhe o tipo
 void TrokZumbis_AoVirarHumano( CBasePlayer *pPlayer );
 void TrokZumbis_AoMorrer( CBasePlayer *pVictim );			// habilidades de morte
 void TrokZumbis_AoAcertar( CBasePlayer *pVictim, const CTakeDamageInfo &info );	// golpe que paralisa
