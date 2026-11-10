@@ -8,7 +8,7 @@ WeaponData
 	"viewmodel"			"models/weapons/v_smg_mp5.mdl"
 	"playermodel"		"models/weapons/w_smg_mp5.mdl"
 	"anim_prefix"		"smg1"
-	"bucket"			"2"
+	"bucket"			"0"
 	"bucket_position"	"0"
 
 	"clip_size"			"30"
