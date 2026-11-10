@@ -125,6 +125,22 @@ index 416c930..bb82548 100644
  
  #define SUITPOWER_INIT -1
  
+diff --git a/src/game/client/hl2/hud_weaponselection.cpp b/src/game/client/hl2/hud_weaponselection.cpp
+index f560070..ef7c7ca 100644
+--- a/src/game/client/hl2/hud_weaponselection.cpp
++++ b/src/game/client/hl2/hud_weaponselection.cpp
+@@ -263,6 +263,11 @@ bool CHudWeaponSelection::ShouldDraw()
+ 	if ( !bret )
+ 		return false;
+ 
++#ifdef TROK
++	// Trok: a troca e instantanea e o HUD proprio ja mostra a arma; a fileira de slots do HL2 nao aparece.
++	return false;
++#endif
++
+ 	// draw weapon selection a little longer if in fastswitch so we can see what we've selected
+ 	if ( hud_fastswitch.GetBool() && ( gpGlobals->curtime - m_flSelectionTime ) < (FASTSWITCH_DISPLAY_TIMEOUT + FASTSWITCH_FADEOUT_TIME) )
+ 		return true;
 diff --git a/src/game/client/hl2mp/c_hl2mp_player.cpp b/src/game/client/hl2mp/c_hl2mp_player.cpp
 index 367a616..8bb9cb1 100644
 --- a/src/game/client/hl2mp/c_hl2mp_player.cpp
@@ -269,6 +285,24 @@ index 8fb97d5..c23eb93 100644
  	VGUI_DestroyClientDLLRootPanel();
  
  #ifndef _X360
+diff --git a/src/game/client/weapon_selection.cpp b/src/game/client/weapon_selection.cpp
+index 45334fc..c0d0e56 100644
+--- a/src/game/client/weapon_selection.cpp
++++ b/src/game/client/weapon_selection.cpp
+@@ -21,7 +21,13 @@
+ #define HISTORY_DRAW_TIME	"5"
+ 
+ ConVar hud_drawhistory_time( "hud_drawhistory_time", HISTORY_DRAW_TIME, 0 );
++#ifdef TROK
++// Trok: troca de arma sempre instantanea (numeros, rodinha e ultima arma), como no CA e no CoD.
++// Minimo e maximo 1: nem o config.cfg salvo do jogador volta para a lista de confirmacao do HL2.
++ConVar hud_fastswitch( "hud_fastswitch", "1", FCVAR_ARCHIVE | FCVAR_ARCHIVE_XBOX, "Trok: sempre 1 (troca instantanea).", true, 1.0f, true, 1.0f );
++#else
+ ConVar hud_fastswitch( "hud_fastswitch", "0", FCVAR_ARCHIVE | FCVAR_ARCHIVE_XBOX );
++#endif
+ 
+ //-----------------------------------------------------------------------------
+ // Purpose: Weapon Selection commands
 diff --git a/src/game/server/NextBot/Path/NextBotPathFollow.cpp b/src/game/server/NextBot/Path/NextBotPathFollow.cpp
 index a9d4189..b5e51f4 100644
 --- a/src/game/server/NextBot/Path/NextBotPathFollow.cpp
