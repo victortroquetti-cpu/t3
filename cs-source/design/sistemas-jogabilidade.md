@@ -198,6 +198,43 @@ cliente em `src/game/client/trok/hud_trok_killstreak.cpp`, evento `trok_serie` e
   granada (o CA não tem). Sem "nutshot" (o HL2 não tem caixa de acerto da virilha).
 - **Testar sem matar:** `trok_serie_teste 2 cabeca`, `trok_serie_teste 1 primeiro`, `trok_serie_teste 1 abates 12`.
 
+## Explosivos
+
+Fonte: `design/chimera/specs/combat_arms/grenades.md` e `special_weapons.md` (e `data/weapons/*.toml`).
+Código: arma em `src/game/shared/trok/weapon_trok_explosivo.cpp` (uma classe para todos, prevista no cliente
+como o `weapon_frag` do HL2MP), objeto em `src/game/server/trok/trok_projetil.cpp`, clarão na tela em
+`src/game/client/trok/c_trok_clarao.cpp`. Números de **cada** explosivo: bloco `"TrokExplosivo"` de
+`scripts/weapon_trok_*.txt`; regras gerais: `cfg/explosivos.cfg` (`trok_explosivo_*`, `trok_max_*`).
+Distâncias em unidades do CA × `trok_ca_escala`. Dano das explosões: `CTrokRules::RadiusDamage` (cobertura do
+CA, `trok_explosao_ca*`); o "x2" do CA (jogador e hitbox) já está no `dano` dos scripts.
+
+| Arma | Classe (bucket) | Quantos | Números do CA |
+|---|---|---|---|
+| `weapon_trok_granada` (M67) | 4 (3) | 1 | pino 0,7 s; sai 0,133 s depois de soltar; 1550 u/s; pavio 2,5 s; 120 (60×2) até 112,5 u, 0 em 450 (`trok_granada_dano/raio`); vida 300 |
+| `weapon_trok_granada_luz` (XM84) | 4 (3) | 2 | pavio 1,5 s; quem vê a até 1000 u: T = 25 s de frente perto (cai em linha reta até 0 no raio), ¼ de costas; atraso 0,25 / 0,083 s; tela branca some como cos(πt/T), toda em T/2 |
+| `weapon_trok_granada_fumaca` (M18) | 4 (3) | 2 | pavio 3 s (explode até no ar); nuvem some de 8 a 10 s; não bloqueia nada (como no CA) |
+| `weapon_trok_mina` (M16A1) | 4 (3) | 3 | arremessada a 600 u/s, gruda no chão; inimigo encosta → 0,267 s → 80 (40×2) em 550 u; vida 50 no chão |
+| `weapon_trok_claymore` | 4 (3) | 2 | plantada à frente do pé; **botão 2** detona todas (0,075 s); morrer detona; cone de 160°: 240 em 500 u; fora do cone 120 em 120 u |
+| `weapon_trok_remota` (Mobile_Grenade) | 4 (3) | 2 | pino 1,767 s; 600 u/s, gruda no chão; **botão 2** detona todas (0,45 s); morrer detona; 200 (100×2) em 450 u |
+| `weapon_trok_torreta` (Auto-Turret) | 5 (4) | 1 | sai 3,1 s depois do clique; 600 u/s; arma em 2,833 s; 12 de dano a cada 0,13 s no inimigo mais perto que vê (800 u, −45° a +60°), erro ±50 u; 100 tiros; vida 350 (3× de explosão); uma por vez |
+| `weapon_trok_foguete` (RPG-7) | 5 (4) | 1 + 2 | 1300 u/s reto; explode no 1º toque (1 u antes da parede) ou em 10 s; 86 (43×2) em 550 u: acerto direto não mata com vida cheia (CA); ciclo 0,9 s, recarga 3 s, câmera sobe 5,5° |
+
+- **Arremesso (CA):** botão 1 puxa o pino; segurar o botão segura a granada na mão, mas **não encurta o pavio**
+  (o CA não tem "cozinhar"); soltou, ela sai da **câmera** ao longo da mira; a velocidade de quem joga não soma;
+  correndo (Shift) não começa. Trocar de arma com o pino puxado devolve a granada. Morrer com o pino puxado
+  solta uma granada do corpo a 500 u/s com o pavio inteiro. Sem nenhuma, a arma some e troca de arma.
+- **Voo (CA):** a granada é um **ponto** (sem física VPhysics): gravidade de objeto 1600 com o "¼ de gravidade" do
+  CA, em passos fixos de 0,05 s (`trok_explosivo_passo_ca`) com o desenho interpolado; quique espelhado ×
+  dureza (0,65 quase tudo, 0,5 grade, 0,1 líquido); **para seco** no primeiro toque no chão (normal > 0,75) com
+  menos de 50 u/s na horizontal; sem atrito de rolar; atravessa clip brush e corpos (cada corpo tira 35% duas
+  vezes); some sem explodir se tocar o céu. Tiro e explosão detonam granadas e aparelhos (vida do script).
+- **"Granada!":** ao arremessar, só o time de quem jogou ouve (`som_aviso`). O pino toca 0,513 s depois do clique.
+- **Fora (por enquanto):** proteção de equipamento contra clarão (o Rearmed não tem equipamento), zumbido, a
+  "foto" da tela no clarão, bots cegos pelo clarão (no CA também não ficam), a mina hornet, caltrops, kit,
+  lança-chamas, lança-granadas (M32/M79: é só um script com `tipo impacto` e `gravidade 1`), AT4 (no CA não faz
+  dano), ataque aéreo, perda de velocidade por arma (`TrokWeapon_MoveSpeedScale` só conhece as armas de fogo).
+- **Depurar:** `trok_explosivo_debug 1` desenha o voo e escreve quiques, explosões e clarões; `give weapon_trok_foguete`.
+
 ## Economia estilo CS (base)
 
 Ver `design/economia.md` (regras, números do CS:S, loja, menu da tecla B, o que o dono decide e o que testar).

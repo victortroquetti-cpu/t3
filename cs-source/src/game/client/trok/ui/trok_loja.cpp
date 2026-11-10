@@ -54,6 +54,7 @@ public:
 	CTrokLojaPainel();
 
 	void Mostrar( bool bMostrar );
+	void IrParaInfectado( void ) { if ( AbaInfectado() >= 0 ) m_iCategoria = AbaInfectado(); }
 	virtual void OnKeyCodePressed( KeyCode code );
 	virtual void OnTick( void );
 
@@ -432,6 +433,8 @@ CON_COMMAND( trok_loja, "Abre ou fecha o menu de compra (economia: trok_economia
 		Msg( "Agora você não pode comprar (morto, zumbi ou o tempo de compra acabou).\n" );
 		return;
 	}
+	if ( !bPodeHumano )
+		s_pLoja->IrParaInfectado();	// Surto, sem poder comprar de humano: abre na aba do infectado
 	s_pLoja->Mostrar( true );
 }
 
