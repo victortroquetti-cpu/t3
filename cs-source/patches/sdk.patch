@@ -467,7 +467,7 @@ index 35bfd1c..f9f21aa 100644
  //-----------------------------------------------------------------------------
  // ClientModeHLNormal implementation
 diff --git a/src/game/client/hl2mp/hl2mp_hud_chat.cpp b/src/game/client/hl2mp/hl2mp_hud_chat.cpp
-index 67f4714..9b9bc78 100644
+index 67f4714..8be673a 100644
 --- a/src/game/client/hl2mp/hl2mp_hud_chat.cpp
 +++ b/src/game/client/hl2mp/hl2mp_hud_chat.cpp
 @@ -15,6 +15,13 @@
@@ -580,17 +580,10 @@ index 67f4714..9b9bc78 100644
 +		return TrokUI::COR_TEXTO2;
 +	}
 +	return TrokUI::COR_TEXTO;
-+#else
++#endif
  	if ( clientIndex == 0 ) // console msg
  	{
  		return g_ColorYellow;
-@@ -113,4 +204,5 @@ Color CHudChat::GetClientColor( int clientIndex )
- 	}
- 
- 	return g_ColorYellow;
-+#endif
- }
-\ No newline at end of file
 diff --git a/src/game/client/hl2mp/hl2mp_hud_chat.h b/src/game/client/hl2mp/hl2mp_hud_chat.h
 index 1f08e60..acaca19 100644
 --- a/src/game/client/hl2mp/hl2mp_hud_chat.h

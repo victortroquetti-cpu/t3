@@ -112,6 +112,9 @@ def fetch_sdk():
         print("baixando o Source SDK 2013 (%s) ..." % commit[:12])
         os.makedirs(SDK, exist_ok=True)
         git("init", "-q")
+        # Sem conversão de fim de linha: os arquivos ficam iguais aos do repositório da Valve e o
+        # patch entra igual no Windows e no Linux (o Visual Studio lê LF sem problema).
+        git("config", "core.autocrlf", "false")
         git("remote", "add", "origin", SDK_URL)
         git("fetch", "--depth", "1", "origin", commit)
         git("checkout", "-q", "FETCH_HEAD")
@@ -129,9 +132,15 @@ def apply_patch():
     if git("apply", "--check", PATCH, check=False, capture=True).returncode == 0:
         git("apply", "--whitespace=nowarn", PATCH)
         print("patch aplicado: patches/sdk.patch")
+    elif git("apply", "--check", "--ignore-whitespace", PATCH, check=False, capture=True).returncode == 0:
+        # SDK baixado com conversão de fim de linha (CRLF no Windows): aplica ignorando espaços.
+        git("apply", "--ignore-whitespace", "--whitespace=nowarn", PATCH)
+        print("patch aplicado (ignorando fim de linha): patches/sdk.patch")
     elif git("apply", "--reverse", "--check", PATCH, check=False, capture=True).returncode == 0:
         print("patch já aplicado: patches/sdk.patch")
     else:
+        r = git("apply", "--check", "--ignore-whitespace", PATCH, check=False, capture=True)
+        print((r.stdout or "") + (r.stderr or ""))
         die("patches/sdk.patch não entra no SDK. Se você mudou arquivos da Valve à mão, "
             "rode \"python trok.py save-patch\" antes; se trocou a versão do SDK, refaça o patch.")
 
