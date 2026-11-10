@@ -57,3 +57,12 @@ Ordem sugerida: de cima para baixo.
 - Lanterna (F) e largar arma (G): ficam ou saem?
 - Recompensas e números da killstreak.
 - Nome completo do jogo e da corporação.
+
+## Rodada grande da nuvem (10/11/2026)
+- Testar cada item da tabela de `MUDANCAS-NUVEM.md` (itens 9 a 32): cada linha tem o "Testar" dela. Ordem sugerida:
+  escala do corpo e nav novo (14) → armas e inventário (16–18) → HUD novo (28) → interface (22–25) → Surto com tipos de
+  zumbi e Fúria (15, 31) → explosivos (26–27) → série e economia (19–20, 31) → Corrida Armada (21) → Hordas (32).
+- **Gerar o `.nav` de novo** em todo mapa (o corpo agora é o do CA, 100u).
+- **Ícones SVG** (armas, explosivos, cabeça, infecção, lados): lista e receita em `design/ui.md` > Ícones.
+- **Mapa de teste do Hordas:** `python cs-source/tools/mapas/gerar_hordas_teste.py`, compilar com o MCP `trok`, abrir tudo e gerar o nav (ver `design/modo-hordas.md`, seção 17).
+- Decisões que esperam o dono: `design/modo-hordas.md` seção 18; `design/economia.md` (pendências).
