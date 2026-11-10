@@ -8,17 +8,6 @@
 Análise (09/11/2026) da lista de mods e jogos de zumbi que o dono passou. O Trok vai ser
 diferente; daqui só sai **referência de mecânica**: regras, números de equilíbrio e ideias.
 
-## Regra para tudo que vier desses mods
-
-| Tipo | Pode? | Por quê |
-|---|---|---|
-| Ler o código para entender regras e números | **sim** | Estudar não copia nada. |
-| Copiar código para o Trok | **não** | Os abertos são GPL (v3 no Zombie:Reloaded e no Zombie Escape AMXX). GPL não combina com a licença do Source SDK. O jeito certo é reescrever do zero a partir da regra. |
-| Usar números de equilíbrio (vida, velocidade, coice) como ponto de partida | **sim** | É ideia e dado, não código. Ajustamos para o nosso jogo. |
-| Modelos, sons, sprites, mapas que vêm nos pacotes | **não** | Quase sempre são de outros jogos (muitos tirados do CS Online da Nexon) ou de autores sem licença declarada. |
-| Jogos comerciais (CS Online, CS Online 2, CS Nexon) | **só vídeo** | Não há o que baixar legalmente; assistir gameplay para ideias. |
-| Pacotes "CS Xtreme" e remakes | **não baixar** | Pacotes com conteúdo da Nexon sem licença, distribuídos por sites de repack (risco de vírus também). Ver vídeo basta. |
-
 ## A lista, item por item
 
 | Item | Plataforma | Dá para baixar? | Serve para |
@@ -30,7 +19,7 @@ diferente; daqui só sai **referência de mecânica**: regras, números de equil
 | CS 1.6 ZM Escape | CS 1.6 / AMX Mod X | **sim**: `refs/zombie-escape-amxx` (GPLv3) | estrutura do modo fuga |
 | CS Online NST / NST Final | CS 1.6 com conteúdo da Nexon | **não** | vídeo: classes com habilidade, suprimentos, herói |
 | CS Xtreme v4–v7 | repack do CS 1.6 | **não** | vídeo |
-| CS:S ZM Riot | CS:S / SourceMod | **sim**: `refs/zombie-riot` (fork do 1.9.1b; sem licença declarada, traz modelos e sons) | **muito útil**: ondas de zumbis feitos de **bots**, por "dias", no próprio CS:S. É o survival com bots que queremos |
+| CS:S ZM Riot | CS:S / SourceMod | **sim**: `refs/zombie-riot` (fork do 1.9.1b; traz modelos e sons) | **muito útil**: ondas de zumbis feitos de **bots**, por "dias", no próprio CS:S. É o survival com bots que queremos |
 | CSS ZM Extermination | CS:S | não achei fonte confiável | vídeo |
 | CSS ZM Plague / ZM Escape | CS:S / SourceMod | **sim**: o principal é o **Zombie:Reloaded**, em `refs/zombiereloaded` (GPLv3) | **o melhor de todos para nós**: infecção completa feita para o CS:S, bem documentada, com configs de classes, coice por arma e por parte do corpo, áreas de mapa com regra própria |
 | CS:GO ZM Survival | CS:GO / SourceMod | servidores da comunidade | vídeo |
@@ -77,5 +66,3 @@ diferente; daqui só sai **referência de mecânica**: regras, números de equil
 3. **Zombie Riot:** já está em `refs/zombie-riot`. Veja `cfg/` (dias e zumbis).
 4. **Vídeos** do CS Online NST, do CS Online 2 Zombie Z e do CS Nexon ZM Survival, para as ideias
    de classes com habilidade, suprimentos e herói.
-
-Nada desses pacotes vai para dentro do mod: nem código, nem modelo, nem som, nem mapa.

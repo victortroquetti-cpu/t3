@@ -45,8 +45,8 @@ Ordem sugerida: de cima para baixo.
 - O que nenhuma fonte tem: medir no CA instalado (cadência real, recarga, queda de dano, faca, raio das granadas).
 
 ## Conteúdo
-- **Assets do CA (provisório pessoal):** a versão atual que o dono tem traz os `.rez` com cabeçalho alterado, ou seja,
-  protegidos, e não são abertos. Se ele tiver um cliente com `.rez` no formato padrão (por exemplo o EU de 2009),
+- **Assets do CA (provisório pessoal):** a versão atual que o dono tem traz os `.rez` com cabeçalho alterado
+  (protegidos), que o extrator pula. Se ele tiver um cliente com `.rez` no formato padrão (por exemplo o EU de 2009),
   rodar `python cs-source/tools/ca_extrator.py listar <pasta>`. A saída vai só para `custom/ca_local/`.
 - Músicas e sons soltos do CA (mp3/wav em `Game/BGM`): podem virar provisório em `custom/ca_local/`.
 - Modelos e animações: Blender + Blender Source Tools + o Blender MCP do dono, e o `modelo_compilar` do MCP `trok`

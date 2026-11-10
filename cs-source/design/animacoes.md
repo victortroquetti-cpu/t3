@@ -13,8 +13,7 @@ Quaternius, CMU, Rokoko, Blender e Blender MCP) e `design/ca-ferramentas.md` (co
 2. **O zumbi já pode ter cara de zumbi sem código.** As garras usam as atividades `*_MELEE`. Um modelo de
    zumbi cujas sequências de zumbi tenham essas atividades no `.qc` já anda e bate como zumbi.
 3. **Para animação boa (9 direções, sprint, pulo em 3 fases, reação a dano) é preciso trocar o
-   animstate** pelo `CMultiPlayerAnimState` (o do TF2, que está no SDK). Já existem dois portes com licença
-   compatível: o `hl2mp_playeranimstate` do NEOTOKYO;Rebuild e o do Zombie Master: Reborn.
+   animstate** pelo `CMultiPlayerAnimState` (o do TF2, que está no SDK). Já existem dois portes: o `hl2mp_playeranimstate` do NEOTOKYO;Rebuild e o do Zombie Master: Reborn.
 4. **Viewmodel:** as armas de hoje são `v_*.mdl` do CS:S, com os braços embutidos. O sprint da arma é
    feito em código (`AddViewmodelBob`). Para braços próprios trocando de roupa, o ZMR tem código pronto
    de "braços separados" (segundo viewmodel com bonemerge).
@@ -145,7 +144,7 @@ Dois caminhos:
   - eventos `PLAYERANIMEVENT_*` mandados pela rede.
 - Roda nos dois lados (cliente e servidor). O cliente anima os outros jogadores a partir da velocidade,
   sem esperar a sequência do servidor. O servidor roda o mesmo cálculo para as hitboxes baterem.
-- **Já portado para o HL2MP** (licença Source 1 SDK, pode copiar com crédito em `CREDITOS.txt`):
+- **Já portado para o HL2MP** (crédito em `CREDITOS.txt`):
   - `refs/neotokyo-rebuild/src/game/shared/hl2mp/hl2mp_playeranimstate.*` (código da Valve; parece ter vindo
     do SDK 2013 antigo, que o SDK de 2025 não traz mais: **a conferir**);
   - `refs/zmr-game/src/game/shared/zmr/zmr_playeranimstate.*`. É o melhor ponto de partida: detecta se o
@@ -251,9 +250,9 @@ Durações (ms; S = Steam, B = cliente BR):
 Sensação a copiar: a arma **reage pela animação, não pelo código**, e tudo é rápido e seco. Hoje o Trok faz
 o contrário (sprint e balanço procedurais). Mudar isso é decisão do dono: **sugerir, não fazer**.
 
-**Exceção do CA (regra 2):** as animações de arma dos `.rez` **abertos** (146 arquivos `ANI_` legíveis)
+**CA (regra 2):** as animações de arma dos `.rez` **abertos** (146 arquivos `ANI_` legíveis)
 poderiam servir de provisório pessoal em `custom/ca_local/`, convertidas como diz `design/ca-ferramentas.md`.
-As de personagem estão em pacote criptografado: **não abrir**.
+As de personagem estão em pacote criptografado.
 
 ---
 
@@ -276,7 +275,7 @@ empurra, `design/modo-surto.md`), a aterrissagem e a transformação ("virar zum
 sequência tocada uma vez).
 
 ### 3.2 TF2 (código no SDK de 2025)
-`sdk/src/game/server/tf/halloween/zombie/` (os esqueletos do Halloween, NextBot). Código da Valve, licença do SDK:
+`sdk/src/game/server/tf/halloween/zombie/` (os esqueletos do Halloween, NextBot). Código da Valve:
 - `zombie_body.cpp`: escolhe a sequência pela atividade, ajusta `move_x`/`move_y` com o vetor de
   movimento do NextBot e a velocidade da animação = velocidade ÷ velocidade da sequência;
 - `zombie_attack.cpp`: corre com `ACT_MP_RUN_MELEE`, e a garrada é **gesto** (`ACT_MP_ATTACK_STAND_MELEE`)
@@ -292,7 +291,7 @@ sequência tocada uma vez).
 Servem de **ideia** para os golpes (bater em objeto, salto com golpe, frenesi). Os modelos são arte do HL2:
 só montados, provisório.
 
-### 3.4 Zombie Master: Reborn (`refs/zmr-game`, licença Source 1 SDK, pode copiar com crédito)
+### 3.4 Zombie Master: Reborn (`refs/zmr-game`, crédito em `CREDITOS.txt`)
 - Zumbis são NPCs nos modelos do HL2. Têm um animstate próprio (`zmr_zombieanimstate.*`) e eventos de
   animação pela rede (`zmr_zombieanimevent.*`).
 - Criaram atividades próprias (`ACT_ZM_*`) acrescentando ao `ai_activity.h` + `REGISTER_SHARED_ACTIVITY`.
@@ -306,47 +305,39 @@ só montados, provisório.
 - Como as animações de escalar e correr dos infectados se misturam: **não achei fonte pública** (a conferir
   na apresentação inteira).
 
-### 3.6 Mods de zumbi GPL ou sem licença
-Zombie:Reloaded, Zombie Escape AMXX, ZP Special e ZM Riot: **só ideia** (ver `design/zumbi-mods-analise.md`).
-Os modelos e sons desses pacotes nunca entram.
+### 3.6 Mods de zumbi do CS
+Zombie:Reloaded, Zombie Escape AMXX, ZP Special e ZM Riot: ver `design/zumbi-mods-analise.md`.
 
 ---
 
 ## 4. Fontes de animação (complemento do catálogo)
 
-Regra do repositório público: arquivo cru que a licença proíbe redistribuir (FBX do Mixamo, lojas) fica
-**fora do git**. Só o `.mdl` compilado vai no pacote. Guardar o cru numa pasta local no `.gitignore`.
-
-| Fonte | Licença | No git público? | Formato | Qualidade | FPS/armas | Zumbi |
-|---|---|---|---|---|---|---|
-| **Mixamo** | uso livre em jogos (comercial também); proibido redistribuir o arquivo cru | **não** (só o compilado) | FBX | mocap boa; deslizes de pé | 3ª pessoa com fuzil e pistola, sem viewmodel | sim (vários) |
-| **Quaternius Universal Animation Library 1 e 2** | CC0 (a parte grátis; a versão Pro/Source é paga e também CC0) | sim | FBX/GLB | estilizada, boa para arcade | a 2 tem "weapon handling"; **a conferir** se tem fuzil | a 2 tem locomoção "zombie-like" |
-| **Kenney Animated Characters 1, 2, 3** | CC0 | sim | FBX/GLB | simples (parado, pulo, corrida) | não | o 3 tem pele de zumbi |
-| **100STYLE** (Ian Mason) | CC BY 4.0 (dar crédito "The 100STYLE Dataset - Ian Mason") | sim, com crédito | BVH, 60 fps (Xsens) | mocap boa | não | estilos de andar e correr; **a conferir** se há estilo de zumbi |
-| **CMU Motion Capture** (versão BVH do cgspeed) | CMU e o cgspeed dizem que não põem restrição; pedem citar a fonte | provavelmente sim; **a conferir** o texto da CMU | BVH | crua, dá trabalho limpar | não | não |
-| **Rokoko** (biblioteca grátis: 150 e depois 263 animações) | uso comercial permitido segundo a Rokoko; termos antigos tinham prazo | **não** (sem licença de redistribuição clara) | FBX/BVH | mocap boa | poucos | **a conferir** |
-| **ActorCore** (Reallusion), animações grátis | jogo exige pedir a "Mass Distribution License" (grátis); em 2025 a Reallusion disse que só vale dentro do AccuRig | **não** | FBX | AAA | algumas | **a conferir**; evitar até ficar claro |
-| **MoCap Online** (demo grátis; zumbi custa US$ 4,99) | royalty-free para quem compra; redistribuição do cru não está clara | **não** | FBX, BIP, Blender | mocap profissional | sim (pacotes pagos) | pago |
-| **Fab** (antigo Unreal Marketplace) | Standard License: qualquer motor, **exceto** o que for "UE-Only" e o conteúdo da própria Epic (Paragon, Mannequin, Lyra: a conferir); há limite para projeto totalmente open source | **não** | FBX/uasset | varia | sim | sim |
-| **Unity Asset Store** | a Unity diz que pode usar em outros motores; exceções: "Unity Companion License" e o que só pode ser baixado pelo editor da Unity | **não** | FBX/unitypackage | varia | sim | sim |
-| **OpenGameArt** | cada item tem a sua (CC0, CC-BY, GPL) | só CC0/CC-BY | vários | varia | braços crus (ver catálogo) | poucos |
-| **Truebones** | royalty-free, pede crédito, proíbe redistribuir | **não** | BVH/FBX | boa | — | — |
-| **Bandai Namco Motion Dataset** | CC BY-NC-ND | **não usar** | BVH | — | — | — |
-| **Ubisoft LaFAN1** | **a conferir** (lembrança de licença não comercial e sem derivados) | evitar | BVH | ótima | — | — |
+| Fonte | Licença | Formato | Qualidade | FPS/armas | Zumbi |
+|---|---|---|---|---|---|
+| **Mixamo** | uso livre em jogos (comercial também) | FBX | mocap boa; deslizes de pé | 3ª pessoa com fuzil e pistola, sem viewmodel | sim (vários) |
+| **Quaternius Universal Animation Library 1 e 2** | CC0 (a parte grátis; a versão Pro/Source é paga e também CC0) | FBX/GLB | estilizada, boa para arcade | a 2 tem "weapon handling"; **a conferir** se tem fuzil | a 2 tem locomoção "zombie-like" |
+| **Kenney Animated Characters 1, 2, 3** | CC0 | FBX/GLB | simples (parado, pulo, corrida) | não | o 3 tem pele de zumbi |
+| **100STYLE** (Ian Mason) | CC BY 4.0 (dar crédito "The 100STYLE Dataset - Ian Mason") | BVH, 60 fps (Xsens) | mocap boa | não | estilos de andar e correr; **a conferir** se há estilo de zumbi |
+| **CMU Motion Capture** (versão BVH do cgspeed) | CMU e o cgspeed pedem citar a fonte | BVH | crua, dá trabalho limpar | não | não |
+| **Rokoko** (biblioteca grátis: 150 e depois 263 animações) | uso comercial permitido segundo a Rokoko | FBX/BVH | mocap boa | poucos | **a conferir** |
+| **ActorCore** (Reallusion), animações grátis | grátis | FBX | AAA | algumas | **a conferir** |
+| **MoCap Online** (demo grátis; zumbi custa US$ 4,99) | royalty-free para quem compra | FBX, BIP, Blender | mocap profissional | sim (pacotes pagos) | pago |
+| **Fab** (antigo Unreal Marketplace) | Standard License: qualquer motor | FBX/uasset | varia | sim | sim |
+| **Unity Asset Store** | a Unity diz que pode usar em outros motores | FBX/unitypackage | varia | sim | sim |
+| **OpenGameArt** | cada item tem a sua (CC0, CC-BY, GPL) | vários | varia | braços crus (ver catálogo) | poucos |
+| **Truebones** | royalty-free, pede crédito | BVH/FBX | boa | — | — |
+| **Ubisoft LaFAN1** | — | BVH | ótima | — | — |
 
 Mocap por vídeo (gravar o dono ou amigos fazendo zumbi, recarga, morte):
 
-| Ferramenta | Grátis serve para o jogo? | Nota |
-|---|---|---|
-| **Rokoko Video** | **a conferir** (o catálogo fala em cerca de 30 s por mês no plano grátis) | celular, exporta FBX/BVH |
-| **DeepMotion** (Animate 3D) | **não**: o grátis é só pessoal e não comercial; o pago proíbe revender a animação crua | 60 s por mês grátis |
-| **Move One / Move AI** | **não confirmado**: o plano Personal é não comercial; o comercial é pago | iPhone, exporta FBX/BVH/USD |
-| **FreeMoCap** | **sim**: o software é AGPL, mas a animação gravada é nossa (a licença do programa não passa para o arquivo gerado; **a conferir** no repositório) | código aberto, 1 a várias câmeras baratas; sai cena do Blender e CSV, FBX/BVH **a conferir** |
+| Ferramenta | Nota |
+|---|---|
+| **Rokoko Video** | celular, exporta FBX/BVH; cerca de 30 s por mês no plano grátis (**a conferir**) |
+| **DeepMotion** (Animate 3D) | 60 s por mês grátis |
+| **Move One / Move AI** | iPhone, exporta FBX/BVH/USD |
+| **FreeMoCap** | código aberto, 1 a várias câmeras baratas; sai cena do Blender e CSV, FBX/BVH **a conferir** |
 
-O mod é grátis, mas licença "não comercial" ainda pode dar problema: o Trok fica público e pode ter
-doação um dia. Na dúvida, preferir CC0 e captura própria.
-
-**Primeira pessoa:** nenhuma fonte grátis tem viewmodel bom com licença limpa (o catálogo já diz). O caminho
+**Primeira pessoa:** nenhuma fonte grátis tem viewmodel bom (o catálogo já diz). O caminho
 é animar à mão no Blender (o Blender MCP ajuda nas partes mecânicas), usando as durações do CA da seção 2.3
 como ponto de partida.
 
@@ -359,10 +350,10 @@ como ponto de partida.
   Há um fork ativo (Compucolor, para Blender 4.2+, versão 3.4.4 de março de 2026, com conserto de animação
   em DMX e opção "Export All Actions"). **A conferir** qual usar.
 - **Crowbar**: decompila `.mdl` para ver como os modelos do HL2MP fazem (`$includemodel`, blends, pose
-  parameters). Só para estudo; nada decompilado entra no repositório.
+  parameters).
 - **Retarget (passar a animação de um esqueleto para outro):**
   - **Rokoko plugin** para Blender: grátis, sem plano pago (pode pedir conta grátis);
-  - **Expy Kit** (grátis; há um fork "Retarget" para Blender 5+; licença **a conferir**);
+  - **Expy Kit** (grátis; há um fork "Retarget" para Blender 5+);
   - **Auto-Rig Pro** (pago; não precisa);
   - ponto de partida para o ValveBiped: os scripts citados no catálogo (`mixamo_converter`, gist de renomear
     ossos) e a lista de ossos do ValveBiped (wiki.facepunch.com/gmod/ValveBiped_Bones).
@@ -416,7 +407,7 @@ Corpo (`trok_mercenario_01.qc`): `$model`, `$includemodel "trok/jogador/anims_hu
 - **Depois (braços separados, troca de luva e manga por facção):** um segundo viewmodel só com os braços,
   grudado nos ossos da arma (bonemerge). Código pronto:
   - ZMR (`zmr_player.cpp`, `zmr_viewmodel.*`, `VMINDEX_ARMS`, braços por modelo de jogador);
-  - Mapbase (`player.cpp`, `protagonist_system.*`; licença Source 1 SDK).
+  - Mapbase (`player.cpp`, `protagonist_system.*`).
   - Cada arma passa a ter animação de "braços + arma" num esqueleto comum (o do `c_arms`); os braços
     mudam por facção sem refazer as armas.
 - Número de mira e posição continuam em script (`trok_mira_ajuste`, `trok_mira_imprimir`).
@@ -439,7 +430,7 @@ Corpo (`trok_mercenario_01.qc`): `$model`, `$includemodel "trok/jogador/anims_hu
 1. Viewmodel do **fuzil** próprio (braços + arma, braços embutidos), com draw, idle, tiro, recarga.
    Usar as durações do CA como ponto de partida (seção 2.3). É o que o jogador vê o tempo todo.
 2. **Zumbi**: modelo próprio no ValveBiped com as 7 atividades `_MELEE` de zumbi (seção 3.1). Fontes:
-   Mixamo (fora do git) ou Quaternius UAL2, ou captura própria.
+   Mixamo ou Quaternius UAL2, ou captura própria.
 3. **Humano**: corpo próprio no ValveBiped com `$includemodel` das animações do HL2MP montadas. Trocar
    primeiro o fuzil e a pistola (`_AR2`, `_PISTOL`); a submetralhadora e a escopeta podem apontar para as do
    fuzil.

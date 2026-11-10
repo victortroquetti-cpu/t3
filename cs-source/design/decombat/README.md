@@ -2,11 +2,9 @@
 
 Cópia de parte da documentação do projeto **DeCombat** (https://github.com/argallo/DeCombat, commit
 `19b7cec`, 08/11/2026). É um emulador independente do Combat Arms EU de 2009, escrito do zero, com licença
-**MIT ou Apache-2.0** (os dois textos estão nesta pasta, junto com `NOTICE.md`, `AUTHORS` e `CLEANROOM.md`, como a
-licença pede). Os autores mediram o jogo real: capturas de rede, observação e análise do cliente que cada um tem.
+**MIT ou Apache-2.0** (os dois textos estão nesta pasta, junto com `NOTICE.md`, `AUTHORS` e `CLEANROOM.md`). Os autores mediram o jogo real: capturas de rede, observação e análise do cliente que cada um tem.
 
-Para o Rearmed, isto serve como **fonte dos números e das sensações** do CA (regra 2 do `CLAUDE.md`). Nenhum asset
-do jogo vem junto.
+Para o Rearmed, isto serve como **fonte dos números e das sensações** do CA.
 
 ## O que usar e para quê
 
@@ -21,14 +19,12 @@ do jogo vem junto.
 | `specs/FMT_DTX.md`, `FMT_LTB.md`, `FMT_DAT85*.md`, `FMT_SPR_LTC_FX.md`, `FMT_RENDERSTYLE_2009.md`, `RENDER_2009.md` | formatos de textura, modelo, mapa e efeitos do LithTech: base para os conversores do `tools/ca_extrator.py` (para versões com `.rez` no formato padrão) |
 | `docs/MODERN_LOOK.md` | o que eles mudaram para o CA parecer mais moderno sem perder a cara |
 
-## O que ficou de fora, e por quê
+## O que ficou de fora
 
 - **Protocolo de rede, lobby, servidor e testes** (`PROTOCOL_2009`, `UDP_*`, `GAME_MESSAGES_*`, `DSERVER_*`, capturas
   de rede): não servem para um jogo no Source.
-- **`HISEC_2009` e `FMT_CRES_UI`:** tratam da proteção do cliente e de chaves. O projeto não contorna proteção
-  (regra 2).
-- **Código Rust:** fica no GitHub deles. A leitura de `.rez` do DeCombat inclui decodificação Blowfish com a chave
-  tirada do `Engine.exe` do jogador, e isso não entra aqui.
+- **`HISEC_2009` e `FMT_CRES_UI`:** tratam da proteção do cliente e de chaves.
+- **Código Rust:** fica no GitHub deles.
 
 ## Como citar
 

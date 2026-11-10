@@ -17,8 +17,6 @@ ligadas. Os sistemas novos entram em `src/game/*/trok/` conforme forem pedidos.
 | Conteúdo do CS:S | montado do jogo instalado | nativo |
 | O que vem do CS:S | **nada de código**: compra, bomba, movimento e bots do CS são refeitos | tudo |
 
-O código de jogo do CS:S não é público. Código vazado (2020) não pode ser usado; ver a skill.
-
 Estado do trabalho, riscos e pendências: [`HANDOFF.md`](HANDOFF.md).
 
 ## Requisitos
@@ -92,7 +90,7 @@ armas/movimento/HUD, conteúdo e ferramentas, e o guia de `refs/`:
 |---|---|
 | `zmr-game` | Zombie Master: Reborn, mod MP completo no SDK 2013 (regras, jogador, armas, IA de zumbis) |
 | `mapbase` | fork do SDK com VScript e muitas correções |
-| `sourcemod` | só consulta de eventos e props do CS:S original (GPL: não copiar código) |
+| `sourcemod` | eventos e props do CS:S original |
 
 ## Atualizar o SDK
 

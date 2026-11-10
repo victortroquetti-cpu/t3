@@ -148,7 +148,7 @@ e longe, abertura da mira, recuo) para os scripts `weapon_trok_*.txt`. Guia camp
   descer, pular da escada, bots na escada).
 - **Zoom da mira** agora é chamado no cliente e no servidor (`SetFOV` é previsto): começa no
   mesmo tique, sem esperar o ping.
-- Estudos completos (código com a mesma licença, pode ser reaproveitado com crédito):
+- Estudos completos (código reaproveitável, com crédito):
   `design/estudo-neotokyo.md` e `design/estudo-da-momentum-ff.md`. Backlog que saiu deles, por
   ganho:
   1. deslize: **desligado** (`trok_deslizar 0`) por decisão do dono, que não quer o deslize "try hard"

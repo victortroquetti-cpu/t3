@@ -27,26 +27,18 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
 
 1. **Fazer só o que ele pedir.** Ele já reclamou quando algo foi implementado sem pedido. Para
    ideias novas, sugira e espere.
-2. **Nada de assets do CoD, CS Online ou de outros jogos no pacote ou no git:** nem modelos, sons,
-   texturas, mapas ou nomes. Deles entram **só números medidos e sensações**.
-   - **Exceção do Combat Arms (decisão do dono, 10/11/2026):** assets dos `.rez` **abertos** do CA podem
-     ser usados como **provisório pessoal**, para sentir a vibe, e vão sendo trocados por arte própria.
-     Três cuidados, sempre:
-     1. ficam só em `game/mod_trok/custom/ca_local/` (no `.gitignore`): **nunca no git nem no zip** do build;
+2. **Conteúdo de fora e onde fica:**
+   - **Combat Arms (decisão do dono, 10/11/2026):** assets dos `.rez` do CA são usados como **provisório
+     pessoal**, para sentir a vibe, e vão sendo trocados por arte própria:
+     1. ficam em `game/mod_trok/custom/ca_local/` (no `.gitignore`), fora do zip do build;
      2. amigos usam a **instalação do CA deles** (script que extrai do jogo instalado em cada PC, como o
-        CS:S montado); nada é copiado de um PC para outro;
-     3. `.rez` **criptografados não são abertos** (não quebrar proteção).
-     Nomes do CA também não aparecem para o jogador.
-   - **Chimera** (github.com/r0pi0x/Chimera, MIT/Apache): o dono decidiu (10/11/2026), assumindo a
-     responsabilidade, que as especificações de Combat Arms dele podem ser usadas como referência de números e
-     regras, como o DeCombat. Crédito em `CREDITOS.txt`.
-   - O CS:S e o HL2 só **montados** (`gameinfo.txt`), nunca copiados para o pacote.
-   - Das TCs estudadas (`cs-source/refs/`), só o **código** com licença compatível (NEOTOKYO
-     Rebuild, Double Action, Momentum e Fortress Forever usam a Source 1 SDK License; dar crédito
-     em `game/mod_trok/CREDITOS.txt`); nunca a arte deles.
-   - Código vazado (CS:GO/TF2 2020, kisak-strike e parecidos): **proibido**.
-   - **O repositório é público:** asset que proíbe redistribuir o arquivo cru (Mixamo, Pixabay, lojas
-     como CGTrader/Fab/Unity) fica **fora do git**; só o compilado vai no pacote. Ver `design/catalogo-assets.md`.
+        CS:S montado).
+     Nomes do CA não aparecem para o jogador.
+   - **Chimera** (github.com/r0pi0x/Chimera): decisão do dono (10/11/2026), as especificações de Combat Arms
+     dele são referência de números e regras, como o DeCombat. Crédito em `CREDITOS.txt`.
+   - O CS:S e o HL2 ficam **montados** (`gameinfo.txt`).
+   - Código aproveitado das TCs estudadas (`cs-source/refs/`: NEOTOKYO Rebuild, Double Action, Momentum e
+     Fortress Forever): dar crédito em `game/mod_trok/CREDITOS.txt`. Assets: ver `design/catalogo-assets.md`.
 3. **Mudanças em arquivo da Valve** sempre com `#ifdef TROK`. Depois de mexer: `python cs-source/trok.py save-patch`.
 4. **Números em cfg ou script, não no código.** Ajuste de jogabilidade não deve precisar recompilar.
 5. **Decisões já tomadas:**
@@ -62,7 +54,7 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
    - **vai ter killstreak** (série de abates), como no Combat Arms, porém mais moderno. As
      recompensas e os números ainda não foram definidos: perguntar ao dono antes de fazer;
    - **sem nível, XP ou patente por enquanto** (decisão do dono). Não fazer nem sugerir agora;
-   - tudo **de graça**: nada pago (a licença do SDK também exige mod gratuito).
+   - tudo **de graça**: nada pago.
 
 ## Ler primeiro (nesta ordem)
 

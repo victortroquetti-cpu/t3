@@ -14,7 +14,7 @@ delas veio de trechos de busca. Os repositórios foram lidos direto, em `refs/` 
    - lightmap bicúbico (`r_lightmap_bicubic 1`) e neblina radial;
    - texturas carregadas sob demanda e opção Vulkan (DXVK);
    - código do VRAD de 64 bits no `sdk/src/utils/vrad`.
-3. **Dois mods no mesmo SDK, com a mesma licença, já estão em `refs/`:**
+3. **Dois mods no mesmo SDK já estão em `refs/`:**
    - **Zombie Master Reborn:** shader PBR com parallax (`pbr_dx9.cpp`) e lanternas com sombra para vários jogadores;
    - **NEOTOKYO;REBUILD:** SSAO, motion blur e efeitos de tela.
 
@@ -41,20 +41,14 @@ delas veio de trechos de busca. Os repositórios foram lidos direto, em `refs/` 
   - **thexa4/source-pbr:** a origem do PBR do ZMR; serve de documentação.
   - **LUX:** pacote grande, mas o repositório principal sumiu da busca.
   - **Mapbase:** porte para o MP 2025 ainda em rascunho (PR #409).
-- **Ferramentas de textura:** podem ser usadas como ferramenta (PBR-2-Source é GPL, então não copiar código dele).
+- **Ferramentas de textura:** PBR-2-Source.
 - **Sombras:** `env_projectedtexture` com sombra (só uma por padrão). O ZMR limita e escolhe as lanternas com sombra.
-  Fake CSM (sem licença declarada; serve de referência de técnica).
+  Fake CSM serve de referência de técnica.
 - **Pós:**
   - **Já no SDK:** color correction, tonemap, bloom, motion blur e grão.
   - **SSAO:** NT;RE (64 bits) e Estranged.
   - **Antisserrilhado:** o MSAA nativo é melhor que FXAA; TAA não é viável no DX9 do Source (não tem vetores de movimento).
-- **Mapas:** VRAD++ e VVIS++ (ficool2) são rápidos, mas redistribuir pede permissão. Hammer++ (versão TF2) melhora o
+- **Mapas:** VRAD++ e VVIS++ (ficool2) são rápidos. Hammer++ (versão TF2) melhora o
   editor. O VBSP do Slammin' não funciona no ramo TF2.
 - **Shaders:** ShaderCompile2 com `-ver 20` ou `-ver 30`. O ps_3_0 tem 224 constantes e 16 samplers. A profundidade sai do
   alfa do framebuffer, com pouca precisão.
-
-## Não usar (código vazado ou origem duvidosa)
-- **Vazados:** quase todo `c_env_cascade_light.cpp` do GitHub (vem do CS:GO vazado: cstrike15_src, Kisak-Strike, csgo-src,
-  SourceSDK2013Ports); Nhqdfy/...Cascaded-Shadow-Maps (vazamento do TF2 2018); etkramer/VRADPort (provavelmente do CS:GO).
-- **Origem incerta:** SourceRevitalize, REDSource, CaliberSource.
-- **Só referência visual:** Black Mesa (Xengine) e Strata Source, motores fechados.

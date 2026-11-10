@@ -1,8 +1,8 @@
 # Instruções para agentes (Codex e outros)
 
 As instruções do projeto estão no `CLAUDE.md`, na raiz. Leia o arquivo **inteiro** antes de mexer e siga as
-regras dele: responder em português do Brasil, fazer só o que o dono pedir, não usar assets de outros jogos,
-mudanças em arquivo da Valve com `#ifdef TROK`, números em cfg ou script.
+regras dele: responder em português do Brasil, fazer só o que o dono pedir, mudanças em arquivo da Valve
+com `#ifdef TROK`, números em cfg ou script.
 
 Depois, na ordem que o `CLAUDE.md` indica:
 

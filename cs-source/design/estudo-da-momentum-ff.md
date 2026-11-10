@@ -1,9 +1,7 @@
 # Estudo: Double Action, Momentum Mod e Fortress Forever → o que levar para o Trok
 
-Feito em 09/11/2026 lendo só o código. Licença: os três usam a Source 1 SDK License, a mesma
-do Trok. **Código pode ser reaproveitado com crédito** (cabeçalho no arquivo + linha em
-`thirdpartylegalnotices`); **arte, modelos, sons, materiais e shaders deles, não** (ex.: os
-sons `Player.GoSlide`, o material `shaders/slowmo`, os .res/fontes do DA).
+Feito em 09/11/2026 lendo só o código. Código reaproveitado leva **crédito** (cabeçalho no
+arquivo + linha em `thirdpartylegalnotices`).
 
 Abreviações de caminho:
 - **DA** = `refs/double-action/mp/src/game` (Double Action: Boogaloo, SDK 2013, código vivo)
@@ -346,4 +344,4 @@ Nada supera nosso NextBot. Duas ideias pequenas: ao travar, `area->IncreaseDange
 
 No topo do arquivo: `// Adaptado de <projeto> (<arquivo original>), Source 1 SDK License.`
 e uma linha por projeto em `thirdpartylegalnotices`/LEIA-ME. Reescrever nomes de ConVar
-para `trok_*`. Nunca trazer `.res`, fontes, sons, materiais ou shaders deles.
+para `trok_*`.

@@ -11,7 +11,7 @@
   `game/mod_trok/`, eles ganham de todos.
 - `|appid_N|` é a pasta de instalação do jogo N na Steam (243750 = Source SDK Base 2013 MP,
   240 = CS:S). O jogo precisa estar instalado.
-- Redistribuição: o mod publicado não pode levar arquivos do CS:S; ele monta do jogo do jogador.
+- O mod monta os arquivos do CS:S do jogo do jogador.
 
 ## Tipos de arquivo
 
@@ -28,7 +28,7 @@
 - Sons de arma e passos vêm de "soundscripts" (`scripts/game_sounds_manifest.txt` lista os arquivos).
   No código: `EmitSound( "Trok.Arma.Tiro" )` e `PrecacheScriptSound` no `Precache()`.
 - Modelos e materiais do CS:S podem ser descompilados com o Crowbar para estudo e para usar de base
-  em conteúdo **seu**; publicar o derivado continua sujeito à licença do CS:S.
+  em conteúdo **seu**.
 
 ## Ferramentas (instalar no Windows de quem desenvolve)
 

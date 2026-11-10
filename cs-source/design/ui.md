@@ -70,4 +70,4 @@ Minimapa com imagem do mapa: precisa de uma imagem de cada mapa (por enquanto é
 6. Placar do TAB: feito (`client/trok/ui/trok_scoreboard.cpp`, troca o do HL2MP no
    `CreatePanelByName`). Falta: estilo do bot (o cliente não sabe), assistências, minimapa.
 7. Para portar mais widgets prontos (tabelas, campos de texto, rolagem), o NeoUI do NT;RE
-   (`neo_ui.cpp`, ~3700 linhas, mesma licença) é o atalho; o menu atual não depende dele.
+   (`neo_ui.cpp`, ~3700 linhas) é o atalho; o menu atual não depende dele.

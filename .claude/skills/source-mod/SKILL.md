@@ -19,17 +19,11 @@ registra no HANDOFF.md.
 Modos zumbi: a referência de jogabilidade é a **quarentena do Combat Arms** e depois os
 **zumbis do Call of Duty**, nunca os modos zumbi do CS (ver `cs-source/design/zumbi-referencias.md`).
 
-## Regra zero: só código legal
+## Regra zero
 
-- O código de jogo do CS:S (compra, bomba, movimento do CS, bots `CCSBot`) **não é público**.
-  Tudo o que for "do CS" é refeito do zero sobre o código do SDK.
-- **Nunca** use, copie, consulte ou "se inspire linha a linha" em código vazado:
-  vazamento de 2020 (CS:GO/TF2), `nillerusr/source-engine`, `kisak-strike`, `cstrike15_src`,
-  ou qualquer repositório que contenha `game/server/cstrike` ou o motor (`engine/`, `materialsystem/` completos).
-  Se o usuário apontar um, explique o motivo e recuse.
+- O código de jogo do CS:S (compra, bomba, movimento do CS, bots `CCSBot`) **não vem no SDK**.
+  Tudo o que for "do CS" é refeito sobre o código do SDK.
 - Conteúdo do CS:S (modelos, sons, mapas) é **montado** do jogo instalado (`|appid_240|` no gameinfo).
-  Redistribuir esses arquivos não é permitido.
-- Licença: Source 1 SDK License (uso gratuito, mod não comercial). Ver `cs-source/sdk/LICENSE`.
 
 ## Mapa da área
 

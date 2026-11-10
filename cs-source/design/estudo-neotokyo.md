@@ -1,9 +1,8 @@
 # Estudo: NEOTOKYO Rebuild (NT;RE) para o Trok
 
 Feito em 09/11/2026 lendo `refs/neotokyo-rebuild` (só código). Base deles: **Source SDK 2013 MP, update
-2025 do TF2**, a mesma do Trok. Licença: **Source 1 SDK License**, a mesma nossa: código pode ser
-reaproveitado **com crédito** (cabeçalho do arquivo + tela de créditos: "partes baseadas em NEOTOKYO
-Rebuild"). Arte, modelos, sons, fontes (`NHudOCR` etc.) e texturas deles **não** entram.
+2025 do TF2**, a mesma do Trok. Código reaproveitado leva **crédito** (cabeçalho do arquivo + tela de
+créditos: "partes baseadas em NEOTOKYO Rebuild").
 
 Abreviação de caminho: `NT:` = `refs/neotokyo-rebuild/src/game/`. `#ifdef NEO` marca cada mudança
 deles em arquivo da Valve (o equivalente ao nosso `#ifdef TROK` + `patches/sdk.patch`).

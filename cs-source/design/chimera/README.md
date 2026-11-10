@@ -2,13 +2,12 @@
 
 - **Origem:** https://github.com/r0pi0x/Chimera, commit `e84e415ff7a431e6b45c86656b989f692bbae202` (copiado em 10/11/2026).
 - **Licença:** MIT ou Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`). Crédito em `game/mod_trok/CREDITOS.txt`.
-- **Decisão do dono (10/11/2026):** usar como referência de números e regras, como o DeCombat; ele assume a responsabilidade.
-- **Atenção:** o Chimera foi escrito por IA e não tem revisão humana. Conferir com o DeCombat (`../decombat/`) e com
-  o jogo quando os números brigarem.
+- **Decisão do dono (10/11/2026):** usar como referência de números e regras, como o DeCombat.
+- **Atenção:** conferir com o DeCombat (`../decombat/`) e com o jogo quando os números brigarem.
 - **O que ficou de fora:**
   - o código Rust do motor dele;
   - `games/originals`, que são minigames próprios dele.
-- O `README-original.md` é o README do projeto, e o `THIRD_PARTY.md` traz as regras de terceiros dele.
+- O `README-original.md` é o README do projeto.
 - Unidades: as specs do CA usam as unidades do LithTech (Y para cima, mundo de cerca de 40 u por metro). Ver `specs/combat_arms/movement.md`.
 
 ## Onde achar cada coisa (o que mais serve ao Rearmed)

@@ -24,7 +24,7 @@ o que vem deles está marcado como "a conferir". São só sugestões: fazer quan
    - **Fonte:** spec `cs_source/nav.md` do Chimera, cruzada com `nav_file.cpp` do SDK. Não foi testado no jogo.
    - **O que fazer:** no de_dust2, rodar `nav_generate` e `nav_analyze` direto; ou testar primeiro num mapa v9; ou escrever um
      conversor que remova o byte.
-3. **Chimera, além das specs do CA** (MIT; escrito por IA e sem revisão humana):
+3. **Chimera, além das specs do CA:**
    - **`specs/cs_source/`:** 23 specs com números medidos num servidor real de CS:S:
      - **armas:** recoil, imprecisão (inclusive ao aterrissar), penetração;
      - **lentidão ao levar tiro:** 0,5 para pistola, SMG e acerto na perna; 0,65 para fuzil, sniper e escopeta;
@@ -40,7 +40,7 @@ o que vem deles está marcado como "a conferir". São só sugestões: fazer quan
 5. **Mapas (Fase 4):**
    - **Hammer++ do TF2 de 64 bits**, instalado no `bin\x64` do SDK Base (a versão "2013 MP" não é mais suportada).
    - **VRAD++** (ficool2).
-   - **CompilePal** e o plugin **AutoNav**, que gera o nav ao compilar. São GPL, mas usados só como ferramenta, então não contaminam o jogo.
+   - **CompilePal** e o plugin **AutoNav**, que gera o nav ao compilar.
    - **Slammin'** não serve no ramo TF2.
 6. **source-sdk-agent** (mixutin, 0BSD):
    - **O que é:** CLI e MCP com 40 ferramentas para Linux: compilar o jogo, editar VMF, VBSP/VVIS/VRAD, VTF/VMT/QC/VPK,
@@ -49,7 +49,7 @@ o que vem deles está marcado como "a conferir". São só sugestões: fazer quan
 7. **Anti-cheat no servidor sem plugin:**
    - **`sv_maxunlag`:** vem com 1,0 s; 0,25 limita o backtrack.
    - **Já no SDK:** `sv_maxusrcmdprocessticks`, `sv_max_usercmd_move_magnitude`.
-   - **Ideias do Little Anti-Cheat e do StAC** (tick_count, cmdnum, ângulos, aimsnap). São GPL: só a ideia, nunca o código.
+   - **Ideias do Little Anti-Cheat e do StAC** (tick_count, cmdnum, ângulos, aimsnap).
 8. **Distribuição:**
    - **Steam (a conferir):** mod grátis exige a papelada do Steamworks e a taxa do app (~US$ 100). O TF2 Classified saiu em
      jan/2026 depois de uma revisão lenta, e a Valve pediu troca de nome.
@@ -62,15 +62,8 @@ o que vem deles está marcado como "a conferir". São só sugestões: fazer quan
 
 ## Outros achados
 - **Base de correções do HL2MP para o SDK 2025:** Alienmario/ssdk13-hl2dm-coop-base (licença do SDK).
-- **Referência de números e lógica (CS 1.5 refeito, ISC):** FreeCS. ReGameDLL_CS tem origem cinzenta: só números e ideias.
+- **Referência de números e lógica (CS 1.5 refeito, ISC):** FreeCS.
 - **VScript do TF2:** TweenVS (MIT), sw-zombie-fortress (modo zumbi em VScript), tf2_freezetag.
 - **Leitor de `.nav`:** `mzdw89/navmesh-parser` (MIT).
 - **O que não existe:** subtick em Source 1, Steam Audio pronto para Source e framework aberto de armas fora o NT;RE.
 - **Remakes de mapas do CA:** só um Oil Rig (oficina do CS:GO/GMod), como referência de layout.
-
-## Não usar
-- **Código de jogo do CS:S** (nunca liberado; aparece vazado): vrad258/cstrike_sdk2013, StargateCoalition/sgcs,
-  blackletum/cstrike-sdk-2013, SanyaSho/source-sdk-2013-hl1 ("leaked") e SourceSDK2013Ports/NextBot.
-- **Descompilações:** cod4-decomp, cod3_REcomp. ReFoF é derivado de binário fechado.
-- **GPL** (não misturar com código sob a licença do SDK; só ideias): BrainBread2, InsurgencyClassic, TF2Vintage, NavBot,
-  plugins do SourceMod.
