@@ -13,6 +13,7 @@
 	#include "trok/weapon_trok_gun.h"
 	#include "NextBot/NextBotInterface.h"
 	#include "NextBot/NextBotIntentionInterface.h"
+	#include "filesystem.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -89,6 +90,11 @@ CTrokRules::CTrokRules()
 		m_bTeamPlayEnabled = true;
 		engine->ServerCommand( "exec equipe.cfg\n" );
 	}
+
+	// Partida criada pelo menu (CRIAR PARTIDA): meta, tempo, nome e senha escolhidos vêm por cima do cfg
+	// do modo. O menu escreve este arquivo ao criar e o apaga ao jogar contra bots pelo JOGAR.
+	if ( filesystem->FileExists( "cfg/partida_menu.cfg", "MOD" ) )
+		engine->ServerCommand( "exec partida_menu.cfg\n" );
 #endif
 }
 

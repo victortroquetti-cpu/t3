@@ -13,9 +13,8 @@
 // O desenho é imediato: Run() desenha (MODE_PAINT) e trata o clique (MODE_CLICK)
 // com o mesmo código, então o que se vê é exatamente onde se clica.
 //
-// CONFIGURAÇÕES é própria (abas Jogo, Vídeo, Áudio e Controles, mais abaixo). Ainda do
-// GameUI (pendências em design/ui.md): lista de servidores, criar servidor e caixas de
-// confirmação. A tela de carregamento é trok_loading.cpp.
+// CONFIGURAÇÕES e CRIAR PARTIDA são próprias (mais abaixo). Ainda do GameUI (pendências em
+// design/ui.md): lista de servidores e caixas de confirmação. A tela de carregamento é trok_loading.cpp.
 //=============================================================================
 
 #include "cbase.h"
@@ -29,6 +28,7 @@
 #include "materialsystem/imaterialsystem.h"
 #include "materialsystem/materialsystem_config.h"
 #include "inputsystem/iinputsystem.h"
+#include "tier1/utlbuffer.h"
 #include <vgui/ISurface.h>
 #include <vgui/IVGui.h>
 #include <vgui/IScheme.h>
@@ -47,6 +47,14 @@ static ConVar trok_ui_bots_por_time( "trok_ui_bots_por_time", "5", FCVAR_ARCHIVE
 static ConVar trok_ui_bots_estilos( "trok_ui_bots_estilos", "31", FCVAR_ARCHIVE, "Menu: estilos marcados (bits: equilibrado, entry, lurker, ancora, suporte)." );
 static ConVar trok_ui_mapa( "trok_ui_mapa", "", FCVAR_ARCHIVE, "Menu: último mapa escolhido." );
 static ConVar trok_ui_modo( "trok_ui_modo", "0", FCVAR_ARCHIVE, "Menu: modo escolhido (0 = mata-mata em equipe, 1 = exército solo, 2 = Surto)." );
+// CRIAR PARTIDA (0 na meta ou no tempo = o valor do cfg do modo)
+static ConVar trok_ui_criar_nome( "trok_ui_criar_nome", "Sala Rearmed", FCVAR_ARCHIVE, "Criar partida: nome da sala." );
+static ConVar trok_ui_criar_senha( "trok_ui_criar_senha", "", 0, "Criar partida: senha (não fica salva)." );
+static ConVar trok_ui_criar_online( "trok_ui_criar_online", "1", FCVAR_ARCHIVE, "Criar partida: 1 = aberta na internet, 0 = só rede local/VPN." );
+static ConVar trok_ui_criar_jogadores( "trok_ui_criar_jogadores", "12", FCVAR_ARCHIVE, "Criar partida: máximo de jogadores." );
+static ConVar trok_ui_criar_meta( "trok_ui_criar_meta", "0", FCVAR_ARCHIVE, "Criar partida: meta de abates (0 = a do modo)." );
+static ConVar trok_ui_criar_tempo( "trok_ui_criar_tempo", "0", FCVAR_ARCHIVE, "Criar partida: tempo em minutos (0 = o do modo)." );
+static ConVar trok_ui_criar_bots( "trok_ui_criar_bots", "1", FCVAR_ARCHIVE, "Criar partida: completar as vagas com bots." );
 // Sons do menu por caminho (no menu não há mapa carregado, então não dá para usar os nomes do
 // game_sounds_trok.txt). TROCAR por sound/trok/ui/... quando houver sons próprios.
 static ConVar trok_ui_som_clique( "trok_ui_som_clique", "ui/buttonclick.wav", FCVAR_ARCHIVE, "Som do clique no menu (dentro de sound/). Vazio = sem som." );
@@ -109,6 +117,7 @@ public:
 	}
 	virtual void OnKeyCodeTyped( KeyCode code );
 	virtual void OnKeyCodePressed( KeyCode code );
+	virtual void OnKeyTyped( wchar_t unichar );
 private:
 	CTrokMenu *m_pMenu;
 };
@@ -120,7 +129,7 @@ class CTrokMenu : public Panel
 {
 	DECLARE_CLASS_SIMPLE( CTrokMenu, Panel );
 public:
-	enum State_t { STATE_ROOT = 0, STATE_PLAY, STATE_OPTIONS };
+	enum State_t { STATE_ROOT = 0, STATE_PLAY, STATE_OPTIONS, STATE_CREATE };
 
 	CTrokMenu();
 	virtual ~CTrokMenu();
@@ -132,6 +141,8 @@ public:
 	bool IsCapturingKey( void ) const { return m_eState == STATE_OPTIONS && m_iCapture >= 0; }
 	void CaptureButton( ButtonCode_t code );
 	// A tecla capturada também chega depois como "digitada": não pode virar ESC/Enter do menu.
+	bool IsEditingText( void ) const { return m_eState == STATE_CREATE && m_iTextField >= 0; }
+	void OnRelayedChar( wchar_t ch );
 	bool SwallowTyped( KeyCode code ) { const bool b = ( code == m_eSwallowTyped ); m_eSwallowTyped = BUTTON_CODE_INVALID; return b; }
 
 protected:
@@ -174,7 +185,10 @@ private:
 	void RunRoot( void );
 	void RunPlay( void );
 	void RunOptions( void );
+	void RunCreate( void );
+	void RunMapPanel( int mx, int top, int mw, int bottom );
 	void RunBottomBar( void );
+	bool TextField( int iField, int x, int y, int w, const char *pszValue, bool bHidden );
 
 	// Configurações: uma linha por opção (rótulo à esquerda, controle à direita)
 	void OptHeader( int x, int &y, int w, const char *pszText );
@@ -187,6 +201,7 @@ private:
 	// Ações
 	void Command( const char *pszGameUICommand );
 	void StartBotGame( void );
+	void StartCreatedGame( void );
 	void BuildMapList( void );
 
 	CTrokMenuInput *m_pInput;
@@ -212,6 +227,10 @@ private:
 	bool m_bVideoWindowed;	// modo escolhido (ainda não aplicado)
 	bool m_bVideoPending;
 	ButtonCode_t m_eSwallowTyped;
+
+	// Criar partida: campo de texto em edição (-1 = nenhum, 0 = nome, 1 = senha)
+	int m_iTextField;
+	char m_szText[ 64 ];
 
 	// Jogar contra bots
 	CUtlVector< CUtlString > m_Maps;
@@ -243,6 +262,12 @@ void CTrokMenuInput::OnKeyCodeTyped( KeyCode code )
 	if ( m_pMenu->IsCapturingKey() || m_pMenu->SwallowTyped( code ) )
 		return; // tratada no OnKeyCodePressed (que também recebe Shift, Ctrl e Alt)
 	m_pMenu->OnRelayedKey( code );
+}
+
+void CTrokMenuInput::OnKeyTyped( wchar_t unichar )
+{
+	if ( m_pMenu->IsEditingText() )
+		m_pMenu->OnRelayedChar( unichar );
 }
 
 void CTrokMenuInput::OnKeyCodePressed( KeyCode code )
@@ -278,6 +303,8 @@ CTrokMenu::CTrokMenu() : BaseClass( NULL, "TrokMenu" )
 	m_bVideoWindowed = false;
 	m_bVideoPending = false;
 	m_eSwallowTyped = BUTTON_CODE_INVALID;
+	m_iTextField = -1;
+	m_szText[ 0 ] = 0;
 
 	SetProportional( false );
 	SetPaintBackgroundEnabled( false );
@@ -373,9 +400,14 @@ void CTrokMenu::SetState( State_t eState )
 	}
 	if ( eState == STATE_OPTIONS && m_eState != STATE_OPTIONS )
 		BuildVideoModes();
+	if ( m_eState == STATE_CREATE && m_iTextField >= 0 )
+	{
+		( m_iTextField == 0 ? trok_ui_criar_nome : trok_ui_criar_senha ).SetValue( m_szText );
+		m_iTextField = -1;
+	}
 	m_eState = eState;
 	m_iLastHoverId = -1;
-	if ( eState == STATE_PLAY )
+	if ( eState == STATE_PLAY || eState == STATE_CREATE )
 		BuildMapList();
 	m_pInput->RequestFocus();
 }
@@ -424,6 +456,24 @@ void CTrokMenu::OnRelayedKey( KeyCode code )
 		m_iCapture = -1;
 		return;
 	}
+	if ( IsEditingText() )
+	{
+		const int iLen = V_strlen( m_szText );
+		if ( code == KEY_BACKSPACE && iLen > 0 )
+		{
+			// apaga um caractere UTF-8 inteiro
+			int i = iLen - 1;
+			while ( i > 0 && ( m_szText[ i ] & 0xC0 ) == 0x80 )
+				--i;
+			m_szText[ i ] = 0;
+		}
+		else if ( code == KEY_ENTER || code == KEY_PAD_ENTER || code == KEY_ESCAPE || code == KEY_TAB )
+		{
+			( m_iTextField == 0 ? trok_ui_criar_nome : trok_ui_criar_senha ).SetValue( m_szText );
+			m_iTextField = -1;
+		}
+		return;
+	}
 	if ( code == KEY_ESCAPE && m_eState != STATE_ROOT )
 	{
 		SetState( STATE_ROOT );
@@ -432,6 +482,11 @@ void CTrokMenu::OnRelayedKey( KeyCode code )
 	if ( ( code == KEY_ENTER || code == KEY_PAD_ENTER ) && m_eState == STATE_PLAY )
 	{
 		StartBotGame();
+		return;
+	}
+	if ( ( code == KEY_ENTER || code == KEY_PAD_ENTER ) && m_eState == STATE_CREATE )
+	{
+		StartCreatedGame();
 		return;
 	}
 	if ( code == KEY_BACKQUOTE )
@@ -610,6 +665,7 @@ void CTrokMenu::Run( Mode_t eMode )
 	{
 	case STATE_PLAY: RunPlay(); break;
 	case STATE_OPTIONS: RunOptions(); break;
+	case STATE_CREATE: RunCreate(); break;
 	default: RunRoot(); break;
 	}
 
@@ -690,7 +746,7 @@ void CTrokMenu::RunRoot( void )
 		if ( MenuItem( 2, x0, y, "02", "SERVIDORES", NULL, false ) )
 			Command( "OpenServerBrowser" );
 		if ( MenuItem( 3, x0, y, "03", "CRIAR PARTIDA", NULL, false ) )
-			Command( "OpenCreateMultiplayerGameDialog" );
+			SetState( STATE_CREATE );
 		if ( MenuItem( 4, x0, y, "04", "CONFIGURAÇÕES", NULL, false ) )
 			SetState( STATE_OPTIONS );
 		if ( MenuItem( 5, x0, y, "05", "SAIR", NULL, false ) )
@@ -746,7 +802,10 @@ void CTrokMenu::RunPlay( void )
 				if ( i == 1 )
 					Command( "OpenServerBrowser" );
 				else if ( i == 2 )
-					Command( "OpenCreateMultiplayerGameDialog" );
+				{
+					SetState( STATE_CREATE );
+					return;
+				}
 			}
 		}
 	}
@@ -754,30 +813,7 @@ void CTrokMenu::RunPlay( void )
 	const int top = S( 252 ), bottom = m_iTall - S( 72 );
 
 	// Mapa
-	{
-		const int mw = S( 420 ), mx = x0;
-		Rect( mx, top, mw, bottom - top, COR_PAINEL );
-		Outline( mx, top, mw, bottom - top, COR_LINHA );
-		const int iInfoTall = S( 96 );
-		Rect( mx + 1, top + 1, mw - 2, bottom - top - iInfoTall, Color( 23, 30, 38, 255 ) );
-		Label( mx + S( 14 ), top + S( 12 ), "[foto do mapa]" );
-
-		const int iy = bottom - iInfoTall + S( 16 );
-		Label( mx + S( 18 ), iy, "MAPA" );
-		const char *pszMap = m_Maps.Count() ? m_Maps[ m_iMap ].Get() : "nenhum mapa encontrado";
-		char szUpper[ 128 ];
-		V_strncpy( szUpper, pszMap, sizeof( szUpper ) );
-		V_strupr( szUpper );
-		TextSpaced( m_hItem, mx + S( 18 ), iy + S( 16 ), COR_TEXTO, szUpper, S( 1 ) );
-		if ( m_Maps.Count() && !m_MapHasNav[ m_iMap ] )
-			Text( m_hSmall, mx + S( 18 ), iy + S( 56 ), COR_TEXTO3, "Sem nav mesh: os bots geram na primeira vez (demora)." );
-
-		const int bs = S( 34 );
-		if ( BoxButton( mx + mw - S( 18 ) - bs * 2 - S( 6 ), iy + S( 14 ), bs, bs, m_hButton, "‹", false, false ) && m_Maps.Count() )
-			m_iMap = ( m_iMap + m_Maps.Count() - 1 ) % m_Maps.Count();
-		if ( BoxButton( mx + mw - S( 18 ) - bs, iy + S( 14 ), bs, bs, m_hButton, "›", false, false ) && m_Maps.Count() )
-			m_iMap = ( m_iMap + 1 ) % m_Maps.Count();
-	}
+	RunMapPanel( x0, top, S( 420 ), bottom );
 
 	// Configuração da partida
 	{
@@ -854,6 +890,33 @@ void CTrokMenu::RunPlay( void )
 	}
 }
 
+void CTrokMenu::RunMapPanel( int mx, int top, int mw, int bottom )
+{
+	{
+		Rect( mx, top, mw, bottom - top, COR_PAINEL );
+		Outline( mx, top, mw, bottom - top, COR_LINHA );
+		const int iInfoTall = S( 96 );
+		Rect( mx + 1, top + 1, mw - 2, bottom - top - iInfoTall, Color( 23, 30, 38, 255 ) );
+		Label( mx + S( 14 ), top + S( 12 ), "[foto do mapa]" );
+
+		const int iy = bottom - iInfoTall + S( 16 );
+		Label( mx + S( 18 ), iy, "MAPA" );
+		const char *pszMap = m_Maps.Count() ? m_Maps[ m_iMap ].Get() : "nenhum mapa encontrado";
+		char szUpper[ 128 ];
+		V_strncpy( szUpper, pszMap, sizeof( szUpper ) );
+		V_strupr( szUpper );
+		TextSpaced( m_hItem, mx + S( 18 ), iy + S( 16 ), COR_TEXTO, szUpper, S( 1 ) );
+		if ( m_Maps.Count() && !m_MapHasNav[ m_iMap ] )
+			Text( m_hSmall, mx + S( 18 ), iy + S( 56 ), COR_TEXTO3, "Sem nav mesh: os bots geram na primeira vez (demora)." );
+
+		const int bs = S( 34 );
+		if ( BoxButton( mx + mw - S( 18 ) - bs * 2 - S( 6 ), iy + S( 14 ), bs, bs, m_hButton, "‹", false, false ) && m_Maps.Count() )
+			m_iMap = ( m_iMap + m_Maps.Count() - 1 ) % m_Maps.Count();
+		if ( BoxButton( mx + mw - S( 18 ) - bs, iy + S( 14 ), bs, bs, m_hButton, "›", false, false ) && m_Maps.Count() )
+			m_iMap = ( m_iMap + 1 ) % m_Maps.Count();
+	}
+}
+
 void CTrokMenu::RunBottomBar( void )
 {
 	const int h = S( 48 );
@@ -864,7 +927,9 @@ void CTrokMenu::RunBottomBar( void )
 	Text( m_hSmall, S( 64 ), ty, COR_TEXTO3, "Protótipo · Source SDK 2013" );
 
 	int x = m_iWide - S( 56 ) - S( 300 );
-	if ( m_eState == STATE_PLAY )
+	if ( IsEditingText() )
+		KeyHint( x, ty, "ENTER", "Confirmar" );
+	else if ( m_eState == STATE_PLAY || m_eState == STATE_CREATE )
 		KeyHint( x, ty, "ENTER", "Iniciar" );
 	else if ( IsCapturingKey() )
 		KeyHint( x, ty, "TECLA", "Definir" );
@@ -1274,6 +1339,244 @@ void CTrokMenu::RunOptions( void )
 }
 
 //-----------------------------------------------------------------------------
+// Criar partida (substitui a janela do motor)
+//-----------------------------------------------------------------------------
+
+// Tira o que quebraria o comando do console (aspas, ponto e vírgula, quebras de linha).
+static void TrokLimparTexto( const char *pszIn, char *pszOut, int iOutSize )
+{
+	int o = 0;
+	for ( const char *p = pszIn; *p && o < iOutSize - 1; ++p )
+	{
+		if ( *p == '"' || *p == ';' || *p == '\n' || *p == '\r' || *p == '\\' )
+			continue;
+		pszOut[ o++ ] = *p;
+	}
+	pszOut[ o ] = 0;
+}
+
+void CTrokMenu::OnRelayedChar( wchar_t ch )
+{
+	if ( !IsEditingText() || ch < 32 || ch == 127 )
+		return;
+	char szChar[ 8 ];
+	const wchar_t wsz[ 2 ] = { ch, 0 };
+	V_UnicodeToUTF8( wsz, szChar, sizeof( szChar ) );
+	if ( szChar[ 0 ] == '"' || szChar[ 0 ] == ';' || szChar[ 0 ] == '\\' )
+		return;
+	if ( V_strlen( m_szText ) + V_strlen( szChar ) < (int)sizeof( m_szText ) - 1 && V_strlen( m_szText ) < 40 )
+		V_strncat( m_szText, szChar, sizeof( m_szText ) );
+}
+
+// Caixa de texto: clicar começa a editar; o texto da edição vem de OnRelayedChar.
+bool CTrokMenu::TextField( int iField, int x, int y, int w, const char *pszValue, bool bHidden )
+{
+	const int h = S( 34 );
+	const bool bEditing = ( m_iTextField == iField );
+	const bool bHover = Hover( x, y, w, h );
+	Rect( x, y, w, h, Color( 11, 13, 16, 200 ) );
+	Outline( x, y, w, h, bEditing ? Accent() : ( bHover ? COR_LINHA_FORTE : COR_LINHA ) );
+	char szShow[ 80 ];
+	const char *pszText = bEditing ? m_szText : pszValue;
+	if ( bHidden && !bEditing )
+	{
+		const int n = MIN( V_strlen( pszText ), 30 );
+		for ( int i = 0; i < n; ++i ) szShow[ i ] = '*';
+		szShow[ n ] = 0;
+	}
+	else
+		V_strncpy( szShow, pszText, sizeof( szShow ) );
+	if ( bEditing && ( (int)( Plat_FloatTime() * 2.0 ) & 1 ) )
+		V_strncat( szShow, "|", sizeof( szShow ) );
+	if ( !szShow[ 0 ] && !bEditing )
+		Text( m_hBody, x + S( 10 ), y + ( h - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO3, bHidden ? "sem senha" : "" );
+	else
+		Text( m_hBody, x + S( 10 ), y + ( h - surface()->GetFontTall( m_hBody ) ) / 2, COR_TEXTO, szShow );
+	if ( Clicked( x, y, w, h ) && !bEditing )
+	{
+		if ( m_iTextField >= 0 )
+			( m_iTextField == 0 ? trok_ui_criar_nome : trok_ui_criar_senha ).SetValue( m_szText );
+		m_iTextField = iField;
+		V_strncpy( m_szText, pszValue, sizeof( m_szText ) );
+		return true;
+	}
+	return false;
+}
+
+void CTrokMenu::RunCreate( void )
+{
+	const int x0 = S( 64 );
+	const int xr = m_iWide - S( 56 );
+
+	if ( LinkButton( x0, S( 52 ), m_hSmall, "‹ VOLTAR" ) )
+	{
+		SetState( STATE_ROOT );
+		return;
+	}
+	const int iSep = x0 + TextWide( m_hSmall, "‹ VOLTAR" ) + S( 20 );
+	Rect( iSep, S( 46 ), 1, S( 22 ), COR_LINHA_FORTE );
+	TextSpaced( m_hTitle, iSep + S( 21 ), S( 36 ), COR_TEXTO, "CRIAR PARTIDA", S( 3 ) );
+	Text( m_hBody, x0, S( 96 ), COR_TEXTO2, "Seu servidor, suas regras. Os amigos entram pelo seu IP (veja o LEIA-ME: JOGAR COM AMIGOS)." );
+
+	const int top = S( 128 ), bottom = m_iTall - S( 72 );
+	RunMapPanel( x0, top, S( 380 ), bottom );
+
+	const int px = x0 + S( 380 ) + S( 16 ), pw = xr - px;
+	Rect( px, top, pw, bottom - top, COR_PAINEL );
+	Outline( px, top, pw, bottom - top, COR_LINHA );
+	const int ix = px + S( 24 ), iw = pw - S( 48 );
+	const int iHalf = ( iw - S( 24 ) ) / 2;
+	int y = top + S( 18 );
+
+	// Modo
+	Label( ix, y, "MODO" );
+	{
+		const char *pszModos[] = { "EQUIPE", "EXÉRCITO SOLO", "SURTO" };
+		const int iModo = clamp( trok_ui_modo.GetInt(), 0, 2 );
+		const int mw = ( iw - S( 12 ) ) / 3;
+		for ( int i = 0; i < 3; ++i )
+		{
+			if ( BoxButton( ix + i * ( mw + S( 6 ) ), y + S( 18 ), mw, S( 34 ), m_hButton, pszModos[ i ], i == iModo, i == iModo ) )
+				trok_ui_modo.SetValue( i );
+		}
+	}
+	y += S( 66 );
+
+	// Nome e senha
+	Label( ix, y, "NOME DA SALA" );
+	Label( ix + iHalf + S( 24 ), y, "SENHA (OPCIONAL)" );
+	TextField( 0, ix, y + S( 18 ), iHalf, trok_ui_criar_nome.GetString(), false );
+	TextField( 1, ix + iHalf + S( 24 ), y + S( 18 ), iHalf, trok_ui_criar_senha.GetString(), true );
+	y += S( 66 );
+
+	// Online e jogadores
+	int iDir = 0;
+	{
+		const int iCol = ix + iHalf + S( 24 );
+		Label( ix, y, "QUEM PODE ENTRAR" );
+		const bool bOnline = trok_ui_criar_online.GetBool();
+		const int bw = ( iHalf - S( 6 ) ) / 2;
+		if ( BoxButton( ix, y + S( 18 ), bw, S( 34 ), m_hButton, "INTERNET", bOnline, bOnline ) )
+			trok_ui_criar_online.SetValue( 1 );
+		if ( BoxButton( ix + bw + S( 6 ), y + S( 18 ), bw, S( 34 ), m_hButton, "REDE LOCAL / VPN", !bOnline, !bOnline ) )
+			trok_ui_criar_online.SetValue( 0 );
+
+		Label( iCol, y, "MÁXIMO DE JOGADORES" );
+		int yy = y + S( 18 ) - S( 0 );
+		char szN[ 16 ];
+		const int iJog = clamp( trok_ui_criar_jogadores.GetInt(), 2, 32 );
+		V_snprintf( szN, sizeof( szN ), "%d", iJog );
+		if ( OptCycle( iCol, yy, iHalf, "", szN, iDir ) )
+			trok_ui_criar_jogadores.SetValue( clamp( iJog + iDir * 2, 2, 32 ) );
+	}
+	y += S( 66 );
+
+	// Meta e tempo
+	{
+		static const int s_Metas[] = { 0, 30, 50, 80, 100, 150 };
+		static const int s_Tempos[] = { 0, 5, 10, 15, 20, 30 };
+		const bool bSurto = trok_ui_modo.GetInt() == 2;
+		int iMeta = 0, iTempo = 0;
+		for ( int i = 0; i < ARRAYSIZE( s_Metas ); ++i ) if ( trok_ui_criar_meta.GetInt() == s_Metas[ i ] ) iMeta = i;
+		for ( int i = 0; i < ARRAYSIZE( s_Tempos ); ++i ) if ( trok_ui_criar_tempo.GetInt() == s_Tempos[ i ] ) iTempo = i;
+		char szMeta[ 32 ], szTempo[ 32 ];
+		if ( s_Metas[ iMeta ] ) V_snprintf( szMeta, sizeof( szMeta ), "%d ABATES", s_Metas[ iMeta ] ); else V_strncpy( szMeta, "DO MODO", sizeof( szMeta ) );
+		if ( s_Tempos[ iTempo ] ) V_snprintf( szTempo, sizeof( szTempo ), "%d MIN", s_Tempos[ iTempo ] ); else V_strncpy( szTempo, "DO MODO", sizeof( szTempo ) );
+
+		int yl = y, yr = y;
+		if ( !bSurto )
+		{
+			Label( ix, y, "META DE ABATES" );
+			yl += S( 18 );
+			if ( OptCycle( ix, yl, iHalf, "", szMeta, iDir ) )
+				trok_ui_criar_meta.SetValue( s_Metas[ ( iMeta + iDir + ARRAYSIZE( s_Metas ) ) % ARRAYSIZE( s_Metas ) ] );
+			Label( ix + iHalf + S( 24 ), y, "TEMPO DA PARTIDA" );
+			yr += S( 18 );
+			if ( OptCycle( ix + iHalf + S( 24 ), yr, iHalf, "", szTempo, iDir ) )
+				trok_ui_criar_tempo.SetValue( s_Tempos[ ( iTempo + iDir + ARRAYSIZE( s_Tempos ) ) % ARRAYSIZE( s_Tempos ) ] );
+		}
+		else
+		{
+			Text( m_hSmall, ix, y + S( 6 ), COR_TEXTO3, "No Surto, os tempos da rodada vêm do cfg/surto.cfg." );
+			yl += S( 30 );
+		}
+		y = MAX( yl, yr ) + S( 10 );
+	}
+
+	// Bots
+	{
+		Label( ix, y, "BOTS" );
+		const bool bBots = trok_ui_criar_bots.GetBool();
+		const int bw = S( 150 );
+		if ( BoxButton( ix, y + S( 18 ), bw, S( 34 ), m_hButton, bBots ? "COMPLETAR VAGAS" : "SEM BOTS", bBots, false ) )
+			trok_ui_criar_bots.SetValue( bBots ? 0 : 1 );
+		if ( bBots )
+		{
+			const int iNivel = clamp( trok_ui_bots_dificuldade.GetInt(), 0, 3 );
+			const int sx = ix + bw + S( 18 );
+			const int sw = ( iw - bw - S( 18 ) - S( 18 ) ) / 4;
+			for ( int i = 0; i < 4; ++i )
+			{
+				if ( BoxButton( sx + i * ( sw + S( 6 ) ), y + S( 18 ), sw, S( 34 ), m_hButton, s_pszNivelRotulo[ i ], i == iNivel, i == iNivel ) )
+					trok_ui_bots_dificuldade.SetValue( i );
+			}
+		}
+	}
+
+	// Criar
+	const int gw = S( 180 ), gh = S( 52 );
+	const int gy = bottom - S( 24 ) - gh;
+	Text( m_hSmall, ix, gy + ( gh - surface()->GetFontTall( m_hSmall ) ) / 2, COR_TEXTO3,
+		trok_ui_criar_online.GetBool() ? "Internet: libere a porta 27015 no roteador ou use uma VPN grátis." : "Só quem estiver na mesma rede ou VPN vê a sala." );
+	if ( BoxButton( px + pw - S( 24 ) - gw, gy, gw, gh, m_hHeading, "CRIAR", true, true ) )
+		StartCreatedGame();
+}
+
+void CTrokMenu::StartCreatedGame( void )
+{
+	if ( !m_Maps.Count() )
+		return;
+	if ( m_iTextField >= 0 )
+	{
+		( m_iTextField == 0 ? trok_ui_criar_nome : trok_ui_criar_senha ).SetValue( m_szText );
+		m_iTextField = -1;
+	}
+	const char *pszMap = m_Maps[ m_iMap ].Get();
+	trok_ui_mapa.SetValue( pszMap );
+
+	char szNome[ 64 ], szSenha[ 64 ];
+	TrokLimparTexto( trok_ui_criar_nome.GetString(), szNome, sizeof( szNome ) );
+	TrokLimparTexto( trok_ui_criar_senha.GetString(), szSenha, sizeof( szSenha ) );
+	if ( !szNome[ 0 ] )
+		V_strncpy( szNome, "Sala Rearmed", sizeof( szNome ) );
+	const bool bOnline = trok_ui_criar_online.GetBool();
+	const int iJog = clamp( trok_ui_criar_jogadores.GetInt(), 2, 32 );
+
+	// As escolhas desta tela vão para cfg/partida_menu.cfg, que o servidor executa depois do cfg do
+	// modo (trok_gamerules.cpp); assim a meta e o tempo daqui não são sobrescritos.
+	CUtlBuffer buf( 0, 0, CUtlBuffer::TEXT_BUFFER );
+	buf.Printf( "// Escrito pelo menu CRIAR PARTIDA. Apagado ao jogar pelo JOGAR.\n" );
+	buf.Printf( "hostname \"%s\"\n", szNome );
+	buf.Printf( "sv_password \"%s\"\n", szSenha );
+	buf.Printf( "sv_lan %d\n", bOnline ? 0 : 1 );
+	if ( trok_ui_criar_meta.GetInt() > 0 && trok_ui_modo.GetInt() != 2 )
+		buf.Printf( "mp_fraglimit %d\n", trok_ui_criar_meta.GetInt() );
+	if ( trok_ui_criar_tempo.GetInt() > 0 && trok_ui_modo.GetInt() != 2 )
+		buf.Printf( "mp_timelimit %d\n", trok_ui_criar_tempo.GetInt() );
+	g_pFullFileSystem->WriteFile( "cfg/partida_menu.cfg", "MOD", buf );
+
+	// Partida para outras pessoas: o online.cfg (sem trapaças) passa a valer em cada mapa.
+	char szCmd[ 1024 ];
+	V_snprintf( szCmd, sizeof( szCmd ),
+		"progress_enable; disconnect; exec online; trok_modo %s; hl2mp_bot_difficulty %d; "
+		"hl2mp_bot_quota %d; hl2mp_bot_quota_mode fill; maxplayers %d; map %s\n",
+		( trok_ui_modo.GetInt() == 2 ) ? "surto" : ( trok_ui_modo.GetInt() == 1 ? "solo" : "equipe" ),
+		clamp( trok_ui_bots_dificuldade.GetInt(), 0, 3 ),
+		trok_ui_criar_bots.GetBool() ? MAX( 1, iJog - 2 ) : 0, iJog, pszMap ); // "fill": sobram 2 vagas; cada amigo que entra tira um bot
+	engine->ClientCmd_Unrestricted( szCmd );
+}
+
+//-----------------------------------------------------------------------------
 // Ações
 //-----------------------------------------------------------------------------
 void CTrokMenu::Command( const char *pszGameUICommand )
@@ -1335,6 +1638,10 @@ void CTrokMenu::StartBotGame( void )
 	const char *pszMap = m_Maps[ m_iMap ].Get();
 	trok_ui_mapa.SetValue( pszMap );
 
+	// Partida contra bots: sem as regras de uma sala criada antes.
+	if ( g_pFullFileSystem->FileExists( "cfg/partida_menu.cfg", "MOD" ) )
+		g_pFullFileSystem->RemoveFile( "cfg/partida_menu.cfg", "MOD" );
+
 	const int iNivel = clamp( trok_ui_bots_dificuldade.GetInt(), 0, 3 );
 	const int iPorTime = clamp( trok_ui_bots_por_time.GetInt(), 1, 16 );
 	const int iMask = trok_ui_bots_estilos.GetInt();
@@ -1353,7 +1660,7 @@ void CTrokMenu::StartBotGame( void )
 	// "fill": a cota conta o jogador, então os dois times ficam com iPorTime cada.
 	char szCmd[ 1024 ];
 	V_snprintf( szCmd, sizeof( szCmd ),
-		"progress_enable; trok_modo %s; hl2mp_bot_difficulty %d; trok_bot_estilo \"\"; trok_bot_estilos \"%s\"; "
+		"progress_enable; lservercfgfile listenserver.cfg; trok_modo %s; hl2mp_bot_difficulty %d; trok_bot_estilo \"\"; trok_bot_estilos \"%s\"; "
 		"hl2mp_bot_quota %d; hl2mp_bot_quota_mode fill; maxplayers %d; map %s\n",
 		( trok_ui_modo.GetInt() == 2 ) ? "surto" : ( trok_ui_modo.GetInt() == 1 ? "solo" : "equipe" ), iNivel, szEstilos, iPorTime * 2, MIN( 32, iPorTime * 2 + 2 ), pszMap );
 	engine->ClientCmd_Unrestricted( szCmd );
