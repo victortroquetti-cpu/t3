@@ -29,7 +29,7 @@ namespace TrokUI
 	const Color COR_LINHA_FORTE( 255, 255, 255, 60 );
 	const Color COR_ALIADO( 90, 162, 255, 255 );
 	const Color COR_INIMIGO( 255, 90, 90, 255 );
-	const Color COR_ZUMBI( 140, 224, 90, 255 );
+	const Color COR_ZUMBI( 217, 54, 43, 255 );	// infecção = vermelho (decisão do dono)
 
 	Color Destaque( void )
 	{

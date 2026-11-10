@@ -323,7 +323,7 @@ void CTrokScoreboard::Paint( void )
 		// No Surto os lados mudam durante a rodada: nomes fixos.
 		const int iRows = MAX( 1, ( sh - y - S( 120 ) ) / 2 / S( 34 ) );
 		y += PaintTeam( x, y, w, TEAM_TROK_HUMANOS, "HUMANOS", COR_ALIADO, iRows ) + S( 16 );
-		y += PaintTeam( x, y, w, TEAM_TROK_ZUMBIS, "INFECTADOS", Color( 140, 224, 90, 255 ), iRows ) + S( 16 );
+		y += PaintTeam( x, y, w, TEAM_TROK_ZUMBIS, "INFECTADOS", Color( 217, 54, 43, 255 ), iRows ) + S( 16 );
 	}
 	else if ( bTeams )
 	{

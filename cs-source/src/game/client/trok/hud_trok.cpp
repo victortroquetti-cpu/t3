@@ -54,7 +54,7 @@ static const Color COR_ALIADO( 90, 162, 255, 255 );
 static const Color COR_INIMIGO( 255, 90, 90, 255 );
 static const Color COR_DESTAQUE_PADRAO( 242, 181, 68, 255 );
 static const Color COR_FUNDO( 11, 13, 16, 255 );
-static const Color COR_ZUMBI( 140, 224, 90, 255 );
+static const Color COR_ZUMBI( 217, 54, 43, 255 );	// infecção = vermelho (decisão do dono)
 
 static const float UNIDADES_POR_METRO = 52.49f;
 static const int MAX_KILLFEED = 5;
