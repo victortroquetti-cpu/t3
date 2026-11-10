@@ -27,8 +27,16 @@ partida**. O primeiro trabalho aqui é fazer funcionar e testar.
 
 1. **Fazer só o que ele pedir.** Ele já reclamou quando algo foi implementado sem pedido. Para
    ideias novas, sugira e espere.
-2. **Nada de assets do Combat Arms, CoD, CS Online ou de outros jogos:** nem modelos, sons,
+2. **Nada de assets do CoD, CS Online ou de outros jogos no pacote ou no git:** nem modelos, sons,
    texturas, mapas ou nomes. Deles entram **só números medidos e sensações**.
+   - **Exceção do Combat Arms (decisão do dono, 10/11/2026):** assets dos `.rez` **abertos** do CA podem
+     ser usados como **provisório pessoal**, para sentir a vibe, e vão sendo trocados por arte própria.
+     Três cuidados, sempre:
+     1. ficam só em `game/mod_trok/custom/ca_local/` (no `.gitignore`): **nunca no git nem no zip** do build;
+     2. amigos usam a **instalação do CA deles** (script que extrai do jogo instalado em cada PC, como o
+        CS:S montado); nada é copiado de um PC para outro;
+     3. `.rez` **criptografados não são abertos** (não quebrar proteção).
+     Nomes do CA também não aparecem para o jogador.
    - O CS:S e o HL2 só **montados** (`gameinfo.txt`), nunca copiados para o pacote.
    - Das TCs estudadas (`cs-source/refs/`), só o **código** com licença compatível (NEOTOKYO
      Rebuild, Double Action, Momentum e Fortress Forever usam a Source 1 SDK License; dar crédito

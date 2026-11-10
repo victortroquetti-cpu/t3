@@ -13,3 +13,6 @@ trok-ui/veiculos/test/out/
 cs-source/sdk/
 cs-source/refs/
 __pycache__/
+# Assets do Combat Arms (provisório pessoal): nunca no git. Ver CLAUDE.md, regra 2.
+cs-source/game/mod_trok/custom/ca_local/
+*.rez
