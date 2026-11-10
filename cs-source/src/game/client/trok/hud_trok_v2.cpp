@@ -11,7 +11,7 @@
 // - vida (número com algarismos de largura fixa + barra em 10 partes com "rastro" do dano),
 //   colete, fôlego, créditos da economia, tipo de zumbi (Surto) e "LENTO", embaixo à esquerda;
 // - arma (nome, modo, pente grande / reserva, uma marca por bala, explosivos), embaixo à direita,
-//   com a escada de armas da Corrida Armada acima;
+//   a escada de armas da Corrida Armada fica centralizada embaixo;
 // - mira que abre com a dispersão, marcador de acerto, direção do dano, aviso de granada,
 //   eventos à direita da mira (ABATE +$300, NA CABEÇA), aviso de recarga e proteção.
 // Medidas em px de uma tela de 720 de altura (S()), iguais às da prévia. Fontes criadas aqui
@@ -1782,6 +1782,8 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 		return;
 	const int xr = ScreenWidth() - m_iMargem, yb = ScreenHeight() - m_iMargem;
 	const bool bZumbi = TrokSurto_IsZumbi( pLocal );
+	if ( bZumbi )
+		return;	// zumbi: nada de arma no canto (sem "GARRAS" nem ícone), decisão do dono
 
 	// Nome numa linha própria, embaixo
 	char szName[ 96 ], szNomeCabe[ 192 ];
@@ -1798,10 +1800,10 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 	const int iw = S( 72 ), ih = S( 27 );
 
 	CWeaponTrokGun *pGun = dynamic_cast< CWeaponTrokGun * >( pWeapon );
-	if ( bZumbi || !pWeapon->UsesClipsForAmmo1() )
+	if ( !pWeapon->UsesClipsForAmmo1() )
 	{
-		// garras, faca, explosivo na mão: só o ícone acima do nome
-		DesenharIcone( szIco, xr - iw, yNum - S( 26 ), iw, ih, A( bZumbi ? COR_ZUMBI : COR_CINZA2 ) );
+		// faca, explosivo na mão: só o ícone acima do nome
+		DesenharIcone( szIco, xr - iw, yNum - S( 26 ), iw, ih, A( COR_CINZA2 ) );
 	}
 	else
 	{
@@ -1864,7 +1866,7 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 	}
 }
 
-// Corrida Armada: a escada de armas acima da arma e o aviso de degrau novo.
+// Corrida Armada: a escada de armas centralizada embaixo (pedido do dono) e o aviso de degrau novo.
 void CHudTrokV2::PaintDegraus( C_BasePlayer *pLocal )
 {
 	CTrokCorridaEstado *pC = TrokCorrida_Ativo() ? TrokCorrida_Estado() : NULL;
@@ -1873,12 +1875,13 @@ void CHudTrokV2::PaintDegraus( C_BasePlayer *pLocal )
 	const int iMe = pLocal->entindex();
 	const int n = MAX( 1, pC->GetDegraus() );
 	const int iDeg = pC->GetDegrau( iMe ) + 1;	// 1..n
-	const int xr = ScreenWidth() - m_iMargem;
-	const int y = ScreenHeight() - m_iMargem - S( 122 );	// acima do bloco da arma (granadas em yb - 93)
+	const int y = ScreenHeight() - m_iMargem - S( 10 );	// centralizada na parte de baixo
 
 	const int w = n > 24 ? S( 5 ) : S( 7 ), gp = S1( 3 );
-	int x = xr - n * ( w + gp ) + gp;
+	const int iLarg = n * ( w + gp ) - gp;
+	int x = ScreenWidth() / 2 - iLarg / 2;
 	const int x0 = x;
+	const int xr = x0 + iLarg;
 	for ( int i = 1; i <= n; ++i )
 	{
 		Color c( 255, 255, 255, 36 );
@@ -1902,7 +1905,7 @@ void CHudTrokV2::PaintDegraus( C_BasePlayer *pLocal )
 		char szNome[ 48 ];
 		CaixaAlta( pEsc->degraus[ iDeg ].szNome, szNome, sizeof( szNome ) );
 		V_snprintf( sz, sizeof( sz ), "›  %s", szNome );	// próxima arma, pequena
-		Texto( m_fLabel, xr, y - S( 8 ), A( COR_CINZA3 ), sz, AL_DIR, 1.4f );
+		Texto( m_fLabel, xr + S( 10 ), y + S( 10 ), A( COR_CINZA3 ), sz, AL_ESQ, 1.4f );	// à direita da escada
 	}
 
 	// subiu de degrau: linha âmbar sob a mira
