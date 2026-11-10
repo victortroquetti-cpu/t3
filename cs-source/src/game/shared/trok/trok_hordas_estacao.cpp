@@ -7,6 +7,8 @@
 //   func_trok_caixa_misteriosa   caixa: gira e oferece uma arma sorteada (scripts/trok_hordas.txt)
 //   func_trok_bancada            bancada: colete, kit de reanimação, torreta, granadas...
 //   func_trok_energia            chave de energia: liga as máquinas que precisam de energia
+//   func_trok_armadilha          painel de armadilha (elétrica, fogo, arame): E liga por X pontos por
+//                                Y segundos; a zona é um trigger_trok_armadilha (server/trok/trok_hordas_mapa.cpp)
 //
 // Todas são pincéis (o mapa desenha a parede, a máquina, a porta) e usam uma classe só em
 // rede (CTrokHordasEstacao): o cliente lê tipo, preço e rótulo para o aviso
@@ -20,6 +22,9 @@
 #include "weapon_parse.h"
 #include "collisionutils.h"
 #include "ammodef.h"
+#ifndef CLIENT_DLL
+	#include "IEffects.h"
+#endif
 
 #ifndef CLIENT_DLL
 	#include "entityoutput.h"
@@ -34,6 +39,7 @@ ConVar trok_hordas_caixa_giro( "trok_hordas_caixa_giro", "4", FCVAR_REPLICATED, 
 ConVar trok_hordas_caixa_oferta( "trok_hordas_caixa_oferta", "10", FCVAR_REPLICATED, "Hordas: segundos que a arma sorteada fica esperando o dono pegar." );
 ConVar trok_hordas_caixa_preco( "trok_hordas_caixa_preco", "950", FCVAR_REPLICATED, "Hordas: preço da caixa misteriosa (quando o mapa não diz)." );
 ConVar trok_hordas_caixa_barata_preco( "trok_hordas_caixa_barata_preco", "10", FCVAR_REPLICATED, "Hordas: preço da caixa com o bônus Caixa barata." );
+ConVar trok_hordas_limite_armadilha( "trok_hordas_limite_armadilha", "1", FCVAR_REPLICATED, "Hordas: armadilhas ligadas ao mesmo tempo por jogador (0 = sem limite)." );
 ConVar trok_hordas_colete( "trok_hordas_colete", "100", FCVAR_REPLICATED, "Hordas: armadura que o colete da bancada dá." );
 
 static CUtlVector< CTrokHordasEstacao * > s_Estacoes;
@@ -79,6 +85,7 @@ LINK_ENTITY_TO_CLASS( func_trok_maquina_upgrade, CTrokHordasEstacao );
 LINK_ENTITY_TO_CLASS( func_trok_caixa_misteriosa, CTrokHordasEstacao );
 LINK_ENTITY_TO_CLASS( func_trok_bancada, CTrokHordasEstacao );
 LINK_ENTITY_TO_CLASS( func_trok_energia, CTrokHordasEstacao );
+LINK_ENTITY_TO_CLASS( func_trok_armadilha, CTrokHordasEstacao );
 #endif
 
 CTrokHordasEstacao::CTrokHordasEstacao()
@@ -99,6 +106,13 @@ CTrokHordasEstacao::CTrokHordasEstacao()
 	m_flFimEstado = 0.0f;
 	m_bDesligada = false;
 	m_iEnergiaMapa = -1;
+	m_iszZona = NULL_STRING;
+	m_flArmDps = -1.0f;
+	m_flArmDpsHumano = -1.0f;
+	m_flArmLentidao = -1.0f;
+	m_flArmDuracao = 25.0f;
+	m_flArmRecarga = 30.0f;
+	m_flProxEfeito = 0.0f;
 #endif
 	s_Estacoes.AddToTail( this );
 }
@@ -247,6 +261,21 @@ bool CTrokHordasEstacao::Aviso( CBasePlayer *pPlayer, char *pszTexto, int iTam, 
 		V_snprintf( pszTexto, iTam, "E  —  %s: %d", szRotulo, iPreco );
 		break;
 	}
+	case ESTACAO_ARMADILHA:
+		if ( GetEstadoCaixa() == 1 )
+		{
+			V_snprintf( pszTexto, iTam, "%s  —  LIGADA", szRotulo );
+			*pbPode = false;
+			return true;
+		}
+		if ( GetEstadoCaixa() == 2 )
+		{
+			V_snprintf( pszTexto, iTam, "%s  —  RECARREGANDO", szRotulo );
+			*pbPode = false;
+			return true;
+		}
+		V_snprintf( pszTexto, iTam, "E  —  LIGAR %s: %d", szRotulo, iPreco );
+		break;
 	case ESTACAO_ENERGIA:
 		if ( IsUsada() || pEstado->IsEnergia() )
 			return false;
@@ -299,6 +328,12 @@ BEGIN_DATADESC( CTrokHordasEstacao )
 	DEFINE_INPUTFUNC( FIELD_VOID, "Desligar", InputDesligar ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "Abrir", InputAbrir ),
 	DEFINE_THINKFUNC( CaixaPensar ),
+	DEFINE_THINKFUNC( ArmadilhaPensar ),
+	DEFINE_KEYFIELD( m_flArmDps, FIELD_FLOAT, "dano" ),
+	DEFINE_KEYFIELD( m_flArmDpsHumano, FIELD_FLOAT, "dano_humano" ),
+	DEFINE_KEYFIELD( m_flArmLentidao, FIELD_FLOAT, "lentidao" ),
+	DEFINE_KEYFIELD( m_flArmDuracao, FIELD_FLOAT, "duracao" ),
+	DEFINE_KEYFIELD( m_flArmRecarga, FIELD_FLOAT, "recarga" ),
 	DEFINE_OUTPUT( m_OnUsada, "OnUsada" ),
 	DEFINE_OUTPUT( m_OnSemPontos, "OnSemPontos" ),
 END_DATADESC()
@@ -307,6 +342,8 @@ bool CTrokHordasEstacao::KeyValue( const char *szKeyName, const char *szValue )
 {
 	if ( FStrEq( szKeyName, "arma" ) || FStrEq( szKeyName, "item" ) )
 		m_iszArmaMapa = AllocPooledString( szValue );
+	else if ( FStrEq( szKeyName, "zona" ) )
+		m_iszZona = AllocPooledString( szValue );
 	else if ( FStrEq( szKeyName, "rotulo" ) )
 		m_iszRotuloMapa = AllocPooledString( szValue );
 	else if ( FStrEq( szKeyName, "preco" ) )
@@ -328,6 +365,7 @@ void CTrokHordasEstacao::Precache( void )
 	PrecacheScriptSound( "Trok.Hordas.Melhoria" );
 	PrecacheScriptSound( "Trok.Hordas.Caixa" );
 	PrecacheScriptSound( "Trok.Hordas.Energia" );
+	PrecacheScriptSound( "Trok.Hordas.Armadilha" );
 	const char *pszArma = STRING( m_iszArmaMapa );
 	if ( pszArma && !Q_strncmp( pszArma, "weapon_", 7 ) )
 		UTIL_PrecacheOther( pszArma );
@@ -346,6 +384,8 @@ void CTrokHordasEstacao::Spawn( void )
 		m_iTipo = ESTACAO_BANCADA;
 	else if ( FStrEq( pszClasse, "func_trok_energia" ) )
 		m_iTipo = ESTACAO_ENERGIA;
+	else if ( FStrEq( pszClasse, "func_trok_armadilha" ) )
+		m_iTipo = ESTACAO_ARMADILHA;
 	else
 		m_iTipo = ESTACAO_PAREDE;
 
@@ -363,6 +403,7 @@ void CTrokHordasEstacao::Spawn( void )
 		case ESTACAO_PORTA: m_iPreco = 1000; break;
 		case ESTACAO_CAIXA: m_iPreco = trok_hordas_caixa_preco.GetInt(); break;
 		case ESTACAO_BANCADA: m_iPreco = 1500; break;
+		case ESTACAO_ARMADILHA: m_iPreco = 1000; break;	// CoD: 1000
 		default: break;
 		}
 	}
@@ -387,6 +428,21 @@ void CTrokHordasEstacao::Spawn( void )
 		V_strncpy( szRotulo, "KIT DE REANIMAÇÃO", sizeof( szRotulo ) );
 	else if ( m_iTipo == ESTACAO_UPGRADE )
 		V_strncpy( szRotulo, "MÁQUINA DE MELHORIA", sizeof( szRotulo ) );
+	else if ( m_iTipo == ESTACAO_ARMADILHA )
+	{
+		// Tipo da armadilha (keyvalue "item"): eletrica (padrão), fogo ou arame. Números padrão
+		// quando o mapa não diz (PROPOSTA; design/modo-hordas.md, "Armadilhas").
+		const char *pszTipo = STRING( m_iszArmaMapa );
+		const bool bFogo = pszTipo && !Q_stricmp( pszTipo, "fogo" );
+		const bool bArame = pszTipo && !Q_stricmp( pszTipo, "arame" );
+		V_strncpy( szRotulo, bFogo ? "ARMADILHA DE FOGO" : ( bArame ? "ARAME ELETRIFICADO" : "ARMADILHA ELÉTRICA" ), sizeof( szRotulo ) );
+		if ( m_flArmDps < 0.0f )
+			m_flArmDps = bArame ? 60.0f : ( bFogo ? 400.0f : 100000.0f );		// elétrica: mata na hora (CoD)
+		if ( m_flArmDpsHumano < 0.0f )
+			m_flArmDpsHumano = bArame ? 5.0f : ( bFogo ? 25.0f : 60.0f );
+		if ( m_flArmLentidao < 0.0f )
+			m_flArmLentidao = bArame ? 0.35f : 1.0f;
+	}
 	else
 		szRotulo[ 0 ] = 0;
 	V_strncpy( m_szRotulo.GetForModify(), szRotulo, 48 );
@@ -487,6 +543,7 @@ void CTrokHordasEstacao::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE
 	case ESTACAO_CAIXA: UsarCaixa( pPlayer ); break;
 	case ESTACAO_BANCADA: UsarBancada( pPlayer ); break;
 	case ESTACAO_ENERGIA: LigarEnergia( pPlayer ); break;
+	case ESTACAO_ARMADILHA: UsarArmadilha( pPlayer ); break;
 	}
 }
 
@@ -696,5 +753,96 @@ void CTrokHordasEstacao::UsarBancada( CBasePlayer *pPlayer )
 	}
 	EmitSound( "Trok.Hordas.Compra" );
 	m_OnUsada.FireOutput( pPlayer, this );
+}
+//-----------------------------------------------------------------------------
+// Armadilha (como as do CoD): E no painel liga por "duracao" s pagando "preco"; depois descansa
+// "recarga" s. Enquanto ligada, quem estiver na zona (trigger_trok_armadilha "zona"; sem zona, 160 u
+// em volta do painel) leva dano por segundo: zumbis "dano", humanos "dano_humano"; o arame ainda
+// deixa o zumbi lento. Limite de armadilhas ligadas por jogador: trok_hordas_limite_armadilha.
+//-----------------------------------------------------------------------------
+void CTrokHordasEstacao::UsarArmadilha( CBasePlayer *pPlayer )
+{
+	if ( m_iEstado != 0 )
+		return;
+	const int iLimite = trok_hordas_limite_armadilha.GetInt();
+	if ( iLimite > 0 && TrokHordas_ArmadilhasLigadas( pPlayer ) >= iLimite )
+	{
+		ClientPrint( pPlayer, HUD_PRINTCENTER, "VOCÊ JÁ TEM UMA ARMADILHA LIGADA" );
+		return;
+	}
+	if ( !TrokHordas_Pagar( pPlayer, m_iPreco ) )
+	{
+		m_OnSemPontos.FireOutput( pPlayer, this );
+		return;
+	}
+	m_hAtivador = pPlayer;
+	m_iEstado = 1;
+	m_flFimEstado = gpGlobals->curtime + MAX( 1.0f, m_flArmDuracao );
+	m_flProxEfeito = 0.0f;
+	EmitSound( "Trok.Hordas.Armadilha" );
+	m_OnUsada.FireOutput( pPlayer, this );
+	SetThink( &CTrokHordasEstacao::ArmadilhaPensar );
+	SetNextThink( gpGlobals->curtime + 0.05f );
+}
+
+void CTrokHordasEstacao::ArmadilhaPensar( void )
+{
+	const float flAgora = gpGlobals->curtime;
+	if ( flAgora >= m_flFimEstado )
+	{
+		if ( m_iEstado == 1 )
+		{
+			m_iEstado = 2;		// recarregando
+			m_flFimEstado = flAgora + MAX( 0.0f, m_flArmRecarga );
+			m_hAtivador = NULL;
+		}
+		else
+		{
+			m_iEstado = 0;
+			SetThink( NULL );
+			return;
+		}
+	}
+	if ( m_iEstado == 1 )
+	{
+		const float flPasso = 0.25f;
+		Vector vecMin, vecMax;
+		CBaseEntity *pZona = ( m_iszZona != NULL_STRING ) ? gEntList.FindEntityByName( NULL, m_iszZona ) : NULL;
+		if ( pZona )
+			pZona->CollisionProp()->WorldSpaceAABB( &vecMin, &vecMax );
+		else
+		{
+			vecMin = WorldSpaceCenter() - Vector( 160, 160, 64 );
+			vecMax = WorldSpaceCenter() + Vector( 160, 160, 96 );
+		}
+		const bool bEfeito = flAgora >= m_flProxEfeito;
+		if ( bEfeito )
+		{
+			m_flProxEfeito = flAgora + 0.4f;
+			const Vector vecFaisca( RandomFloat( vecMin.x, vecMax.x ), RandomFloat( vecMin.y, vecMax.y ), vecMin.z + 8.0f );
+			g_pEffects->Sparks( vecFaisca, 2, 2 );
+		}
+		CBasePlayer *pAtivador = m_hAtivador.Get();
+		for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+		{
+			CBasePlayer *p = UTIL_PlayerByIndex( i );
+			if ( !p || !p->IsAlive() || !IsPointInBox( p->WorldSpaceCenter(), vecMin, vecMax ) )
+				continue;
+			const bool bZumbi = TrokSurto_IsZumbi( p );
+			const float flDps = bZumbi ? m_flArmDps : m_flArmDpsHumano;
+			if ( flDps > 0.0f )
+			{
+				// Zumbi: crédito do abate para quem ligou (pontos: trok_hordas_pontos_armadilha).
+				CBaseEntity *pAtacante = ( bZumbi && pAtivador ) ? (CBaseEntity *)pAtivador : (CBaseEntity *)this;
+				CTakeDamageInfo info( this, pAtacante, flDps * flPasso, DMG_SHOCK );
+				p->TakeDamage( info );
+			}
+			if ( bZumbi && m_flArmLentidao < 1.0f )
+				TrokHordas_LentoZumbi( p, m_flArmLentidao, 0.5f );
+		}
+		SetNextThink( flAgora + flPasso );
+		return;
+	}
+	SetNextThink( flAgora + 0.25f );
 }
 #endif // !CLIENT_DLL
