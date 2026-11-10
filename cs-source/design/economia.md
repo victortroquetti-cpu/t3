@@ -10,8 +10,12 @@ todo mundo nasce com o que equipou. O CS tem dinheiro por rodada: ganha abatendo
 (perde o que comprou) e compra num tempo e numa zona. Esta base é a do CS:S, com números do CS:S
 (`design/chimera/games/cs_source/data/economy.toml`, `rounds.toml`, `specs/cs_source/weapons.md` "Economy",
 `specs/cs_source/objectives.md` "Money"), e dois acréscimos pedidos pelo dono: **coletes em níveis** que dão
-armadura **e** mais fôlego **e** mais velocidade, e **capacete** que tira o crítico do tiro na cabeça. No Surto, a
-loja também vende os **mutagênicos** (tipos de zumbi; no CA eram comprados fora da partida).
+armadura **e** mais fôlego **e** mais velocidade, e **capacete** que tira o crítico do tiro na cabeça.
+
+**Surto: duas moedas.** O dinheiro desta economia é o de **humano**. Os tipos de zumbi são pagos com o
+**dinheiro de infectado** (outra moeda, de `shared/trok/trok_zumbis.cpp`: `TrokZumbis_Dinheiro`, ganho por
+infecção e fim de rodada, preço `preco` de cada tipo em `scripts/trok_zumbis.txt`, cobrado ao virar zumbi). Não
+são itens da loja de humano (decisão do dono).
 
 ## Regras (o que o código faz)
 
@@ -48,7 +52,7 @@ Diferenças da base para o CS:S, para o dono decidir:
 ## Loja (`scripts/trok_loja.txt`)
 
 Categorias (teclas 1..8 no menu): **Pistolas, Submetralhadoras, Fuzis, Escopetas, Especiais, Explosivos,
-Equipamentos, Mutagênicos.** Cada item tem `nome`, `categoria`, `tipo`, `preco`, `descricao` e os campos do tipo:
+Equipamentos**; no Surto, mais a aba **INFECTADO** (ver abaixo). Cada item tem `nome`, `categoria`, `tipo`, `preco`, `descricao` e os campos do tipo:
 
 | Tipo | Campos | O que faz no jogo |
 |---|---|---|
@@ -57,7 +61,6 @@ Equipamentos, Mutagênicos.** Cada item tem `nome`, `categoria`, `tipo`, `preco`
 | `capacete` | `protecao`, `golpes` | tiro na cabeça: o multiplicador `sk_player_head` vira `1 + (mult − 1) × (1 − protecao)`; `golpes` > 0 = quebra depois de tantos tiros na cabeça |
 | `municao` | `slot` (-1 = todas), `municao` (0 = enche) | enche a reserva |
 | `medico` | `vida` | devolve vida na hora (até a máxima) |
-| `mutagenico` | `zumbi` (tipo de `scripts/trok_zumbis.txt`) | só no Surto: `TrokZumbis_Liberar`; o jogador escolhe o tipo na tecla N (`trok_zumbi_classe`) |
 
 Preços de partida (CS:S onde existe; o resto **PROPOSTA**):
 
@@ -77,7 +80,6 @@ Preços de partida (CS:S onde existe; o resto **PROPOSTA**):
 | Capacete balístico: tira 100%, quebra em 2 tiros | 800 | PROPOSTA |
 | Kit de munição (todas as armas) | 0 | munição é grátis no CS:S |
 | Kit médico (+50 de vida) | 400 | PROPOSTA (o CS:S não vende vida) |
-| Mutagênicos (veloz, brutamontes, investida, tóxico) | 1000 cada | PROPOSTA |
 
 **Atenção à armadura:** a absorção é a do HL2 (o colete segura a maior parte do dano enquanto tem pontos), bem
 mais forte que o kevlar do CS:S (que só corta parte do dano conforme a arma). Por isso os pontos estão baixos.
@@ -90,6 +92,9 @@ Medir e decidir: manter a regra do HL2, ou trocar pela do CS (precisa de um ganc
   tempo de compra no alto, equipamento atual, categorias à esquerda (1..8), itens no meio (clique compra; mostra
   preço, "NA MÃO"/"EQUIPADO", vermelho sem dinheiro), detalhes do item à direita. Fecha com B, ESC, FECHAR, ao
   morrer ou quando o tempo acaba. O servidor confere tudo de novo.
+- **Surto:** o alto do menu mostra as duas moedas (INFECTADO em verde, HUMANO em âmbar) e há a aba **INFECTADO**
+  com os tipos de zumbi jogáveis, preço em dinheiro de infectado e saldo; clicar manda `trok_zumbi_classe <nome>`
+  (só escolhe; paga ao virar). Essa aba fica aberta a qualquer hora do Surto, mesmo morto ou zumbi.
 - Console: `trok_comprar <id> [<id> ...]`, `trok_loja_lista`, `trok_loja_recarregar` (cliente; o servidor relê a
   loja a cada mapa). Teste: `sv_cheats 1` e `trok_dinheiro_teste 10000`.
 - HUD (`client/trok/hud_trok_economia.cpp`): dinheiro acima da vida, "+$300"/"−$2500" por 2 s, "COMPRA 14 s [B]",
@@ -101,7 +106,7 @@ Medir e decidir: manter a regra do HL2, ou trocar pela do CS (precisa de um ganc
 
 1. Ligar a economia em quais modos (hoje é uma chave só, para todos).
 2. Ganho por abate: plano (CS:S, 300) ou por classe (CS:GO).
-3. Surto: pagar por time (hoje) ou por papel; preço dos mutagênicos; se mutagênico comprado dura o mapa.
+3. Surto: pagar por time (hoje) ou por papel (o dinheiro de infectado já paga por infecção).
 4. Coletes: pontos, fôlego e velocidade de cada nível; regra de armadura (HL2 ou CS).
 5. Capacete: proteção e se quebra.
 6. Kit médico existe ou não (no CS não tem).
@@ -120,5 +125,7 @@ Medir e decidir: manter a regra do HL2, ou trocar pela do CS (precisa de um ganc
 8. Capacete: levar tiro na cabeça de bot e comparar o dano (balístico: 2 tiros sem crítico, depois normal).
 9. Morrer: renasce só com o kit; colete e capacete somem.
 10. Surto: comprar no preparo; humano vivo no fim ganha $3000 e renasce com o que comprou; zumbi não compra.
-11. Mutagênico no Surto: comprar o veloz, virar zumbi e escolher com N; comprar de novo dá "já está liberado".
+11. Surto, aba INFECTADO (tecla B, última aba; abre direto nela quando não dá para comprar de humano): mostra as
+    duas moedas, lista os tipos jogáveis com o preço em dinheiro de infectado; clicar escolhe
+    (`trok_zumbi_classe`) e marca ESCOLHIDO; ao virar zumbi o preço é cobrado (lógica de `trok_zumbis.cpp`).
 12. Kit de munição e kit médico; granadas até o máximo (dependem das armas da sessão de explosivos existirem).

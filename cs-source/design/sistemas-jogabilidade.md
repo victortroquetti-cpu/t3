@@ -22,7 +22,7 @@ nada de modelos, sons, texturas, mapas ou dados extraídos do jogo.
 | Modos equipe e solo | `game/mod_trok/cfg/equipe.cfg` e `solo.cfg` | meta de abates, tempo, renascer, proteção ao nascer (ver `design/modos.md`) |
 | Modo Surto (infecção) | `game/mod_trok/cfg/surto.cfg` + `empurrao`/`segurar` nas armas | tempos da rodada, hospedeiros, vida e regeneração do zumbi, garras, empurrão (ver `design/modo-surto.md`) |
 | Série de abates (killstreak do CA) | `game/mod_trok/cfg/killstreak.cfg` + `scripts/trok_anunciador.txt` | janela do multi-abate, vingança, primeiro abate, tiro de sorte, voz; no script: textos, vozes, níveis, cores e tempos da faixa e da lista (ver abaixo) |
-| Economia estilo CS (desligada) | `game/mod_trok/cfg/economia.cfg` + `scripts/trok_loja.txt` | dinheiro inicial, teto, ganhos, tempo e zona de compra, kit inicial; na loja: itens, preços, coletes, capacetes, mutagênicos, ganho por classe (ver `design/economia.md`) |
+| Economia estilo CS (desligada) | `game/mod_trok/cfg/economia.cfg` + `scripts/trok_loja.txt` | dinheiro inicial, teto, ganhos, tempo e zona de compra, kit inicial; na loja: itens, preços, coletes, capacetes, ganho por classe (tipos de zumbi: dinheiro de infectado, `scripts/trok_zumbis.txt`) (ver `design/economia.md`) |
 
 ## Campos do bloco "Trok" das armas
 
