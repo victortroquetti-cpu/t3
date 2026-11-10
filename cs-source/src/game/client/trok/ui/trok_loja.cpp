@@ -198,7 +198,10 @@ void CTrokLojaPainel::Desenhar( void )
 		char szInf[ 48 ];
 		V_snprintf( szInf, sizeof( szInf ), "FÚRIA  %d", TrokZumbis_Dinheiro( pLocal ) );
 		const int xInf = x0 + wTotal - wDin - S( 10 ) - Largura( m_hPequena, "HUMANO" ) - S( 28 );
-		TextoDir( m_hItem, xInf, y0 + Altura( m_hTitulo ) - Altura( m_hItem ) - S( 2 ), COR_ZUMBI, szInf );
+		const int yInf = y0 + Altura( m_hTitulo ) - Altura( m_hItem ) - S( 2 );
+		const int wInf = Largura( m_hItem, szInf );
+		Ret( xInf - wInf - S( 8 ), yInf - S( 3 ), wInf + S( 16 ), Altura( m_hItem ) + S( 6 ), COR_FURIA_FUNDO );
+		TextoDir( m_hItem, xInf, yInf, COR_FURIA, szInf );
 	}
 	float flFalta = 0.0f;
 	const bool bPode = PodeComprarAgora( &flFalta );
@@ -371,7 +374,8 @@ void CTrokLojaPainel::DesenharInfectado( int x, int y )
 
 	char sz[ 128 ];
 	V_snprintf( sz, sizeof( sz ), "FÚRIA: %d   (moeda do infectado, separada do dinheiro de humano)", iSaldo );
-	Texto( m_hPequena, x, y, COR_ZUMBI, sz );
+	Ret( x - S( 6 ), y - S( 2 ), Largura( m_hPequena, sz ) + S( 12 ), Altura( m_hPequena ) + S( 4 ), COR_FURIA_FUNDO );
+	Texto( m_hPequena, x, y, COR_FURIA, sz );
 	Texto( m_hPequena, x, y + Altura( m_hPequena ) + S( 2 ), COR_TEXTO3, "Escolha o tipo agora; paga ao virar zumbi (sem saldo, vira o normal)." );
 	y += 2 * Altura( m_hPequena ) + S( 12 );
 
@@ -386,7 +390,7 @@ void CTrokLojaPainel::DesenharInfectado( int x, int y )
 		Ret( x, y, w, h, bSobre ? COR_PAINEL_HOVER : COR_PAINEL );
 		Contorno( x, y, w, h, bSobre ? COR_LINHA_FORTE : COR_LINHA );
 		if ( bEscolhido )
-			Ret( x, y, S( 3 ), h, COR_ZUMBI );
+			Ret( x, y, S( 3 ), h, COR_FURIA );
 		Texto( m_hItem, x + S( 14 ), y + ( h - Altura( m_hItem ) ) / 2, bCaro ? COR_TEXTO3 : COR_TEXTO, c.szTitulo );
 		if ( bEscolhido )
 			V_strncpy( sz, "ESCOLHIDO", sizeof( sz ) );
@@ -395,7 +399,7 @@ void CTrokLojaPainel::DesenharInfectado( int x, int y )
 		else
 			V_strncpy( sz, "GRÁTIS", sizeof( sz ) );
 		TextoDir( m_hItem, x + w - S( 14 ), y + ( h - Altura( m_hItem ) ) / 2,
-			bEscolhido ? acc : ( bCaro ? COR_INIMIGO : COR_ZUMBI ), sz );
+			bEscolhido ? acc : ( bCaro ? COR_TEXTO3 : COR_FURIA ), sz );
 		if ( Clicou( x, y, w, h ) && !bEscolhido )
 		{
 			V_snprintf( sz, sizeof( sz ), "trok_zumbi_classe %s\n", c.szNome );

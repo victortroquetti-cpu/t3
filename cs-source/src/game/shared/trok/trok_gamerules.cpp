@@ -61,7 +61,7 @@ ConVar trok_surto_ca_granada_tempo( "trok_surto_ca_granada_tempo", "0.4", FCVAR_
 extern ConVar trok_mov_ca;
 ConVar trok_surto_zumbi_folego( "trok_surto_zumbi_folego", "2", FCVAR_NOTIFY, "Fôlego do zumbi correndo, em vezes o do humano (CA: o dobro)." );
 ConVar trok_surto_assistir( "trok_surto_assistir", "3", FCVAR_NOTIFY, "Segundos depois de morrer (sem virar zumbi) para passar a assistir os vivos." );
-ConVar trok_surto_cor_zumbi( "trok_surto_cor_zumbi", "150 225 140", FCVAR_NOTIFY, "Tom do zumbi enquanto não há modelo próprio (R G B)." );
+ConVar trok_surto_cor_zumbi( "trok_surto_cor_zumbi", "185 70 62", FCVAR_NOTIFY, "Tom do zumbi enquanto não há modelo próprio (R G B; sangue, decisão do dono)." );
 #endif
 
 //-----------------------------------------------------------------------------
@@ -115,6 +115,7 @@ CTrokRules::CTrokRules()
 		m_iRodadaZumbis[ i ] = 0;
 	}
 	m_flUltimoThink = 0.0f;
+	TrokZumbis_Precache();	// olhos que brilham, bolhas (trok_zumbis.cpp)
 	if ( m_iModo == TROK_MODO_SURTO )
 	{
 		// Surto é sempre em times (humanos x zumbis) e lê os números do cfg do modo.

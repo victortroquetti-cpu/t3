@@ -35,6 +35,8 @@ struct TrokZumbiClasse_t
 	float flGarraDano, flGarraAlcance, flGarraCadencia;	// multiplicadores das garras
 	float flEscala;					// tamanho do corpo (multiplica a escala do corpo do CA)
 	int iCor[ 3 ];
+	int iOlhos[ 3 ];				// brilho dos olhos (vermelho; mais saturado = zumbi mais forte)
+	float flOlhosTamanho;
 	// Habilidades (0 = não tem)
 	float flExplodeDano, flExplodeRaio;					// ao morrer
 	float flNuvemDps, flNuvemRaio, flNuvemTempo, flNuvemLentidao;	// nuvem tóxica ao morrer
@@ -73,6 +75,7 @@ void TrokZumbis_AoVirarHumano( CBasePlayer *pPlayer );
 void TrokZumbis_AoMorrer( CBasePlayer *pVictim );			// habilidades de morte
 void TrokZumbis_AoAcertar( CBasePlayer *pVictim, const CTakeDamageInfo &info );	// golpe que paralisa
 void TrokZumbis_Think( void );								// aura, bolhas, fôlego infinito
+void TrokZumbis_Precache( void );
 #endif
 
 #endif // TROK_ZUMBIS_H

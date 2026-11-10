@@ -30,6 +30,8 @@ namespace TrokUI
 	extern const Color COR_ALIADO;
 	extern const Color COR_INIMIGO;
 	extern const Color COR_ZUMBI;
+	extern const Color COR_FURIA;			// Fúria: vermelho-sangue...
+	extern const Color COR_FURIA_FUNDO;		// ...sobre roxo escuro quase preto (decisão do dono)
 
 	Color Destaque( void );								// trok_ui_destaque
 	Color CorDoTime( int iTeam );						// relativa ao jogador local (aliado azul, inimigo vermelho)

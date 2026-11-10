@@ -10,6 +10,7 @@
 
 #ifndef CLIENT_DLL
 #include "explode.h"
+#include "Sprite.h"
 #include "IEffects.h"
 #include "hl2_player.h"
 #include "trok_gamerules.h"
@@ -52,6 +53,8 @@ static void TrokZumbis_Padrao( TrokZumbiClasse_t &c, const char *pszNome )
 	c.flGarraDano = c.flGarraAlcance = c.flGarraCadencia = 1.0f;
 	c.flEscala = 1.0f;
 	c.iCor[ 0 ] = c.iCor[ 1 ] = c.iCor[ 2 ] = -1;
+	c.iOlhos[ 0 ] = 200; c.iOlhos[ 1 ] = 50; c.iOlhos[ 2 ] = 45;
+	c.flOlhosTamanho = 0.12f;
 	c.flBonusHumanoVelocidade = 1.0f;
 }
 
@@ -82,6 +85,10 @@ static void TrokZumbis_Carregar( void )
 			const char *pszCor = pSub->GetString( "cor", NULL );
 			if ( pszCor )
 				sscanf( pszCor, "%d %d %d", &c.iCor[ 0 ], &c.iCor[ 1 ], &c.iCor[ 2 ] );
+			const char *pszOlhos = pSub->GetString( "olhos", NULL );
+			if ( pszOlhos )
+				sscanf( pszOlhos, "%d %d %d", &c.iOlhos[ 0 ], &c.iOlhos[ 1 ], &c.iOlhos[ 2 ] );
+			c.flOlhosTamanho = pSub->GetFloat( "olhos_tamanho", c.flOlhosTamanho );
 			c.flExplodeDano = pSub->GetFloat( "explode_dano", 0.0f );
 			c.flExplodeRaio = pSub->GetFloat( "explode_raio", 0.0f );
 			c.flNuvemDps = pSub->GetFloat( "nuvem_dps", 0.0f );
@@ -326,6 +333,63 @@ bool TrokZumbis_ClientCommand( CBasePlayer *pPlayer, const CCommand &args )
 	return true;
 }
 
+//-----------------------------------------------------------------------------
+// Olhos que brilham (vermelho; quanto mais saturado, mais forte o tipo). Um brilho no anexo
+// "eyes" do modelo, que segue a cabeça; o próprio jogador não recebe (não ofusca a câmera).
+//-----------------------------------------------------------------------------
+#define TROK_OLHOS_SPRITE "sprites/light_glow02_add.vmt"
+
+class CTrokOlhoZumbi : public CSprite
+{
+public:
+	DECLARE_CLASS( CTrokOlhoZumbi, CSprite );
+	virtual int ShouldTransmit( const CCheckTransmitInfo *pInfo )
+	{
+		CBaseEntity *pDono = GetOwnerEntity();
+		if ( pDono && pDono->edict() == pInfo->m_pClientEnt )
+			return FL_EDICT_DONTSEND;
+		return BaseClass::ShouldTransmit( pInfo );
+	}
+};
+LINK_ENTITY_TO_CLASS( trok_olho_zumbi, CTrokOlhoZumbi );
+
+static EHANDLE s_aOlhos[ MAX_PLAYERS + 1 ];
+
+void TrokZumbis_Precache( void )
+{
+	CBaseEntity::PrecacheModel( TROK_OLHOS_SPRITE );
+	CBaseEntity::PrecacheModel( "models/weapons/w_grenade.mdl" );
+}
+
+static void TrokZumbis_OlhosDesligar( CBasePlayer *pPlayer )
+{
+	if ( !pPlayer )
+		return;
+	CBaseEntity *pOlho = s_aOlhos[ pPlayer->entindex() ].Get();
+	if ( pOlho )
+		UTIL_Remove( pOlho );
+	s_aOlhos[ pPlayer->entindex() ] = NULL;
+}
+
+static void TrokZumbis_OlhosLigar( CBasePlayer *pPlayer, const TrokZumbiClasse_t &c )
+{
+	TrokZumbis_OlhosDesligar( pPlayer );
+	const int iAnexo = pPlayer->LookupAttachment( "eyes" );
+	if ( iAnexo <= 0 || c.flOlhosTamanho <= 0.0f )
+		return;
+	CTrokOlhoZumbi *pOlho = (CTrokOlhoZumbi *)CreateEntityByName( "trok_olho_zumbi" );
+	if ( !pOlho )
+		return;
+	pOlho->SpriteInit( TROK_OLHOS_SPRITE, pPlayer->EyePosition() );
+	pOlho->SetOwnerEntity( pPlayer );
+	pOlho->SetAttachment( pPlayer, iAnexo );
+	pOlho->SetTransparency( kRenderWorldGlow, clamp( c.iOlhos[ 0 ], 0, 255 ), clamp( c.iOlhos[ 1 ], 0, 255 ), clamp( c.iOlhos[ 2 ], 0, 255 ), 255, kRenderFxNoDissipation );
+	pOlho->SetScale( c.flOlhosTamanho );
+	pOlho->SetGlowProxySize( 4.0f );
+	pOlho->TurnOn();
+	s_aOlhos[ pPlayer->entindex() ] = pOlho;
+}
+
 int TrokZumbis_AoVirar( CBasePlayer *pPlayer )
 {
 	CTrokSurtoEstado *pEstado = TrokSurto_Estado();
@@ -350,6 +414,7 @@ int TrokZumbis_AoVirar( CBasePlayer *pPlayer )
 	}
 	pEstado->m_aClasseZumbi.Set( i, iClasse );
 	s_aProxBomba[ i ] = gpGlobals->curtime + TrokZumbis_Classe( iClasse ).flBombaIntervalo;
+	TrokZumbis_OlhosLigar( pPlayer, TrokZumbis_Classe( iClasse ) );
 	return iClasse;
 }
 
@@ -367,6 +432,7 @@ void TrokZumbis_DefinirClasse( CBasePlayer *pPlayer, int iClasse )
 void TrokZumbis_AoVirarHumano( CBasePlayer *pPlayer )
 {
 	CTrokSurtoEstado *pEstado = TrokSurto_Estado();
+	TrokZumbis_OlhosDesligar( pPlayer );
 	if ( pEstado && pPlayer )
 	{
 		pEstado->m_aClasseZumbi.Set( pPlayer->entindex(), 0 );
@@ -474,6 +540,7 @@ LINK_ENTITY_TO_CLASS( trok_nuvem_toxica, CTrokNuvemToxica );
 
 void TrokZumbis_AoMorrer( CBasePlayer *pVictim )
 {
+	TrokZumbis_OlhosDesligar( pVictim );
 	if ( !pVictim || !TrokSurto_IsZumbi( pVictim ) )
 		return;
 	const TrokZumbiClasse_t &c = TrokZumbis_Classe( TrokZumbis_ClasseDe( pVictim ) );

@@ -38,6 +38,9 @@
 #include "trok/trok_corrida.h"
 #include "trok/trok_placar_extra.h"
 #include "trok/hud_trok_v2.h"
+#include "materialsystem/imaterial.h"
+#include "materialsystem/imaterialsystem.h"
+#include "utldict.h"
 #include <vgui/ISurface.h>
 #include <vgui/IScheme.h>
 #include <vgui_controls/Panel.h>
@@ -52,7 +55,7 @@ static ConVar trok_hud_estilo( "trok_hud_estilo", "2", FCVAR_ARCHIVE, "Estilo do
 static ConVar trok_hud_escala( "trok_hud_escala", "1", FCVAR_ARCHIVE, "Tamanho do HUD novo (0.6 a 1.6).", true, 0.6f, true, 1.6f );
 static ConVar trok_hud_opacidade( "trok_hud_opacidade", "1", FCVAR_ARCHIVE, "Opacidade do HUD novo (0.2 a 1).", true, 0.2f, true, 1.0f );
 static ConVar trok_hud_minimalista( "trok_hud_minimalista", "0", FCVAR_ARCHIVE, "1 = HUD mínimo: sem bússola, rótulos, marcas de bala e créditos; radar menor." );
-static ConVar trok_hud_bussola( "trok_hud_bussola", "1", FCVAR_ARCHIVE, "Bússola no topo da tela." );
+static ConVar trok_hud_bussola( "trok_hud_bussola", "0", FCVAR_ARCHIVE, "Bússola no topo da tela (o dono preferiu sem; 1 liga)." );
 static ConVar trok_hud_eventos( "trok_hud_eventos", "1", FCVAR_ARCHIVE, "Eventos à direita da mira (ABATE, NA CABEÇA, +$)." );
 static ConVar trok_hud_granada( "trok_hud_granada", "1", FCVAR_ARCHIVE, "Aviso de granada perto (ícone em volta da mira apontando para ela)." );
 static ConVar trok_hud_granada_raio( "trok_hud_granada_raio", "400", FCVAR_ARCHIVE, "Distância (u) até a qual a granada aparece no aviso." );
@@ -63,8 +66,13 @@ static const Color COR_CINZA2( 163, 169, 177, 255 );
 static const Color COR_CINZA3( 128, 134, 142, 255 );
 static const Color COR_ALIADO( 90, 162, 255, 255 );
 static const Color COR_INIMIGO( 255, 90, 90, 255 );
-static const Color COR_ZUMBI( 140, 224, 90, 255 );
+static const Color COR_ZUMBI( 217, 54, 43, 255 );		// infecção: vermelho-sangue (decisão do dono)
 static const Color COR_COLETE( 157, 183, 208, 255 );
+// Fúria (moeda do infectado): vermelho-sangue sobre roxo-escuro (decisão do dono; ui/trok_ui_comum.h
+// tem as mesmas COR_FURIA / COR_FURIA_FUNDO da loja). O número usa um tom mais claro para ler no roxo.
+static const Color COR_FURIA( 204, 32, 48, 255 );
+static const Color COR_FURIA_FUNDO( 34, 10, 38, 255 );
+static const Color COR_FURIA_TEXTO( 232, 65, 79, 255 );
 static const Color COR_FUNDO( 11, 13, 16, 255 );
 static const Color COR_DESTAQUE_PADRAO( 242, 181, 68, 255 );
 
@@ -131,6 +139,11 @@ private:
 	void Circulo( float cx, float cy, float r, const Color &c );
 	int Tecla( int x, int y, const char *pszTecla, const Color &c );
 	void IconeExplosivo( int iTipo, int x, int y, const Color &c );
+	// Ícones em textura (vgui/trok/icones/<nome>, design/ui.md > Ícones). Sem o material
+	// (IsErrorMaterial), devolvem -1 / false e quem chama usa o desenho ou o texto de antes.
+	int Icone( const char *pszNome );
+	bool DesenharIcone( const char *pszNome, int x, int y, int w, int h, const Color &c );
+	void IconeLado( bool bZumbi, int x, int y, int s, const Color &c );
 	void Vinheta( const Color &c, int a );
 	void AvisoCentro( const char *pszTexto, const char *pszTecla, const Color &c, bool bPulsa );
 	void NomeArma( const char *pszClassOrEventName, char *pszOut, int iOutSize );
@@ -162,6 +175,13 @@ private:
 	int m_iFontesAlt;
 	float m_flFontesEsc;
 	int m_iTexBranca;
+	CUtlDict< int, int > m_Icones;
+
+	// Aviso do Surto (alarme, abrigos, preparação): só alguns segundos quando acontece.
+	char m_szAvisoSurto[ 64 ];
+	float m_flAvisoSurto;
+	int m_iFaseAnt;
+	bool m_bAlarmeAnt, m_bAbrigosAnt;
 
 	float m_flEsc, m_flOpac;
 	bool m_bMin;
@@ -169,7 +189,7 @@ private:
 
 	struct KillEntry_t
 	{
-		char szAtk[ 64 ], szVic[ 64 ], szWpn[ 48 ];
+		char szAtk[ 64 ], szVic[ 64 ], szWpn[ 48 ], szIcone[ 48 ];
 		Color corAtk, corVic;
 		bool bHead, bInfeccao, bMeu;
 		float flTime;
@@ -236,6 +256,10 @@ CHudTrokV2::CHudTrokV2( const char *pElementName ) : CHudElement( pElementName )
 	m_iFontesAlt = 0;
 	m_flFontesEsc = 0.0f;
 	m_iTexBranca = -1;
+	m_szAvisoSurto[ 0 ] = 0;
+	m_flAvisoSurto = -100.0f;
+	m_iFaseAnt = -1;
+	m_bAlarmeAnt = m_bAbrigosAnt = false;
 	m_flEsc = 1.0f;
 	m_flOpac = 1.0f;
 	m_bMin = false;
@@ -494,6 +518,84 @@ void CHudTrokV2::Circulo( float cx, float cy, float r, const Color &c )
 	Poly( v, N, c );
 }
 
+int CHudTrokV2::Icone( const char *pszNome )
+{
+	if ( !pszNome || !pszNome[ 0 ] )
+		return -1;
+	const int i = m_Icones.Find( pszNome );
+	if ( i != m_Icones.InvalidIndex() )
+		return m_Icones[ i ];
+	char szMat[ 128 ];
+	V_snprintf( szMat, sizeof( szMat ), "vgui/trok/icones/%s", pszNome );
+	int id = -1;
+	IMaterial *pMat = materials ? materials->FindMaterial( szMat, TEXTURE_GROUP_VGUI, false ) : NULL;
+	if ( pMat && !pMat->IsErrorMaterial() )
+	{
+		id = surface()->CreateNewTextureID();
+		surface()->DrawSetTextureFile( id, szMat, true, false );
+	}
+	m_Icones.Insert( pszNome, id );
+	return id;
+}
+
+bool CHudTrokV2::DesenharIcone( const char *pszNome, int x, int y, int w, int h, const Color &c )
+{
+	const int id = Icone( pszNome );
+	if ( id < 0 )
+		return false;
+	surface()->DrawSetColor( c );
+	surface()->DrawSetTexture( id );
+	surface()->DrawTexturedRect( x, y, x + w, y + h );
+	return true;
+}
+
+// Ícone do lado no placar do Surto (lado_humano / lado_zumbi); sem textura, uma silhueta simples.
+void CHudTrokV2::IconeLado( bool bZumbi, int x, int y, int s, const Color &c )
+{
+	if ( DesenharIcone( bZumbi ? "lado_zumbi" : "lado_humano", x, y, s, s, c ) )
+		return;
+	const float cx = x + s * 0.5f, cy = y + s * 0.5f, r = s * 0.5f - 1.0f;
+	Circulo( cx, cy - r * 0.45f, r * 0.38f, c );
+	if ( bZumbi )
+	{
+		Vertex_t v[ 5 ] = { Vertex_t( Vector2D( cx - r * 0.9f, cy + r ) ), Vertex_t( Vector2D( cx - r * 0.45f, cy + r * 0.05f ) ),
+			Vertex_t( Vector2D( cx + r * 0.9f, cy - r * 0.1f ) ), Vertex_t( Vector2D( cx + r * 0.5f, cy + r * 0.3f ) ), Vertex_t( Vector2D( cx + r * 0.6f, cy + r ) ) };
+		Poly( v, 5, c );
+	}
+	else
+	{
+		Vertex_t v[ 4 ] = { Vertex_t( Vector2D( cx - r * 0.7f, cy + r ) ), Vertex_t( Vector2D( cx - r * 0.55f, cy + r * 0.05f ) ),
+			Vertex_t( Vector2D( cx + r * 0.55f, cy + r * 0.05f ) ), Vertex_t( Vector2D( cx + r * 0.7f, cy + r ) ) };
+		Poly( v, 4, c );
+	}
+}
+
+// Nome do ícone da arma a partir da classe ou do nome que vem no player_death
+// ("weapon_trok_fuzil", "trok_fuzil", "trok_granada", "world"...).
+static void NomeIconeArma( const char *psz, char *pszOut, int iOutSize )
+{
+	const char *p = psz ? psz : "";
+	if ( !V_strnicmp( p, "weapon_", 7 ) )
+		p += 7;
+	if ( !V_strnicmp( p, "trok_", 5 ) )
+		p += 5;
+	if ( !p[ 0 ] || !V_stricmp( p, "world" ) || !V_stricmp( p, "worldspawn" ) || !V_stricmp( p, "trigger_hurt" ) )
+		V_strncpy( pszOut, "abate_queda", iOutSize );
+	else if ( V_stristr( p, "explos" ) || V_stristr( p, "barrel" ) )
+		V_strncpy( pszOut, "abate_explosao", iOutSize );
+	else if ( !V_stricmp( p, "crowbar" ) || !V_stricmp( p, "stunstick" ) || !V_stricmp( p, "faca" ) )
+		V_strncpy( pszOut, "arma_faca", iOutSize );
+	else if ( !V_stricmp( p, "garras" ) )
+		V_strncpy( pszOut, "garras", iOutSize );
+	else if ( !V_stricmp( p, "granada_remota" ) )
+		V_strncpy( pszOut, "arma_remota", iOutSize );
+	else if ( !V_stricmp( p, "frag" ) || !V_stricmp( p, "grenade_frag" ) )
+		V_strncpy( pszOut, "arma_granada", iOutSize );
+	else
+		V_snprintf( pszOut, iOutSize, "arma_%s", p );
+	V_strlower( pszOut );
+}
+
 // Tecla num quadradinho ("R", "E"). y = topo. Devolve a largura.
 int CHudTrokV2::Tecla( int x, int y, const char *pszTecla, const Color &c )
 {
@@ -724,11 +826,13 @@ void CHudTrokV2::FireGameEvent( IGameEvent *event )
 		if ( g_PR && iVic > 0 )
 			V_strncpy( k.szVic, g_PR->GetPlayerName( iVic ), sizeof( k.szVic ) );
 		NomeArma( event->GetString( "weapon" ), k.szWpn, sizeof( k.szWpn ) );
+		NomeIconeArma( event->GetString( "weapon" ), k.szIcone, sizeof( k.szIcone ) );
 		// Surto: zumbi pegando humano é infecção (a vítima ainda é humana no evento).
 		if ( TrokSurto_Ativo() && g_PR && iAtk > 0 && g_PR->GetTeam( iAtk ) == TEAM_TROK_ZUMBIS && g_PR->GetTeam( iVic ) == TEAM_TROK_HUMANOS )
 		{
 			k.bInfeccao = true;
 			V_strncpy( k.szWpn, "INFECTOU", sizeof( k.szWpn ) );
+			V_strncpy( k.szIcone, "garras", sizeof( k.szIcone ) );
 			k.corVic = COR_ALIADO;
 		}
 		m_Kills.AddToTail( k );
@@ -840,6 +944,30 @@ void CHudTrokV2::OnThink( void )
 		m_flPlacarTempo = gpGlobals->curtime;
 	m_iPlacarAnt = iPlacar;
 
+	// Surto: começou a preparação, tocou o alarme, abriram os abrigos.
+	CTrokSurtoEstado *pSurtoE = TrokSurto_Ativo() ? TrokSurto_Estado() : NULL;
+	if ( pSurtoE )
+	{
+		const int iFase = pSurtoE->GetFase();
+		const char *pszAviso = NULL;
+		if ( iFase == SURTO_PREPARO && m_iFaseAnt != SURTO_PREPARO )
+			pszAviso = "PREPARE-SE  ·  OS INFECTADOS SERÃO SORTEADOS";
+		else if ( iFase == SURTO_JOGO && pSurtoE->IsAbrigos() && !m_bAbrigosAnt )
+			pszAviso = "ABRIGOS ABERTOS  ·  FECHE AS GRADES";
+		else if ( iFase == SURTO_JOGO && pSurtoE->IsAlarme() && !m_bAlarmeAnt )
+			pszAviso = "ALARME  ·  OS ABRIGOS VÃO ABRIR";
+		if ( pszAviso )
+		{
+			V_strncpy( m_szAvisoSurto, pszAviso, sizeof( m_szAvisoSurto ) );
+			m_flAvisoSurto = gpGlobals->curtime;
+		}
+		m_iFaseAnt = iFase;
+		m_bAlarmeAnt = pSurtoE->IsAlarme();
+		m_bAbrigosAnt = pSurtoE->IsAbrigos();
+	}
+	else
+		m_iFaseAnt = -1;
+
 	// Corrida Armada: subiu de degrau.
 	CTrokCorridaEstado *pCorrida = TrokCorrida_Ativo() ? TrokCorrida_Estado() : NULL;
 	if ( pCorrida )
@@ -906,21 +1034,15 @@ void CHudTrokV2::PaintVinhetas( C_BasePlayer *pLocal )
 		if ( flFrac < flLimite )
 		{
 			const float k = 1.0f - flFrac / flLimite;
-			Vinheta( Color( 170, 20, 20, 255 ), (int)( k * ( 95.0f + 25.0f * sinf( t * 4.0f ) ) ) );
+			Vinheta( Color( 170, 20, 20, 255 ), (int)( k * 80.0f ) );	// fixa, sem pulsar
 		}
 	}
-	if ( bZumbi )
-		Vinheta( Color( 79, 138, 44, 255 ), 50 );
 
 	// Acabou de levar dano: um clarão vermelho curto nas bordas.
 	const float flDano = t - m_flDanoTempo;
 	if ( flDano >= 0.0f && flDano < 0.6f )
 		Vinheta( Color( 180, 20, 20, 255 ), (int)( 90.0f * ( 1.0f - flDano / 0.6f ) ) );
 
-	// Lento (golpe do Splicer, nuvem tóxica): bordas azul-aço.
-	CTrokSurtoEstado *pSurto = TrokSurto_Ativo() ? TrokSurto_Estado() : NULL;
-	if ( pSurto && pSurto->GetLentoAte( pLocal->entindex() ) > t )
-		Vinheta( COR_COLETE, (int)( 55.0f + 10.0f * sinf( t * 3.0f ) ) );
 }
 
 // Radar quadrado que gira com a visão: aliados sempre, inimigos quando vistos ou atirando.
@@ -1015,7 +1137,8 @@ void CHudTrokV2::PaintRadar( C_BasePlayer *pLocal )
 			// some aos poucos no último meio segundo
 			const float flResta = m_flSpotted[ i ] - gpGlobals->curtime;
 			const float a = clamp( flResta / 0.5f, 0.2f, 1.0f );
-			const Color c = ( bSurto && TrokSurto_IsZumbi( p ) ) ? COR_ZUMBI : COR_INIMIGO;
+			// Surto: humano sempre azul e zumbi sempre vermelho-sangue, de qualquer lado
+			const Color c = bSurto ? ( TrokSurto_IsZumbi( p ) ? COR_ZUMBI : COR_ALIADO ) : COR_INIMIGO;
 			Rect( (int)px - dot / 2, (int)py - dot / 2, dot, dot, A( c, a ) );
 		}
 	}
@@ -1181,14 +1304,11 @@ void CHudTrokV2::PaintPlacarEquipe( C_BasePlayer *pLocal, int y )
 	Rect( cx + gap, y + S( 33 ), bw, bh, A( Color( 255, 255, 255, 36 ) ) );
 	Rect( cx + gap, y + S( 33 ), (int)( bw * clamp( iTheirs / flRef, 0.0f, 1.0f ) ), bh, A( COR_INIMIGO ) );
 
-	if ( !m_bMin )
+	// meta, discreta, sob o relógio
+	if ( iLimit > 0 )
 	{
-		char szLabel[ 64 ];
-		if ( iLimit > 0 )
-			V_snprintf( szLabel, sizeof( szLabel ), "EQUIPE  ·  %d PARA VENCER", iLimit );
-		else
-			V_strncpy( szLabel, "EQUIPE", sizeof( szLabel ) );
-		Texto( m_fLabel, cx, y + S( 54 ), A( COR_CINZA3 ), szLabel, AL_CENTRO, 1.6f );
+		V_snprintf( szNum, sizeof( szNum ), "%d", iLimit );
+		Texto( m_fLabel, cx, y + S( 36 ), A( COR_CINZA3 ), szNum, AL_CENTRO, 0.0f, true );
 	}
 }
 
@@ -1227,12 +1347,10 @@ void CHudTrokV2::PaintPlacarSolo( C_BasePlayer *pLocal, int y )
 	Rect( cx + gap, y + S( 33 ), bw, bh, A( Color( 255, 255, 255, 36 ) ) );
 	Rect( cx + gap, y + S( 33 ), (int)( bw * clamp( iTheirs / flRef, 0.0f, 1.0f ) ), bh, A( COR_INIMIGO ) );
 
-	char szLabel[ 64 ];
-	if ( iLimit > 0 )
-		V_snprintf( szLabel, sizeof( szLabel ), "SOLO  ·  %dº DE %d  ·  %d PARA VENCER", iPos, iTotal, iLimit );
-	else
-		V_snprintf( szLabel, sizeof( szLabel ), "SOLO  ·  %dº DE %d", iPos, iTotal );
-	Texto( m_fLabel, cx, y + S( 54 ), A( iPos == 1 ? Accent() : COR_CINZA3 ), szLabel, AL_CENTRO, 1.6f );
+	// sua posição, pequena, sob o relógio
+	char szLabel[ 32 ];
+	V_snprintf( szLabel, sizeof( szLabel ), "%dº/%d", iPos, iTotal );
+	Texto( m_fLabel, cx, y + S( 36 ), A( iPos == 1 ? Accent() : COR_CINZA3 ), szLabel, AL_CENTRO, 0.0f, true );
 }
 
 // Surto: relógio da fase no meio (âmbar pulsando no alarme), humanos e zumbis dos lados, a frase
@@ -1249,50 +1367,25 @@ void CHudTrokV2::PaintPlacarSurto( C_BasePlayer *pLocal, int y )
 
 	Veu( cx - S( 230 ), y - S( 6 ), S( 460 ), S( 50 ), 0.34f, 2 );
 	const bool bAlarme = pEstado->IsAlarme() && pEstado->GetFase() == SURTO_JOGO;
-	const float flPulso = bAlarme ? 0.5f + 0.5f * sinf( gpGlobals->curtime * M_PI_F * 2.0f * 1.2f ) : 0.0f;
-	Texto( m_fScore, cx, y + S( 28 ), bAlarme ? A( Accent(), 0.65f + 0.35f * flPulso ) : A( COR_BRANCO ), szTime, AL_CENTRO, 0.0f, true );
-	if ( bAlarme )
-	{
-		surface()->DrawSetColor( A( Accent(), 0.25f + 0.35f * flPulso ) );
-		surface()->DrawOutlinedRect( cx - S( 44 ), y + S( 1 ), cx + S( 44 ), y + S( 36 ) );
-	}
+	Texto( m_fScore, cx, y + S( 28 ), A( bAlarme ? Accent() : COR_BRANCO ), szTime, AL_CENTRO, 0.0f, true );	// alarme: âmbar fixo
 
+	// humanos (esq.) e zumbis (dir.): número + ícone pequeno na cor do lado
 	char szNum[ 16 ];
+	const int iIco = S( 16 );
 	V_snprintf( szNum, sizeof( szNum ), "%d", pEstado->GetHumanosVivos() );
 	const int wH = Texto( m_fScore, cx - S( 64 ), y + S( 28 ), A( COR_ALIADO ), szNum, AL_DIR, 0.0f, true );
-	if ( !m_bMin )
-		Texto( m_fLabel, cx - S( 64 ) - wH - S( 8 ), y + S( 24 ), A( COR_CINZA2 ), "HUMANOS", AL_DIR, 1.6f );
+	IconeLado( false, cx - S( 64 ) - wH - S( 6 ) - iIco, y + S( 10 ), iIco, A( COR_ALIADO ) );
 	V_snprintf( szNum, sizeof( szNum ), "%d", pEstado->GetZumbisVivos() );
 	const int wZ = Texto( m_fScore, cx + S( 64 ), y + S( 28 ), A( COR_ZUMBI ), szNum, AL_ESQ, 0.0f, true );
-	if ( !m_bMin )
-		Texto( m_fLabel, cx + S( 64 ) + wZ + S( 8 ), y + S( 24 ), A( COR_CINZA2 ), "ZUMBIS", AL_ESQ, 1.6f );
+	IconeLado( true, cx + S( 64 ) + wZ + S( 6 ), y + S( 10 ), iIco, A( COR_ZUMBI ) );
 
-	const char *pszLinha = NULL;
-	Color colLinha = COR_CINZA3;
-	if ( pEstado->GetFase() == SURTO_PREPARO )
+	// Aviso real só quando acontece (preparação, alarme, abrigos), por alguns segundos.
+	const float flAviso = gpGlobals->curtime - m_flAvisoSurto;
+	if ( m_szAvisoSurto[ 0 ] && flAviso >= 0.0f && flAviso < 4.0f )
 	{
-		pszLinha = "PREPARE-SE  ·  OS INFECTADOS SERÃO SORTEADOS";
-		colLinha = Accent();
+		const float a = flAviso < 0.2f ? flAviso / 0.2f : ( flAviso > 3.4f ? ( 4.0f - flAviso ) / 0.6f : 1.0f );
+		Texto( m_fLabel, cx, y + S( 54 ), A( Accent(), a ), m_szAvisoSurto, AL_CENTRO, 1.8f );
 	}
-	else if ( pEstado->GetFase() == SURTO_JOGO )
-	{
-		if ( TrokSurto_IsZumbi( pLocal ) )
-			pszLinha = "INFECTE OS HUMANOS ANTES DO FIM";
-		else if ( pEstado->IsAbrigos() )
-		{
-			pszLinha = "ABRIGOS ABERTOS  ·  FECHE AS GRADES";
-			colLinha = Accent();
-		}
-		else if ( bAlarme )
-		{
-			pszLinha = "ALARME  ·  OS ABRIGOS VÃO ABRIR";
-			colLinha = Accent();
-		}
-		else
-			pszLinha = "SOBREVIVA ATÉ O FIM DO TEMPO";
-	}
-	if ( pszLinha )
-		Texto( m_fLabel, cx, y + S( 56 ), A( colLinha ), pszLinha, AL_CENTRO, 1.8f );
 
 	// Fim da rodada
 	if ( pEstado->GetFase() == SURTO_FIM )
@@ -1343,21 +1436,20 @@ void CHudTrokV2::PaintPlacarCorrida( C_BasePlayer *pLocal, int y )
 		}
 	}
 
-	Veu( cx - S( 220 ), y - S( 4 ), S( 440 ), S( 46 ), 0.32f, 2 );
-	Texto( m_fLabel, cx, y + S( 8 ), A( COR_CINZA2 ), "CORRIDA ARMADA", AL_CENTRO, 1.8f );
+	Veu( cx - S( 200 ), y - S( 4 ), S( 400 ), S( 44 ), 0.32f, 2 );
+	// sua posição no meio ("2º", "DE 8" pequeno); o líder (nome e degrau) à direita, em vermelho
 	char sz[ 96 ];
-	V_snprintf( sz, sizeof( sz ), "%d/%d", pC->GetDegrau( iMe ) + 1, iTotal );
-	Texto( m_fScore, cx, y + S( 36 ), A( COR_BRANCO ), sz, AL_CENTRO, 0.0f, true );
-
-	Texto( m_fLabel, cx - S( 70 ), y + S( 20 ), A( COR_CINZA3 ), "VOCÊ", AL_DIR, 1.6f );
-	V_snprintf( sz, sizeof( sz ), "%dº DE %d", iPos, iJog );
-	Texto( m_fMed, cx - S( 70 ), y + S( 38 ), A( iPos == 1 ? Accent() : COR_ALIADO ), sz, AL_DIR, 0.0f, true );
+	V_snprintf( sz, sizeof( sz ), "%dº", iPos );
+	Texto( m_fScore, cx, y + S( 26 ), A( iPos == 1 ? Accent() : COR_ALIADO ), sz, AL_CENTRO, 0.0f, true );
+	V_snprintf( sz, sizeof( sz ), "DE %d", iJog );
+	Texto( m_fLabel, cx, y + S( 38 ), A( COR_CINZA3 ), sz, AL_CENTRO, 0.0f, true );
 	if ( iLider > 0 )
 	{
-		Texto( m_fLabel, cx + S( 70 ), y + S( 20 ), A( COR_CINZA3 ), iPos == 1 ? "PERSEGUIDOR" : "LÍDER", AL_ESQ, 1.6f );
-		V_snprintf( sz, sizeof( sz ), "%s  %d", g_PR->GetPlayerName( iLider ), pC->GetDegrau( iLider ) + 1 );
-		Texto( m_fMed, cx + S( 70 ), y + S( 38 ), A( COR_INIMIGO ), sz, AL_ESQ );
+		const int wl = Texto( m_fMed, cx + S( 50 ), y + S( 24 ), A( COR_INIMIGO ), g_PR->GetPlayerName( iLider ), AL_ESQ );
+		V_snprintf( sz, sizeof( sz ), "%d", pC->GetDegrau( iLider ) + 1 );
+		Texto( m_fMed, cx + S( 50 ) + wl + S( 8 ), y + S( 24 ), A( COR_INIMIGO ), sz, AL_ESQ, 0.0f, true );
 	}
+	(void)iTotal;
 }
 
 //-----------------------------------------------------------------------------
@@ -1379,8 +1471,13 @@ void CHudTrokV2::PaintKillfeed( void )
 
 		const int gap = S( 8 );
 		const int wA = k.szAtk[ 0 ] ? Larg( m_fName, k.szAtk ) + gap : 0;
-		const int wW = Larg( m_fLabel, k.szWpn, 1.2f ) + gap;
-		const int wCab = k.bHead ? S( 14 ) : 0;
+		// arma: ícone (48x18) entre os nomes; sem ícone, o nome em texto
+		const bool bIcoArma = Icone( k.szIcone ) >= 0;
+		const int wW = ( bIcoArma ? S( 48 ) : Larg( m_fLabel, k.szWpn, 1.2f ) ) + gap;
+		// marca do abate: cabeça ou infecção (ícone 16x16; sem ícone, losango na cabeça)
+		const char *pszMarca = k.bHead ? "abate_cabeca" : ( k.bInfeccao ? "abate_infeccao" : NULL );
+		const bool bIcoMarca = pszMarca && Icone( pszMarca ) >= 0;
+		const int wCab = bIcoMarca ? S( 22 ) : ( k.bHead ? S( 14 ) : 0 );
 		const int wV = Larg( m_fName, k.szVic );
 		const int total = wA + wW + wCab + wV;
 		int x = xr - total + (int)( ( 1.0f - flEnt ) * S( 30 ) );
@@ -1393,9 +1490,17 @@ void CHudTrokV2::PaintKillfeed( void )
 			Texto( m_fName, x, y + S( 15 ), A( k.corAtk, a ), k.szAtk );
 			x += wA;
 		}
-		Texto( m_fLabel, x, y + S( 14 ), A( k.bInfeccao ? COR_ZUMBI : COR_CINZA3, a ), k.szWpn, AL_ESQ, 1.2f );
+		if ( bIcoArma )
+			DesenharIcone( k.szIcone, x, y + S( 1 ), S( 48 ), S( 18 ), A( k.bInfeccao ? COR_ZUMBI : COR_CINZA2, a ) );
+		else
+			Texto( m_fLabel, x, y + S( 14 ), A( k.bInfeccao ? COR_ZUMBI : COR_CINZA3, a ), k.szWpn, AL_ESQ, 1.2f );
 		x += wW;
-		if ( k.bHead )
+		if ( bIcoMarca )
+		{
+			DesenharIcone( pszMarca, x, y + S( 2 ), S( 16 ), S( 16 ), A( k.bInfeccao ? COR_ZUMBI : Accent(), a ) );
+			x += wCab;
+		}
+		else if ( k.bHead )
 		{
 			// losango âmbar = na cabeça
 			const float mx = x + S( 5 ), my = y + S( 10 ), r = S( 5 );
@@ -1438,8 +1543,6 @@ void CHudTrokV2::PaintVitais( C_BasePlayer *pLocal )
 		CaixaAlta( ( iClasse >= 0 && iClasse < TrokZumbis_Num() ) ? TrokZumbis_Classe( iClasse ).szTitulo : "INFECTADO", szTipo, sizeof( szTipo ) );
 		Texto( m_fLabel, x + wNum + S( 8 ), yb - S( 22 ), A( COR_ZUMBI ), szTipo[ 0 ] ? szTipo : "INFECTADO", AL_ESQ, 1.6f );
 	}
-	else if ( !m_bMin || flFrac < 1.0f )
-		Texto( m_fLabel, x + wNum + S( 8 ), yb - S( 22 ), A( COR_CINZA3 ), "VIDA", AL_ESQ, 1.6f );
 
 	// barra em 10 partes, com o rastro do dano
 	const int bw = S( 220 ), bh = S1( 5 ), segs = 10, sg = S1( 2 ), by = yb - S( 10 );
@@ -1463,19 +1566,27 @@ void CHudTrokV2::PaintVitais( C_BasePlayer *pLocal )
 		}
 	}
 	// regenerando (zumbi do Surto)
+	// regenerando (zumbi do Surto): um brilho curto correndo pela parte cheia da barra, sem texto
 	if ( bZumbi && t - m_flRegenTempo < 0.8f && flFrac < 1.0f )
-		Texto( m_fLabel, x + bw + S( 10 ), by + S( 6 ), A( COR_ZUMBI ), "+ REGENERANDO", AL_ESQ, 1.4f );
+	{
+		const float p = fmodf( t * 0.8f, 1.0f );
+		const int gx = x + (int)( bw * flFrac * p ), gw = S( 30 );
+		surface()->DrawSetColor( Color( 255, 255, 255, 255 ) );
+		surface()->DrawFilledRectFade( MAX( x, gx - gw ), by, gx, by + bh, 0, Alfa( 0.35f ), true );
+	}
 
 	// colete: linha fina por cima da barra e o número
 	if ( m_iColete > 0 && !bZumbi )
 	{
 		CTrokPlacarExtra *pExtra = TrokPlacarExtra();
 		(void)pExtra;
+		// ao lado da vida, na mesma linha: barra própria (1/3 da largura) e o número pequeno em cima
 		const int iColeteMax = MAX( 100, m_iColete );
-		Rect( x, by - S( 7 ), bw, S1( 2 ), A( Color( 255, 255, 255, 26 ) ) );
-		Rect( x, by - S( 7 ), (int)( bw * m_iColete / (float)iColeteMax ), S1( 2 ), A( COR_COLETE ) );
-		V_snprintf( sz, sizeof( sz ), "COLETE %d", m_iColete );
-		Texto( m_fLabel, x + bw, yb - S( 22 ), A( COR_COLETE ), sz, AL_DIR, 1.4f );
+		const int cxC = x + bw + S( 12 ), cw = S( 74 );
+		Rect( cxC, by, cw, bh, A( Color( COR_COLETE.r(), COR_COLETE.g(), COR_COLETE.b(), 46 ) ) );
+		Rect( cxC, by, (int)( cw * m_iColete / (float)iColeteMax ), bh, A( COR_COLETE ) );
+		V_snprintf( sz, sizeof( sz ), "%d", m_iColete );
+		Texto( m_fText, cxC, by - S( 5 ), A( COR_COLETE ), sz, AL_ESQ, 0.0f, true );
 	}
 
 	// fôlego da corrida: só quando gasto
@@ -1493,14 +1604,6 @@ void CHudTrokV2::PaintVitais( C_BasePlayer *pLocal )
 	// Linha de cima: LENTO, tipo de zumbi escolhido (Surto) e créditos (economia).
 	int yTopo = yb - S( 58 );
 	CTrokSurtoEstado *pSurto = TrokSurto_Ativo() ? TrokSurto_Estado() : NULL;
-	if ( pSurto && pSurto->GetLentoAte( pLocal->entindex() ) > t )
-	{
-		const int lw = Larg( m_fLabel, "LENTO", 1.4f ) + S( 12 );
-		surface()->DrawSetColor( A( COR_COLETE ) );
-		surface()->DrawOutlinedRect( x, yTopo - S( 14 ), x + lw, yTopo + S( 2 ) );
-		Texto( m_fLabel, x + S( 6 ), yTopo - S( 2 ), A( COR_COLETE ), "LENTO", AL_ESQ, 1.4f );
-		yTopo -= S( 24 );
-	}
 	if ( pSurto && !bZumbi && ( !m_bMin || pSurto->GetFase() == SURTO_PREPARO ) && TrokZumbis_Num() > 0 )
 	{
 		const int iEsc = TrokZumbis_EscolhaDe( pLocal );
@@ -1510,23 +1613,27 @@ void CHudTrokV2::PaintVitais( C_BasePlayer *pLocal )
 			TeclaDe( "trok_zumbi_classe_prox", "N", szTecla, sizeof( szTecla ) );
 			CaixaAlta( TrokZumbis_Classe( iEsc ).szTitulo, szTipo, sizeof( szTipo ) );
 			const int wk = Tecla( x, yTopo - S( 15 ), szTecla, A( COR_CINZA2 ) );
-			const int wl = Texto( m_fLabel, x + wk + S( 8 ), yTopo - S( 2 ), A( COR_CINZA3 ), "ZUMBI:", AL_ESQ, 1.6f );
-			const int xt = x + wk + S( 8 ) + wl + S( 6 );
+			const int xt = x + wk + S( 8 );
 			const int wt = Texto( m_fLabel, xt, yTopo - S( 2 ), A( COR_ZUMBI ), szTipo, AL_ESQ, 1.6f );
 			// Fúria (o dinheiro de infectado, a outra moeda do Surto) / preço do tipo escolhido: a fúria
-			// sempre verde; o preço em vermelho quando não dá para pagar.
+			// sempre na cor da infecção; o preço em âmbar quando não dá para pagar.
 			const int iPreco = TrokZumbis_Classe( iEsc ).iPreco;
 			if ( iPreco > 0 )
 			{
 				const int iDin = TrokZumbis_Dinheiro( pLocal );
 				char szMil[ 24 ], szPreco[ 32 ];
 				Milhar( iDin, szMil, sizeof( szMil ) );
+				// plaquinha roxo-escuro com filete vermelho-sangue: cor própria da Fúria (igual à loja)
 				const int xm = xt + wt + S( 14 );
-				const int wd = Texto( m_fText, xm, yTopo, A( COR_ZUMBI ), szMil, AL_ESQ, 0.0f, true );
-				Milhar( iPreco, szMil, sizeof( szMil ) );
-				V_snprintf( szPreco, sizeof( szPreco ), "/ %s", szMil );
-				const int wp = Texto( m_fText, xm + wd + S( 4 ), yTopo, iDin >= iPreco ? A( COR_CINZA3 ) : A( COR_INIMIGO, 0.85f ), szPreco, AL_ESQ, 0.0f, true );
-				Texto( m_fLabel, xm + wd + S( 4 ) + wp + S( 6 ), yTopo - S( 2 ), A( COR_ZUMBI, 0.8f ), "FÚRIA", AL_ESQ, 1.6f );
+				Milhar( iPreco, szPreco, sizeof( szPreco ) );
+				char szPrecoT[ 40 ];
+				V_snprintf( szPrecoT, sizeof( szPrecoT ), "/ %s", szPreco );
+				const int wTot = S( 8 ) + Larg( m_fText, szMil, 0.0f, true ) + S( 4 ) + Larg( m_fText, szPrecoT, 0.0f, true ) + S( 6 ) + Larg( m_fLabel, "FÚRIA", 1.6f ) + S( 8 );
+				Rect( xm, yTopo - S( 16 ), wTot, S( 21 ), A( Color( COR_FURIA_FUNDO.r(), COR_FURIA_FUNDO.g(), COR_FURIA_FUNDO.b(), 235 ) ) );
+				Rect( xm, yTopo - S( 16 ), S1( 2 ), S( 21 ), A( COR_FURIA ) );
+				const int wd = Texto( m_fText, xm + S( 8 ), yTopo, A( COR_FURIA_TEXTO ), szMil, AL_ESQ, 0.0f, true );
+				const int wp = Texto( m_fText, xm + S( 8 ) + wd + S( 4 ), yTopo, iDin >= iPreco ? A( COR_CINZA2 ) : A( Accent() ), szPrecoT, AL_ESQ, 0.0f, true );
+				Texto( m_fLabel, xm + S( 8 ) + wd + S( 4 ) + wp + S( 6 ), yTopo - S( 2 ), A( COR_FURIA ), "FÚRIA", AL_ESQ, 1.6f );
 			}
 			yTopo -= S( 26 );
 		}
@@ -1537,9 +1644,8 @@ void CHudTrokV2::PaintVitais( C_BasePlayer *pLocal )
 		char szMil[ 24 ];
 		Milhar( pExtra->GetDinheiro( pLocal->entindex() ), szMil, sizeof( szMil ) );
 		V_snprintf( sz, sizeof( sz ), "$ %s", szMil );
-		const int wl = Texto( m_fLabel, x, yTopo - S( 2 ), A( COR_CINZA3 ), "CRÉDITOS", AL_ESQ, 1.6f );
 		const bool bCompra = pExtra->GetCompraAte( pLocal->entindex() ) > t;
-		Texto( m_fMed, x + wl + S( 8 ), yTopo, A( bCompra ? Accent() : COR_BRANCO ), sz, AL_ESQ, 0.0f, true );
+		Texto( m_fMed, x, yTopo, A( bCompra ? Accent() : COR_BRANCO ), sz, AL_ESQ, 0.0f, true );
 	}
 }
 
@@ -1574,9 +1680,8 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 	// Garras do zumbi
 	if ( TrokSurto_IsZumbi( pLocal ) )
 	{
-		Texto( m_fMed, xr, yb - S( 4 ), A( COR_BRANCO ), szName, AL_DIR, 1.2f );
-		if ( !m_bMin )
-			Texto( m_fLabel, xr, yb - S( 26 ), A( COR_ZUMBI ), "CORPO A CORPO", AL_DIR, 1.6f );
+		const int wn = Texto( m_fMed, xr, yb - S( 4 ), A( COR_BRANCO ), szName, AL_DIR, 1.2f );
+		DesenharIcone( "garras", xr - wn - S( 58 ), yb - S( 19 ), S( 48 ), S( 18 ), A( COR_ZUMBI ) );
 		return;
 	}
 
@@ -1585,14 +1690,15 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 	int x = xr;
 	if ( pGun )
 	{
+		// modo de tiro: só o texto pequeno
 		const char *pszModo = pGun->IsAutomatic() ? "AUTO" : "SEMI";
-		const int w = Larg( m_fLabel, pszModo, 1.4f ) + S( 10 );
-		surface()->DrawSetColor( A( Color( 236, 238, 241, 90 ) ) );
-		surface()->DrawOutlinedRect( x - w, yb - S( 15 ), x, yb );
-		Texto( m_fLabel, x - w / 2, yb - S( 4 ), A( COR_CINZA2 ), pszModo, AL_CENTRO, 1.4f );
-		x -= w + S( 8 );
+		x -= Texto( m_fLabel, x, yb - S( 3 ), A( COR_CINZA3 ), pszModo, AL_DIR, 1.4f ) + S( 10 );
 	}
-	Texto( m_fMed, x, yb - S( 2 ), A( COR_BRANCO ), szName, AL_DIR, 1.2f );
+	x -= Texto( m_fMed, x, yb - S( 2 ), A( COR_BRANCO ), szName, AL_DIR, 1.2f ) + S( 10 );
+	// ícone da arma à esquerda do nome (48x18), se existir
+	char szIco[ 48 ];
+	NomeIconeArma( pWeapon->GetClassname(), szIco, sizeof( szIco ) );
+	DesenharIcone( szIco, x - S( 48 ), yb - S( 17 ), S( 48 ), S( 18 ), A( COR_BRANCO ) );
 
 	const int yNum = yb - S( 30 );
 	int xEquip = xr;
@@ -1654,8 +1760,15 @@ void CHudTrokV2::PaintArma( C_BasePlayer *pLocal )
 		V_snprintf( szN, sizeof( szN ), "%d", n );
 		const Color c = A( n > 0 ? ( pW == pWeapon ? Accent() : COR_BRANCO ) : COR_CINZA3 );
 		const int wN = Texto( m_fText, xEquip, yNum - S( 4 ), c, szN, AL_DIR, 0.0f, true );
-		IconeExplosivo( iTipo, xEquip - wN - S( 10 ), yNum - S( 14 ), c );
-		xEquip -= wN + S( 26 );
+		char szIcoE[ 48 ];
+		NomeIconeArma( pW->GetClassname(), szIcoE, sizeof( szIcoE ) );
+		if ( DesenharIcone( szIcoE, xEquip - wN - S( 44 ), yNum - S( 21 ), S( 40 ), S( 15 ), c ) )
+			xEquip -= wN + S( 54 );
+		else
+		{
+			IconeExplosivo( iTipo, xEquip - wN - S( 10 ), yNum - S( 14 ), c );
+			xEquip -= wN + S( 26 );
+		}
 	}
 }
 
@@ -1686,11 +1799,8 @@ void CHudTrokV2::PaintDegraus( C_BasePlayer *pLocal )
 		x += w + gp;
 	}
 	char sz[ 96 ];
-	if ( !m_bMin )
-	{
-		V_snprintf( sz, sizeof( sz ), "DEGRAU %d/%d", iDeg, n );
-		Texto( m_fLabel, x0 - S( 6 ), y + S( 10 ), A( COR_CINZA3 ), sz, AL_DIR, 1.6f );
-	}
+	V_snprintf( sz, sizeof( sz ), "%d/%d", iDeg, n );
+	Texto( m_fMed, x0 - S( 8 ), y + S( 11 ), A( COR_BRANCO ), sz, AL_DIR, 0.0f, true );
 
 	// próxima arma e quantos abates faltam
 	const bool bOutro = OutroElementoLigado( "trok_corrida_hud" );
@@ -1699,10 +1809,8 @@ void CHudTrokV2::PaintDegraus( C_BasePlayer *pLocal )
 	{
 		char szNome[ 48 ];
 		CaixaAlta( pEsc->degraus[ iDeg ].szNome, szNome, sizeof( szNome ) );
-		const int iFalta = MAX( 0, pEsc->degraus[ iDeg ].iAbates - pC->GetAbates( iMe ) );
-		V_snprintf( sz, sizeof( sz ), "%s  ·  %d %s", szNome, iFalta, iFalta == 1 ? "ABATE" : "ABATES" );
-		const int wv = Texto( m_fLabel, xr, y - S( 8 ), A( COR_CINZA2 ), sz, AL_DIR, 1.4f );
-		Texto( m_fLabel, xr - wv - S( 8 ), y - S( 8 ), A( COR_CINZA3 ), "PRÓXIMA", AL_DIR, 1.6f );
+		V_snprintf( sz, sizeof( sz ), "›  %s", szNome );	// próxima arma, pequena
+		Texto( m_fLabel, xr, y - S( 8 ), A( COR_CINZA3 ), sz, AL_DIR, 1.4f );
 	}
 
 	// subiu de degrau: linha âmbar sob a mira
@@ -1875,7 +1983,7 @@ void CHudTrokV2::PaintGranadas( C_BasePlayer *pLocal )
 	const float R = (float)S( 78 );
 	const float d = gpGlobals->curtime - m_flGranDesde;
 	const float a = clamp( d / 0.12f, 0.0f, 1.0f );
-	const float pulso = 0.6f + 0.4f * sinf( d * M_PI_F * 2.0f * 2.2f );
+	const float pulso = 1.0f;	// nada piscando em loop
 	QAngle angView = pLocal->EyeAngles();
 	angView.x = angView.z = 0.0f;
 	Vector fwd, right;
@@ -1890,7 +1998,8 @@ void CHudTrokV2::PaintGranadas( C_BasePlayer *pLocal )
 		Circulo( px, py, (float)S( 15 ), A( Color( 11, 13, 16, 140 ), a ) );
 		surface()->DrawSetColor( A( COR_INIMIGO, a * pulso ) );
 		surface()->DrawOutlinedCircle( (int)px, (int)py, S( 15 ), 24 );
-		IconeExplosivo( 0, (int)px, (int)py, A( Color( 255, 120, 110, 255 ), a ) );
+		if ( !DesenharIcone( "arma_granada", (int)px - S( 13 ), (int)py - S( 5 ), S( 26 ), S( 10 ), A( Color( 255, 120, 110, 255 ), a ) ) )
+			IconeExplosivo( 0, (int)px, (int)py, A( Color( 255, 120, 110, 255 ), a ) );
 		// seta para fora
 		const float sr = R + S( 22 ), t = (float)S( 6 );
 		const float sx = cx + sinf( ang ) * sr, sy = cy - cosf( ang ) * sr;
@@ -1936,7 +2045,8 @@ void CHudTrokV2::PaintEventos( void )
 // Aviso sob a mira ("[R] RECARREGAR"), com véu leve; pulsa sem sumir.
 void CHudTrokV2::AvisoCentro( const char *pszTexto, const char *pszTecla, const Color &c, bool bPulsa )
 {
-	const float a = bPulsa ? 0.78f + 0.22f * sinf( gpGlobals->curtime * M_PI_F * 2.0f * 1.5f ) : 1.0f;
+	const float a = 1.0f;	// nada piscando em loop
+	(void)bPulsa;
 	const int y = ScreenHeight() / 2 + S( 74 );
 	const int wk = pszTecla ? MAX( S( 18 ), Larg( m_fLabel, pszTecla, 1.0f ) + S( 10 ) ) + S( 8 ) : 0;
 	const int wt = Larg( m_fText, pszTexto, 2.0f );

@@ -9,7 +9,8 @@
 // regen            fração da vida por segundo parado (-1 usa trok_surto_regen)
 // garra_dano / garra_alcance / garra_cadencia   x os números das garras (cadência maior = mais lento)
 // escala           tamanho do corpo
-// cor              tom provisório até ter modelo próprio (R G B)
+// cor              tom provisório do corpo até ter modelo próprio (R G B; tons de sangue)
+// olhos / olhos_tamanho   brilho vermelho dos olhos: quanto MAIS SATURADO e brilhante, mais forte o zumbi
 // explode_dano / explode_raio                         explode ao morrer
 // nuvem_dps / nuvem_raio / nuvem_tempo / nuvem_lentidao  nuvem tóxica ao morrer (lentidão = x velocidade)
 // aura_dps / aura_raio                                dano em volta enquanto vivo
@@ -24,6 +25,9 @@
 		"titulo"	"Infectado"
 		"vida_hospedeiro"	"300"		// CA: depende do colete do humano (Medium/Combat 300/200)
 		"vida"		"200"
+		"cor"		"185 70 62"
+		"olhos"		"190 70 60"
+		"olhos_tamanho"	"0.10"
 	}
 
 	// --- Mutagênicos do Quarantine ---
@@ -40,8 +44,10 @@
 		"vida"		"185"
 		"velocidade"	"1.15"			// MEDIR (CA: "a mais rápida")
 		"folego_infinito"	"1"
-		"cor"		"255 225 150"		// olhos com rastro amarelo
 		"bonus_humano_velocidade"	"1.03"
+		"cor"		"190 75 65"
+		"olhos"		"230 30 25"
+		"olhos_tamanho"	"0.12"
 	}
 	"crusher"
 	{
@@ -55,8 +61,10 @@
 		"garra_dano"	"1.5"			// dono: o Crusher bate mais forte (fura colete)
 		"garra_cadencia"	"1.6"			// MEDIR (CA: golpe com uma mão, mais lento)
 		"escala"	"1.15"			// MEDIR (CA: grande, pode tampar passagem)
-		"cor"		"140 170 255"		// azul
 		"bonus_humano_velocidade"	"1.03"
+		"cor"		"150 45 40"
+		"olhos"		"255 10 5"
+		"olhos_tamanho"	"0.15"
 	}
 
 	// --- Infectados da Equipe Armada (Fireteam) ---
@@ -69,7 +77,9 @@
 		"velocidade"	"1.1"			// CA: rápido, vai direto em quem vê
 		"explode_dano"	"100"			// MEDIR (CA: colete de dinamite, ferimentos graves)
 		"explode_raio"	"250"
-		"cor"		"200 120 90"
+		"cor"		"175 60 50"
+		"olhos"		"215 45 35"
+		"olhos_tamanho"	"0.11"
 	}
 	"splicer"
 	{
@@ -84,7 +94,9 @@
 		"nuvem_raio"	"160"
 		"nuvem_tempo"	"6"
 		"nuvem_lentidao"	"0.5"
-		"cor"		"170 200 120"
+		"cor"		"165 55 55"
+		"olhos"		"240 20 20"
+		"olhos_tamanho"	"0.13"
 	}
 
 	// --- Variações (Equipe Armada): também compráveis no Surto. Como no CA, só o golpe de garra
@@ -102,7 +114,9 @@
 		"bomba_dano"	"40"
 		"bomba_raio"	"180"
 		"bomba_pavio"	"1.5"
-		"cor"		"255 200 120"
+		"cor"		"195 70 55"
+		"olhos"		"250 15 10"
+		"olhos_tamanho"	"0.13"
 	}
 	"crusher_toxico"
 	{
@@ -121,6 +135,8 @@
 		"nuvem_raio"	"150"
 		"nuvem_tempo"	"5"
 		"nuvem_lentidao"	"0.7"
-		"cor"		"110 150 255"
+		"cor"		"130 30 35"
+		"olhos"		"255 0 0"
+		"olhos_tamanho"	"0.17"
 	}
 }

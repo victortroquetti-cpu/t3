@@ -14,7 +14,7 @@ Tela inicial, Jogar contra bots, Arsenal, Configurações, Carregando, HUD, Plac
 | Fundo | `#0B0D10`, painéis `#14171C` a ~80%, linhas brancas a 8% |
 | Texto | `#ECEEF1` / `#A3A9B1` / `#80868E` |
 | Destaque | `#F2B544` (âmbar), ConVar `trok_ui_destaque "R G B"` |
-| Times | azul `#5AA2FF`, vermelho `#FF5A5A` |
+| Times | azul `#5AA2FF`, vermelho `#FF5A5A`; infecção/zumbi vermelho-sangue `#D9362B`; Fúria `#CC2030` sobre roxo-escuro `#220A26` (decisões do dono; humano do Surto sempre azul) |
 | Fontes | Barlow Condensed (títulos, botões) e Barlow (texto), SIL OFL, em `resource/fonts/` |
 | Escala | concept em 1280x720; o código escala tudo pela altura da tela (`S(px)`) |
 
@@ -51,7 +51,7 @@ do servidor no mesmo visual (barra escondida = desconectado).
   "Damage" do servidor; o indicador do HL2 saiu);
 - vida baixa: bordas da tela avermelhando e pulsando (`trok_hud_vida_baixa`, fração da vida);
 - radar no canto superior esquerdo, girando com a visão: aliados sempre; inimigos (zumbis em
-  verde) quando estão à vista ou acabaram de acertar alguém (`trok_hud_radar`, `_alcance`).
+  vermelho-sangue) quando estão à vista ou acabaram de acertar alguém (`trok_hud_radar`, `_alcance`).
 O HUD do HL2 (vida, colete, munição, energia, mortes, mira, indicador de dano) sai por `#ifndef TROK`.
 Minimapa com imagem do mapa: precisa de uma imagem de cada mapa (por enquanto é radar sem fundo).
 
@@ -64,26 +64,54 @@ Equipe, Surto humano, Surto zumbi, Corrida Armada, + minimalista): arquivo `hud.
 fica para `trok_hud_estilo 1` e desenha a tela de morte nos dois).
 
 Regras do visual: tudo preso à margem (`trok_hud_margem`, 28 px a 720); um número grande por canto;
-rótulos pequenos em caixa alta com espaçamento; algarismos de largura fixa (o código desenha letra a
-letra); traço fino em vez de moldura; véu escuro em degradê no lugar de caixa; uma cor de destaque
-(âmbar) para "mudou", vermelho só para perigo, azul/vermelho/verde só para lados; o HUD fixo não se
-mexe, só os eventos animam (entrada 0,12-0,25 s, saída 0,4-0,5 s; pulso só em alarme, sem munição e granada).
+números e ícones em vez de rótulos (nada de "VIDA", "COLETE", "CRÉDITOS", "HUMANOS", "PARA VENCER"...);
+algarismos de largura fixa (o código desenha letra a letra); traço fino em vez de moldura; véu escuro em
+degradê no lugar de caixa; uma cor de destaque (âmbar) para "mudou", vermelho só para perigo, azul/vermelho
+para lados e vermelho-sangue para a infecção. **Nada pisca em loop e não há vinheta de estado** (nem verde
+do zumbi, nem âmbar do alarme, nem do lento): só eventos curtos animam (acerto, dano, abate; entrada
+0,12-0,25 s, saída 0,4-0,5 s). Fica só a vinheta vermelha curta do dano e a de vida baixa, fixa.
+Sem bússola (o dono preferiu; `trok_hud_bussola 1` ainda liga): a direção do dano é só a cunha em volta da mira.
 
 | Elemento | Onde (px a 1280×720) | O quê |
 |---|---|---|
-| Radar | canto sup. esq., 168 (140 no minimalista) | gira com a visão, cantos marcados, anéis, cone da visão, "N" na borda; aliados triângulo, inimigos quadrado que some |
-| Bússola | topo, centro, 400 de largura, y 14 | marcas de 15°, N NE L SE S SO O NO, rumo no meio, marca vermelha do dano |
-| Placar | embaixo da bússola (y 66; 20 sem bússola) | Equipe: nós · tempo · eles + barras até a meta; Solo: você · tempo · melhor rival, "1º DE 8"; Surto: humanos · relógio (âmbar pulsando no alarme) · zumbis + frase; Corrida: você (posição) · degrau/total · líder |
-| Lista de abates | canto sup. dir., linhas de 24 | só texto, véu à direita, traço âmbar nas suas linhas, losango = cabeça, INFECTOU em verde |
-| Vida | canto inf. esq. | número 46 px; barra de 10 partes (220) com rastro vermelho do dano; colete em linha fina e "COLETE N"; fôlego em linha âmbar só quando gasto |
-| Acima da vida | | "LENTO"; Surto humano: "[N] ZUMBI: STRIKER 1.800 / 2.350 FÚRIA" (fúria = moeda do infectado, verde; preço vermelho se não dá); "CRÉDITOS $ 1.250" (economia, âmbar no tempo de compra) |
-| Zumbi | | tipo do zumbi no lugar de "VIDA", barra verde, "+ REGENERANDO", bordas verdes |
-| Arma | canto inf. dir. | NOME + [AUTO/SEMI]; pente 46 px / reserva 22 px; uma marca por bala (pentes até 40); explosivos com ícone e número à esquerda |
-| Corrida | acima da arma | escada (degrau atual âmbar e mais alto), "DEGRAU 14/20", "PRÓXIMA ESCOPETA · 1 ABATE"; ao subir, "DEGRAU 15 · ESCOPETA" sob a mira |
-| Centro | | mira com contorno (abre com a dispersão), X de acerto (abate vermelho e 35% maior, cabeça âmbar), cunha de dano em 3 faixas (raio 118), granada perto (anel 78, seta, metros), eventos à direita (x +44, y +30: ABATE +$300 nome, NA CABEÇA, ZUMBI ABATIDO, INFECTOU +1), "[R] RECARREGAR" / "SEM MUNIÇÃO" (y +74), "PROTEGIDO" com barra, "[E] PEGAR FUZIL" (62% da altura) |
+| Radar | canto sup. esq., 168 (140 no minimalista) | gira com a visão, cantos marcados, anéis, cone da visão, "N" na borda; aliados triângulo, inimigos quadrado que some; no Surto humano azul e zumbi vermelho-sangue |
+| Placar | topo, centro, y 20 | Equipe: nós · tempo · eles + barras até a meta, meta pequena sob o relógio; Solo: você · tempo · melhor rival, "1º/8" pequeno; Surto: ícone + humanos · relógio (âmbar fixo no alarme) · zumbis + ícone; aviso real (preparação, alarme, abrigos) só 4 s quando acontece; Corrida: "2º" e "DE 8" no meio, líder (nome e degrau) à direita |
+| Lista de abates | canto sup. dir., linhas de 24 | atacante · ícone da arma (48×18) · ícone de cabeça/infecção (16) · vítima; véu à direita, traço âmbar nas suas linhas; sem ícone, o texto/losango de antes |
+| Vida | canto inf. esq. | número 46 px; barra de 10 partes (220×5) com rastro vermelho do dano; fôlego em linha âmbar só quando gasto |
+| Colete | ao lado da barra de vida, mesma linha | barra própria 74×5 na cor do colete e o número pequeno em cima, sem rótulo |
+| Acima da vida | | "$ 1.250" (economia, âmbar no tempo de compra; só se `trok_hud_dinheiro` estiver desligado, senão é o `hud_trok_economia.cpp`); Surto humano: "[N] STRIKER" e a plaquinha da Fúria "1.800 / 2.350 FÚRIA" (fundo roxo-escuro `#220A26`, filete e rótulo vermelho-sangue `#CC2030`, número `#E8414F` para ler no roxo; preço âmbar se não dá) |
+| Zumbi | | tipo do zumbi ao lado do número, barra vermelho-sangue, brilho curto correndo na barra enquanto regenera (sem texto) |
+| Arma | canto inf. dir. | ícone (48×18) · NOME · modo de tiro em texto pequeno; pente 46 px / reserva 22 px; uma marca por bala (pentes até 40); explosivos com ícone e número à esquerda; garras: ícone + "GARRAS" |
+| Corrida | acima da arma | "14/20" + escada (degrau atual âmbar e mais alto) e "› ESCOPETA" pequeno (próxima); ao subir, "DEGRAU 15 · ESCOPETA" sob a mira |
+| Centro | | mira com contorno (abre com a dispersão), X de acerto (abate vermelho e 35% maior, cabeça âmbar), cunha de dano em 3 faixas (raio 118), granada perto (anel 78, ícone, seta, metros; sem pulsar), eventos à direita (x +44, y +30: ABATE +$300 nome, NA CABEÇA, ZUMBI ABATIDO, INFECTOU +1), "[R] RECARREGAR" / "SEM MUNIÇÃO" (y +74, fixo), "PROTEGIDO" com barra, "[E] PEGAR FUZIL" (62% da altura) |
+
+### Ícones (para o local fazer)
+
+O HUD procura cada ícone como material `vgui/trok/icones/<nome>`. Se não existir (`IsErrorMaterial`),
+usa o desenho ou o texto de antes, então dá para ir pondo um por um. A prévia mostra silhuetas
+genéricas provisórias (contorno tracejado) no lugar e no tamanho de cada um.
+
+| Grupo | Nomes | Tamanho do arquivo | Desenhado em (px a 720) |
+|---|---|---|---|
+| Armas e explosivos | `arma_fuzil`, `arma_submetralhadora`, `arma_escopeta`, `arma_pistola`, `arma_faca`, `arma_granada`, `arma_granada_luz`, `arma_granada_fumaca`, `arma_mina`, `arma_claymore`, `arma_remota`, `arma_torreta`, `arma_foguete`, `garras` | 128×48 (8:3) | 48×18 (lista de abates, ao lado do nome da arma); 40×15 (explosivos na arma); 26×10 (aviso de granada) |
+| Abate | `abate_cabeca`, `abate_infeccao`, `abate_explosao`, `abate_queda` | 32×32 | 16×16 (lista de abates); explosão/queda entram no lugar da arma (48×18), então desenhe centrado com sobra dos lados |
+| Lados (Surto) | `lado_humano`, `lado_zumbi` | 32×32 | 16×16 (placar do topo) |
+
+- O nome da arma sai da classe: `weapon_trok_<x>` vira `arma_<x>` (arma nova = ícone novo com o mesmo nome).
+  `weapon_crowbar`/`stunstick` = `arma_faca`; mundo/queda = `abate_queda`; explosão/barril = `abate_explosao`.
+- Silhueta de perfil, **cano para a direita**, centrada, com ~2 px de margem; **branco puro sobre
+  transparente** (o código pinta a cor: cinza, âmbar, vermelho-sangue). Traço/preenchimento cheio, sem
+  sombra nem contorno (o HUD não põe sombra em textura).
+- Feitos a partir dos modelos do próprio jogo (render de perfil → traçar em SVG), nunca de ícones de outros jogos.
+- SVG → PNG (Inkscape: `inkscape icone.svg -w 128 -h 48 -o icone.png`) → VTF com alfa (VTFEdit ou
+  `vtex`; formato BGRA8888 ou DXT5, sem mipmaps: "No Mipmap", "No LOD", "Clamp S/T").
+- VMT ao lado (`game/mod_trok/materials/vgui/trok/icones/<nome>.vmt`):
+  `"UnlitGeneric" { "$basetexture" "vgui/trok/icones/<nome>" "$translucent" 1 "$vertexcolor" 1 "$vertexalpha" 1 "$ignorez" 1 }`
+- Arquivos em `game/mod_trok/materials/vgui/trok/icones/` (vão no git e no zip, são arte própria).
+- Para ver no jogo: `mat_reloadallmaterials` não basta para o cache do HUD; reabra o mapa.
 
 Opções (cvars, salvas): `trok_hud_estilo`, `trok_hud_escala` (0,6-1,6), `trok_hud_opacidade` (0,2-1),
-`trok_hud_minimalista` (sem bússola, rótulos, marcas de bala e créditos; radar menor), `trok_hud_bussola`,
+`trok_hud_minimalista` (sem marcas de bala e créditos; radar menor), `trok_hud_bussola` (padrão 0),
 `trok_hud_eventos`, `trok_hud_granada`, `trok_hud_granada_raio`, `trok_hud_margem`; continuam valendo
 `trok_hud`, `trok_hud_mira`, `trok_hud_radar(_alcance)`, `trok_hud_vida_baixa`, `trok_hud_killfeed_tempo`,
 `trok_hitmarker(_tempo)`. Ganchos para outros elementos: `TrokHudV2_Ativo()`, `TrokHudV2_Prompt()`,

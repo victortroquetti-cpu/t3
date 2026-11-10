@@ -8,6 +8,7 @@
 | Exército solo | `solo` (ou `ffa`) | `cfg/solo.cfg` | todos contra todos; meta de abates individual; o HUD mostra sua posição ("2º DE 8") |
 | Surto | `surto` | `cfg/surto.cfg` | infecção (ver `design/modo-surto.md`) |
 | Corrida Armada | `corrida` | `cfg/corrida.cfg` | todos contra todos com escada de armas: os abates trocam a sua arma; vence quem chegar na meta (seção abaixo) |
+| Hordas | `hordas` | `cfg/hordas.cfg` | cooperativo contra hordas de zumbis bots por rodadas, com pontos, compras no mapa e máquina de melhoria (seção abaixo e `design/modo-hordas.md`) |
 
 Regras comuns de equipe e solo, no estilo do Combat Arms (números MEDIR no jogo de referência):
 - **Renascer sozinho** depois de `trok_renascer_tempo` s, com "RENASCENDO EM N" na tela de morte.
@@ -75,3 +76,31 @@ Testar no PC: `trok_modo corrida`, `map de_dust2`, `exec bots`. Conferir a troca
 abate; renascer com a arma do degrau; aviso da última arma; vitória no 15º; suicídio (`kill`) não
 tirando abate; nada caindo ao morrer; bots usando a arma da escada e jogando a granada (se o bot não
 souber usar a granada, ele fica preso no último degrau: anotar); TAB com a coluna ARMA.
+
+## Hordas (`trok_modo hordas`)
+
+Pedido do dono: modo de hordas de zumbis por rodadas, como os zumbis do CoD, inspirado na Equipe
+Armada (Fireteam) do CA, com economia, loja física no mapa e máquina de melhoria de 5 níveis.
+Desenho completo, comparação dos CoDs e decisões: **`design/modo-hordas.md`**.
+
+- Todos os jogadores são humanos (time dos Remanescentes); os zumbis são bots do diretor no outro time,
+  num grupo reaproveitado (máximo vivo ao mesmo tempo, total por rodada).
+- Rodada: os zumbis da rodada nascem aos poucos nos `info_trok_hordas_spawn` das áreas abertas; acaba
+  quando todos morrem; intervalo de 10 s; quem morreu volta na rodada seguinte.
+- Vida 150 → +100 por rodada até a 9ª → ×1,1 por rodada; quantidade = fórmula do CoD (base 24 + 6 por
+  jogador); velocidade sobe até correr na 7ª; tipos novos entram por rodada (Charger 5, Striker 8,
+  Splicer 12, Crusher 15...). Matilha (corredores) a cada 4–6 rodadas; Colosso (chefe) a cada 10.
+- Pontos (separados do dinheiro da economia): acerto 10, abate 50, cabeça 100, faca 130, tábua 10.
+- Estações com E: arma na parede, porta paga (abre área), máquina de melhoria (MK I a MK V), caixa
+  misteriosa, bancada (colete, kit de reanimação, torreta...), chave de energia.
+- Derrubado em vez de morrer; colega segura E 3 s para reviver; todos caídos = fim de jogo.
+- Bônus que caem: Reabastecimento, Abate certo, Pontos em dobro, Ataque aéreo, Reforço, Caixa barata.
+
+Código: `shared/trok/trok_hordas.{h,cpp}` (estado em rede, níveis), `shared/trok/trok_hordas_estacao.cpp`,
+`server/trok/trok_hordas_diretor.cpp`, `server/trok/trok_hordas_mapa.{h,cpp}`, `client/trok/hud_trok_hordas.cpp`.
+Mapa de teste: `tools/mapas/gerar_hordas_teste.py` → `game/mod_trok/mapsrc/trok_hordas_teste.vmf`.
+
+Testar no PC: `trok_modo hordas`, `maxplayers 32`, `map trok_hordas_teste` (depois de compilar e gerar o
+nav) ou `map de_dust2` (sem estações: zumbis nascem nos pontos do CS:S). `trok_hordas_info` mostra a
+tabela das rodadas; `trok_hordas_rodada 15`, `trok_hordas_pontos 50000`, `trok_hordas_dar_bonus 1`,
+`trok_hordas_ligar_energia` (cheats) para pular etapas.

@@ -590,9 +590,22 @@ void TrokHordas_DarArma( CBasePlayer *pPlayer, const char *pszArma )
 	if ( !pNova )
 		return;
 
-	// Inventário do CA: uma arma por classe (principal, secundária...). A velha da mesma classe sai.
+	// Inventário do CA: nas classes que trocam (trok_pegar_trocar, padrão "1 2" = principal e
+	// secundária) a velha da mesma classe sai; nas outras (explosivos) as armas se somam.
 	const int iSlot = pNova->GetSlot();
-	for ( int i = 0; i < pPlayer->WeaponCount(); ++i )
+	static ConVarRef s_trocar( "trok_pegar_trocar" );
+	bool bTroca = iSlot <= 1;
+	if ( s_trocar.IsValid() )
+	{
+		bTroca = false;
+		CUtlVector< char * > classes;
+		V_SplitString( s_trocar.GetString(), " ", classes );
+		FOR_EACH_VEC( classes, k )
+			if ( atoi( classes[ k ] ) == iSlot + 1 )
+				bTroca = true;
+		classes.PurgeAndDeleteElements();
+	}
+	for ( int i = 0; bTroca && i < pPlayer->WeaponCount(); ++i )
 	{
 		CBaseCombatWeapon *pW = pPlayer->GetWeapon( i );
 		if ( !pW || pW == pNova || pW->GetSlot() != iSlot )
@@ -602,10 +615,10 @@ void TrokHordas_DarArma( CBasePlayer *pPlayer, const char *pszArma )
 		pPlayer->Weapon_Detach( pW );
 		UTIL_Remove( pW );
 	}
-	if ( iSlot >= 0 && iSlot < TROK_HORDAS_SLOTS )
+	if ( bTroca && iSlot >= 0 && iSlot < TROK_HORDAS_SLOTS )
 	{
-		DefinirNivel( pPlayer, iSlot, 0 );
-		s_hArmaSlot[ pPlayer->entindex() ][ iSlot ] = pNova;
+		DefinirNivel( pPlayer, iSlot, 0 );		// arma nova na classe: sem melhoria
+		s_hArmaSlot[ pPlayer->entindex() ][ iSlot ] = NULL;
 	}
 	TrokHordas_EncherMunicao( pPlayer, pNova );
 	pPlayer->Weapon_Switch( pNova );
@@ -1560,12 +1573,14 @@ static void PensarArmas( void )
 			continue;
 		for ( int s = 0; s < TROK_HORDAS_SLOTS; ++s )
 		{
-			CBaseCombatWeapon *w = p->Weapon_GetSlot( s );
-			if ( w != s_hArmaSlot[ i ][ s ].Get() )
+			if ( pEstado->GetNivel( i, s ) == 0 )
+				continue;
+			// A arma melhorada desta classe saiu da mão do jogador (trocou, perdeu): nível zera.
+			CBaseCombatWeapon *w = s_hArmaSlot[ i ][ s ].Get();
+			if ( !w || w->GetOwner() != p )
 			{
-				s_hArmaSlot[ i ][ s ] = w;
-				if ( pEstado->GetNivel( i, s ) != 0 )
-					pEstado->m_aNivel.Set( i * TROK_HORDAS_SLOTS + s, 0 );
+				s_hArmaSlot[ i ][ s ] = NULL;
+				pEstado->m_aNivel.Set( i * TROK_HORDAS_SLOTS + s, 0 );
 			}
 		}
 	}
